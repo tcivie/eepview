@@ -255,3 +255,105 @@ fn explicit_ports_are_forwarded() {
     let zero = send(&gate, "GET http://site.i2p:0/x HTTP/1.1\r\n\r\n");
     assert!(zero.starts_with("HTTP/1.1 403"), "{zero}");
 }
+
+// UX1-3: a failed page load must not be saved in history; the gatekeeper reports the failures
+// it saw so the shell can tell.
+
+#[test]
+fn upstream_5xx_is_a_failure_that_clears_on_read() {
+    let (_router, gate, _) = setup();
+    let out = send(
+        &gate,
+        "GET http://down.i2p/ HTTP/1.1\r\nHost: down.i2p\r\n\r\n",
+    );
+    assert!(out.starts_with("HTTP/1.1 503"), "{out}");
+    assert!(
+        gate.take_failure("http://down.i2p/"),
+        "5xx answer is a failure"
+    );
+    assert!(
+        !gate.take_failure("http://down.i2p/"),
+        "the flag clears when read"
+    );
+}
+
+#[test]
+fn a_2xx_answer_is_not_a_failure() {
+    let (_router, gate, _) = setup();
+    let out = send(
+        &gate,
+        "GET http://site.i2p/ok HTTP/1.1\r\nHost: site.i2p\r\n\r\n",
+    );
+    assert!(out.starts_with("HTTP/1.1 200"), "{out}");
+    assert!(!gate.take_failure("http://site.i2p/ok"));
+}
+
+#[test]
+fn failure_is_kept_per_exact_url() {
+    let (_router, gate, _) = setup();
+    send(
+        &gate,
+        "GET http://down.i2p/ HTTP/1.1\r\nHost: down.i2p\r\n\r\n",
+    );
+    assert!(
+        !gate.take_failure("http://down.i2p/other"),
+        "another path is another URL"
+    );
+    assert!(
+        !gate.take_failure("http://site.i2p/"),
+        "another host is another URL"
+    );
+    assert!(
+        gate.take_failure("http://down.i2p/"),
+        "reading other URLs does not clear this one"
+    );
+}
+
+#[test]
+fn a_later_2xx_for_the_same_url_clears_the_failure() {
+    let (_router, gate, _) = setup();
+    let first = send(
+        &gate,
+        "GET http://flaky.i2p/ HTTP/1.1\r\nHost: flaky.i2p\r\n\r\n",
+    );
+    assert!(first.starts_with("HTTP/1.1 503"), "{first}");
+    let second = send(
+        &gate,
+        "GET http://flaky.i2p/ HTTP/1.1\r\nHost: flaky.i2p\r\n\r\n",
+    );
+    assert!(second.starts_with("HTTP/1.1 200"), "{second}");
+    assert!(!gate.take_failure("http://flaky.i2p/"));
+}
+
+#[test]
+fn bad_gateway_is_a_failure() {
+    let (_router, gate, _) = setup();
+    let out = send(
+        &gate,
+        "GET http://cut.i2p/ HTTP/1.1\r\nHost: cut.i2p\r\n\r\n",
+    );
+    assert!(out.starts_with("HTTP/1.1 502"), "{out}");
+    assert!(gate.take_failure("http://cut.i2p/"));
+}
+
+#[test]
+fn a_bad_request_for_an_i2p_url_is_a_failure() {
+    let (_router, gate, _) = setup();
+    let out = send(
+        &gate,
+        "POST http://site.i2p/bad HTTP/1.1\r\nContent-Length: 2\r\nContent-Length: 2\r\n\r\nab",
+    );
+    assert!(out.starts_with("HTTP/1.1 400"), "{out}");
+    assert!(gate.take_failure("http://site.i2p/bad"));
+}
+
+#[test]
+fn a_length_required_refusal_for_an_i2p_url_is_a_failure() {
+    let (_router, gate, _) = setup();
+    let out = send(
+        &gate,
+        "POST http://site.i2p/chunk HTTP/1.1\r\nTransfer-Encoding: chunked\r\n\r\n",
+    );
+    assert!(out.starts_with("HTTP/1.1 411"), "{out}");
+    assert!(gate.take_failure("http://site.i2p/chunk"));
+}

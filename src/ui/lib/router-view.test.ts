@@ -3,22 +3,15 @@
 
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { type RouterLike, routerView } from "./router-view.ts";
+import { versionText } from "./router-view.ts";
 
-const router = (state: RouterLike["state"]): RouterLike => ({
-  state,
-  proxy: "127.0.0.1:4444",
-  version: "2.10.0",
-  detail: null,
-});
-
-describe("router state", () => {
-  it("Router panel: ready, building and stopped have different colors", () => {
-    const tones = [router("ok"), router("building"), router("down")].map((r) => routerView(r).tone);
-    assert.deepEqual(tones, ["ready", "building", "stopped"]);
+describe("versionText", () => {
+  it("[browser-shell ux1 6] shows I2P and the version when the router reports it", () => {
+    assert.equal(versionText({ version: "2.10.0" }), "I2P 2.10.0");
   });
-  it("Router panel: a ready router lets you browse and a stopped one does not", () => {
-    assert.equal(routerView(router("ok")).canBrowse, true);
-    assert.equal(routerView(router("down")).canBrowse, false);
+  it("[browser-shell ux1 6] says the version is not reported, never Unknown", () => {
+    const text = versionText({ version: null });
+    assert.equal(text, "Version not reported by the router");
+    assert.doesNotMatch(text, /unknown/i);
   });
 });

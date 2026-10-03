@@ -80,6 +80,11 @@ fn answer(mut stream: TcpStream, log: &Mutex<Vec<String>>) {
     let reply: Vec<u8> = match head.start.split(' ').nth(1).unwrap_or("") {
         "http://proxy.i2p/" => b"HTTP/1.1 200 OK\r\n\r\nI2P HTTP proxy OK".to_vec(),
         "http://example.com/" => b"HTTP/1.1 503 No Outproxy Configured\r\n\r\n".to_vec(),
+        "http://down.i2p/" => b"HTTP/1.1 503 Service Unavailable\r\n\r\n".to_vec(),
+        "http://flaky.i2p/" if first_request(log, &head.start) => {
+            b"HTTP/1.1 503 Service Unavailable\r\n\r\n".to_vec()
+        }
+        "http://cut.i2p/" => return,
         "tls.i2p:443" => return echo_tunnel(stream),
         _ => {
             let body = format!("hello body={}", String::from_utf8_lossy(&rest));
@@ -87,6 +92,11 @@ fn answer(mut stream: TcpStream, log: &Mutex<Vec<String>>) {
         }
     };
     let _ = stream.write_all(&reply);
+}
+
+/// True when `line` was requested exactly once so far (the log already holds this request).
+fn first_request(log: &Mutex<Vec<String>>, line: &str) -> bool {
+    log.lock().unwrap().iter().filter(|l| *l == line).count() == 1
 }
 
 /// Reads one request head and the bytes after it.
