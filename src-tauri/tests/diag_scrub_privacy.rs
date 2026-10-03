@@ -323,11 +323,21 @@ fn encode(plain: &str, cases: &[bool]) -> String {
     out
 }
 
+/// The file endings R15.5 keeps in free text.
+const KEPT_ENDINGS: [&str; 9] = [
+    "txt", "log", "json", "html", "js", "css", "toml", "yml", "plist",
+];
+
 /// A secret, and the same secret with its dots and slashes encoded.
 fn encoded_secret() -> impl Strategy<Value = (String, String)> {
     let secret = prop_oneof![
         "zq[a-z]{3,10}\\.i2p(/[a-z]{1,8})?",
-        "zq[a-z]{3,10}\\.[a-z]{2,6}",
+        ("zq[a-z]{3,10}", "[a-z]{2,6}")
+            .prop_filter(
+                "R15.5: these endings are file endings and stay",
+                |(_, end)| { !KEPT_ENDINGS.contains(&end.as_str()) }
+            )
+            .prop_map(|(name, end)| format!("{name}.{end}")),
         (0u8..=255, 0u8..=255, 0u8..=255, 0u8..=255)
             .prop_map(|(a, b, c, d)| format!("{a}.{b}.{c}.{d}")),
         "/Users/zq[a-z]{3,10}",
