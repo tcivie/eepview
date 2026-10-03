@@ -24,4 +24,4 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Release gates job replaces the reusable-workflow calls; the macOS app is ad-hoc signed inside the dmg (#24)
 - Release gate accepts checks that run on pull requests only (#39)
 - Sign releases with Sigstore, build the Linux binary repeatably, harden the release profile (#37)
-- Run zizmor with the pedantic persona, document every workflow permission, add concurrency to the scorecard workflow
+- Run zizmor with the pedantic persona, document every workflow permission, add concurrency to the scorecard workflow (#47)
