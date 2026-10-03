@@ -27,6 +27,7 @@ pub mod state;
 mod testing;
 pub mod view;
 pub mod watch;
+pub mod webrtc;
 
 use std::thread;
 use std::time::Duration;

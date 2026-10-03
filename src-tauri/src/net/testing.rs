@@ -10,7 +10,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
 
-use super::console::{ConsoleKind, VerifiedConsole, probe};
+use super::console::{ConsoleKind, VerifiedConsole as Verified, probe};
 use super::http::{self, Head};
 use super::loopback::LoopbackAddr;
 use super::verify::{Verdict, VerifiedUpstream, verify};
@@ -141,7 +141,7 @@ impl FakeConsole {
     }
 
     /// The console after a passing probe.
-    pub fn verified(&self) -> VerifiedConsole {
+    pub fn verified(&self) -> Verified {
         probe(self.kind, self.port()).expect("fake console failed the probe")
     }
 

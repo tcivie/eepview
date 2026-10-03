@@ -73,12 +73,14 @@ pub struct WindowButtons {
 }
 
 /// The rules of [`attach_rules`].
-#[derive(Debug, Clone, Copy)]
 pub struct Rules<'a> {
+    /// The identifier of the compiled rule list (macOS). One identifier per rule set: a
+    /// compiled list is cached by it.
+    pub id: &'a str,
     /// `WKContentRuleList` JSON (macOS).
     pub json: &'a str,
     /// True for a request URL the engine may load (Windows filter).
-    pub allow: fn(&str) -> bool,
+    pub allow: Box<dyn Fn(&str) -> bool>,
 }
 
 /// The name of the private script world and of its message handler (macOS).

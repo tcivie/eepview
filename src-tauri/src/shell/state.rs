@@ -26,6 +26,10 @@ pub struct Shared<R: Runtime> {
     pub console: Mutex<Option<VerifiedConsole>>,
     /// True while the console re-check thread runs.
     pub console_watch: AtomicBool,
+    /// True while the console retry thread runs.
+    pub console_retry: AtomicBool,
+    /// True once the console rule list is attached to the console view.
+    pub console_armed: AtomicBool,
     /// The label of the live webview of each tab.
     pub labels: Mutex<HashMap<u32, String>>,
     /// The origin of the bundled pages (`tauri://localhost` or the dev server).
@@ -50,6 +54,8 @@ impl<R: Runtime> Shared<R> {
             gate: Mutex::new(None),
             console: Mutex::new(None),
             console_watch: AtomicBool::new(false),
+            console_retry: AtomicBool::new(false),
+            console_armed: AtomicBool::new(false),
             labels: Mutex::new(HashMap::new()),
             base: Mutex::new(None),
             stop_item: Mutex::new(None),

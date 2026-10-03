@@ -8,6 +8,8 @@
 //! and loads only that console origin (`http://127.0.0.1:<port>`):
 //! - no `proxy_url`: the console is on loopback, and the gatekeeper never sees it;
 //! - no IPC: no capability names the `console` webview;
+//! - an engine rule list that allows only the console origin, attached before the first
+//!   load: the view starts on `about:blank` and stays there if the list cannot be attached;
 //! - a navigation guard: the console origin stays, an I2P link opens in a normal tab
 //!   through the tab guard, anything else is cancelled;
 //! - WebRTC off in every frame, downloads refused, incognito.
@@ -18,6 +20,7 @@ use std::sync::atomic::Ordering;
 use std::thread;
 use std::time::Duration;
 
+use eepview_platform::Rules;
 use tauri::webview::NewWindowResponse;
 use tauri::window::WindowBuilder;
 use tauri::{
@@ -26,10 +29,12 @@ use tauri::{
 };
 
 use super::apply::{self, LISTENERS, with_core};
-use super::content::webrtc_off;
 use super::log;
 use super::state::{lock, shared};
-use crate::net::console::{ConsoleInfo, ConsoleNav, ConsolePage, VerifiedConsole, detect_here};
+use super::webrtc::webrtc_off;
+use crate::net::console::{
+    ConsoleInfo, ConsoleNav, ConsolePage, VerifiedConsole, after_recheck, detect_here,
+};
 
 /// The label of the console webview.
 pub const CONSOLE_LABEL: &str = "console";
@@ -39,8 +44,12 @@ pub const CONSOLE_WINDOW: &str = "console-window";
 const TITLE: &str = "Router console";
 /// The first window size.
 const SIZE: (f64, f64) = (1100.0, 760.0);
-/// How often a known console is checked again.
-const RECHECK: Duration = Duration::from_secs(10);
+/// The first document of the console view, until the rule list is on.
+const BLANK: &str = "about:blank";
+/// How often a known console is checked again, and how often a miss is retried.
+pub const RETRY_EVERY: Duration = Duration::from_secs(10);
+/// How long a miss is retried after a trigger.
+pub const RETRY_FOR: Duration = Duration::from_mins(2);
 
 /// The router console view.
 pub struct ConsoleWebview;
@@ -60,27 +69,40 @@ impl ConsoleWebview {
             .url(page)
             .ok_or(tauri::Error::InvalidWebviewUrl("no such console page"))?;
         if let Some(webview) = app.get_webview(CONSOLE_LABEL) {
-            webview.navigate(url)?;
+            reload(app, &webview, console, url)?;
             focus(app);
             return Ok(webview);
         }
-        let webview = build(app, console, url)?;
+        let webview = build(app, console)?;
+        arm(&webview, console, url)?;
         focus(app);
         Ok(webview)
     }
 }
 
-/// Builds the console window and its one webview.
-fn build<R: Runtime>(
+/// Loads `url` in the open view: directly once the rule list is on, else after it.
+fn reload<R: Runtime>(
     app: &AppHandle<R>,
+    webview: &Webview<R>,
     console: &VerifiedConsole,
     url: Url,
-) -> tauri::Result<Webview<R>> {
+) -> tauri::Result<()> {
+    if shared(app).console_armed.load(Ordering::SeqCst) {
+        webview.navigate(url)
+    } else {
+        arm(webview, console, url)
+    }
+}
+
+/// Builds the console window and its one webview.
+fn build<R: Runtime>(app: &AppHandle<R>, console: &VerifiedConsole) -> tauri::Result<Webview<R>> {
+    shared(app).console_armed.store(false, Ordering::SeqCst);
+    let blank = Url::parse(BLANK).map_err(|_| tauri::Error::InvalidWebviewUrl(BLANK))?;
     let window = WindowBuilder::new(app, CONSOLE_WINDOW)
         .title(TITLE)
         .inner_size(SIZE.0, SIZE.1)
         .build()?;
-    let builder = WebviewBuilder::new(CONSOLE_LABEL, WebviewUrl::External(url))
+    let builder = WebviewBuilder::new(CONSOLE_LABEL, WebviewUrl::External(blank))
         .incognito(true)
         .auto_resize()
         .initialization_script_for_all_frames(webrtc_off());
@@ -90,6 +112,41 @@ fn build<R: Runtime>(
         LogicalPosition::new(0.0, 0.0),
         LogicalSize::new(SIZE.0, SIZE.1),
     )
+}
+
+/// Attaches the console rule list, then loads `url`. When the list cannot be attached, the
+/// view stays on `about:blank` (fail closed).
+fn arm<R: Runtime>(webview: &Webview<R>, console: &VerifiedConsole, url: Url) -> tauri::Result<()> {
+    let live = webview.clone();
+    let rules = console.clone();
+    webview.with_webview(move |platform| {
+        let json = rules.rule_list().to_string();
+        let id = format!("eepview-console-{}", rules.port());
+        let allow = rules.clone();
+        let list = Rules {
+            id: &id,
+            json: &json,
+            allow: Box::new(move |url| allow.engine_allows(url)),
+        };
+        eepview_platform::attach_rules(&platform, list, load_after_rules(live, url));
+    })
+}
+
+/// The first load of the console view, after the rule list is attached. On `Ok` it marks
+/// the view armed and loads `url`, off the engine callback; on `Err` nothing loads.
+pub fn load_after_rules<R: Runtime>(
+    webview: Webview<R>,
+    url: Url,
+) -> Box<dyn FnOnce(Result<(), String>)> {
+    Box::new(move |result| match result {
+        Ok(()) => {
+            shared(webview.app_handle())
+                .console_armed
+                .store(true, Ordering::SeqCst);
+            apply::outside(move || navigate(&webview, url));
+        }
+        Err(e) => log::error("console rule list, page not loaded", &e),
+    })
 }
 
 /// The engine callbacks: navigation guard, new windows, downloads.
@@ -108,6 +165,9 @@ fn hooks<R: Runtime>(
 
 /// A navigation of the console view: the console origin stays; an I2P site opens in a tab.
 fn navigation<R: Runtime>(app: &AppHandle<R>, console: &VerifiedConsole, url: &Url) -> bool {
+    if url.as_str() == BLANK {
+        return true;
+    }
     match console.route(url) {
         ConsoleNav::Stay => true,
         ConsoleNav::OpenTab => {
@@ -159,8 +219,13 @@ fn focus<R: Runtime>(app: &AppHandle<R>) {
     }
 }
 
-/// Closes the console window, if open.
+/// Closes the console webview and its window, if open.
 pub fn close<R: Runtime>(app: &AppHandle<R>) {
+    if let Some(webview) = app.get_webview(CONSOLE_LABEL)
+        && let Err(e) = webview.close()
+    {
+        log::error("console close", &e.to_string());
+    }
     if let Some(window) = app.get_window(CONSOLE_WINDOW)
         && let Err(e) = window.destroy()
     {
@@ -200,42 +265,84 @@ pub fn set_console<R: Runtime>(app: &AppHandle<R>, console: Option<VerifiedConso
     }
 }
 
-/// Probes now (blocking), stores the result and answers its info. While a console is
-/// known, a thread checks it again every 10 s.
+/// Probes now (blocking), stores the result and answers its info. A found console is
+/// re-checked every 10 s; a miss is retried every 10 s for 2 minutes.
 pub fn detect_now<R: Runtime>(app: &AppHandle<R>) -> ConsoleInfo {
     let found = detect_here();
-    set_console(app, found.clone());
+    let info = info_of(found.as_ref());
     if found.is_some() {
+        set_console(app, found);
         recheck(app);
+    } else if current(app).is_none() {
+        retry(app);
     }
-    info_of(found.as_ref())
+    info
 }
 
-/// Starts the re-check thread, unless one runs. It ends when no console is known.
-fn recheck<R: Runtime>(app: &AppHandle<R>) {
-    if shared(app).console_watch.swap(true, Ordering::SeqCst) {
+/// Starts a named thread unless `flag` says one runs; the thread clears it when it ends.
+fn spawn_once<R: Runtime>(
+    app: &AppHandle<R>,
+    name: &str,
+    flag: fn(&AppHandle<R>) -> &std::sync::atomic::AtomicBool,
+    body: fn(&AppHandle<R>),
+) {
+    if flag(app).swap(true, Ordering::SeqCst) {
         return;
     }
     let handle = app.clone();
-    let spawned = thread::Builder::new()
-        .name("console-watch".into())
-        .spawn(move || watch_loop(&handle));
+    let spawned = thread::Builder::new().name(name.into()).spawn(move || {
+        body(&handle);
+        flag(&handle).store(false, Ordering::SeqCst);
+    });
     if let Err(e) = spawned {
-        shared(app).console_watch.store(false, Ordering::SeqCst);
-        log::error("console watch", &e.to_string());
+        flag(app).store(false, Ordering::SeqCst);
+        log::error(name, &e.to_string());
     }
 }
 
-/// Checks the known console every 10 s until none is known.
-fn watch_loop<R: Runtime>(app: &AppHandle<R>) {
-    while current(app).is_some() {
-        thread::sleep(RECHECK);
-        set_console(app, detect_here());
+/// Retries a miss every 10 s for 2 minutes, unless a retry runs.
+fn retry<R: Runtime>(app: &AppHandle<R>) {
+    spawn_once(
+        app,
+        "console-retry",
+        |a| &shared(a).inner().console_retry,
+        retry_loop,
+    );
+}
+
+fn retry_loop<R: Runtime>(app: &AppHandle<R>) {
+    let rounds = RETRY_FOR.as_secs() / RETRY_EVERY.as_secs();
+    for _ in 0..rounds {
+        thread::sleep(RETRY_EVERY);
+        if current(app).is_some() {
+            return;
+        }
+        if let Some(found) = detect_here() {
+            set_console(app, Some(found));
+            recheck(app);
+            return;
+        }
     }
-    shared(app).console_watch.store(false, Ordering::SeqCst);
-    // A detection may have found a console between the last check and the store.
-    if current(app).is_some() {
-        recheck(app);
+}
+
+/// Re-checks the known console every 10 s, unless a re-check runs.
+fn recheck<R: Runtime>(app: &AppHandle<R>) {
+    spawn_once(
+        app,
+        "console-watch",
+        |a| &shared(a).inner().console_watch,
+        watch_loop,
+    );
+}
+
+/// Checks the known console every 10 s until it is cleared ([`after_recheck`]).
+fn watch_loop<R: Runtime>(app: &AppHandle<R>) {
+    let mut misses = 0;
+    while let Some(known) = current(app) {
+        thread::sleep(RETRY_EVERY);
+        let (next, count) = after_recheck(Some(&known), misses, detect_here());
+        misses = count;
+        set_console(app, next);
     }
 }
 

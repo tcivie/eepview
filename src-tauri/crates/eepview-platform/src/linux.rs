@@ -15,9 +15,10 @@ use crate::{FindRequest, Nav, PlatformWebview, Rules, WindowButtons};
 /// of its own (spike S1). The CSP of the gatekeeper is the L3 layer here.
 pub fn attach_rules(
     _webview: &PlatformWebview,
-    _rules: Rules<'_>,
+    rules: Rules<'_>,
     done: Box<dyn FnOnce(Result<(), String>)>,
 ) {
+    drop(rules);
     done(Ok(()));
 }
 

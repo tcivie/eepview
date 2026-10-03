@@ -17,9 +17,11 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use serde::Serialize;
+use serde_json::{Value, json};
 use tauri::Url;
 
 use super::loopback::LoopbackAddr;
+use super::rules::LOCAL_URL_PATTERNS;
 use super::verify::{Answer, parse_answer};
 use crate::nav;
 
@@ -36,6 +38,8 @@ const JAVA_MARKERS: [&str; 2] = ["/themes/console/", "console.css"];
 const I2PD_MARKERS: [&str; 1] = ["?page=i2p_tunnels"];
 /// The probe waits this long for the console (a cold Java console is slow).
 const TIMEOUT: Duration = Duration::from_secs(5);
+/// A known console is cleared after this many failed re-checks in a row.
+pub const RECHECK_MISSES: u32 = 3;
 /// Most bytes read from one probe answer.
 const MAX_ANSWER: u64 = 512 * 1024;
 
@@ -373,11 +377,12 @@ pub fn detect_here() -> Option<VerifiedConsole> {
     detect(&candidates(&|var| std::env::var(var).ok()))
 }
 
-/// `GET <path>` on `addr`, no redirects followed.
+/// `GET <path> HTTP/1.0` in origin form on `addr`: an HTTP/1.0 answer is never chunked, so
+/// the markers arrive whole. No redirect is followed.
 fn get(addr: LoopbackAddr, path: &str) -> Answer {
     let mut stream = addr.connect(TIMEOUT).map_err(|e| format!("{addr}: {e}"))?;
     let head = format!(
-        "GET {path} HTTP/1.1\r\nHost: {addr}\r\nUser-Agent: eepview\r\n\
+        "GET {path} HTTP/1.0\r\nHost: {addr}\r\nUser-Agent: eepview\r\n\
          Accept: text/html\r\nConnection: close\r\n\r\n"
     );
     stream
@@ -467,6 +472,34 @@ impl VerifiedConsole {
         }
     }
 
+    /// The engine rule list of the console view as `WKContentRuleList` JSON: block every
+    /// URL, then allow the console origin and the local `about:`, `data:` and `blob:` URLs.
+    #[must_use]
+    pub fn rule_list(&self) -> Value {
+        let origin = format!(r"^http://127\.0\.0\.1:{}/", self.port);
+        let mut rules = vec![
+            json!({ "trigger": { "url-filter": ".*" }, "action": { "type": "block" } }),
+            json!({
+                "trigger": { "url-filter": origin, "url-filter-is-case-sensitive": true },
+                "action": { "type": "ignore-previous-rules" }
+            }),
+        ];
+        rules.extend(LOCAL_URL_PATTERNS.iter().map(|pattern| {
+            json!({
+                "trigger": { "url-filter": pattern },
+                "action": { "type": "ignore-previous-rules" }
+            })
+        }));
+        Value::Array(rules)
+    }
+
+    /// The rule of [`Self::rule_list`] for one request URL (the `WebView2` filter).
+    #[must_use]
+    pub fn engine_allows(&self, url: &str) -> bool {
+        Url::parse(url)
+            .is_ok_and(|u| self.owns(&u) || matches!(u.scheme(), "about" | "data" | "blob"))
+    }
+
     /// The contract `ConsoleInfo` of this console.
     #[must_use]
     pub fn info(&self) -> ConsoleInfo {
@@ -477,6 +510,22 @@ impl VerifiedConsole {
             pages: self.pages(),
             version: self.version.clone(),
         }
+    }
+}
+
+/// The known console and the miss count after one re-check that found `found`: a found
+/// console replaces the known one at once; a miss keeps the known one until
+/// [`RECHECK_MISSES`] misses in a row.
+#[must_use]
+pub fn after_recheck(
+    known: Option<&VerifiedConsole>,
+    misses: u32,
+    found: Option<VerifiedConsole>,
+) -> (Option<VerifiedConsole>, u32) {
+    match (found, known) {
+        (Some(console), _) => (Some(console), 0),
+        (None, Some(known)) if misses + 1 < RECHECK_MISSES => (Some(known.clone()), misses + 1),
+        (None, _) => (None, 0),
     }
 }
 
