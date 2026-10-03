@@ -77,19 +77,6 @@ CodeQL and Scorecard start when the repo becomes public. See [Going public](http
 
 All docs live in the [wiki](https://github.com/tcivie/eepview/wiki).
 
-User guide:
-
-- [Install](https://github.com/tcivie/eepview/wiki/Install)
-- [First run](https://github.com/tcivie/eepview/wiki/First-run)
-- [Using eepview](https://github.com/tcivie/eepview/wiki/Using-eepview)
-- [Privacy and security](https://github.com/tcivie/eepview/wiki/Privacy-and-security)
-- [Troubleshooting](https://github.com/tcivie/eepview/wiki/Troubleshooting)
-- [FAQ](https://github.com/tcivie/eepview/wiki/FAQ)
-
-Developer guide:
-
-- [Developer guide](https://github.com/tcivie/eepview/wiki/Developer-guide)
-
 ## Credits
 
 eepview uses the [I2P](https://geti2p.net) network. It is not affiliated with the I2P project.
