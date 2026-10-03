@@ -31,7 +31,7 @@ This wiki is generated from docs/wiki in the repository. Edit it there, in a PR.
 | Release and support | in progress | [Release and support](release-and-support.md) | [#37](https://github.com/tcivie/eepview/pull/37) |
 | Coverage | shipped | [Coverage](coverage.md) | [#13](https://github.com/tcivie/eepview/pull/13) |
 | Score ratchet | shipped | [Score ratchet](score-ratchet.md) | [#40](https://github.com/tcivie/eepview/pull/40) |
-| Brand | in progress | [Brand](brand.md) | [#11](https://github.com/tcivie/eepview/pull/11) |
+| Brand | shipped | [Brand](brand.md) | [#11](https://github.com/tcivie/eepview/pull/11) |
 
 ## Project
 
