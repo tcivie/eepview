@@ -10,6 +10,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="light dark" />
     <title>Not an I2P address</title>
+    <link rel="icon" type="image/svg+xml" href="../../assets/brand/eepview-mark-small.svg" />
     <link rel="stylesheet" href="./theme.css" />
     <link rel="stylesheet" href="./ui.css" />
     <link rel="stylesheet" href="./pages.css" />
@@ -21,18 +22,18 @@
         <li class="hop" data-state="built"><span class="hop-node"></span>You</li>
         <li class="hop hop-end" data-state="refused"><span class="hop-node"></span>Clearnet</li>
       </ol>
-      <h1>This is not an I2P address</h1>
-      <p class="notice-lede">
+      <h1 class="display">This is not an I2P address</h1>
+      <p class="lede">
         eepview opens eepsites only. It stopped this request before it left your computer, so
         nothing went out to the clearnet.
       </p>
-      <div class="notice-box">
-        <p class="notice-box-label">Refused address</p>
+      <div class="banner banner-lg" data-tone="danger">
+        <p class="caption">Refused address</p>
         <p class="refused-url" id="refused-url">
           https://www.example.com/
         </p>
       </div>
-      <p class="notice-hint">
+      <p class="hint">
         Meant an eepsite? Check the address. It ends in <span class="mono">.i2p</span>, like
         <span class="mono">stats.i2p</span>.
       </p>

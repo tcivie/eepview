@@ -10,6 +10,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="light dark" />
     <title>History</title>
+    <link rel="icon" type="image/svg+xml" href="../../assets/brand/eepview-mark-small.svg" />
     <link rel="stylesheet" href="./theme.css" />
     <link rel="stylesheet" href="./ui.css" />
     <link rel="stylesheet" href="./pages.css" />
@@ -19,15 +20,11 @@
     <div class="shell">
       <aside class="rail">
         <a class="brand" href="./home.html">
-          <svg class="mark" viewBox="0 0 28 28" aria-hidden="true">
-            <rect x="1.75" y="1.75" width="24.5" height="24.5" rx="8" />
-            <rect x="6.5" y="6.5" width="15" height="15" rx="5" />
-            <rect class="core" x="11" y="11" width="6" height="6" rx="2" />
-          </svg>
+          <img class="mark" src="../../assets/brand/eepview-mark-small.svg" alt="" width="28" height="28" />
           eepview
         </a>
         <nav class="rail-nav" aria-label="eepview pages">
-          <ul>
+          <ul class="list">
             <li>
               <a href="./home.html">
                 <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -95,9 +92,9 @@
           </div>
         </header>
 
-        <form class="panel clear-panel" id="clear-panel" aria-labelledby="clear-title" hidden>
+        <form class="banner banner-lg clear-panel" data-tone="danger" id="clear-panel" aria-labelledby="clear-title" hidden>
           <h2 id="clear-title">Clear history</h2>
-          <fieldset class="clear-ranges">
+          <fieldset>
             <legend class="visually-hidden">Time range</legend>
             <div class="segmented">
               <label><input type="radio" name="range" value="hour" checked />Last hour</label>
@@ -106,7 +103,7 @@
               <label><input type="radio" name="range" value="all" />Everything</label>
             </div>
           </fieldset>
-          <p class="clear-warning" id="clear-warning">
+          <p class="hint" id="clear-warning">
             Pages you visited in the last hour are removed. This cannot be undone.
           </p>
           <div class="actions">
@@ -115,7 +112,7 @@
           </div>
         </form>
 
-        <div class="history-search">
+        <div class="input-icon history-search">
           <label class="visually-hidden" for="history-q">Search history</label>
           <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
             <circle cx="11" cy="11" r="6" />
@@ -131,32 +128,32 @@
           />
         </div>
 
-        <p class="notice-inline" id="history-off" hidden>
+        <p class="banner history-off" data-tone="warning" id="history-off" hidden>
           History is off. eepview does not record the pages you visit.
           <a href="./settings.html#privacy">Turn it on</a>
         </p>
 
         <p class="visually-hidden" id="history-status" role="status" aria-live="polite"></p>
         <div class="history" id="history" aria-busy="false"></div>
-        <p class="history-empty" id="history-empty" hidden></p>
+        <p class="empty" id="history-empty" hidden></p>
         <div class="history-sentinel" id="history-sentinel" aria-hidden="true"></div>
       </main>
     </div>
 
     <template id="day-template">
       <section class="history-day">
-        <h2 class="history-day-title">Day</h2>
-        <ul class="history-rows"></ul>
+        <h2 class="hint history-day-title">Day</h2>
+        <ul class="list card card-flush"></ul>
       </section>
     </template>
 
     <template id="entry-template">
-      <li class="history-row">
-        <time class="history-time num">00:00</time>
-        <a class="history-link" href="./history.html">
-          <span class="site-mark" aria-hidden="true">E</span>
-          <span class="history-title">Title</span>
-          <span class="history-host">host.i2p</span>
+      <li class="list-row history-row">
+        <time class="caption num history-time">00:00</time>
+        <a class="row-link" href="./history.html">
+          <span class="letter-icon site-mark" aria-hidden="true">E</span>
+          <span class="row-title truncate history-title">Title</span>
+          <span class="caption history-host">host.i2p</span>
         </a>
         <button class="icon-btn icon-btn-danger" type="button" data-remove="" aria-label="Remove">
           <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">

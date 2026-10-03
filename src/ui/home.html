@@ -10,6 +10,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="light dark" />
     <title>Home</title>
+    <link rel="icon" type="image/svg+xml" href="../../assets/brand/eepview-mark-small.svg" />
     <link rel="stylesheet" href="./theme.css" />
     <link rel="stylesheet" href="./ui.css" />
     <link rel="stylesheet" href="./pages.css" />
@@ -19,15 +20,11 @@
     <div class="shell">
       <aside class="rail">
         <a class="brand" href="./home.html">
-          <svg class="mark" viewBox="0 0 28 28" aria-hidden="true">
-            <rect x="1.75" y="1.75" width="24.5" height="24.5" rx="8" />
-            <rect x="6.5" y="6.5" width="15" height="15" rx="5" />
-            <rect class="core" x="11" y="11" width="6" height="6" rx="2" />
-          </svg>
+          <img class="mark" src="../../assets/brand/eepview-mark-small.svg" alt="" width="28" height="28" />
           eepview
         </a>
         <nav class="rail-nav" aria-label="eepview pages">
-          <ul>
+          <ul class="list">
             <li>
               <a href="./home.html" aria-current="page">
                 <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -90,7 +87,7 @@
           <button class="btn btn-small" type="button" id="crash-dismiss">Dismiss</button>
         </div>
 
-        <section class="section router-card panel" aria-labelledby="router-title">
+        <section class="section card card-pad router-card" aria-labelledby="router-title">
           <div class="router-card-main">
             <h2 id="router-title" class="visually-hidden">Router status</h2>
             <p class="router-card-state" role="status">
@@ -116,10 +113,10 @@
             </div>
           </dl>
           <a class="router-card-link" href="./stats.html">Network details</a>
-          <nav class="console-links router-card-console" aria-labelledby="console-title">
-            <p class="console-title" id="console-title">Router console</p>
+          <nav class="router-card-console" aria-labelledby="console-title">
+            <p class="caption console-title" id="console-title">Router console</p>
             <div class="console-list" id="console-links" hidden></div>
-            <p class="muted console-note" id="console-note">No router console found</p>
+            <p class="hint" id="console-note">No router console found</p>
           </nav>
         </section>
 
@@ -128,26 +125,26 @@
             <h2 id="tiles-title">Bookmarks</h2>
             <a href="./bookmarks.html">Manage bookmarks</a>
           </div>
-          <ul class="tiles" id="tiles"></ul>
-          <p class="muted" id="tiles-error" hidden></p>
+          <ul class="list tiles" id="tiles"></ul>
+          <p class="empty" id="tiles-error" hidden></p>
         </section>
 
         <template id="tile-template">
           <li>
-            <a class="tile" href="./bookmarks.html">
-              <span class="tile-mark" aria-hidden="true">E</span>
-              <span class="tile-name">Name</span>
-              <span class="tile-addr">address.i2p</span>
+            <a class="card card-link tile" href="./bookmarks.html">
+              <span class="letter-icon letter-icon-lg tile-mark" aria-hidden="true">E</span>
+              <span class="row-title truncate tile-name">Name</span>
+              <span class="addr truncate tile-addr">address.i2p</span>
             </a>
           </li>
         </template>
 
         <template id="tile-add-template">
           <li>
-            <a class="tile tile-add" href="./bookmarks.html#new">
-              <span class="tile-mark" aria-hidden="true">+</span>
-              <span class="tile-name">Add a bookmark</span>
-              <span class="tile-addr">Any .i2p address</span>
+            <a class="card card-link tile tile-add" href="./bookmarks.html#new">
+              <span class="letter-icon letter-icon-lg letter-icon-add" aria-hidden="true">+</span>
+              <span class="row-title truncate">Add a bookmark</span>
+              <span class="addr truncate">Any .i2p address</span>
             </a>
           </li>
         </template>
