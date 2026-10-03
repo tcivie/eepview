@@ -7,6 +7,7 @@ import { panelState } from "../lib/router-panel.ts";
 import { routerView } from "../lib/router-view.ts";
 import { zoomText } from "../lib/tab-strip.ts";
 import { bindClicks } from "../shared/events.ts";
+import { closePanel } from "./router-panel.ts";
 import { activeTab } from "./state.ts";
 
 const TOAST_MS = 4000;
@@ -93,6 +94,7 @@ function setTip(open: boolean): void {
 }
 
 function setMenu(open: boolean): void {
+  if (open) closePanel(false);
   byId("menu").hidden = !open;
   byId("menu-btn").setAttribute("aria-expanded", String(open));
   if (open) byId("menu").querySelector<HTMLElement>("button")?.focus();

@@ -89,3 +89,18 @@ export function recentWindow(values: readonly number[], stepSeconds: number): nu
   const count = Math.max(MIN_POINTS, Math.ceil(SPARK_WINDOW_SECONDS / stepSeconds) + 1);
   return values.slice(-count);
 }
+
+export interface SparkHistory {
+  stepSeconds: number;
+  inBps: readonly number[];
+  outBps: readonly number[];
+}
+
+export function sparkSeries(
+  history: SparkHistory | null,
+): { inBps: number[]; outBps: number[] } | null {
+  if (!history) return null;
+  const inBps = recentWindow(history.inBps, history.stepSeconds);
+  const outBps = recentWindow(history.outBps, history.stepSeconds);
+  return inBps.length < MIN_POINTS || outBps.length < MIN_POINTS ? null : { inBps, outBps };
+}

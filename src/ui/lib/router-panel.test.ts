@@ -9,6 +9,7 @@ import {
   panelText,
   recentWindow,
   SPARK_WINDOW_SECONDS,
+  sparkSeries,
   tunnelsText,
   UNMANAGED_TITLE,
 } from "./router-panel.ts";
@@ -117,5 +118,17 @@ describe("recentWindow", () => {
   it("keeps at least two points and copes with a bad step", () => {
     assert.equal(recentWindow(series, 3600).length, 2);
     assert.equal(recentWindow(series, 0).length, 200);
+  });
+});
+
+describe("sparkSeries", () => {
+  it("has nothing to draw without a history or with fewer than two samples", () => {
+    assert.equal(sparkSeries(null), null);
+    assert.equal(sparkSeries({ stepSeconds: 10, inBps: [], outBps: [] }), null);
+    assert.equal(sparkSeries({ stepSeconds: 10, inBps: [5], outBps: [5, 6] }), null);
+  });
+  it("trims both series to the last ten minutes", () => {
+    const series = sparkSeries({ stepSeconds: 300, inBps: [1, 2, 3, 4], outBps: [5, 6, 7, 8] });
+    assert.deepEqual(series, { inBps: [2, 3, 4], outBps: [6, 7, 8] });
   });
 });

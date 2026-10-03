@@ -6,7 +6,7 @@ import {
   panelControls,
   panelState,
   panelText,
-  recentWindow,
+  sparkSeries,
 } from "../lib/router-panel.ts";
 import { areaPath, CHART_HEIGHT, linePath, scaleMax } from "../lib/sparkline.ts";
 import { MISSING } from "../lib/stats-view.ts";
@@ -55,16 +55,15 @@ export function renderPanelStatus(status: RouterStatus): void {
 }
 
 function renderSpark(history: RouterStats["history"]): void {
-  if (!history) {
+  const series = sparkSeries(history);
+  if (!series) {
     for (const id of SPARK_PATHS) byId(id).setAttribute("d", EMPTY_PATH);
     return;
   }
-  const inBps = recentWindow(history.inBps, history.stepSeconds);
-  const outBps = recentWindow(history.outBps, history.stepSeconds);
-  const max = scaleMax([...inBps, ...outBps]);
-  byId("rp-spark-in").setAttribute("d", linePath(inBps, max));
-  byId("rp-spark-area").setAttribute("d", areaPath(inBps, max));
-  byId("rp-spark-out").setAttribute("d", linePath(outBps, max));
+  const max = scaleMax([...series.inBps, ...series.outBps]);
+  byId("rp-spark-in").setAttribute("d", linePath(series.inBps, max));
+  byId("rp-spark-area").setAttribute("d", areaPath(series.inBps, max));
+  byId("rp-spark-out").setAttribute("d", linePath(series.outBps, max));
 }
 
 function renderStats(stats: RouterStats): void {
@@ -74,9 +73,10 @@ function renderStats(stats: RouterStats): void {
 }
 
 async function refresh(): Promise<void> {
-  const [status, stats] = await Promise.all([call("router_status", {}), call("router_stats", {})]);
-  renderPanelStatus(status);
-  renderStats(stats);
+  await Promise.allSettled([
+    call("router_status", {}).then(renderPanelStatus),
+    call("router_stats", {}).then(renderStats),
+  ]);
 }
 
 function openPanel(): void {
