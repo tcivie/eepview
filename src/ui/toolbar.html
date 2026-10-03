@@ -24,7 +24,7 @@
           <span class="visually-hidden">New tab</span>
         </button>
         <div class="tab-drag" data-tauri-drag-region></div>
-        <p class="toast" id="toast" role="status" aria-live="polite" hidden></p>
+        <p class="popover toast" id="toast" role="status" aria-live="polite" hidden></p>
       </div>
 
       <div class="navrow">
@@ -69,13 +69,13 @@
             autocapitalize="off"
             placeholder="Enter an .i2p address"
           />
-          <button class="icon-btn address-star" type="button" id="star" aria-pressed="false" title="Bookmark this page">
+          <button class="icon-btn icon-btn-sm address-star" type="button" id="star" aria-pressed="false" title="Bookmark this page">
             <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
               <path d="m12 4.5 2.3 4.7 5.2.8-3.75 3.6.9 5.15L12 16.3l-4.65 2.45.9-5.15L4.5 10l5.2-.8z" />
             </svg>
             <span class="visually-hidden" id="star-label">Bookmark this page</span>
           </button>
-          <div class="suggestions" id="suggestions" role="listbox" aria-label="Suggestions" hidden></div>
+          <div class="popover suggestions" id="suggestions" role="listbox" aria-label="Suggestions" hidden></div>
         </form>
 
         <div class="nav-group">
@@ -100,7 +100,7 @@
           </button>
           <span class="status-anchor">
             <button
-              class="status-btn"
+              class="icon-btn status-btn"
               type="button"
               id="status"
               data-tone="building"
@@ -109,12 +109,12 @@
               aria-expanded="false"
               aria-controls="router-panel"
             >
-              <span class="status-dot" aria-hidden="true"></span>
+              <span class="dot" aria-hidden="true"></span>
               <span class="visually-hidden" id="status-label">Router: checking</span>
             </button>
-            <div class="tooltip" id="status-tip" role="tooltip" hidden>
+            <div class="popover tooltip" id="status-tip" role="tooltip" hidden>
               <p class="tooltip-title" id="status-title">Checking the router</p>
-              <p class="tooltip-text" id="status-text"></p>
+              <p class="caption tooltip-text" id="status-text"></p>
             </div>
             <section
               class="popover router-panel"
@@ -125,11 +125,11 @@
               hidden
             >
               <header class="rp-head" data-tone="building" id="rp-head">
-                <span class="rp-dot" aria-hidden="true"></span>
+                <span class="dot" aria-hidden="true"></span>
                 <h2 class="rp-title" id="rp-title" tabindex="-1">Checking the router</h2>
               </header>
-              <p class="rp-text" id="rp-text"></p>
-              <dl class="rp-facts">
+              <p class="hint rp-text" id="rp-text"></p>
+              <dl class="facts rp-facts">
                 <div>
                   <dt>Version</dt>
                   <dd id="rp-version">—</dd>
@@ -152,23 +152,23 @@
                 </div>
               </dl>
               <figure class="rp-bandwidth">
-                <figcaption class="rp-bandwidth-head">
+                <figcaption class="caption rp-bandwidth-head">
                   <span>Bandwidth now</span>
                   <span class="num" id="rp-bandwidth">—</span>
                 </figcaption>
                 <svg class="rp-spark" viewBox="0 0 600 140" preserveAspectRatio="none" aria-hidden="true">
-                  <path class="rp-spark-area" id="rp-spark-area" d="M0 140" />
-                  <path class="rp-spark-line rp-spark-in" id="rp-spark-in" d="M0 140" />
-                  <path class="rp-spark-line rp-spark-out" id="rp-spark-out" d="M0 140" />
+                  <path class="spark-area" id="rp-spark-area" d="M0 140" />
+                  <path class="spark-line spark-in" id="rp-spark-in" d="M0 140" />
+                  <path class="spark-line spark-out" id="rp-spark-out" d="M0 140" />
                 </svg>
-                <p class="rp-spark-axis"><span>10 min ago</span><span>Now</span></p>
+                <p class="caption spark-axis"><span>10 min ago</span><span>Now</span></p>
               </figure>
-              <p class="rp-proxy">Proxy <span class="mono" id="rp-proxy">—</span></p>
+              <p class="caption rp-proxy">Proxy <span class="mono" id="rp-proxy">—</span></p>
               <div class="rp-actions">
                 <button class="btn btn-primary rp-pause" type="button" id="rp-pause">Pause I2P browsing</button>
                 <button class="btn" type="button" id="rp-restart" data-action="restart" aria-describedby="rp-managed-note">Restart router</button>
                 <button class="btn" type="button" id="rp-stop" data-action="stop" aria-describedby="rp-managed-note">Stop router</button>
-                <button class="btn btn-quiet rp-network" type="button" id="rp-network" data-open="eepview://stats">Open Network page</button>
+                <button class="btn btn-ghost rp-network" type="button" id="rp-network" data-open="eepview://stats">Open Network page</button>
               </div>
               <p class="visually-hidden" id="rp-managed-note"></p>
             </section>
@@ -200,7 +200,7 @@
                 <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12" /></svg>
                 <span class="visually-hidden">Zoom out</span>
               </button>
-              <button class="zoom-value" type="button" data-command="zoom-reset" id="zoom-value" title="Reset zoom">100%</button>
+              <button class="icon-btn icon-btn-text zoom-value" type="button" data-command="zoom-reset" id="zoom-value" title="Reset zoom">100%</button>
               <button class="icon-btn" type="button" data-command="zoom-in" title="Zoom in">
                 <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6v12M6 12h12" /></svg>
                 <span class="visually-hidden">Zoom in</span>
@@ -212,8 +212,8 @@
 
       <form class="findbar" id="findbar" aria-label="Find in page" hidden>
         <label class="visually-hidden" for="find-input">Find in page</label>
-        <input class="find-input" id="find-input" type="text" placeholder="Find in page" spellcheck="false" />
-        <span class="find-count" id="find-count" role="status" aria-live="polite"></span>
+        <input class="input input-sm find-input" id="find-input" type="text" placeholder="Find in page" spellcheck="false" />
+        <span class="caption num find-count" id="find-count" role="status" aria-live="polite"></span>
         <button class="icon-btn" type="button" id="find-prev" title="Previous match">
           <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 15 6-6 6 6" /></svg>
           <span class="visually-hidden">Previous match</span>
@@ -222,7 +222,7 @@
           <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
           <span class="visually-hidden">Next match</span>
         </button>
-        <button class="icon-btn find-case" type="button" id="find-case" aria-pressed="false" title="Match case">
+        <button class="icon-btn icon-btn-text find-case" type="button" id="find-case" aria-pressed="false" title="Match case">
           <span aria-hidden="true">Aa</span>
           <span class="visually-hidden">Match case</span>
         </button>
@@ -235,9 +235,9 @@
 
     <template id="tab-template">
       <div class="tab" role="tab" aria-selected="false" tabindex="-1" draggable="true">
-        <span class="tab-icon" aria-hidden="true">E</span>
+        <span class="letter-icon tab-icon" aria-hidden="true">E</span>
         <span class="tab-title">Tab</span>
-        <button class="tab-close" type="button" tabindex="-1" title="Close tab">
+        <button class="icon-btn icon-btn-sm tab-close" type="button" tabindex="-1" title="Close tab">
           <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m8 8 8 8M16 8l-8 8" /></svg>
           <span class="visually-hidden">Close tab</span>
         </button>

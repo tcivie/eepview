@@ -52,6 +52,7 @@ Working rules for any human or AI agent on this repo.
 - Do not edit CHANGELOG.md in a pull request. The release job generates it from the commit titles, so write a clear Conventional Commit PR title.
 - Get the number with `gh pr view --json number` after you open the PR. Then push the docs commit.
 - A PR that changes the UI runs scripts/screenshots.sh and commits the updated images.
+- A UI change uses the shared components in src/ui/ui.css (docs/wiki/ui-components.md). scripts/style-check.sh fails on a raw spacing, radius or font size and on an inline style.
 - CI (`docs-check`) fails a `feat` PR that does not change a page under `docs/wiki/`, and any PR that edits `CHANGELOG.md`.
 
 ## Writing style

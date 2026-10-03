@@ -24,7 +24,7 @@
           eepview
         </span>
         <div class="setup-progress" id="setup-progress">
-          <p class="step-count" id="step-count">Step 1 of 4</p>
+          <p class="caption step-count" id="step-count">Step 1 of 4</p>
           <ol class="hops stepper" id="stepper" aria-label="Setup steps">
             <li class="hop"><span class="hop-node"></span>Router</li>
             <li class="hop"><span class="hop-node"></span>Download</li>
@@ -37,9 +37,9 @@
       <main class="setup-main" id="main">
         <section class="step" data-step="install" aria-labelledby="install-title">
           <h1 id="install-title" tabindex="-1">Install an I2P router</h1>
-          <p class="step-lede">eepview found no I2P router on this computer, so it can install one now.</p>
-          <details class="why">
-            <summary>What does this mean?</summary>
+          <p class="lede">eepview found no I2P router on this computer, so it can install one now.</p>
+          <details class="hint why">
+            <summary class="link">What does this mean?</summary>
             <p>
               eepview opens eepsites only through an I2P router that runs on your computer. The
               router hides who you are by sending each request through several other routers.
@@ -49,9 +49,9 @@
             </p>
           </details>
 
-          <div class="panel step-panel">
-            <h2>What will be downloaded</h2>
-            <table class="download-table">
+          <div class="card card-pad">
+            <h2 class="card-title">What will be downloaded</h2>
+            <table class="table download-table">
               <tbody>
                 <tr>
                   <th scope="row">I2P router 2.10.0</th>
@@ -69,51 +69,51 @@
                 </tr>
               </tfoot>
             </table>
-            <p class="setup-note">
+            <p class="hint setup-note">
               From <span class="mono">files.i2p-projekt.de</span> and
               <span class="mono">github.com</span>, this one time.
             </p>
           </div>
 
-          <div class="panel step-panel">
+          <div class="card card-pad">
             <fieldset class="setup-fieldset">
-              <legend class="panel-legend">Java</legend>
-              <div class="radio-list">
+              <legend class="card-title">Java</legend>
+              <div class="choices">
                 <label class="check">
                   <input type="radio" name="java" value="bundled" checked />
                   <span class="check-text">Download Java with the router</span>
-                  <span class="check-hint">Temurin 21. eepview keeps it separate from other apps.</span>
+                  <span class="hint">Temurin 21. eepview keeps it separate from other apps.</span>
                 </label>
                 <label class="check">
                   <input type="radio" name="java" value="system" />
                   <span class="check-text">Use the Java on this computer</span>
-                  <span class="check-hint">Found OpenJDK 17.0.12. Version 17 or newer works.</span>
+                  <span class="hint">Found OpenJDK 17.0.12. Version 17 or newer works.</span>
                 </label>
               </div>
             </fieldset>
             <fieldset class="setup-fieldset">
-              <legend class="panel-legend">Allow eepview to</legend>
-              <div class="radio-list">
+              <legend class="card-title">Allow eepview to</legend>
+              <div class="choices">
                 <label class="check">
                   <input type="checkbox" name="perm-updates" checked />
                   <span class="check-text">Update the router automatically over I2P</span>
-                  <span class="check-hint">Signed updates, fetched inside the I2P network.</span>
+                  <span class="hint">Signed updates, fetched inside the I2P network.</span>
                 </label>
                 <label class="check">
                   <input type="checkbox" name="perm-java" checked />
                   <span class="check-text">Check for Java security updates</span>
-                  <span class="check-hint">
+                  <span class="hint">
                     One small clearnet request a week to <span class="mono">api.adoptium.net</span>.
                   </span>
                 </label>
               </div>
-              <p class="setup-note">You can change both later in Settings.</p>
+              <p class="hint setup-note">You can change both later in Settings.</p>
             </fieldset>
           </div>
 
           <div class="step-actions">
             <span class="step-actions-side">
-              <button class="btn btn-quiet" type="button" id="have-file">I have the installer file</button>
+              <button class="btn btn-ghost" type="button" id="have-file">I have the installer file</button>
               <input
                 class="visually-hidden"
                 type="file"
@@ -122,17 +122,17 @@
                 tabindex="-1"
                 aria-hidden="true"
               />
-              <button class="btn btn-quiet" type="button" data-goto="later">Not now</button>
+              <button class="btn btn-ghost" type="button" data-goto="later">Not now</button>
             </span>
-            <button class="btn btn-primary" type="button" data-goto="download">Accept and download</button>
+            <button class="btn btn-primary btn-large" type="button" data-goto="download">Accept and download</button>
           </div>
         </section>
 
         <section class="step" data-step="found" aria-labelledby="found-title" hidden>
           <h1 id="found-title" tabindex="-1">Use the router you already have</h1>
-          <p class="step-lede">An I2P router is already running on this computer, and eepview can use it.</p>
-          <details class="why">
-            <summary>What does this mean?</summary>
+          <p class="lede">An I2P router is already running on this computer, and eepview can use it.</p>
+          <details class="hint why">
+            <summary class="link">What does this mean?</summary>
             <p>
               eepview sends every request through this router's web proxy. It does not change the
               router's settings. If you stop that router, eepview cannot open eepsites until it
@@ -140,7 +140,7 @@
               stops for you.
             </p>
           </details>
-          <div class="panel step-panel">
+          <div class="card card-pad">
             <dl class="facts">
               <div>
                 <dt>Router</dt>
@@ -158,25 +158,25 @@
           </div>
           <div class="step-actions">
             <span class="step-actions-side">
-              <button class="btn btn-quiet" type="button" data-goto="install">Install a separate router</button>
+              <button class="btn btn-ghost" type="button" data-goto="install">Install a separate router</button>
             </span>
-            <button class="btn btn-primary" type="button" data-goto="ready">Use this router</button>
+            <button class="btn btn-primary btn-large" type="button" data-goto="ready">Use this router</button>
           </div>
         </section>
 
         <section class="step" data-step="download" aria-labelledby="download-title" hidden>
           <h1 id="download-title" tabindex="-1">Downloading the router</h1>
-          <p class="step-lede">eepview is downloading the router and checking each file.</p>
-          <details class="why">
-            <summary>What does this mean?</summary>
+          <p class="lede">eepview is downloading the router and checking each file.</p>
+          <details class="hint why">
+            <summary class="link">What does this mean?</summary>
             <p>
               This is the only time eepview uses the clearnet. Each file is checked against its
               signature, and nothing runs until every signature matches. Keep this window open
               until the download ends.
             </p>
           </details>
-          <div class="panel step-panel">
-            <ul class="transfers">
+          <div class="card card-pad">
+            <ul class="list transfers">
               <li class="transfer">
                 <span class="transfer-name">I2P router 2.10.0</span>
                 <span class="transfer-size num" id="router-size">19.4 of 31 MB · 62%</span>
@@ -204,9 +204,9 @@
           <p class="visually-hidden" id="download-status" role="status" aria-live="polite"></p>
           <div class="step-actions">
             <span class="step-actions-side">
-              <button class="btn btn-quiet" type="button" data-goto="install">Cancel</button>
+              <button class="btn btn-ghost" type="button" data-goto="install">Cancel</button>
             </span>
-            <button class="btn btn-primary" type="button" id="download-next" data-goto="tunnels" disabled>
+            <button class="btn btn-primary btn-large" type="button" id="download-next" data-goto="tunnels" disabled>
               Continue
             </button>
           </div>
@@ -214,19 +214,19 @@
 
         <section class="step" data-step="download-failed" aria-labelledby="download-failed-title" hidden>
           <h1 id="download-failed-title" tabindex="-1">The download failed</h1>
-          <p class="step-lede">eepview stopped the download and installed nothing.</p>
-          <div class="notice-box retry">
+          <p class="lede">eepview stopped the download and installed nothing.</p>
+          <div class="banner banner-lg retry" data-tone="danger">
             <p class="retry-line">
               <span class="chip" data-tone="stopped">Failed</span>
               <span>The Java runtime does not match its signature.</span>
             </p>
-            <p class="notice-hint">
+            <p class="hint">
               Got <span class="num">44.0 of 44 MB</span> from <span class="mono">github.com</span>.
               eepview deleted the file.
             </p>
           </div>
-          <details class="why">
-            <summary>What does this mean?</summary>
+          <details class="hint why">
+            <summary class="link">What does this mean?</summary>
             <p>
               A file that does not match its signature may have been changed on the way. eepview
               never runs such a file. Trying again downloads it fresh, often from another mirror.
@@ -242,24 +242,24 @@
           </details>
           <div class="step-actions">
             <span class="step-actions-side">
-              <button class="btn btn-quiet" type="button" data-goto="later">Not now</button>
+              <button class="btn btn-ghost" type="button" data-goto="later">Not now</button>
             </span>
-            <button class="btn btn-primary" type="button" data-goto="download">Try again</button>
+            <button class="btn btn-primary btn-large" type="button" data-goto="download">Try again</button>
           </div>
         </section>
 
         <section class="step" data-step="tunnels" aria-labelledby="tunnels-title" hidden>
           <h1 id="tunnels-title" tabindex="-1">Building tunnels</h1>
-          <p class="step-lede">Your router is joining the network, which takes 2 to 10 minutes the first time.</p>
-          <details class="why">
-            <summary>What does this mean?</summary>
+          <p class="lede">Your router is joining the network, which takes 2 to 10 minutes the first time.</p>
+          <details class="hint why">
+            <summary class="link">What does this mean?</summary>
             <p>
               A tunnel is a path through three other routers. Your router needs one tunnel out and
               one tunnel in before it can open a site. Later starts take less than a minute. You
               can close this window, and eepview tells you when it is ready.
             </p>
           </details>
-          <div class="panel step-panel tunnel-build">
+          <div class="card card-pad tunnel-build">
             <div class="tunnel-build-row">
               <span class="tunnel-dir">Outbound</span>
               <ol class="hops" id="build-out" aria-label="Outbound tunnel">
@@ -300,7 +300,7 @@
           <p class="visually-hidden" id="tunnel-status" role="status" aria-live="polite"></p>
           <div class="step-actions">
             <span class="step-actions-side"></span>
-            <button class="btn btn-primary" type="button" id="tunnels-next" data-goto="ready" disabled>
+            <button class="btn btn-primary btn-large" type="button" id="tunnels-next" data-goto="ready" disabled>
               Continue
             </button>
           </div>
@@ -308,18 +308,18 @@
 
         <section class="step" data-step="tunnels-failed" aria-labelledby="tunnels-failed-title" hidden>
           <h1 id="tunnels-failed-title" tabindex="-1">No tunnels yet</h1>
-          <p class="step-lede">Your router has not built a tunnel in 10 minutes.</p>
-          <div class="notice-box retry">
+          <p class="lede">Your router has not built a tunnel in 10 minutes.</p>
+          <div class="banner banner-lg retry" data-tone="danger">
             <p class="retry-line">
               <span class="chip" data-tone="stopped">Stalled</span>
               <span>0 of 2 tunnels built after 10 min 0 s.</span>
             </p>
-            <p class="notice-hint">
+            <p class="hint">
               The router knows <span class="num">14</span> other routers. It needs about 50.
             </p>
           </div>
-          <details class="why">
-            <summary>What does this mean?</summary>
+          <details class="hint why">
+            <summary class="link">What does this mean?</summary>
             <p>
               Your router cannot reach enough other routers. A firewall or a network that blocks
               UDP is the usual cause. eepview keeps trying in the background, and it never sends
@@ -336,23 +336,23 @@
           </details>
           <div class="step-actions">
             <span class="step-actions-side">
-              <a class="btn btn-quiet" href="./stats.html">Router details</a>
+              <a class="btn btn-ghost" href="./stats.html">Router details</a>
             </span>
-            <button class="btn btn-primary" type="button" data-goto="tunnels">Keep trying</button>
+            <button class="btn btn-primary btn-large" type="button" data-goto="tunnels">Keep trying</button>
           </div>
         </section>
 
         <section class="step" data-step="ready" aria-labelledby="ready-title" hidden>
           <h1 id="ready-title" tabindex="-1">eepview is ready</h1>
-          <p class="step-lede">Your router is part of the I2P network, and eepsites open through it.</p>
-          <details class="why">
-            <summary>What does this mean?</summary>
+          <p class="lede">Your router is part of the I2P network, and eepsites open through it.</p>
+          <details class="hint why">
+            <summary class="link">What does this mean?</summary>
             <p>
               Each request passes three other routers before it reaches a site, so the site does
               not learn who you are. eepview sends nothing outside I2P.
             </p>
           </details>
-          <div class="panel step-panel">
+          <div class="card card-pad">
             <ol class="hops" aria-label="Your traffic passes 3 hops before it reaches a site">
               <li class="hop" data-state="built"><span class="hop-node"></span>You</li>
               <li class="hop" data-state="built"><span class="hop-node"></span>Hop</li>
@@ -377,15 +377,15 @@
           </div>
           <div class="step-actions">
             <span class="step-actions-side"></span>
-            <a class="btn btn-primary" href="./home.html">Open eepview</a>
+            <a class="btn btn-primary btn-large" href="./home.html">Open eepview</a>
           </div>
         </section>
 
         <section class="step" data-step="later" aria-labelledby="later-title" hidden>
           <h1 id="later-title" tabindex="-1">Nothing was downloaded</h1>
-          <p class="step-lede">eepview cannot open eepsites until a router runs on this computer.</p>
-          <details class="why">
-            <summary>What does this mean?</summary>
+          <p class="lede">eepview cannot open eepsites until a router runs on this computer.</p>
+          <details class="hint why">
+            <summary class="link">What does this mean?</summary>
             <p>
               Start setup again from the menu at any time. If you install I2P yourself, restart
               eepview and it finds the router.
@@ -393,12 +393,12 @@
           </details>
           <div class="step-actions">
             <span class="step-actions-side"></span>
-            <button class="btn btn-primary" type="button" data-goto="install">Back to setup</button>
+            <button class="btn btn-primary btn-large" type="button" data-goto="install">Back to setup</button>
           </div>
         </section>
       </main>
 
-      <nav class="review-nav" aria-label="Review: setup states">
+      <nav class="caption review-nav" aria-label="Review: setup states">
         <span>Preview a state:</span>
         <a href="?step=install">No router</a>
         <a href="?step=found">Router found</a>

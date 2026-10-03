@@ -24,7 +24,7 @@
           eepview
         </a>
         <nav class="rail-nav" aria-label="eepview pages">
-          <ul>
+          <ul class="list">
             <li>
               <a href="./home.html" aria-current="page">
                 <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -81,7 +81,7 @@
           </div>
         </header>
 
-        <section class="section router-card panel" aria-labelledby="router-title">
+        <section class="section card card-pad router-card" aria-labelledby="router-title">
           <div class="router-card-main">
             <h2 id="router-title" class="visually-hidden">Router status</h2>
             <p class="router-card-state" role="status">
@@ -114,26 +114,26 @@
             <h2 id="tiles-title">Bookmarks</h2>
             <a href="./bookmarks.html">Manage bookmarks</a>
           </div>
-          <ul class="tiles" id="tiles"></ul>
-          <p class="muted" id="tiles-error" hidden></p>
+          <ul class="list tiles" id="tiles"></ul>
+          <p class="empty" id="tiles-error" hidden></p>
         </section>
 
         <template id="tile-template">
           <li>
-            <a class="tile" href="./bookmarks.html">
-              <span class="tile-mark" aria-hidden="true">E</span>
-              <span class="tile-name">Name</span>
-              <span class="tile-addr">address.i2p</span>
+            <a class="card card-link tile" href="./bookmarks.html">
+              <span class="letter-icon letter-icon-lg tile-mark" aria-hidden="true">E</span>
+              <span class="row-title truncate tile-name">Name</span>
+              <span class="addr truncate tile-addr">address.i2p</span>
             </a>
           </li>
         </template>
 
         <template id="tile-add-template">
           <li>
-            <a class="tile tile-add" href="./bookmarks.html#new">
-              <span class="tile-mark" aria-hidden="true">+</span>
-              <span class="tile-name">Add a bookmark</span>
-              <span class="tile-addr">Any .i2p address</span>
+            <a class="card card-link tile tile-add" href="./bookmarks.html#new">
+              <span class="letter-icon letter-icon-lg letter-icon-add" aria-hidden="true">+</span>
+              <span class="row-title truncate">Add a bookmark</span>
+              <span class="addr truncate">Any .i2p address</span>
             </a>
           </li>
         </template>
