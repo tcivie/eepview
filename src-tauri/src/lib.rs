@@ -3,6 +3,8 @@
 pub mod nav;
 pub mod net;
 pub mod session;
+pub mod store;
+pub mod suggest;
 pub mod tabs;
 pub mod types;
 
