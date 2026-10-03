@@ -11,7 +11,7 @@ Fuzzing feeds random input to the parsers that decide what eepview may load. It 
 - A pull request that changes `src-tauri/src/` or the fuzz setup gets a code-change run of 20 minutes in all, about 5 minutes per target.
 - Main gets a batch run every day at 03:41 UTC, 60 minutes in all. The corpus lives in the Actions cache, so each run starts from the last one.
 - Only the fuzz job uses a nightly toolchain, pinned to one date (`nightly-2026-10-01`, set in `.clusterfuzzlite/build.sh`). The app stays on the stable toolchain of `rust-toolchain.toml`. Nothing sets `RUSTC_BOOTSTRAP`.
-- The fuzz job is not a required check.
+- The fuzz job is not a required check. The `lint` workflow runs rustfmt and clippy (pedantic, `-D warnings`) on the fuzz crate too.
 
 | Target | API | Properties |
 |---|---|---|

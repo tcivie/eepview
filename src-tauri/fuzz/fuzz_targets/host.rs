@@ -14,7 +14,7 @@ use libfuzzer_sys::fuzz_target;
 
 fn assert_normalised(host: &str) {
     assert!(
-        host.ends_with(".i2p"),
+        matches!(host.rsplit_once('.'), Some((_, "i2p"))),
         "accepted host must end in .i2p: {host:?}"
     );
     assert!(host.is_ascii(), "accepted host must be ASCII: {host:?}");
