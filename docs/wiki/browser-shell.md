@@ -26,6 +26,18 @@ The Rust side of the browser, in `src-tauri/`: tabs, navigation, bookmarks, hist
 - Hand-edited store files are not trusted: a settings homepage that is not an I2P site or an internal page falls back to `eepview://home`; history keeps only I2P entries, newest first, at most 10 000.
 - Gatekeeper: duplicate `Content-Length` headers are refused with 400; a request body cut short closes both sides at once.
 
+## Requirements (UX batch 1)
+
+Found in QA of the first shell build. Fixed in [#57](https://github.com/tcivie/eepview/pull/57).
+
+1. After a page loads from the address bar, keyboard scrolling (Page Down, Space, the arrow keys) works on the page with no extra click. Keyboard focus moves to the page when the first commit of that navigation arrives, once, whatever address it commits: a redirect target counts. A later commit (a link, a script, a second redirect) does not move focus. Pressing Cmd/Ctrl+L before the commit cancels the move, so typing in the address bar is never taken away. A navigation from the address bar to an internal page moves focus to that page at once.
+2. While a web page loads, the content area shows the theme surface colour (dark in dark mode), never white. A new web tab starts with its background set to the `--color-surface` token of the saved theme, before its first paint, and the window behind the tabs has the same colour. "System" follows the operating system. The Settings page saves the theme choice in the settings store, so the shell knows it, and a theme change repaints the window. When the first page of a tab has finished, the tab goes back to the engine default background, so a page that sets no background of its own stays readable in dark mode.
+3. A page load that failed is not saved in history. That covers the I2P "Website Unreachable" page, any HTTP 5xx answer that passes the gatekeeper (the router proxy's and an eepsite's own), and a gatekeeper refusal for an I2P address. The gatekeeper matches an answer to a page by the exact URL, not by tab. The tab stops loading and shows the page. A history entry that already exists for the address stays as it is: its title, visit count and visit time do not change.
+4. Cmd/Ctrl+T opens a new tab, puts keyboard focus in the address bar and selects its text. The "New tab" button and the menu item do the same. A tab that a page opens (`target=_blank`) or that opens with an address does not put focus in the address bar.
+5. In Settings, "Where eepview connects" lists the router proxy that eepview really uses, the same value the Home page shows, including a value set with `EEPVIEW_PROXY`. Both pages show a dash until the proxy is known.
+6. The Router card on the Home page never shows "Unknown". It shows `I2P <version>` when the router reports its version, and "Version not reported by the router" when it does not. The version comes from the router statistics when a router helper is set up.
+7. After you close the last tab, Cmd/Ctrl+Shift+T opens that closed tab again, with the page it showed. The fresh Home tab that replaced it may stay or go.
+
 ## Toolbar popups
 
 The toolbar has four popups: the address suggestions, the main menu, the router panel and the router hint (hovering the router dot). They show in their own webview, `popup`, over the page. The toolbar never grows for them.
@@ -72,7 +84,11 @@ TypeScript (pure):
 
 IPC: see the [IPC contract](ipc-contract.md) (v1.4): `popup_open`, `popup_size`, `popup_close`, `popup-show`, `popup-closed` and `popup-select`.
 
-The `popup` webview may call: `popup_size`, `popup_close`, `navigate`, `tab_new`, `tab_list`, `zoom_in`, `zoom_out`, `zoom_reset`, `router_status`, `router_stats`, `connection_pause`, `connection_resume`, `router_control`, and listen to events.
+The `popup` webview may call: `popup_size`, `popup_close`, `navigate`, `tab_new`, `tab_list`, `zoom_in`, `zoom_out`, `zoom_reset`, `router_status`, `router_stats`, `connection_pause`, `connection_resume`, `router_control`, `console_status`, `console_detect`, `console_open`, and listen to events.
+
+## Router console
+
+eepview shows router information but never changes the router configuration. It finds the console of the router in use (Java I2P or i2pd) on loopback and gives quick links to it: Console, Tunnels, Address book, Config and Logs. The links show in the router panel, on the home page and in Settings. A link opens the router's own page in a separate `Router console` window. With no console, one line says "No router console found". Details: [Router console](router-console.md).
 
 ## How to use / run locally
 
@@ -84,11 +100,14 @@ The `popup` webview may call: `popup_size`, `popup_close`, `navigate`, `tab_new`
 
 - Find on Windows uses an app-injected script (`WebView2` has no native find with a count).
 - The Linux engine filter (L3b) waits for a webkit2gtk binding; the page policy (L3a) holds there.
+- On macOS the engine draws no background of its own once a colour is set, so a page with no background shows the window colour until the tab returns to the engine default (UX batch 1, item 2).
 - HTTPS eepsites load only on Windows: TLS tunnels stay closed on macOS and Linux (ADR 0001).
 - The first-run setup flow and router control are Phase 2 and Phase 3.
 
 ## History
 
+- 2026-10-03 — UX batch 1: focus after address-bar navigation, theme background, failed pages kept out of history, new tab focus, Settings proxy, Home router version — [#57](https://github.com/tcivie/eepview/pull/57)
 - 2026-10-03 — Browser shell: tabs, navigation, bookmarks, history, find, gatekeeper, pause and resume — [#29](https://github.com/tcivie/eepview/pull/29)
 - 2026-10-03 — Site icons in tabs, bookmarks and history — [#53](https://github.com/tcivie/eepview/pull/53)
 - 2026-10-03 — Toolbar popups in their own `popup` webview; the toolbar stays 84 px — [#55](https://github.com/tcivie/eepview/pull/55)
+- 2026-10-03 — Router console quick links and the console window — [#54](https://github.com/tcivie/eepview/pull/54)

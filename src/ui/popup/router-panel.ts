@@ -1,9 +1,11 @@
 // SPDX-FileCopyrightText: 2026 The eepview contributors
 // SPDX-License-Identifier: MIT
 
-import type { RouterStats, RouterStatus } from "../contract.ts";
+import { renderConsoleLinks, wireConsoleClicks } from "../console-nav.ts";
+import type { ConsoleInfo, RouterStats, RouterStatus } from "../contract.ts";
 import { all, byId } from "../dom.ts";
 import { call, on } from "../ipc.ts";
+import { routerVersion, shouldRedetect } from "../lib/console-links.ts";
 import {
   type PanelText,
   panelControls,
@@ -21,6 +23,8 @@ const EMPTY_PATH = `M0 ${CHART_HEIGHT}`;
 const SPARK_PATHS = ["rp-spark-in", "rp-spark-area", "rp-spark-out"];
 const quiet = (): undefined => undefined;
 let refreshTimer = 0;
+let lastStatus: RouterStatus | null = null;
+let lastConsole: ConsoleInfo | null = null;
 
 const STAT_FIELDS: Record<string, keyof PanelText> = {
   "rp-version": "version",
@@ -56,6 +60,27 @@ export function renderPanelStatus(status: RouterStatus): void {
   byId("rp-text").textContent = state.text;
   byId("rp-proxy").textContent = status.proxy || MISSING;
   renderControls(status);
+  const ready = shouldRedetect(lastStatus, status);
+  lastStatus = status;
+  if (ready && !panel().hidden) call("console_detect", {}).then(renderConsole).catch(quiet);
+}
+
+function renderConsole(info: ConsoleInfo): void {
+  lastConsole = info;
+  renderConsoleLinks(
+    {
+      list: byId("rp-console-links"),
+      note: byId("rp-console-note"),
+      title: byId("rp-console-title"),
+    },
+    info,
+  );
+  if (byId("rp-version").textContent === MISSING) showConsoleVersion();
+}
+
+function showConsoleVersion(): void {
+  const version = routerVersion(lastStatus?.version ?? null, lastConsole);
+  if (version) byId("rp-version").textContent = `I2P ${version}`;
 }
 
 function renderSpark(history: RouterStats["history"]): void {
@@ -73,6 +98,7 @@ function renderSpark(history: RouterStats["history"]): void {
 function renderStats(stats: RouterStats): void {
   const text = panelText(stats);
   for (const [id, key] of Object.entries(STAT_FIELDS)) byId(id).textContent = text[key];
+  if (text.version === MISSING) showConsoleVersion();
   renderSpark(stats.history);
 }
 
@@ -88,6 +114,7 @@ async function refresh(): Promise<void> {
 /** The panel opened: refresh it now and every 5 s while it is open. */
 export function openPanel(): void {
   refresh().catch(quiet);
+  call("console_detect", {}).then(renderConsole).catch(quiet);
   window.clearInterval(refreshTimer);
   refreshTimer = window.setInterval(() => refresh().catch(quiet), REFRESH_MS);
   byId("rp-title").focus();
@@ -124,4 +151,7 @@ export function wireRouterPanel(): void {
   delegateClick<HTMLElement>(panel(), "[data-action]", onRouterAction);
   byId("rp-network").addEventListener("click", openNetworkPage);
   on("router-status", renderPanelStatus).catch(quiet);
+  wireConsoleClicks(byId("rp-console-links"), () => closeCurrent(false));
+  call("console_status", {}).then(renderConsole).catch(quiet);
+  on("console-changed", renderConsole).catch(quiet);
 }

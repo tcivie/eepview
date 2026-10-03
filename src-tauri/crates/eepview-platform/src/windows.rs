@@ -32,7 +32,7 @@ pub fn attach_rules(
 }
 
 /// Answers 403 to every request whose URL `allow` refuses (L3b).
-fn filter(webview: &PlatformWebview, allow: fn(&str) -> bool) -> Result<(), String> {
+fn filter(webview: &PlatformWebview, allow: Box<dyn Fn(&str) -> bool>) -> Result<(), String> {
     let core = core(webview)?;
     let env = webview.environment();
     // SAFETY: COM call on a live object with a static wide string.

@@ -37,6 +37,8 @@ impl Core {
     /// While paused, the new status is kept but counts as not ok: nothing loads.
     pub fn router_changed(&mut self, mut status: RouterStatus) -> Vec<Effect> {
         status.paused = self.router.paused;
+        // VERIFY does not read the version: keep the one the router statistics gave.
+        status.version = self.router.version.clone().filter(|_| status.state == "ok");
         let was_ok = self.router.is_ok();
         let now_ok = status.is_ok();
         self.router = status;
@@ -50,6 +52,17 @@ impl Core {
             fx.extend([Effect::Emit(Event::TabsChanged), Effect::Layout]);
         }
         fx
+    }
+
+    /// The router reported its version in its statistics. Tells the UI when it changes.
+    pub fn router_version(&mut self, version: Option<&str>) -> Vec<Effect> {
+        match version {
+            Some(v) if self.router.version.as_deref() != Some(v) => {
+                self.router.version = Some(v.to_owned());
+                vec![Effect::Emit(Event::Router)]
+            }
+            _ => Vec::new(),
+        }
     }
 
     /// True while the user has paused the connection.
