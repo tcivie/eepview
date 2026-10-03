@@ -19,8 +19,8 @@ use std::time::{Duration, Instant};
 use super::failures::{Failures, is_server_error};
 use super::http::{self, Head, Plan, Refusal};
 use super::loopback::LoopbackAddr;
-use super::trace;
 use super::verify::VerifiedUpstream;
+use crate::diag::{self, Code, ErrorKind, Field, HttpStatus, trace};
 
 /// Most connections handled at once.
 const MAX_CONNECTIONS: usize = 256;
@@ -183,12 +183,20 @@ fn accept_loop(listener: &TcpListener, shared: &Shared) {
         let active = Arc::clone(&shared.active);
         let shared = shared.clone();
         let spawned = thread::Builder::new().spawn(move || {
-            let _ = handle(stream, &shared);
+            serve(stream, &shared);
             shared.active.fetch_sub(1, Ordering::SeqCst);
         });
         if spawned.is_err() {
             active.fetch_sub(1, Ordering::SeqCst);
         }
+    }
+}
+
+/// Handles one connection; a failed one records `page-load-failed` with its error kind.
+fn serve(client: TcpStream, shared: &Shared) {
+    if let Err(e) = handle(client, shared) {
+        trace::line(&format!("connection failed: {:?} {e}", e.kind()));
+        diag::count(Code::PageLoadFailed, Field::Error(ErrorKind::from(&e)));
     }
 }
 
@@ -198,6 +206,7 @@ fn answer_busy(mut stream: TcpStream, shared: &Shared) {
     let _ = stream.set_write_timeout(Some(DRAIN_TIME));
     if shared.draining.fetch_add(1, Ordering::SeqCst) >= shared.limit {
         shared.draining.fetch_sub(1, Ordering::SeqCst);
+        refused(Refusal::Busy);
         let _ = stream.write_all(&Refusal::Busy.response());
         return;
     }
@@ -237,9 +246,23 @@ fn handle(mut client: TcpStream, shared: &Shared) -> io::Result<()> {
     }
 }
 
+/// Counts a refusal by its reason kind only: a site can make any number of requests, so
+/// they are never recorded one by one (R12.2).
+fn refused(reason: Refusal) {
+    diag::count(Code::GatekeeperRefused, Field::Refuse(reason.reason()));
+}
+
+/// Counts a router error page (5xx) by its coarse status only (R12.1).
+fn upstream_status(head: &Head) {
+    if let Some(status) = http::status_code(&head.start).and_then(HttpStatus::from_code) {
+        diag::count(Code::PageLoadFailed, Field::Status(status));
+    }
+}
+
 /// Sends a refusal and ends the connection so that the answer reaches the client.
 fn refuse(client: &mut TcpStream, reason: Refusal) -> io::Result<()> {
     trace::line(&format!("refused {reason:?}"));
+    refused(reason);
     client.write_all(&reason.response())?;
     client.flush()?;
     close_gently(client);
@@ -296,7 +319,7 @@ fn terminate(client: &mut TcpStream, early: &[u8], host: &str, shared: &Shared) 
     let (unread, _) = source.into_inner();
     let Some((head, mut rest)) = head else {
         trace::line(&format!("tunnel to {host} closed with no request"));
-        return Ok(());
+        return refuse(client, Refusal::BadRequest);
     };
     trace::line(&format!("tunnel head {}", head.start));
     rest.extend_from_slice(unread);
@@ -360,6 +383,7 @@ fn forward(client: &mut TcpStream, rest: &[u8], req: &Request, shared: &Shared) 
         return refuse_page(client, req, shared, Refusal::Upstream);
     };
     trace::line(&format!("answer {} for {}", head.start, req.url()));
+    upstream_status(&head);
     shared
         .failures
         .note(&req.url(), is_server_error(&head.start));

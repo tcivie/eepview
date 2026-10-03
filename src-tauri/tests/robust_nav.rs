@@ -26,6 +26,15 @@ fn tricky() -> impl Strategy<Value = String> {
     ]
 }
 
+/// URLs that sit next to the rule edges: IDN labels, `b32` names of every length, port 0.
+fn host_like() -> impl Strategy<Value = String> {
+    prop_oneof![
+        "https?://(xn--)?[a-z0-9-]{0,8}(\\.[a-z0-9-]{0,8}){0,2}\\.i2p(:[0-9]{1,2})?/[a-z]{0,3}",
+        "https?://([a-z0-9]{0,6}\\.)?[a-z2-7]{0,60}\\.b32\\.i2p(:[0-9]{1,2})?/",
+        "https?://(b32|a\\.b32|b32\\.a)\\.i2p(:[0-9]{1,2})?/",
+    ]
+}
+
 /// A host that is valid by the rule of the ADR: lower-case labels, `.i2p`.
 fn plain_i2p_host() -> impl Strategy<Value = String> {
     "[a-ac-z0-9][a-z0-9-]{0,10}(\\.[a-ac-z0-9][a-z0-9]{0,10}){0,3}\\.i2p"
@@ -33,30 +42,37 @@ fn plain_i2p_host() -> impl Strategy<Value = String> {
 
 #[cfg(test)]
 mod adr {
-    use std::sync::LazyLock;
-
-    use eepview_lib::net::rules::{I2P_URL_PATTERN, LOCAL_URL_PATTERNS};
+    use eepview_lib::net::rules::content_rule_list;
     use regex::Regex;
+    use serde_json::Value;
 
-    /// The L3 allow rule of ADR 0001, compiled once from the constant the rule list uses.
-    /// `rule_list_blocks_then_allows_i2p` pins the rule list to this constant.
-    pub static L3_ALLOW: LazyLock<Regex> = LazyLock::new(|| Regex::new(I2P_URL_PATTERN).unwrap());
+    /// One rule of the `WKContentRuleList`: its regex and what it does.
+    struct Rule {
+        filter: Regex,
+        blocks: bool,
+    }
 
-    /// The local forms the ADR rule also allows (`about:`, `data:`, `blob:`), one regex each.
-    static L3_LOCAL: LazyLock<Vec<Regex>> = LazyLock::new(|| {
-        LOCAL_URL_PATTERNS
-            .iter()
-            .map(|p| Regex::new(p).unwrap())
-            .collect()
-    });
+    fn rule(json: &Value) -> Rule {
+        let pattern = json["trigger"]["url-filter"].as_str().unwrap();
+        let sensitive = json["trigger"]["url-filter-is-case-sensitive"] == true;
+        let case = if sensitive { "" } else { "(?i)" };
+        Rule {
+            filter: Regex::new(&format!("{case}{pattern}")).unwrap(),
+            blocks: json["action"]["type"] == "block",
+        }
+    }
 
-    /// The ADR rule as an oracle that does not call the code under test.
+    /// The L3b rule list (ADR 0001: block all, then allow `.i2p`, `about:`, `data:`, `blob:`) as
+    /// an oracle that does not call the guard or the host predicate. A rule that blocks marks
+    /// the URL blocked; `ignore-previous-rules` clears that mark, as `WebKit` does.
     pub fn allows(url: &str) -> bool {
-        L3_ALLOW.is_match(url) || L3_LOCAL.iter().any(|re| re.is_match(url))
+        let list = content_rule_list();
+        let step = |blocked: bool, rule: Rule| {
+            [blocked, rule.blocks][usize::from(rule.filter.is_match(url))]
+        };
+        !list.as_array().unwrap().iter().map(rule).fold(false, step)
     }
 }
-
-use adr::L3_ALLOW;
 
 fn head_of(text: &str) -> Option<Head> {
     Head::parse(text.as_bytes())
@@ -91,11 +107,24 @@ proptest! {
         let url = format!("http://{authority}/x?y=1");
         let parsed = Url::parse(&url).map_err(|e| TestCaseError::fail(e.to_string()))?;
         prop_assert!(guard(&parsed), "L4 refuses {url}");
-        prop_assert!(L3_ALLOW.is_match(parsed.as_str()), "the ADR L3 rule refuses {url}");
+        prop_assert!(adr::allows(parsed.as_str()), "the ADR L3 rule refuses {url}");
         let head = head_of(&format!("GET {url} HTTP/1.1\r\n\r\n"));
         let accepted = matches!(head.map(|h| plan(&h, false)), Some(Plan::Http { .. }));
         prop_assert!(accepted, "L1 refuses {url}");
         prop_assert!(matches!(classify(&url), Target::Web(_)), "the address bar refuses {url}");
+    }
+
+    // Req: ADR "One host predicate is the single source of truth for L1, L3 and L4": for any
+    // http(s) URL, the L3b rule list allows exactly what the L4 guard allows. Found by the fuzz
+    // target `url_rules` (docs/wiki/fuzzing.md).
+    #[test]
+    fn the_l3b_rule_list_allows_exactly_what_the_guard_allows(
+        input in prop_oneof![tricky(), host_like()],
+    ) {
+        let Ok(url) = Url::parse(&input) else { return Ok(()); };
+        if matches!(url.scheme(), "http" | "https") {
+            prop_assert_eq!(adr::allows(url.as_str()), guard(&url), "{}", url);
+        }
     }
 
     // Req: PO decision "the address bar lowercases the host and strips one trailing dot": any
@@ -142,7 +171,7 @@ proptest! {
     fn guard_is_never_wider_than_the_engine_rule(input in tricky()) {
         let Ok(url) = Url::parse(&input) else { return Ok(()); };
         if guard(&url) {
-            prop_assert!(L3_ALLOW.is_match(url.as_str()) || url.scheme() == "about", "{url}");
+            prop_assert!(adr::allows(url.as_str()), "{url}");
         }
         // Req: ADR L3b "block all, then allow .i2p and about:, data:, blob:": the engine filter
         // is never wider than that rule (checked against the ADR patterns, not against `guard`).
@@ -433,5 +462,53 @@ fn tricky_absolute_uris_name_the_engine_host() {
                 "{target} was forwarded"
             );
         }
+    }
+}
+
+/// Whether the guard (L4), the L3b rule list, the planner (L1) and the address bar accept a
+/// URL. `None` when they disagree.
+fn layers_accept(url: &str) -> Option<bool> {
+    let parsed = Url::parse(url).ok();
+    let l4 = parsed.as_ref().is_some_and(guard);
+    let l3 = parsed.as_ref().is_some_and(|u| adr::allows(u.as_str()));
+    let head = head_of(&format!("GET {url} HTTP/1.1\r\n\r\n"));
+    let l1 = matches!(head.map(|h| plan(&h, false)), Some(Plan::Http { .. }));
+    let bar = matches!(classify(url), Target::Web(_));
+    (l4 == l3 && l3 == l1 && l1 == bar).then_some(l4)
+}
+
+// Req: ADR "One host predicate is the single source of truth ... IDN is rejected": the guard
+// (L4), the L3b rule list, the gatekeeper planner (L1) and the address bar refuse the same
+// forms, and accept a 52-character `b32` name. The inputs are the ones the fuzz target
+// `url_rules` found (docs/wiki/fuzzing.md), and their neighbours.
+#[test]
+fn the_three_layers_agree_on_the_rule_edges() {
+    let b32 = "a".repeat(52);
+    let accepted = [
+        format!("http://{b32}.b32.i2p/"),
+        format!("http://{}.b32.i2p:8080/x", "7".repeat(60)),
+        "http://ab32.i2p/".to_owned(),
+        "http://b32.foo.i2p/".to_owned(),
+        "http://foo.b32x.i2p/".to_owned(),
+    ];
+    // An invalid IDN label does not even parse, which refuses it too.
+    let refused = [
+        "http://xn--tt88fi-xph5e.i2p/".to_owned(),
+        "http://xn--a.i2p/".to_owned(),
+        "http://sub.xn--a.i2p/".to_owned(),
+        "http://a.xn--a.sub.i2p:8080/".to_owned(),
+        "http://b32.i2p/".to_owned(),
+        "http://short.b32.i2p/".to_owned(),
+        format!("http://{}.b32.i2p/", "a".repeat(51)),
+        format!("http://x.{b32}.b32.i2p/"),
+        format!("http://{}1.b32.i2p/", "a".repeat(51)),
+        "http://foo.i2p:0/".to_owned(),
+        format!("http://{b32}.b32.i2p:0/"),
+    ];
+    for url in &accepted {
+        assert_eq!(layers_accept(url), Some(true), "{url}");
+    }
+    for url in &refused {
+        assert_eq!(layers_accept(url), Some(false), "{url}");
     }
 }

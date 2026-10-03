@@ -22,4 +22,4 @@ PYTHONPATH="scripts/lizard-stubs" "${LIZARD_PYTHON:-python3}" -m lizard \
   --exclude "*/node_modules/*" \
   --exclude "*/dist/*" \
   --exclude "*/gen/*" \
-  src src-tauri/src src-tauri/crates
+  src src-tauri/src src-tauri/crates src-tauri/fuzz

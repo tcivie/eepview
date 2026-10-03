@@ -9,6 +9,7 @@
 //! Tauri glue: [`shell`].
 
 pub mod core;
+pub mod diag;
 pub mod hover;
 pub mod icons;
 pub mod layout;

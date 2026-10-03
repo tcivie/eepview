@@ -37,7 +37,9 @@ pub struct Head {
 }
 
 impl Head {
-    /// Parses a head that ends with an empty line. `None` when it is not valid UTF-8 HTTP.
+    /// Parses a head that ends with an empty line. `None` when it is not valid UTF-8 HTTP, or
+    /// when a line holds a bare CR or LF (RFC 9112, 2.2 and 5.5): such a byte lets one side read a
+    /// second request line or header that the other side does not see.
     #[must_use]
     pub fn parse(bytes: &[u8]) -> Option<Self> {
         let text = std::str::from_utf8(bytes).ok()?;
@@ -48,7 +50,10 @@ impl Head {
             let (name, value) = line.split_once(':')?;
             headers.push((name.trim().to_owned(), value.trim().to_owned()));
         }
-        Some(Self { start, headers })
+        // Check the raw lines: `trim` would hide a CR or LF at the end of a value.
+        let mut raw = text.split("\r\n").take_while(|l| !l.is_empty());
+        let clean = raw.all(|l| !l.contains(['\r', '\n']));
+        clean.then_some(Self { start, headers })
     }
 
     /// The first value of a header, by case-insensitive name.
@@ -132,6 +137,19 @@ pub enum Refusal {
 }
 
 impl Refusal {
+    /// The reason kind for the diagnostics log. The host is never logged.
+    #[must_use]
+    pub fn reason(self) -> crate::diag::RefuseReason {
+        use crate::diag::RefuseReason as R;
+        match self {
+            Self::NotI2p => R::NotI2p,
+            Self::BadRequest => R::BadRequest,
+            Self::LengthRequired => R::LengthRequired,
+            Self::Upstream => R::Upstream,
+            Self::Busy => R::Busy,
+        }
+    }
+
     /// The full response the gatekeeper sends, with no upstream connection.
     #[must_use]
     pub fn response(self) -> Vec<u8> {
@@ -486,6 +504,15 @@ mod tests {
     }
 
     #[test]
+    fn refusals_have_a_reason_kind() {
+        assert_eq!(Refusal::Busy.reason().as_str(), "busy");
+        assert_eq!(Refusal::NotI2p.reason().as_str(), "not-i2p");
+        assert_eq!(Refusal::Upstream.reason().as_str(), "upstream");
+        assert_eq!(Refusal::BadRequest.reason().as_str(), "bad-request");
+        assert_eq!(Refusal::LengthRequired.reason().as_str(), "length-required");
+    }
+
+    #[test]
     fn refusals_and_status() {
         for (r, code) in [
             (Refusal::NotI2p, 403),
@@ -501,5 +528,26 @@ mod tests {
         assert!(!is_success("HTTP/1.1 503 No Outproxy"));
         assert_eq!(status_code("SPDY 200"), None);
         assert_eq!(status_code("HTTP/1.1"), None);
+    }
+
+    // Req: RFC 9112 2.2 and 5.5: a bare CR anywhere in the request line or the headers, and a
+    // bare LF or CR inside a header value, make the head invalid. Found by the fuzz target
+    // `gatekeeper_request` (docs/wiki/fuzzing.md).
+    #[test]
+    fn a_bare_cr_or_lf_makes_the_head_invalid() {
+        // The exact input of the fuzz crash.
+        assert!(Head::parse(b"\r / HTTP/1.").is_none());
+        for raw in [
+            "\r / HTTP/1.1\r\n\r\n",
+            "GET\r http://stats.i2p/ HTTP/1.1\r\n\r\n",
+            "GET http://stats.i2p/\n HTTP/1.1\r\n\r\n",
+            "GET http://stats.i2p/ HTTP/1.1\r\nX: a\nHost: evil.example\r\n\r\n",
+            "GET http://stats.i2p/ HTTP/1.1\r\nX: a\rHost: evil.example\r\n\r\n",
+            "GET http://stats.i2p/ HTTP/1.1\r\nX: a\r\r\n\r\n",
+            "GET http://stats.i2p/ HTTP/1.1\r\nX\r: a\r\n\r\n",
+        ] {
+            assert!(Head::parse(raw.as_bytes()).is_none(), "{raw:?}");
+        }
+        assert!(Head::parse(b"GET / HTTP/1.1\r\nX: a b\r\n\r\n").is_some());
     }
 }

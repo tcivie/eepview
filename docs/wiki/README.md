@@ -34,15 +34,19 @@ This wiki is generated from docs/wiki in the repository. Edit it there, in a PR.
 | IPC contract | shipped | [IPC contract](ipc-contract.md) | [#29](https://github.com/tcivie/eepview/pull/29) |
 | Router console | in progress | [Router console](router-console.md) | [#54](https://github.com/tcivie/eepview/pull/54) |
 | No-leak architecture | shipped | [No-leak architecture](no-leak-architecture.md) | [#29](https://github.com/tcivie/eepview/pull/29) |
+| Diagnostics and bug reports | in progress | [Diagnostics and bug reports](diagnostics-and-bug-reports.md) | [#56](https://github.com/tcivie/eepview/pull/56) |
 | Site icons | shipped | [Site icons](site-icons.md) | [#53](https://github.com/tcivie/eepview/pull/53) |
 | Robustness tests | in progress | [Robustness tests](robustness-tests.md) | [#52](https://github.com/tcivie/eepview/pull/52) |
 | Leak test | shipped | [Leak test](leak-test.md) | [#41](https://github.com/tcivie/eepview/pull/41) |
+| Fuzzing | in progress | [Fuzzing](fuzzing.md) | [#62](https://github.com/tcivie/eepview/pull/62) |
 | Release pipeline | shipped | [Release pipeline](release-pipeline.md) | [#14](https://github.com/tcivie/eepview/pull/14) |
-| Reproducible builds | shipped | [Reproducible builds](reproducible-builds.md) | [#37](https://github.com/tcivie/eepview/pull/37) |
+| Reproducible builds | settings only | [Reproducible builds](reproducible-builds.md) | [#37](https://github.com/tcivie/eepview/pull/37) |
 | Release and support | in progress | [Release and support](release-and-support.md) | [#37](https://github.com/tcivie/eepview/pull/37) |
 | Coverage | shipped | [Coverage](coverage.md) | [#13](https://github.com/tcivie/eepview/pull/13) |
 | Score ratchet | shipped | [Score ratchet](score-ratchet.md) | [#40](https://github.com/tcivie/eepview/pull/40) |
-| Brand | shipped | [Brand](brand.md) | [#11](https://github.com/tcivie/eepview/pull/11) |
+| Brand | shipped | [Brand](brand.md) | [#11](https://github.com/tcivie/eepview/pull/11), [#61](https://github.com/tcivie/eepview/pull/61) |
+| UI screenshots | shipped | [Brand: Screenshots](brand.md#screenshots) | [#61](https://github.com/tcivie/eepview/pull/61) |
+| UI components | shipped | [UI components](ui-components.md) | [#65](https://github.com/tcivie/eepview/pull/65) |
 
 ## Project
 

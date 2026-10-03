@@ -1,7 +1,8 @@
 # SPDX-FileCopyrightText: 2026 The eepview contributors
 # SPDX-License-Identifier: MIT
 
-"""Unit tests for the pure parts of the leak harness: host rules and the strace parser.
+"""Unit tests for the pure parts of the leak harness: host rules, the strace parser, the
+script rows of the verdict, the WebRTC candidate rule and the frame-wait budget.
 
 Run with: python3 -m unittest discover -s tests/leak
 """
@@ -12,6 +13,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from harness import frame_wait_ms
 from servers import EventLog, is_i2p, normalize_host
 from verdict import (
     REAL_IP_CANDIDATE,
@@ -76,19 +78,6 @@ class Strace(unittest.TestCase):
         path.write_text(GATE + connect_v4("127.0.0.1", 41001))
         self.assertEqual(strace_row(path, 41001)[1], "pass")
 
-    def test_the_page_must_wait_for_the_frame_signal(self) -> None:
-        def row(waited: str | None) -> tuple:
-            log = EventLog()
-            log.run = "default"
-            if waited:
-                log.add("report", host="leaktest.i2p", k="frame_wait", v=waited)
-            rows = script_rows(log, "default")
-            return next(r for r in rows if r[0].startswith("frame probes"))
-
-        self.assertEqual(row("done")[1], "pass")
-        self.assertEqual(row("timeout")[1], "FAIL")
-        self.assertEqual(row(None)[1], "FAIL")
-
     def test_client_socket_port_is_not_listening(self) -> None:
         text = '3 getsockname(5, {sa_family=AF_INET, sin_port=htons(50000), sin_addr=inet_addr("127.0.0.1")}, [16]) = 0\n'
         self.assertEqual(parse_strace(text)[0], set())
@@ -107,6 +96,30 @@ class Strace(unittest.TestCase):
             self.assertTrue(is_loopback(address), address)
         for address in ("10.0.0.1", "::ffff:10.0.0.1", "192.168.1.5", "fe80::1"):
             self.assertFalse(is_loopback(address), address)
+
+
+class ScriptRows(unittest.TestCase):
+    def test_the_page_must_wait_for_the_frame_signal(self) -> None:
+        def row(waited: str | None) -> tuple:
+            log = EventLog()
+            log.run = "default"
+            if waited:
+                log.add("report", host="leaktest.i2p", k="frame_wait", v=waited)
+            rows = script_rows(log, "default")
+            return next(r for r in rows if r[0].startswith("frame probes"))
+
+        self.assertEqual(row("done")[1], "pass")
+        self.assertEqual(row("timeout")[1], "FAIL")
+        self.assertEqual(row(None)[1], "FAIL")
+
+
+class FrameWait(unittest.TestCase):
+    def test_the_frame_wait_leaves_the_rest_of_the_exit_budget(self) -> None:
+        self.assertEqual(frame_wait_ms(30), 15000)
+        self.assertEqual(frame_wait_ms(60), 45000)
+
+    def test_a_short_budget_still_waits_one_second(self) -> None:
+        self.assertEqual(frame_wait_ms(5), 1000)
 
 
 class StraceFixes(unittest.TestCase):

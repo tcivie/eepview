@@ -1229,7 +1229,6 @@ fn spy_loop(
 fn default_spies() -> Option<(Spy, Spy)> {
     let spies = Spy::on(JAVA_DEFAULT_PORT, JAVA_BODY).zip(Spy::on(I2PD_DEFAULT_PORT, I2PD_BODY));
     if spies.is_none() {
-        eprintln!("skipped: port 7657 or 7070 is in use");
         assert!(
             std::env::var_os("CI").is_none(),
             "ports 7657 and 7070 must be free on CI"

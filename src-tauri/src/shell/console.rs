@@ -29,9 +29,9 @@ use tauri::{
 };
 
 use super::apply::{self, LISTENERS, with_core};
-use super::log;
 use super::state::{lock, shared};
 use super::webrtc::webrtc_off;
+use crate::diag::{self, Code, ErrorKind, Field, OpKind};
 use crate::net::console::{
     ConsoleInfo, ConsoleNav, ConsolePage, VerifiedConsole, after_recheck, detect_here,
 };
@@ -145,7 +145,7 @@ pub fn load_after_rules<R: Runtime>(
                 .store(true, Ordering::SeqCst);
             apply::outside(move || navigate(&webview, url));
         }
-        Err(e) => log::error("console rule list, page not loaded", &e),
+        Err(_) => failed(OpKind::EngineFilter, ErrorKind::Platform),
     })
 }
 
@@ -204,7 +204,7 @@ fn load_here<R: Runtime>(app: &AppHandle<R>, url: Url) {
 
 fn navigate<R: Runtime>(webview: &Webview<R>, url: Url) {
     if let Err(e) = webview.navigate(url) {
-        log::error("console load", &e.to_string());
+        failed(OpKind::ConsoleLoad, ErrorKind::from(&e));
     }
 }
 
@@ -222,17 +222,25 @@ fn focus<R: Runtime>(app: &AppHandle<R>) {
     }
 }
 
+/// Records a failed engine call of the console view.
+fn failed(op: OpKind, error: ErrorKind) {
+    diag::event(
+        Code::EngineCallFailed,
+        &[Field::Op(op), Field::Error(error)],
+    );
+}
+
 /// Closes the console webview and its window, if open.
 pub fn close<R: Runtime>(app: &AppHandle<R>) {
     if let Some(webview) = app.get_webview(CONSOLE_LABEL)
         && let Err(e) = webview.close()
     {
-        log::error("console close", &e.to_string());
+        failed(OpKind::ConsoleClose, ErrorKind::from(&e));
     }
     if let Some(window) = app.get_window(CONSOLE_WINDOW)
         && let Err(e) = window.destroy()
     {
-        log::error("console close", &e.to_string());
+        failed(OpKind::ConsoleClose, ErrorKind::from(&e));
     }
 }
 
@@ -314,7 +322,10 @@ fn spawn_once<R: Runtime>(
     });
     if let Err(e) = spawned {
         slot(app).store(0, Ordering::SeqCst);
-        log::error(name, &e.to_string());
+        diag::event(
+            Code::ThreadFailed,
+            &[Field::Op(OpKind::Spawn), Field::Error(ErrorKind::from(&e))],
+        );
     }
 }
 

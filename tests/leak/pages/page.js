@@ -3,7 +3,7 @@
 
 // Every vector from ADR 0001. Each one must be stopped by eepview; none may reach a canary
 // or a clearnet host. Navigation vectors run last, because a leak there leaves the page.
-const { cfg, report, probe, sleep, webrtc } = window.leak;
+const { cfg, origins, report, probe, sleep, webrtc } = window.leak;
 
 function websocket(key, url) {
   try {
@@ -37,12 +37,27 @@ function popupVectors() {
 
 // The frame says so when all its probes have reported (see frame.js). A page that waits for a
 // fixed time instead can navigate away while a slow runner is still loading the frame's scripts.
-const FRAME_DEADLINE_MS = 18000;
+// The harness sets the cap from EEPVIEW_EXIT_AFTER (harness.frame_wait_ms), so the vectors
+// after the wait still run before the app quits.
+const FRAME_DEADLINE_MS = Number(cfg.frameWait) || 15000;
+// The vectors that main() does not await (WebSockets, images, link hints, the popups) get at
+// least this long before the first navigation can cancel them.
+const DWELL_MS = 4000;
+const PING_MS = 250;
 
+// Pings the frame until it answers, so neither side's message is lost when the other side
+// is not listening yet. Only the frame's own window and origin count.
 function frameDone() {
+  const frame = document.getElementById("frame");
   return new Promise((resolve) => {
+    const ping = setInterval(() => {
+      frame.contentWindow?.postMessage("leak-frame-ping", origins.frame);
+    }, PING_MS);
     window.addEventListener("message", (event) => {
-      if (event.data === "leak-frame-done") resolve("done");
+      if (event.origin !== origins.frame || event.source !== frame.contentWindow) return;
+      if (event.data !== "leak-frame-done") return;
+      clearInterval(ping);
+      resolve("done");
     });
   });
 }
@@ -55,10 +70,11 @@ async function main() {
   await report("done", "1");
   // Fail closed: when the frame never signals, the page goes on after the deadline and the
   // harness fails the frame checks, because the frame's reports are missing.
-  await report(
-    "frame_wait",
-    await Promise.race([frame, sleep(FRAME_DEADLINE_MS).then(() => "timeout")]),
-  );
+  const [waited] = await Promise.all([
+    Promise.race([frame, sleep(FRAME_DEADLINE_MS).then(() => "timeout")]),
+    sleep(DWELL_MS),
+  ]);
+  await report("frame_wait", waited);
   await report("nav_form", "1"); // reported first: a slow or blocked navigation must not hide a skipped one
   document.getElementById("clearnet-form").submit();
   await sleep(3000);

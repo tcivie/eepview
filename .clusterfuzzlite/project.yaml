@@ -1,0 +1,5 @@
+# SPDX-FileCopyrightText: 2026 The eepview contributors
+# SPDX-License-Identifier: MIT
+
+language: rust
+base_os_version: ubuntu-24-04

@@ -10,6 +10,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="light dark" />
     <title>eepview interface</title>
+    <link rel="icon" type="image/svg+xml" href="../../assets/brand/eepview-mark-small.svg" />
     <link rel="stylesheet" href="./theme.css" />
     <link rel="stylesheet" href="./ui.css" />
     <link rel="stylesheet" href="./pages.css" />
@@ -19,14 +20,10 @@
     <main class="gallery" id="main">
       <header class="gallery-head">
         <span class="brand">
-          <svg class="mark" viewBox="0 0 28 28" aria-hidden="true">
-            <rect x="1.75" y="1.75" width="24.5" height="24.5" rx="8" />
-            <rect x="6.5" y="6.5" width="15" height="15" rx="5" />
-            <rect class="core" x="11" y="11" width="6" height="6" rx="2" />
-          </svg>
+          <img class="mark" src="../../assets/brand/eepview-mark-small.svg" alt="" width="28" height="28" />
           eepview
         </span>
-        <fieldset class="gallery-theme">
+        <fieldset>
           <legend class="visually-hidden">Theme</legend>
           <div class="segmented">
             <label><input type="radio" name="theme" value="system" />System</label>
@@ -36,118 +33,118 @@
         </fieldset>
       </header>
 
-      <h1>Interface review</h1>
-      <p class="gallery-lede">
+      <h1 class="display">Interface review</h1>
+      <p class="lede">
         Every internal page, filled by the dev mock backend. The theme you pick here applies to all of them.
         Each page also has light and dark links that do not change your saved choice.
       </p>
 
       <section class="section" aria-labelledby="g-start">
         <h2 id="g-start">First start</h2>
-        <ul class="gallery-list">
+        <ul class="list gallery-list">
           <li>
             <a href="./setup.html">No router found, install offer</a>
-            <span class="gallery-desc">Download size, sources, Java choice, permissions.</span>
-            <span class="gallery-modes"><a href="./setup.html?theme=light">Light</a><a href="./setup.html?theme=dark">Dark</a></span>
+            <span class="muted">Download size, sources, Java choice, permissions.</span>
+            <span class="caption gallery-modes"><a href="./setup.html?theme=light">Light</a><a href="./setup.html?theme=dark">Dark</a></span>
           </li>
           <li>
             <a href="./setup.html?step=download">Download and verify</a>
-            <span class="gallery-desc">Progress per file, then the signature check.</span>
-            <span class="gallery-modes"><a href="./setup.html?step=download&amp;theme=light">Light</a><a href="./setup.html?step=download&amp;theme=dark">Dark</a></span>
+            <span class="muted">Progress per file, then the signature check.</span>
+            <span class="caption gallery-modes"><a href="./setup.html?step=download&amp;theme=light">Light</a><a href="./setup.html?step=download&amp;theme=dark">Dark</a></span>
           </li>
           <li>
             <a href="./setup.html?step=download-failed">Download failed</a>
-            <span class="gallery-desc">A file did not match its signature. Nothing was installed.</span>
-            <span class="gallery-modes"><a href="./setup.html?step=download-failed&amp;theme=light">Light</a><a href="./setup.html?step=download-failed&amp;theme=dark">Dark</a></span>
+            <span class="muted">A file did not match its signature. Nothing was installed.</span>
+            <span class="caption gallery-modes"><a href="./setup.html?step=download-failed&amp;theme=light">Light</a><a href="./setup.html?step=download-failed&amp;theme=dark">Dark</a></span>
           </li>
           <li>
             <a href="./setup.html?step=tunnels">Building tunnels</a>
-            <span class="gallery-desc">The first start, 2 to 10 minutes.</span>
-            <span class="gallery-modes"><a href="./setup.html?step=tunnels&amp;theme=light">Light</a><a href="./setup.html?step=tunnels&amp;theme=dark">Dark</a></span>
+            <span class="muted">The first start, 2 to 10 minutes.</span>
+            <span class="caption gallery-modes"><a href="./setup.html?step=tunnels&amp;theme=light">Light</a><a href="./setup.html?step=tunnels&amp;theme=dark">Dark</a></span>
           </li>
           <li>
             <a href="./setup.html?step=tunnels-failed">Tunnels stalled</a>
-            <span class="gallery-desc">No tunnel after 10 minutes, with the router log.</span>
-            <span class="gallery-modes"><a href="./setup.html?step=tunnels-failed&amp;theme=light">Light</a><a href="./setup.html?step=tunnels-failed&amp;theme=dark">Dark</a></span>
+            <span class="muted">No tunnel after 10 minutes, with the router log.</span>
+            <span class="caption gallery-modes"><a href="./setup.html?step=tunnels-failed&amp;theme=light">Light</a><a href="./setup.html?step=tunnels-failed&amp;theme=dark">Dark</a></span>
           </li>
           <li>
             <a href="./setup.html?step=ready">Ready</a>
-            <span class="gallery-desc">What was set up.</span>
-            <span class="gallery-modes"><a href="./setup.html?step=ready&amp;theme=light">Light</a><a href="./setup.html?step=ready&amp;theme=dark">Dark</a></span>
+            <span class="muted">What was set up.</span>
+            <span class="caption gallery-modes"><a href="./setup.html?step=ready&amp;theme=light">Light</a><a href="./setup.html?step=ready&amp;theme=dark">Dark</a></span>
           </li>
           <li>
             <a href="./setup.html?step=found">Router found on this computer</a>
-            <span class="gallery-desc">Use the running router, or install a separate one.</span>
-            <span class="gallery-modes"><a href="./setup.html?step=found&amp;theme=light">Light</a><a href="./setup.html?step=found&amp;theme=dark">Dark</a></span>
+            <span class="muted">Use the running router, or install a separate one.</span>
+            <span class="caption gallery-modes"><a href="./setup.html?step=found&amp;theme=light">Light</a><a href="./setup.html?step=found&amp;theme=dark">Dark</a></span>
           </li>
         </ul>
       </section>
 
       <section class="section" aria-labelledby="g-browser">
         <h2 id="g-browser">Browser</h2>
-        <ul class="gallery-list">
+        <ul class="list gallery-list">
           <li>
             <a href="./toolbar.html">Toolbar</a>
-            <span class="gallery-desc">Tabs, address bar with suggestions, find bar, router status, menu.</span>
-            <span class="gallery-modes"><a href="./toolbar.html?theme=light">Light</a><a href="./toolbar.html?theme=dark">Dark</a></span>
+            <span class="muted">Tabs, address bar with suggestions, find bar, router status, menu.</span>
+            <span class="caption gallery-modes"><a href="./toolbar.html?theme=light">Light</a><a href="./toolbar.html?theme=dark">Dark</a></span>
           </li>
           <li>
             <a href="./toolbar.html?panel=1">Router panel</a>
-            <span class="gallery-desc">Opened from the status dot: state, figures, bandwidth, pause and router controls.</span>
-            <span class="gallery-modes"><a href="./toolbar.html?panel=1&amp;theme=light">Light</a><a href="./toolbar.html?panel=1&amp;theme=dark">Dark</a></span>
+            <span class="muted">Opened from the status dot: state, figures, bandwidth, pause and router controls.</span>
+            <span class="caption gallery-modes"><a href="./toolbar.html?panel=1&amp;theme=light">Light</a><a href="./toolbar.html?panel=1&amp;theme=dark">Dark</a></span>
           </li>
           <li>
             <a href="./toolbar.html?panel=1&amp;managed=0">Router panel, external router</a>
-            <span class="gallery-desc">Restart and stop are off for a router eepview does not manage.</span>
-            <span class="gallery-modes"><a href="./toolbar.html?panel=1&amp;managed=0&amp;theme=light">Light</a><a href="./toolbar.html?panel=1&amp;managed=0&amp;theme=dark">Dark</a></span>
+            <span class="muted">Restart and stop are off for a router eepview does not manage.</span>
+            <span class="caption gallery-modes"><a href="./toolbar.html?panel=1&amp;managed=0&amp;theme=light">Light</a><a href="./toolbar.html?panel=1&amp;managed=0&amp;theme=dark">Dark</a></span>
           </li>
           <li>
             <a href="./home.html">Home</a>
-            <span class="gallery-desc">Bookmark tiles and the router status card.</span>
-            <span class="gallery-modes"><a href="./home.html?theme=light">Light</a><a href="./home.html?theme=dark">Dark</a></span>
+            <span class="muted">Bookmark tiles and the router status card.</span>
+            <span class="caption gallery-modes"><a href="./home.html?theme=light">Light</a><a href="./home.html?theme=dark">Dark</a></span>
           </li>
           <li>
             <a href="./bookmarks.html">Bookmarks</a>
-            <span class="gallery-desc">Folders, add, edit, delete, import, export.</span>
-            <span class="gallery-modes"><a href="./bookmarks.html?theme=light">Light</a><a href="./bookmarks.html?theme=dark">Dark</a></span>
+            <span class="muted">Folders, add, edit, delete, import, export.</span>
+            <span class="caption gallery-modes"><a href="./bookmarks.html?theme=light">Light</a><a href="./bookmarks.html?theme=dark">Dark</a></span>
           </li>
           <li>
             <a href="./history.html">History</a>
-            <span class="gallery-desc">Grouped by day, search, remove, clear.</span>
-            <span class="gallery-modes"><a href="./history.html?theme=light">Light</a><a href="./history.html?theme=dark">Dark</a></span>
+            <span class="muted">Grouped by day, search, remove, clear.</span>
+            <span class="caption gallery-modes"><a href="./history.html?theme=light">Light</a><a href="./history.html?theme=dark">Dark</a></span>
           </li>
           <li>
             <a href="./stats.html">Network</a>
-            <span class="gallery-desc">Bandwidth, tunnels, router facts.</span>
-            <span class="gallery-modes"><a href="./stats.html?theme=light">Light</a><a href="./stats.html?theme=dark">Dark</a></span>
+            <span class="muted">Bandwidth, tunnels, router facts.</span>
+            <span class="caption gallery-modes"><a href="./stats.html?theme=light">Light</a><a href="./stats.html?theme=dark">Dark</a></span>
           </li>
           <li>
             <a href="./settings.html">Settings</a>
-            <span class="gallery-desc">Theme, homepage, privacy, router, about.</span>
-            <span class="gallery-modes"><a href="./settings.html?theme=light">Light</a><a href="./settings.html?theme=dark">Dark</a></span>
+            <span class="muted">Theme, homepage, privacy, router, about.</span>
+            <span class="caption gallery-modes"><a href="./settings.html?theme=light">Light</a><a href="./settings.html?theme=dark">Dark</a></span>
           </li>
         </ul>
       </section>
 
       <section class="section" aria-labelledby="g-stops">
         <h2 id="g-stops">When something stops</h2>
-        <ul class="gallery-list">
+        <ul class="list gallery-list">
           <li>
             <a href="./blocked.html">Not an I2P address</a>
-            <span class="gallery-desc">The refused address, shown as text.</span>
-            <span class="gallery-modes"><a href="./blocked.html?theme=light">Light</a><a href="./blocked.html?theme=dark">Dark</a></span>
+            <span class="muted">The refused address, shown as text.</span>
+            <span class="caption gallery-modes"><a href="./blocked.html?theme=light">Light</a><a href="./blocked.html?theme=dark">Dark</a></span>
           </li>
           <li>
             <a href="./router-down.html">The router stopped</a>
-            <span class="gallery-desc">Automatic restarts with a countdown.</span>
-            <span class="gallery-modes"><a href="./router-down.html?theme=light">Light</a><a href="./router-down.html?theme=dark">Dark</a></span>
+            <span class="muted">Automatic restarts with a countdown.</span>
+            <span class="caption gallery-modes"><a href="./router-down.html?theme=light">Light</a><a href="./router-down.html?theme=dark">Dark</a></span>
           </li>
         </ul>
       </section>
 
       <section class="section" aria-labelledby="g-tokens">
         <h2 id="g-tokens">Colour tokens</h2>
-        <ul class="swatches">
+        <ul class="list caption swatches">
           <li><span class="swatch sw-bg"></span>Ground</li>
           <li><span class="swatch sw-surface"></span>Surface</li>
           <li><span class="swatch sw-text"></span>Ink</li>

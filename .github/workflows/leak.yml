@@ -78,6 +78,9 @@ jobs:
       - run: npm ci
       - name: Build the release binary
         run: npm run tauri -- build --no-bundle -- --locked
+      - name: Check PIE, RELRO and NX on the Linux binary
+        if: runner.os == 'Linux'
+        run: ./scripts/check-hardening.sh src-tauri/target/release/eepview
       - name: Run the leak test
         shell: bash
         run: |
