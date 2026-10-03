@@ -3,9 +3,11 @@ import { byId } from "../dom.ts";
 import { call } from "../ipc.ts";
 import { hostOf } from "../lib/address.ts";
 import { jsToggleLabel } from "../lib/js-toggle.ts";
+import { panelState } from "../lib/router-panel.ts";
 import { routerView } from "../lib/router-view.ts";
 import { zoomText } from "../lib/tab-strip.ts";
 import { bindClicks } from "../shared/events.ts";
+import { closePanel } from "./router-panel.ts";
 import { activeTab } from "./state.ts";
 
 const TOAST_MS = 4000;
@@ -51,10 +53,11 @@ export function renderNav(tab: TabInfo | undefined): void {
 
 export function renderStatus(status: RouterStatus): void {
   const view = routerView(status);
-  byId("status").dataset.tone = view.tone;
-  byId("status-label").textContent = `Router: ${view.label}`;
-  byId("status-title").textContent = view.title;
-  byId("status-text").textContent = view.text;
+  const state = panelState(status);
+  byId("status").dataset.tone = state.tone;
+  byId("status-label").textContent = `Router: ${status.paused ? state.label : view.label}`;
+  byId("status-title").textContent = state.label;
+  byId("status-text").textContent = status.paused ? state.text : view.text;
 }
 
 export function showToast(toast: Toast): void {
@@ -91,6 +94,7 @@ function setTip(open: boolean): void {
 }
 
 function setMenu(open: boolean): void {
+  if (open) closePanel(false);
   byId("menu").hidden = !open;
   byId("menu-btn").setAttribute("aria-expanded", String(open));
   if (open) byId("menu").querySelector<HTMLElement>("button")?.focus();
@@ -115,11 +119,9 @@ function onMenuClick(event: MouseEvent): void {
 
 function wireStatus(): void {
   const status = byId("status");
-  status.addEventListener("mouseenter", () => setTip(true));
+  status.addEventListener("mouseenter", () => setTip(byId("router-panel").hidden === true));
   status.addEventListener("mouseleave", () => setTip(false));
-  status.addEventListener("focus", () => setTip(true));
-  status.addEventListener("blur", () => setTip(false));
-  status.addEventListener("click", () => setTip(byId("status-tip").hidden === true));
+  status.addEventListener("click", () => setTip(false));
 }
 
 function closePopups(): void {
