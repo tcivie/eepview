@@ -362,6 +362,9 @@ const handlers: Record<CommandName, Handler> = {
   chrome_set_height: () => undefined,
   platform: () => platformFromParams(),
   window_fullscreen: () => params.has("fullscreen"),
+  chrome_insets: () => ({
+    left: platformFromParams() === "macos" && !params.has("fullscreen") ? data.macInsetLeft : 0,
+  }),
   bookmarks_export_file: () => data.exportPath,
 };
 
