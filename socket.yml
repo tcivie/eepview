@@ -1,0 +1,23 @@
+# Socket.dev GitHub App config.
+# Socket checks every dependency change in a PR: known vulnerabilities, licenses, and supply-chain
+# risk (malware, install scripts, network access, typosquats, new maintainers).
+# Block and license policies live in the Socket dashboard of the `eepview` org.
+version: 2
+
+projectIgnorePaths:
+  - "node_modules"
+  - "src-tauri/target"
+  - "dist"
+
+triggerPaths:
+  - "package.json"
+  - "package-lock.json"
+  - "src-tauri/Cargo.toml"
+  - "src-tauri/Cargo.lock"
+
+githubApp:
+  enabled: true
+  pullRequestAlertsEnabled: true
+  dependencyOverviewEnabled: true
+  projectReportsEnabled: true
+  ignoreUsers: []

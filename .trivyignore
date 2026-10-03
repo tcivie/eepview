@@ -1,3 +1,0 @@
-# One finding per line: the ID, then a comment with the reason and an expiry date.
-# Example:
-# CVE-2026-0000  # not reachable: we never call foo(). Expires 2026-12-31.
