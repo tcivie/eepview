@@ -1,0 +1,58 @@
+# SPDX-FileCopyrightText: 2026 The eepview contributors
+# SPDX-License-Identifier: MIT
+
+# Fuzz targets for the pure modules of eepview_lib. See docs/wiki/fuzzing.md.
+# This crate has its own workspace, so `cargo build --workspace` in src-tauri never builds it.
+
+[package]
+name = "eepview-fuzz"
+version = "0.0.0"
+description = "cargo-fuzz targets for eepview_lib"
+license = "MIT"
+edition = "2024"
+rust-version = "1.96"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[workspace]
+
+[dependencies]
+eepview = { path = ".." }
+libfuzzer-sys = "0.4"
+# The same `url` crate as `tauri::Url` (one lock entry), for `nav::guard`.
+url = "2"
+
+[lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+too_many_lines = "warn"
+cognitive_complexity = "warn"
+
+[[bin]]
+name = "host"
+path = "fuzz_targets/host.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "address_bar"
+path = "fuzz_targets/address_bar.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "gatekeeper_request"
+path = "fuzz_targets/gatekeeper_request.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "url_rules"
+path = "fuzz_targets/url_rules.rs"
+test = false
+doc = false
+bench = false

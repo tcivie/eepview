@@ -1,0 +1,58 @@
+# SPDX-FileCopyrightText: 2026 The eepview contributors
+# SPDX-License-Identifier: MIT
+
+# Continuous fuzzing with ClusterFuzzLite. See docs/wiki/fuzzing.md.
+# A pull request gets a short run on the code it changes. Main gets a longer batch run every
+# day. The batch run keeps its corpus in the Actions cache. This workflow is not a required check.
+name: fuzz
+
+on:
+  pull_request:
+    paths:
+      - "src-tauri/src/**"
+      - "src-tauri/fuzz/**"
+      - "src-tauri/Cargo.toml"
+      - "src-tauri/Cargo.lock"
+      - ".clusterfuzzlite/**"
+      - ".github/workflows/fuzz.yml"
+  schedule:
+    - cron: "41 3 * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: fuzz-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  fuzz:
+    name: fuzz (${{ github.event_name == 'pull_request' && 'code-change' || 'batch' }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    permissions:
+      contents: read # check out the repository
+    env:
+      MODE: ${{ github.event_name == 'pull_request' && 'code-change' || 'batch' }}
+      # Total time for all four targets: 5 minutes each on a pull request, 15 each in the batch.
+      FUZZ_SECONDS: ${{ github.event_name == 'pull_request' && '1200' || '3600' }}
+    steps:
+      - name: Build the fuzz targets
+        id: build
+        uses: google/clusterfuzzlite/actions/build_fuzzers@884713a6c30a92e5e8544c39945cd7cb630abcd1 # v1
+        with:
+          language: rust
+          sanitizer: address
+      - name: Run the fuzz targets
+        uses: google/clusterfuzzlite/actions/run_fuzzers@884713a6c30a92e5e8544c39945cd7cb630abcd1 # v1
+        with:
+          fuzz-seconds: ${{ env.FUZZ_SECONDS }}
+          mode: ${{ env.MODE }}
+          sanitizer: address
+      - name: Upload the crash inputs
+        if: failure() && steps.build.outcome == 'success'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: fuzz-crashes
+          path: ./out/artifacts
+          if-no-files-found: ignore

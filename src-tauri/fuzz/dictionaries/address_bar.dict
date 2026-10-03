@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: 2026 The eepview contributors
+# SPDX-License-Identifier: MIT
+
+"http://"
+"https://"
+"eepview://"
+"eepview://settings"
+"javascript:"
+"data:"
+"about:blank"
+"file://"
+".i2p"
+".i2p."
+".i2p:80"
+"stats.i2p"
+"user:pass@"
+"127.0.0.1"
+"localhost"
+"[::1]"
+"\x00"
+"%2e"
+"..%2f"
