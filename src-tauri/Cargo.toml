@@ -68,7 +68,7 @@ image = { version = "0.25", default-features = false, features = [
   "webp",
 ] }
 # The SHA-256 file names of the icon files, so no host name reaches the disk.
-sha2 = "0.11"
+sha2 = "0.10"
 # The `data:image/png;base64,` URLs the UI gets.
 base64 = "0.23"
 
