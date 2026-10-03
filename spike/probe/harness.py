@@ -51,63 +51,81 @@ def render(template: str, mode: str, ports: dict) -> bytes:
     return text.replace("__UDP__", str(ports["udp"])).encode()
 
 
-def proxy_handler(log: EventLog, ports: dict):
-    class Handler(BaseHTTPRequestHandler):
-        def log_message(self, *_args) -> None:
-            return
+class ProbeServer(ThreadingHTTPServer):
+    """A loopback HTTP server that carries the shared event log and the canary ports."""
 
-        def reply(self, status: int, body: bytes, ctype: str = "text/html") -> None:
-            self.send_response(status)
-            self.send_header("Content-Type", ctype)
-            self.send_header("Content-Length", str(len(body)))
-            self.send_header("Cache-Control", "no-store")
-            self.end_headers()
-            self.wfile.write(body)
+    daemon_threads = True
 
-        def do_CONNECT(self) -> None:
-            log.add("connect", target=self.path)
-            self.reply(502, b"I2P ERROR: No outproxy found")
+    def __init__(self, handler: type[BaseHTTPRequestHandler], log: EventLog, ports: dict) -> None:
+        super().__init__(("127.0.0.1", 0), handler)
+        self.log = log
+        self.ports = ports
 
-        def do_GET(self) -> None:
-            url = urlsplit(self.path)
-            host = url.hostname or self.headers.get("Host", "")
-            log.add("proxy", method=self.command, host=host, path=url.path, query=url.query)
-            if host.endswith("probe.i2p"):
-                return self.serve_probe(url)
-            return self.reply(503, b"<h1>I2P ERROR: No outproxy found</h1>")
 
-        do_POST = do_GET
-        do_HEAD = do_GET
+class QuietHandler(BaseHTTPRequestHandler):
+    server: ProbeServer
 
-        def serve_probe(self, url) -> None:
-            mode = parse_qs(url.query).get("mode", ["manual"])[0]
-            if url.path == "/report":
-                log.add("report", **{k: v[0] for k, v in parse_qs(url.query).items()})
-                return self.reply(204, b"")
-            pages = {"/test.html": PAGE, "/frame.html": FRAME}
-            if url.path in pages:
-                return self.reply(200, render(pages[url.path], mode, ports))
+    def log_message(self, *_args) -> None:
+        return
+
+    def reply(self, status: int, body: bytes, ctype: str = "text/html") -> None:
+        self.send_response(status)
+        self.send_header("Content-Type", ctype)
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.end_headers()
+        self.wfile.write(body)
+
+
+class ProxyHandler(QuietHandler):
+    """Acts like an I2P HTTP proxy with no outproxy: serves probe.i2p, refuses the rest."""
+
+    def do_CONNECT(self) -> None:
+        self.server.log.add("connect", target=self.path)
+        host, _, port = self.path.rpartition(":")
+        if not (host.endswith("probe.i2p") and port == "80"):
+            return self.reply(502, b"I2P ERROR: No outproxy found")
+        # An I2P HTTP proxy tunnels CONNECT to an eepsite; WKWebView uses CONNECT even for http.
+        self.send_response(200, "Connection established")
+        self.end_headers()
+        self.wfile.flush()
+        ProxyHandler(self.connection, self.client_address, self.server)
+        self.close_connection = True
+        return None
+
+    def do_GET(self) -> None:
+        url = urlsplit(self.path)
+        host = url.hostname or self.headers.get("Host", "").rsplit(":", 1)[0]
+        self.server.log.add("proxy", method=self.command, host=host, path=url.path, query=url.query)
+        if host.endswith("probe.i2p"):
+            return self.serve_probe(url)
+        return self.reply(503, b"<h1>I2P ERROR: No outproxy found</h1>")
+
+    do_POST = do_GET
+    do_HEAD = do_GET
+
+    def serve_probe(self, url) -> None:
+        query = {k: v[0] for k, v in parse_qs(url.query).items()}
+        if url.path == "/report":
+            self.server.log.add("report", **query)
+            return self.reply(204, b"")
+        pages = {"/test.html": PAGE, "/frame.html": FRAME}
+        if url.path not in pages:
             return self.reply(404, b"not found")
-
-    return Handler
-
-
-def canary_handler(log: EventLog):
-    class Handler(BaseHTTPRequestHandler):
-        def log_message(self, *_args) -> None:
-            return
-
-        def do_GET(self) -> None:
-            log.add("canary", path=self.path)
-            self.send_response(200)
-            self.send_header("Access-Control-Allow-Origin", "*")
-            self.end_headers()
-
-    return Handler
+        return self.reply(200, render(pages[url.path], query.get("mode", "manual"), self.server.ports))
 
 
-def serve_http(handler) -> ThreadingHTTPServer:
-    server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+class CanaryHandler(QuietHandler):
+    """Records any request that reaches loopback without the proxy."""
+
+    def do_GET(self) -> None:
+        self.server.log.add("canary", path=self.path)
+        self.reply(200, b"")
+
+
+def serve_http(handler: type[BaseHTTPRequestHandler], log: EventLog, ports: dict) -> ProbeServer:
+    server = ProbeServer(handler, log, ports)
     threading.Thread(target=server.serve_forever, daemon=True).start()
     return server
 
@@ -157,6 +175,15 @@ def via_proxy(log: EventLog, mode: str, host_part: str) -> bool:
     return any(host_part in (e.get("host", "") + e.get("target", "")) for e in hits)
 
 
+def page_result(log: EventLog, mode: str) -> tuple[str, str]:
+    served = [e for e in log.of(mode, "proxy") if e["host"] == "probe.i2p" and e["path"] == "/test.html"]
+    if served:
+        return "pass", f"{len(served)} page request(s) served"
+    if via_proxy(log, mode, "probe.i2p"):
+        return "FAIL", "the proxy saw the host, but the page was never requested"
+    return "FAIL", "no page request"
+
+
 def loopback_result(log: EventLog, mode: str, tag: str) -> tuple[str, str]:
     if any(tag in e["path"] for e in log.of(mode, "canary")):
         return "LEAK", "the request reached the loopback canary directly"
@@ -203,7 +230,7 @@ def js_result(log: EventLog, mode: str) -> tuple[str, str]:
 def evaluate(log: EventLog, mode: str) -> list[tuple[str, str, str]]:
     m = mode
     rows = [
-        ("page loaded via proxy", *(("pass", "") if via_proxy(log, m, "probe.i2p") else ("FAIL", "no page request"))),
+        ("page loaded via proxy", *page_result(log, m)),
         ("JavaScript state", *js_result(log, m)),
         ("http image via proxy", *(("pass", "") if via_proxy(log, m, f"img-http-{m}") else ("info", "not seen"))),
         ("https image via proxy", *(("pass", "") if via_proxy(log, m, f"img-https-{m}") else ("info", "not seen"))),
@@ -240,8 +267,9 @@ def parse_args():
 def main() -> int:
     args = parse_args()
     log = EventLog()
-    ports = {"canary": serve_http(canary_handler(log)).server_port, "udp": serve_udp(log).getsockname()[1]}
-    ports["proxy"] = serve_http(proxy_handler(log, ports)).server_port
+    ports = {"udp": serve_udp(log).getsockname()[1]}
+    ports["canary"] = serve_http(CanaryHandler, log, ports).server_port
+    ports["proxy"] = serve_http(ProxyHandler, log, ports).server_port
     modes = args.modes.split(",")
     for mode in modes:
         run_mode(mode, ports, log, args)
