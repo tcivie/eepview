@@ -2,7 +2,7 @@
 
 Status: in progress.
 
-Five layers that keep the web engine from reaching the clearnet. See ADR 0001 (docs/wiki/adr-0001-no-leak-architecture.md).
+Five layers that keep the web engine from reaching the clearnet. ADR 0001 lands with the browser shell PR, as adr-0001-no-leak-architecture.md in this wiki.
 
 Work: branch `feat/browser-shell`
 
