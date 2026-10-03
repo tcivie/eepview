@@ -1,16 +1,16 @@
 [package]
 name = "eepview"
 version = "0.1.0"
-description = "A Tauri App"
-authors = ["you"]
-edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+description = "A small browser that opens I2P sites only"
+authors = ["Gleb Tcivie"]
+license = "MIT"
+repository = "https://github.com/tcivie/eepview"
+edition = "2024"
+rust-version = "1.96"
+publish = false
 
 [lib]
-# The `_lib` suffix may seem redundant but it is necessary
-# to make the lib name unique and wouldn't conflict with the bin name.
-# This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
+# The `_lib` suffix keeps the lib name apart from the bin name (cargo#8519 on Windows).
 name = "eepview_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
@@ -19,12 +19,18 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 tauri = { version = "2", features = [] }
-tauri-plugin-opener = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
+[lints.rust]
+unsafe_code = "deny"
 
-# Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration
+[lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+module_name_repetitions = "allow"
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+
 [profile.release]
 codegen-units = 1
 lto = true
