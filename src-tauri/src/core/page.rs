@@ -10,6 +10,15 @@ use crate::hover;
 use crate::nav::{guard, host_of, internal_from_file, internal_with, is_allowed, is_web};
 use crate::tabs::Place;
 
+/// Titles of the error pages of the I2P router proxy.
+const ERROR_TITLES: [&str; 2] = ["Website Unreachable", "Website Not Found In Addressbook"];
+
+/// True for the title of a router proxy error page.
+fn is_error_title(title: &str) -> bool {
+    let title = title.trim();
+    ERROR_TITLES.iter().any(|e| e.eq_ignore_ascii_case(title))
+}
+
 impl Core {
     /// `on_navigation` of a `tab-*` webview. Returns whether the engine may go on (layer L4).
     ///
@@ -34,7 +43,8 @@ impl Core {
     /// The main frame of a tab started to show `url`. Ignored while the tab shows an internal
     /// page: the hidden web view may still run a timer or a refresh.
     pub fn page_started(&mut self, id: u32, url: &str) -> Vec<Effect> {
-        if !self.shows_web(id) {
+        if !self.shows_web(id) || !is_allowed(url) {
+            // Only an I2P address may enter tab state, so it can never be replayed.
             return Vec::new();
         }
         let host = host_of(url).unwrap_or_default();
@@ -44,15 +54,12 @@ impl Core {
         let Some(tab) = self.tabs.get_mut(id) else {
             return Vec::new();
         };
-        if !is_allowed(url) {
-            // Only an I2P address may enter tab state, so it can never be replayed.
-            return Vec::new();
-        }
         if tab.web_js.is_some_and(|live| live != js) {
             // A host with another JS choice: build the webview again for it.
             return self.go_web(id, url);
         }
         tab.loading = true;
+        tab.failed = false;
         url.clone_into(&mut tab.url);
         tab.web_url = Some(url.to_owned());
         tab.session.commit_web(url);
@@ -63,8 +70,18 @@ impl Core {
         ];
         if active {
             fx.extend(self.show_hover(hover::loading(url)));
+            fx.extend(self.take_focus(id));
         }
         fx
+    }
+
+    /// The first commit of an address-bar navigation takes keyboard focus, once, whatever
+    /// address it commits (a redirect target counts).
+    fn take_focus(&mut self, id: u32) -> Option<Effect> {
+        (self.focus_on_commit == Some(id)).then(|| {
+            self.focus_on_commit = None;
+            Effect::FocusContent
+        })
     }
 
     /// The main frame of a tab finished loading `url`.
@@ -82,6 +99,8 @@ impl Core {
         tab.loading = false;
         tab.session.commit_web(url);
         let title = tab.web_title.clone();
+        // A failed load is shown, but it is not a visit worth remembering.
+        let record = record && !tab.failed && !is_error_title(&title);
         let mut fx = vec![Effect::Emit(Event::TabUpdated(id))];
         if record {
             let evicted = self.history.visit(url, &title, now);
@@ -89,6 +108,22 @@ impl Core {
             fx.extend(self.forget_icon_of(evicted.as_ref()));
         }
         fx.extend(self.want_icon(url, now));
+        fx.extend(self.hover_out());
+        fx
+    }
+
+    /// The main frame of a tab loaded `url`, but the load failed: a router or proxy error page,
+    /// a 5xx answer, or a gatekeeper refusal. The tab stops loading. No history entry is made.
+    pub fn page_failed(&mut self, id: u32, url: &str) -> Vec<Effect> {
+        if !self.shows_web(id) || !is_allowed(url) {
+            return Vec::new();
+        }
+        let Some(tab) = self.tabs.get_mut(id) else {
+            return Vec::new();
+        };
+        tab.loading = false;
+        tab.failed = true;
+        let mut fx = vec![Effect::Emit(Event::TabUpdated(id))];
         fx.extend(self.hover_out());
         fx
     }
@@ -106,8 +141,11 @@ impl Core {
             return Vec::new();
         };
         title.clone_into(&mut tab.title);
+        // While the page loads, the finish event records the title; a failed page never
+        // renames the entry of an address.
+        let settled = !tab.loading && !tab.failed && !is_error_title(title);
         let mut fx = vec![Effect::Emit(Event::TabUpdated(id))];
-        if self.settings.history.enabled && self.history.set_title(&url, title) {
+        if settled && self.settings.history.enabled && self.history.set_title(&url, title) {
             fx.extend(self.save_history());
         }
         fx

@@ -314,6 +314,22 @@ mod tests {
     }
 
     #[test]
+    fn a_closed_last_tab_comes_back_with_its_webview() {
+        let app = app();
+        browse(&app, true, "http://a.i2p/");
+        let first = core(&app).tabs().active().unwrap().id;
+        let fx = core(&app).tab_close(first);
+        apply(app.handle(), fx);
+        assert_eq!(label(&app, first), None);
+        let fx = core(&app).tab_reopen();
+        apply(app.handle(), fx);
+        let tab = core(&app).tabs().active().unwrap().id;
+        assert_eq!(core(&app).tabs().active().unwrap().url, "http://a.i2p/");
+        assert_eq!(core(&app).view(), View::Web(tab));
+        assert!(label(&app, tab).is_some());
+    }
+
+    #[test]
     fn a_web_tab_without_a_webview_hides_the_internal_page() {
         let app = app();
         browse(&app, false, "http://a.i2p/");

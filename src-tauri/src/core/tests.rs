@@ -679,3 +679,257 @@ fn the_load_choke_point_refuses_clearnet() {
             .starts_with("eepview://blocked")
     );
 }
+
+fn focus_content_count(fx: &[Effect]) -> usize {
+    fx.iter().filter(|e| **e == Effect::FocusContent).count()
+}
+
+fn focus_address(fx: &[Effect]) -> bool {
+    has(fx, &Effect::Emit(Event::Shortcut("focus-address"))) && has(fx, &Effect::FocusToolbar)
+}
+
+// UX1-1: focus moves to the page when a navigation from the address bar commits.
+#[test]
+fn ux1_1_address_bar_navigation_focuses_the_page_when_it_starts() {
+    let mut c = core();
+    let (_, fx) = c.navigate("stats.i2p");
+    assert_eq!(
+        focus_content_count(&fx),
+        0,
+        "not before the page commits: {fx:?}"
+    );
+    let id = c.tabs().active_id();
+    let fx = c.page_started(id, STATS);
+    assert_eq!(focus_content_count(&fx), 1, "{fx:?}");
+}
+
+// UX1-1: only the first commit of the navigation takes focus.
+#[test]
+fn ux1_1_a_redirect_after_the_commit_does_not_focus_again() {
+    let mut c = core();
+    c.navigate("stats.i2p");
+    let id = c.tabs().active_id();
+    assert_eq!(focus_content_count(&c.page_started(id, STATS)), 1);
+    assert_eq!(focus_content_count(&c.page_started(id, REG)), 0);
+    c.page_finished(id, REG, 1);
+    assert_eq!(focus_content_count(&c.page_started(id, STATS)), 0);
+}
+
+// UX1-1: a page start with no navigation from the address bar (link, redirect) keeps focus.
+#[test]
+fn ux1_1_a_link_does_not_move_focus() {
+    let mut c = core();
+    visit(&mut c, STATS);
+    let id = c.tabs().active_id();
+    let fx = c.page_started(id, REG);
+    assert_eq!(focus_content_count(&fx), 0, "{fx:?}");
+}
+
+// UX1-1: an address bar navigation to an internal page focuses the page at once.
+#[test]
+fn ux1_1_internal_page_navigation_focuses_at_once() {
+    let mut c = core();
+    let (_, fx) = c.navigate("eepview://settings");
+    assert_eq!(focus_content_count(&fx), 1, "{fx:?}");
+}
+
+// UX1-1: each new address bar navigation takes focus again.
+#[test]
+fn ux1_1_a_new_address_bar_navigation_focuses_again() {
+    let mut c = core();
+    visit(&mut c, STATS);
+    let id = c.tabs().active_id();
+    c.navigate("reg.i2p");
+    let fx = c.page_started(id, REG);
+    assert_eq!(focus_content_count(&fx), 1, "{fx:?}");
+}
+
+// UX1-3: a failed load stops loading, tells the UI, and adds no history entry.
+#[test]
+fn ux1_3_page_failed_stops_loading_and_saves_nothing() {
+    let mut c = core();
+    c.navigate("stats.i2p");
+    let id = c.tabs().active_id();
+    c.page_started(id, STATS);
+    assert!(c.tab_info(id).unwrap().nav.loading);
+    let fx = c.page_failed(id, STATS);
+    assert!(has(&fx, &Effect::Emit(Event::TabUpdated(id))), "{fx:?}");
+    assert!(!c.tab_info(id).unwrap().nav.loading);
+    assert!(c.history_query(&HistoryQuery::default()).is_empty());
+}
+
+// UX1-3: a page failed event must not turn the later finish event into a history entry.
+#[test]
+fn ux1_3_page_finished_after_page_failed_saves_nothing() {
+    let mut c = core();
+    c.navigate("stats.i2p");
+    let id = c.tabs().active_id();
+    c.page_started(id, STATS);
+    c.page_failed(id, STATS);
+    c.page_finished(id, STATS, 1);
+    assert!(c.history_query(&HistoryQuery::default()).is_empty());
+}
+
+// UX1-3: an I2P proxy error page ("Website Unreachable") is not saved in history.
+#[test]
+fn ux1_3_website_unreachable_page_is_not_saved() {
+    let mut c = core();
+    c.navigate("stats.i2p");
+    let id = c.tabs().active_id();
+    c.page_started(id, STATS);
+    c.title_changed(id, "Website Unreachable");
+    c.page_finished(id, STATS, 1);
+    assert!(c.history_query(&HistoryQuery::default()).is_empty());
+    assert!(!c.tab_info(id).unwrap().nav.loading);
+}
+
+// UX1-3: a good page is still saved (the rule is not "save nothing").
+#[test]
+fn ux1_3_a_good_page_is_still_saved() {
+    let mut c = core();
+    c.navigate("stats.i2p");
+    let id = c.tabs().active_id();
+    c.page_started(id, STATS);
+    c.title_changed(id, "Stats");
+    c.page_finished(id, STATS, 1);
+    assert_eq!(c.history_query(&HistoryQuery::default()).len(), 1);
+}
+
+// UX1-3: a history entry that already exists for the address is not removed by a failure.
+#[test]
+fn ux1_3_an_existing_entry_survives_a_failed_load() {
+    let mut c = core();
+    visit(&mut c, STATS);
+    c.title_changed(1, "Stats");
+    c.navigate("stats.i2p");
+    let id = c.tabs().active_id();
+    c.page_started(id, STATS);
+    c.title_changed(id, "Website Unreachable");
+    c.page_failed(id, STATS);
+    c.page_finished(id, STATS, 2);
+    let h = c.history_query(&HistoryQuery::default());
+    assert_eq!(h.len(), 1, "{h:?}");
+    assert_eq!(h[0].url, STATS);
+}
+
+// UX1-4: the shortcut puts focus in the address bar after the tab exists.
+#[test]
+fn ux1_4_new_tab_without_url_focuses_the_address_bar() {
+    let mut c = core();
+    let (info, fx) = c.tab_new(None, Place::End);
+    assert!(info.is_some());
+    assert!(focus_address(&fx), "{fx:?}");
+    let at = |want: &Effect| fx.iter().position(|e| e == want);
+    let created = at(&Effect::Emit(Event::TabsChanged)).expect("tab created");
+    let focus = at(&Effect::FocusToolbar);
+    assert!(
+        focus.is_some_and(|f| created < f),
+        "focus comes after the tab is created: {fx:?}"
+    );
+}
+
+// UX1-4: Cmd/Ctrl+T opens a tab and focuses the address bar.
+#[test]
+fn ux1_4_new_tab_shortcut_focuses_the_address_bar() {
+    let mut c = core();
+    let fx = c.shortcut(Action::NewTab, 0);
+    assert_eq!(c.tab_infos().len(), 2);
+    assert!(focus_address(&fx), "{fx:?}");
+}
+
+// UX1-4: a tab opened with a URL does not take focus.
+#[test]
+fn ux1_4_new_tab_with_a_url_does_not_focus_the_address_bar() {
+    let mut c = core();
+    let (_, fx) = c.tab_new(Some(STATS), Place::End);
+    assert!(!has(&fx, &Effect::FocusToolbar), "{fx:?}");
+    assert!(
+        !has(&fx, &Effect::Emit(Event::Shortcut("focus-address"))),
+        "{fx:?}"
+    );
+}
+
+// UX1-4: a tab opened by a page (target=_blank) does not take focus away from the page.
+#[test]
+fn ux1_4_a_page_opened_tab_does_not_focus_the_address_bar() {
+    let mut c = core();
+    visit(&mut c, STATS);
+    let fx = c.new_window(&Url::parse(REG).unwrap());
+    assert!(!has(&fx, &Effect::FocusToolbar), "{fx:?}");
+    assert!(
+        !has(&fx, &Effect::Emit(Event::Shortcut("focus-address"))),
+        "{fx:?}"
+    );
+}
+
+// UX1-7: after the last tab closed, reopen brings back its page as the active tab.
+#[test]
+fn ux1_7_reopen_after_closing_the_last_tab_restores_its_page() {
+    let mut c = core();
+    visit(&mut c, STATS);
+    c.tab_close(1);
+    assert_eq!(c.tab_infos().len(), 1);
+    assert_eq!(c.tab_infos()[0].url, "eepview://home");
+    let fx = c.tab_reopen();
+    assert_eq!(c.tabs().active().unwrap().url, STATS);
+    assert_eq!(loads(&fx).len(), 1, "{fx:?}");
+    assert_eq!(loads(&fx)[0].url, STATS);
+}
+
+// UX1-7: the Cmd/Ctrl+Shift+T shortcut does the same.
+#[test]
+fn ux1_7_reopen_shortcut_after_closing_the_last_tab_restores_its_page() {
+    let mut c = core();
+    visit(&mut c, STATS);
+    c.tab_close(1);
+    c.shortcut(Action::ReopenTab, 0);
+    assert_eq!(c.tabs().active().unwrap().url, STATS);
+}
+
+// UX1-7: an internal page comes back too.
+#[test]
+fn ux1_7_reopen_restores_an_internal_page() {
+    let mut c = core();
+    c.navigate("eepview://settings");
+    c.tab_close(1);
+    c.tab_reopen();
+    assert_eq!(c.tabs().active().unwrap().url, "eepview://settings");
+}
+
+#[test]
+fn the_router_version_comes_from_the_statistics_and_survives_verify() {
+    let mut c = core();
+    assert!(c.router_version(None).is_empty());
+    let fx = c.router_version(Some("2.10.0"));
+    assert!(has(&fx, &Effect::Emit(Event::Router)));
+    assert!(c.router_version(Some("2.10.0")).is_empty());
+    c.router_changed(ok_status());
+    assert_eq!(c.router().version.as_deref(), Some("2.10.0"));
+    c.router_changed(down_status());
+    assert_eq!(c.router().version, None);
+}
+
+#[test]
+fn focusing_the_address_bar_cancels_the_page_focus() {
+    let mut c = core();
+    c.navigate("stats.i2p");
+    c.shortcut(Action::FocusAddress, 0);
+    let id = c.tabs().active_id();
+    assert_eq!(focus_content_count(&c.page_started(id, STATS)), 0);
+}
+
+#[test]
+fn a_failed_page_does_not_rename_its_history_entry() {
+    let mut c = core();
+    visit(&mut c, STATS);
+    c.title_changed(1, "Stats");
+    c.navigate("stats.i2p");
+    let id = c.tabs().active_id();
+    c.page_started(id, STATS);
+    c.title_changed(id, "Broken");
+    c.page_failed(id, STATS);
+    c.title_changed(id, "Broken again");
+    c.page_finished(id, STATS, 9);
+    let h = c.history_query(&HistoryQuery::default());
+    assert_eq!((h.len(), h[0].title.as_str(), h[0].visits), (1, "Stats", 1));
+}

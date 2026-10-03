@@ -21,6 +21,7 @@ pub mod log;
 pub mod menu;
 pub mod popup;
 pub mod state;
+pub mod surface;
 #[cfg(test)]
 mod testing;
 pub mod view;
@@ -178,6 +179,7 @@ fn start<R: Runtime>(app: &mut App<R>, inputs: Inputs) -> tauri::Result<()> {
     chrome::build(app)?;
     let handle = app.handle().clone();
     view::place_buttons(&handle);
+    surface::paint_window(&handle);
     open_start_urls(&handle, &inputs.urls);
     watch::start(&handle, inputs.proxy);
     if let Some(seconds) = inputs.exit_after {

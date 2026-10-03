@@ -1,6 +1,9 @@
 // SPDX-FileCopyrightText: 2026 The eepview contributors
 // SPDX-License-Identifier: MIT
 
+/** What the Router card says when the router did not report a version. */
+export const NO_VERSION = "Version not reported by the router";
+
 export type RouterTone = "ready" | "building" | "stopped";
 
 export interface RouterLike {
@@ -78,4 +81,9 @@ export function hopStates(tone: RouterTone, count: number): HopState[] {
     if (tone === "stopped") return i === 1 ? "refused" : null;
     return i === 1 ? "building" : null;
   });
+}
+
+/** The router version for a page: `I2P <version>`, or why there is none. */
+export function versionText(status: { version: string | null }): string {
+  return status.version ? `I2P ${status.version}` : NO_VERSION;
 }
