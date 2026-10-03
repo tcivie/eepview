@@ -2,10 +2,12 @@ const I2P_HOST = /^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+i2p$/;
 const WEB_SCHEME = /^https?:/i;
 const INTERNAL_SCHEME = "eepview:";
 const EEPSITE_SCHEME = "http:";
+const ANY_SCHEME = /^[a-z][a-z0-9+.-]*:/i;
 
 export function hostOf(input: string): string {
   const bare = input.trim().toLowerCase().replace(WEB_SCHEME, "");
-  return bare.replace(/^\/+/, "").split(/[/?#]/)[0] ?? "";
+  const authority = bare.replace(/^\/+/, "").split(/[/?#]/)[0] ?? "";
+  return authority.replace(/^[^@]*@/, "").replace(/:\d*$/, "");
 }
 
 export function isI2pAddress(input: string): boolean {
@@ -37,6 +39,7 @@ export function internalPageOf(url: string): string | null {
 }
 
 export function internalUrlForFile(href: string): string | null {
+  if (ANY_SCHEME.test(href)) return null;
   const match = /(?:^|\/)([a-z-]+)\.html(\?[^#]*)?(?:#.*)?$/.exec(href);
   if (!match) return null;
   return `eepview://${match[1]}${match[2] ?? ""}`;

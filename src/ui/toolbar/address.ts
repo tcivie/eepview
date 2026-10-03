@@ -55,6 +55,7 @@ function renderList(): void {
 }
 
 function closeList(): void {
+  requestSeq += 1;
   state = emptySuggest();
   renderList();
 }

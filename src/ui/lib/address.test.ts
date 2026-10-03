@@ -17,6 +17,10 @@ describe("hostOf", () => {
   it("accepts a bare host", () => {
     assert.equal(hostOf("  zzz.i2p "), "zzz.i2p");
   });
+  it("drops the port and the user info", () => {
+    assert.equal(hostOf("http://user:pw@foo.i2p:8080/x"), "foo.i2p");
+    assert.equal(isI2pAddress("http://foo.i2p:8080/"), true);
+  });
   it("returns empty text for empty input", () => {
     assert.equal(hostOf(""), "");
   });
@@ -49,6 +53,7 @@ describe("internal addresses", () => {
     assert.equal(internalUrlForFile("./bookmarks.html"), "eepview://bookmarks");
     assert.equal(internalUrlForFile("/src/ui/history.html?q=a#x"), "eepview://history?q=a");
     assert.equal(internalUrlForFile("http://stats.i2p/"), null);
+    assert.equal(internalUrlForFile("http://foo.i2p:8080/index.html"), null);
   });
 });
 

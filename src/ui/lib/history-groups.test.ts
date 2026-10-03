@@ -1,6 +1,14 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { dayKey, dayLabel, groupByDay, oldestVisit, timeOfDay } from "./history-groups.ts";
+import {
+  dayKey,
+  dayLabel,
+  groupByDay,
+  mergePage,
+  oldestVisit,
+  pageCursor,
+  timeOfDay,
+} from "./history-groups.ts";
 
 const at = (y: number, m: number, d: number, h = 12, min = 0): number =>
   new Date(y, m - 1, d, h, min).getTime();
@@ -52,5 +60,28 @@ describe("helpers", () => {
   it("finds the oldest visit for the next page", () => {
     assert.equal(oldestVisit([{ visited: 5 }, { visited: 2 }, { visited: 9 }]), 2);
     assert.equal(oldestVisit([]), undefined);
+  });
+});
+
+describe("paging", () => {
+  it("asks for the oldest timestamp again so ties are not lost", () => {
+    assert.equal(pageCursor([{ visited: 9 }, { visited: 4 }]), 5);
+    assert.equal(pageCursor([]), undefined);
+  });
+  it("drops rows it already has", () => {
+    const first = [
+      { id: "a", visited: 5 },
+      { id: "b", visited: 4 },
+    ];
+    const page = [
+      { id: "b", visited: 4 },
+      { id: "c", visited: 4 },
+    ];
+    const merged = mergePage(first, page);
+    assert.deepEqual(
+      merged.entries.map((e) => e.id),
+      ["a", "b", "c"],
+    );
+    assert.equal(merged.added, 1);
   });
 });

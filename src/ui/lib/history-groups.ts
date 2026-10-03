@@ -51,3 +51,22 @@ export function timeOfDay(ts: number, locale = "en-GB"): string {
 export function oldestVisit<T extends Dated>(entries: T[]): number | undefined {
   return entries.length === 0 ? undefined : Math.min(...entries.map((e) => e.visited));
 }
+
+export function pageCursor<T extends Dated>(entries: T[]): number | undefined {
+  const oldest = oldestVisit(entries);
+  return oldest === undefined ? undefined : oldest + 1;
+}
+
+export interface PageMerge<T> {
+  entries: T[];
+  added: number;
+}
+
+export function mergePage<T extends Dated & { id: string }>(
+  existing: T[],
+  page: T[],
+): PageMerge<T> {
+  const known = new Set(existing.map((e) => e.id));
+  const fresh = page.filter((e) => !known.has(e.id));
+  return { entries: [...existing, ...fresh], added: fresh.length };
+}
