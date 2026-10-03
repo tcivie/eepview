@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: 2026 The eepview contributors
+# SPDX-License-Identifier: MIT
 # Publish docs/wiki to the GitHub wiki. Needs GH_TOKEN and REPO (owner/name).
 # README.md becomes Home.md. Relative links are rewritten for the wiki.
 set -euo pipefail

@@ -27,6 +27,7 @@ Working rules for any human or AI agent on this repo.
 - Write unit tests for every pure module.
 - Coverage only goes up. The ratchet is in `ci.yml`.
 - Add no coverage exclusions.
+- Tests check the requirement, not the code. The agent that writes the tests is not the agent that writes the code. It reads the requirement and the public interface only, never the implementation. Each test names its requirement. Never edit a test to match the code. See `docs/wiki/testing-policy.md`.
 
 ## Security
 
@@ -48,9 +49,9 @@ Working rules for any human or AI agent on this repo.
 - Edit `docs/wiki/` in the repo. The GitHub wiki is generated from it.
 - Add a History line with the PR link.
 - Update the status in `docs/wiki/README.md`.
-- Add a line to `CHANGELOG.md` under Unreleased with the PR link.
+- Do not edit CHANGELOG.md in a pull request. The release job generates it from the commit titles, so write a clear Conventional Commit PR title.
 - Get the number with `gh pr view --json number` after you open the PR. Then push the docs commit.
-- CI (`docs-check`) fails a PR that changes code or workflows without a docs or changelog update.
+- CI (`docs-check`) fails a `feat` PR that does not change a page under `docs/wiki/`, and any PR that edits `CHANGELOG.md`.
 
 ## Writing style
 

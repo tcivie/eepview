@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The eepview contributors
+// SPDX-License-Identifier: MIT
+
 import type { RouterStats, RouterStatus } from "../contract.ts";
 import { all, byId } from "../dom.ts";
 import { call } from "../ipc.ts";

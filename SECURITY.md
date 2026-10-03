@@ -28,10 +28,13 @@ Include this information in your report:
 
 ## What to expect
 
-- We acknowledge your report within 7 days.
+- We acknowledge your report within 3 days.
+- We triage it within 7 days.
 - We send a fix or a plan within 30 days.
 - We use coordinated disclosure. We publish the advisory after the fix is ready. We agree the date with you.
 - We credit you in the advisory if you want it. Tell us the name to use.
+
+The full steps, from report to advisory and CVE, are in [Vulnerability response](https://github.com/tcivie/eepview/wiki/vulnerability-response).
 
 ## Scope
 

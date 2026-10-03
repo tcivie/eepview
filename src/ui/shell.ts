@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The eepview contributors
+// SPDX-License-Identifier: MIT
+
 import type { Settings } from "./contract.ts";
 import { call, devMode, inShell, on } from "./ipc.ts";
 import { internalUrlForFile, isI2pAddress, isInternal } from "./lib/address.ts";

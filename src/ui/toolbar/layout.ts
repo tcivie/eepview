@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The eepview contributors
+// SPDX-License-Identifier: MIT
+
 import type { ChromeInsets } from "../contract.ts";
 import { all, byId } from "../dom.ts";
 import { call, on } from "../ipc.ts";

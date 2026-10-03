@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The eepview contributors
+// SPDX-License-Identifier: MIT
+
 declare module "node:test" {
   type TestFn = () => unknown;
   export function describe(name: string, fn: TestFn): void;

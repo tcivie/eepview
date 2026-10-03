@@ -4,7 +4,8 @@ Every change to main passes lint, complexity limits, security scans and a rulese
 
 ## How it works
 
-- `.github/workflows/lint.yml` runs rustfmt and clippy (pedantic, `-D warnings`), biome and tsc, taplo, shellcheck, lizard complexity and actionlint.
+- `.github/workflows/lint.yml` runs rustfmt and clippy (pedantic, `-D warnings`), biome and tsc, taplo, shellcheck, lizard complexity, actionlint and `reuse lint` (SPDX headers, with `REUSE.toml` for files that cannot hold a comment). The `reuse` tool and its build backend are pinned by hash in `scripts/requirements-reuse.txt` and `scripts/requirements-reuse-build.txt`.
+- `.github/workflows/dco.yml` runs the `dco` job on each PR. It checks that every commit has a `Signed-off-by` line that matches its author. Dependabot commits are skipped. It is not a required check yet.
 - `.github/workflows/ci.yml` builds and tests the app.
 - `.github/workflows/security.yml` runs cargo-deny, gitleaks and zizmor. zizmor runs with `--persona=pedantic` in CI and in lefthook, and every write permission and every non-default read permission has a comment that says why. CI pins the zizmor version (1.30.1).
 - `.github/workflows/codeql.yml` runs CodeQL (`security-extended`) for actions, javascript-typescript and rust. Each matrix entry has a fixed job name, `codeql (<language>)`.
@@ -13,7 +14,7 @@ Every change to main passes lint, complexity limits, security scans and a rulese
 - Complexity limits: cognitive and cyclomatic complexity 10 or less, 40 lines per function, 5 parameters, nesting 3.
 - No lint exclusions exist. The code is fixed instead.
 - Socket reviews every dependency change.
-- The `docs-check` job (`scripts/docs-check.sh`) fails a PR that changes code or workflows without a CHANGELOG or docs/wiki update. It also checks that every wiki page is indexed.
+- The `docs-check` job (`scripts/docs-check.sh`) fails a `feat` PR that changes no page under `docs/wiki/`, and any PR that edits `CHANGELOG.md`. It also checks that every wiki page is indexed. `scripts/docs-check.test.sh` tests the check. The job lives in `.github/workflows/docs-check.yml` and runs again when the PR title changes.
 - A repository ruleset blocks direct pushes to main. A pull request needs green required checks.
 
 ## How to use / run locally
@@ -22,6 +23,8 @@ Every change to main passes lint, complexity limits, security scans and a rulese
 - Rust: `cargo fmt --manifest-path src-tauri/Cargo.toml --check` and `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --locked -- -D warnings`.
 - Web: `npx biome ci .` and `npm run typecheck`.
 - Complexity: `./scripts/complexity.sh`.
+- Licenses: `reuse lint`.
+- Sign-off: use `git commit -s`.
 
 ## Limits
 
@@ -38,4 +41,6 @@ Every change to main passes lint, complexity limits, security scans and a rulese
 - 2026-10-03 — Hash-pinned CI tools and typed vite config — [#15](https://github.com/tcivie/eepview/pull/15)
 - 2026-10-03 — Add the docs-check job: code changes need a docs or changelog update — [#16](https://github.com/tcivie/eepview/pull/16)
 - 2026-10-03 — Restore CodeQL and Scorecard, add dependency review and audit badges — [#26](https://github.com/tcivie/eepview/pull/26)
+- 2026-10-03 — Add `reuse lint` and the DCO check — [#30](https://github.com/tcivie/eepview/pull/30)
 - 2026-10-03 — Run zizmor with the pedantic persona; document every workflow permission — [#47](https://github.com/tcivie/eepview/pull/47)
+- 2026-10-03 — docs-check: a feat PR needs a wiki change, and CHANGELOG.md is generated, not edited — [#50](https://github.com/tcivie/eepview/pull/50)
