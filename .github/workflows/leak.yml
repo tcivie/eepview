@@ -1,6 +1,6 @@
 name: leak
 
-# The permanent leak test from docs/adr/0001-no-leak-architecture.md. It runs the real
+# The permanent leak test from docs/wiki/adr-0001-no-leak-architecture.md. It runs the real
 # release binary against a fake I2P proxy and canaries, on every OS. Required check.
 
 on:

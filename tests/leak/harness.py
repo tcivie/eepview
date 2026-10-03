@@ -3,7 +3,7 @@
 
 Exit code 0 only when every canary got zero hits, the fake upstream saw only `.i2p` hosts,
 the test page loaded and reported, and (on Linux, with --strace) the app opened no socket
-except to its own gatekeeper and the fake upstream. See docs/adr/0001-no-leak-architecture.md.
+except to its own gatekeeper and the fake upstream. See docs/wiki/adr-0001-no-leak-architecture.md.
 
   python3 tests/leak/harness.py --binary src-tauri/target/release/eepview
   python3 tests/leak/harness.py --negative-control
