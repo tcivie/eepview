@@ -21,6 +21,12 @@ name = "eepview_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [dev-dependencies]
+# Property tests of the robustness suite (tests/robust_*.rs) and the site icons
+# (tests/site_icons_props.rs). No default features: no fork, no timeout.
+proptest = { version = "1.11.0", default-features = false, features = ["std"] }
+# The L3 rule is a regex; the tests run the real rule against the same URLs as the guard.
+# Already in the tree through Tauri.
+regex = { version = "1", default-features = false, features = ["std"] }
 # The mock runtime (`tauri::test`) for the shell tests.
 tauri = { version = "2", default-features = false, features = ["test", "unstable", "wry"] }
 # Real PNG, ICO, GIF, JPEG, WebP and BMP bytes for the site icon tests (tests/site_icons_*.rs).
@@ -32,8 +38,6 @@ image = { version = "0.25", default-features = false, features = [
   "webp",
   "bmp",
 ] }
-# Property tests for the icon file names and the host check (tests/site_icons_props.rs).
-proptest = "1"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
