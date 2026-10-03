@@ -24,8 +24,8 @@ const renderBlockingEntry: Plugin = {
   transformIndexHtml: {
     order: "post",
     handler: (html) =>
-      html.replaceAll(
-        '<script type="module" crossorigin',
+      html.replace(
+        /<script type="module" crossorigin/g,
         '<script type="module" blocking="render" crossorigin',
       ),
   },
