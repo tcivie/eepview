@@ -181,10 +181,18 @@ proptest! {
         prop_assert_eq!(classify(&host), Target::Web(Url::parse(&want).map_err(|e| TestCaseError::fail(e.to_string()))?));
     }
 
-    // Req: IPC `navigate`: text with no dot and no scheme searches history and bookmarks.
+    // Req: IPC `navigate` / owner decision: one word with no dot, no colon and no scheme
+    // searches history and bookmarks.
     #[test]
-    fn plain_words_search(text in "[a-z]{1,8}( [a-z]{1,8}){0,3}") {
-        prop_assert!(matches!(classify(&text), Target::Search(_)), "{text:?}");
+    fn one_word_searches(word in "[a-z0-9]{1,12}") {
+        prop_assert!(matches!(classify(&word), Target::Search(_)), "{word:?}");
+    }
+
+    // Req: owner decision "one word ... searches; anything else that is not on *.i2p is refused":
+    // text with spaces inside never searches and never loads.
+    #[test]
+    fn several_words_are_refused(text in "[a-z]{1,8}( [a-z]{1,8}){1,3}") {
+        prop_assert!(matches!(classify(&text), Target::Refused(_)), "{text:?}");
     }
 
     // Req: IPC `navigate`: an `http(s)` URL on a `.i2p` host loads (with a path, query, fragment).
