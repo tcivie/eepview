@@ -129,7 +129,17 @@ function wirePopupButtons(): void {
   });
 }
 
+const MOUSE_BACK = 3;
+const MOUSE_FORWARD = 4;
+
+/** The mouse back and forward buttons over the toolbar (links-and-shortcuts B3). */
+function onMouseButton(event: MouseEvent): void {
+  if (event.button === MOUSE_BACK) call("go_back", {}).catch(quiet);
+  if (event.button === MOUSE_FORWARD) call("go_forward", {}).catch(quiet);
+}
+
 export function wireNav(): void {
+  document.addEventListener("mouseup", onMouseButton);
   bindClicks(
     {
       back: () => call("go_back", {}).catch(quiet),

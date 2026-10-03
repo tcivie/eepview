@@ -15,6 +15,9 @@
 //! | [`go`] | `goBack` … `stopLoading` | `GoBack` … `Stop` | `go_back` … `stop_loading` |
 //! | [`find`] | `findString` + a count in the private world | not handled | `WebKitFindController` |
 //! | [`harden`] | fraud-check call-home off | autofill, password save, `SmartScreen` off | WebRTC and media capture off |
+//! | [`on_input`] | a script in the private world | `AcceleratorKeyPressed`, `ContextMenuRequested` | `button-press-event`, `key-press-event`, `context-menu` |
+//! | [`copy_text`], [`edit`] | `NSPasteboard`, responder actions | Win32 clipboard; native menu items | `GtkClipboard`, editing commands |
+//! | [`held_keys`] | `NSEvent.modifierFlags` | `GetKeyState` | `GdkKeymap` |
 
 #[cfg(target_os = "linux")]
 pub mod linux;
@@ -30,6 +33,9 @@ pub mod windows;
 use windows as imp;
 
 use std::fmt::Write as _;
+
+mod input;
+pub use input::*;
 
 pub use tauri::webview::PlatformWebview;
 
@@ -212,6 +218,47 @@ pub fn place_window_buttons(webview: &PlatformWebview, center_y: f64) -> Option<
 /// Fails when the engine handle is missing or the engine refuses the call.
 pub fn harden(webview: &PlatformWebview) -> Result<(), String> {
     imp::harden(webview)
+}
+
+/// Reports the input of a webview to `hooks`: link clicks, keys the menu bar cannot see,
+/// the mouse back and forward buttons, and context menu requests. Install it once per
+/// webview.
+///
+/// # Errors
+///
+/// Fails when the engine handle is missing or the engine refuses the call.
+pub fn on_input(webview: &PlatformWebview, hooks: Hooks) -> Result<(), String> {
+    imp::on_input(webview, hooks)
+}
+
+/// Puts plain text on the system clipboard.
+///
+/// # Errors
+///
+/// Fails when the clipboard cannot be opened or written.
+pub fn copy_text(text: &str) -> Result<(), String> {
+    imp::copy_text(text)
+}
+
+/// Runs an editing command in the webview, as the engine's own menu item does.
+///
+/// # Errors
+///
+/// Fails where the engine runs the command from its own menu item instead.
+pub fn edit(webview: &PlatformWebview, command: Native) -> Result<(), String> {
+    imp::edit(webview, command)
+}
+
+/// The modifier keys held right now.
+#[must_use]
+pub fn held_keys() -> Keys {
+    imp::held_keys()
+}
+
+/// Takes the Start Dictation and Emoji items out of the macOS menu bar (P4). Call it
+/// before the menu bar is built. Other systems add no such item.
+pub fn quiet_menus() {
+    imp::quiet_menus();
 }
 
 #[cfg(test)]

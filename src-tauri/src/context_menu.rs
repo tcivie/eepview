@@ -154,12 +154,19 @@ pub struct Target {
     pub editable: bool,
     /// The URL of the page.
     pub page: String,
+    /// Where the tab can go on its history.
+    pub history: PageHistory,
+    /// The page has a bookmark.
+    pub bookmarked: bool,
+}
+
+/// Where a tab can go on its history.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct PageHistory {
     /// The tab can go back.
     pub can_back: bool,
     /// The tab can go forward.
     pub can_forward: bool,
-    /// The page has a bookmark.
-    pub bookmarked: bool,
 }
 
 fn item(id: ItemId, enabled: bool) -> Entry {
@@ -219,8 +226,8 @@ fn image_group(url: &str) -> Vec<Entry> {
 
 fn page_group(target: &Target) -> Vec<Entry> {
     vec![
-        item(ItemId::Back, target.can_back),
-        item(ItemId::Forward, target.can_forward),
+        item(ItemId::Back, target.history.can_back),
+        item(ItemId::Forward, target.history.can_forward),
         item(ItemId::Reload, true),
         Entry::Separator,
         item(

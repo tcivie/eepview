@@ -31,9 +31,10 @@ use tauri::{
 use super::apply::{self, LISTENERS, with_core};
 use super::state::{lock, shared};
 use super::webrtc::webrtc_off;
-use super::{engine, view};
+use super::{engine, input, view};
 use crate::core::{ConsoleOp, Core, EngineOp};
 use crate::diag::{self, Code, ErrorKind, Field, OpKind};
+use crate::input::{Disposition, MAC};
 use crate::net::console::{ConsoleInfo, ConsoleNav, VerifiedConsole, after_recheck, detect_here};
 
 /// The label of the console webview.
@@ -93,6 +94,8 @@ fn build<R: Runtime>(app: &AppHandle<R>, console: &VerifiedConsole) -> tauri::Re
         LogicalSize::new(rect.w, rect.h),
     )?;
     let _ = webview.hide();
+    let handle = app.clone();
+    let _ = webview.with_webview(move |p| input::install(&handle, &p, input::Source::Console));
     view::raise_chrome(app, &window);
     Ok(webview)
 }
@@ -185,10 +188,28 @@ pub fn new_window<R: Runtime>(
 ) -> NewWindowResponse<R> {
     match console.route(url) {
         ConsoleNav::Stay => load_here(app, url.clone()),
-        ConsoleNav::OpenTab => open_tab(app, url),
+        ConsoleNav::OpenTab => match input::window_action(MAC, eepview_platform::held_keys()) {
+            Some(how) => with_core(app, |core| core.open_link(url, how)),
+            None => open_tab(app, url),
+        },
         ConsoleNav::Cancel => {}
     }
     NewWindowResponse::Deny
+}
+
+/// A console link opened with the new-tab keys or the middle button (L2 to L5). The
+/// console origin stays in the console view: there is never a second console tab, and no
+/// normal tab ever loads a loopback page. An I2P site opens in a new normal tab through the
+/// tab guard. Anything else does nothing.
+pub fn open_link<R: Runtime>(app: &AppHandle<R>, url: &Url, how: Disposition) {
+    let Some(console) = current(app) else {
+        return;
+    };
+    match console.route(url) {
+        ConsoleNav::Stay => load_here(app, url.clone()),
+        ConsoleNav::OpenTab => with_core(app, |core| core.open_link(url, how)),
+        ConsoleNav::Cancel => {}
+    }
 }
 
 /// R25: a main-frame load of the console view. Only a URL on the console origin reaches

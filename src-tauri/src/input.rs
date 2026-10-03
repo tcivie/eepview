@@ -2,37 +2,10 @@
 // SPDX-License-Identifier: MIT
 
 //! Where a link opens: the held keys and the mouse button decide (docs/wiki/links-and-shortcuts.md,
-//! L1 to L7). Pure.
+//! L1 to L7). Pure. [`Modifiers`] and [`MouseButton`] are the types the engine bridge
+//! reports (`eepview_platform::Keys` and `Button`).
 
-/// The modifier keys held during a click or a key press.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
-pub struct Modifiers {
-    /// Command on macOS, the Windows (Super) key elsewhere.
-    pub meta: bool,
-    /// Control.
-    pub ctrl: bool,
-    /// Alt (Option on macOS).
-    pub alt: bool,
-    /// Shift.
-    pub shift: bool,
-}
-
-/// The mouse button of a click.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum MouseButton {
-    /// A keyboard activation, such as Enter on a link.
-    None,
-    /// The primary (left) button.
-    Primary,
-    /// The middle button or wheel.
-    Middle,
-    /// The secondary (right) button.
-    Secondary,
-    /// The back button.
-    Back,
-    /// The forward button.
-    Forward,
-}
+pub use eepview_platform::{Button as MouseButton, Keys as Modifiers};
 
 /// Where a link opens.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -49,10 +22,14 @@ pub enum Disposition {
 /// elsewhere. On macOS a Ctrl click is the context menu, so it never opens a tab.
 #[must_use]
 pub fn link_disposition(mac: bool, modifiers: Modifiers, button: MouseButton) -> Disposition {
-    let new_tab_key = if mac { modifiers.meta } else { modifiers.ctrl };
+    let new_tab_key = if mac {
+        modifiers.meta()
+    } else {
+        modifiers.ctrl()
+    };
     let opens_tab = match button {
         MouseButton::Middle => true,
-        MouseButton::Primary | MouseButton::None if mac && modifiers.ctrl => {
+        MouseButton::Primary | MouseButton::None if mac && modifiers.ctrl() => {
             return Disposition::CurrentTab;
         }
         MouseButton::Primary | MouseButton::None => new_tab_key,
@@ -60,7 +37,7 @@ pub fn link_disposition(mac: bool, modifiers: Modifiers, button: MouseButton) ->
             return Disposition::CurrentTab;
         }
     };
-    if modifiers.shift {
+    if modifiers.shift() {
         Disposition::NewForegroundTab
     } else if opens_tab {
         Disposition::NewBackgroundTab

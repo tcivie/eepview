@@ -325,6 +325,10 @@ named_enum!(
         Harden => "harden",
         /// The hover hook.
         Hover => "hover",
+        /// The input hook (links, keys, mouse buttons, context menus).
+        Input => "input",
+        /// The clipboard.
+        Clipboard => "clipboard",
         /// The first load of a tab.
         FirstLoad => "first-load",
         /// The engine request filter.

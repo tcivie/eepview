@@ -188,7 +188,7 @@ fn hooks<R: Runtime>(
     let (nav_app, win_app, dl_app) = (app.clone(), app.clone(), app.clone());
     builder
         .on_navigation(move |url| navigation(&nav_app, tab, url))
-        .on_new_window(move |url, _features| new_window(&win_app, &url))
+        .on_new_window(move |url, _features| new_window(&win_app, tab, &url))
         .on_download(move |_webview, event| download(&dl_app, &event))
         .on_page_load(move |webview, payload| {
             page_load(webview.app_handle(), tab, payload.event(), payload.url());
@@ -209,8 +209,8 @@ fn navigation<R: Runtime>(app: &AppHandle<R>, tab: u32, url: &Url) -> bool {
 }
 
 /// A page asked for a new window: the core may open a tab, the engine never opens one.
-fn new_window<R: Runtime>(app: &AppHandle<R>, url: &Url) -> NewWindowResponse<R> {
-    with_core(app, |core| core.new_window(url));
+fn new_window<R: Runtime>(app: &AppHandle<R>, tab: u32, url: &Url) -> NewWindowResponse<R> {
+    super::input::new_window(app, super::input::Source::Tab(tab), url);
     NewWindowResponse::Deny
 }
 
@@ -281,7 +281,7 @@ mod tests {
     #[test]
     fn new_windows_are_always_denied() {
         let app = bare();
-        let response = new_window(app.handle(), &url("http://a.i2p/"));
+        let response = new_window(app.handle(), 1, &url("http://a.i2p/"));
         assert!(matches!(response, NewWindowResponse::Deny));
     }
 

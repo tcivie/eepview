@@ -73,8 +73,10 @@ fn go<R: Runtime>(webview: &Webview<R>, nav: Nav) -> tauri::Result<()> {
     })
 }
 
-/// Hardens the engine and hooks the link under the mouse to the status bubble.
+/// Hardens the engine, hooks the link under the mouse to the status bubble, and hooks the
+/// input (links, Esc, mouse buttons, context menus).
 pub fn native_hooks<R: Runtime>(platform: &PlatformWebview, app: &AppHandle<R>, tab: u32) {
+    super::input::install(app, platform, super::input::Source::Tab(tab));
     if eepview_platform::harden(platform).is_err() {
         bridge_failed(OpKind::Harden);
     }

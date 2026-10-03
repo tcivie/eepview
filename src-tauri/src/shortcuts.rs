@@ -229,12 +229,12 @@ fn chord_of(mac: bool, accel: &str) -> Chord {
     let code = parts.pop().unwrap_or_default().to_owned();
     let mut modifiers = Modifiers::default();
     for part in parts {
-        match part {
-            "CmdOrCtrl" if mac => modifiers.meta = true,
-            "Alt" => modifiers.alt = true,
-            "Shift" => modifiers.shift = true,
-            _ => modifiers.ctrl = true,
-        }
+        modifiers = match part {
+            "CmdOrCtrl" if mac => modifiers.with_meta(true),
+            "Alt" => modifiers.with_alt(true),
+            "Shift" => modifiers.with_shift(true),
+            _ => modifiers.with_ctrl(true),
+        };
     }
     Chord { code, modifiers }
 }
