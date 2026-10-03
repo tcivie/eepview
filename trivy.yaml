@@ -1,0 +1,17 @@
+# Trivy config for `trivy fs .` in CI.
+# The release gate: no CRITICAL or HIGH finding that has a fix.
+scan:
+  scanners:
+    - vuln
+    - secret
+    - misconfig
+  skip-dirs:
+    - src-tauri/target
+    - dist
+severity:
+  - CRITICAL
+  - HIGH
+vulnerability:
+  ignore-unfixed: true
+exit-code: 1
+ignorefile: .trivyignore

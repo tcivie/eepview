@@ -1,0 +1,41 @@
+# cargo-deny policy. CI runs `cargo deny check` and fails on any error.
+
+[graph]
+all-features = true
+
+[advisories]
+# Every RustSec advisory is an error unless it is listed here with a reason.
+yanked = "deny"
+ignore = [
+  # proc-macro-error is unmaintained (not a vulnerability). Build-time macro only, pulled by
+  # tauri -> muda -> gtk 0.18 -> glib-macros on Linux. Remove when Tauri moves off gtk-rs 0.18.
+  { id = "RUSTSEC-2024-0370", reason = "transitive build-time macro from Tauri's GTK stack" },
+]
+
+[licenses]
+# Permissive licenses only. A copyleft crate needs a decision first.
+allow = [
+  "MIT",
+  "MIT-0",
+  "Apache-2.0",
+  "Apache-2.0 WITH LLVM-exception",
+  "BSD-3-Clause",
+  "Zlib",
+  "0BSD",
+  "Unlicense",
+  "CC0-1.0",
+  "MPL-2.0",
+  "Unicode-3.0",
+]
+confidence-threshold = 0.9
+
+[bans]
+multiple-versions = "allow"
+wildcards = "deny"
+allow-wildcard-paths = true
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []
