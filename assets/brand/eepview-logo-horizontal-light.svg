@@ -1,31 +1,69 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1160 256">
   <title>eepview logo, for light backgrounds</title>
-  <defs>
-    <linearGradient id="evl-bg" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#30357A"/>
-      <stop offset="1" stop-color="#191C44"/>
-    </linearGradient>
-    <linearGradient id="evl-clove" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#C4B8FF"/>
-      <stop offset="1" stop-color="#8C79F4"/>
-    </linearGradient>
-  </defs>
   <g transform="scale(.31068) translate(-100 -100)">
-    <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#evl-bg)" stroke="#FFFFFF" stroke-opacity=".12" stroke-width="4"/>
-    <rect x="200" y="240" width="624" height="544" rx="64" fill="#F6F3EC"/>
-    <rect x="240" y="344" width="544" height="400" rx="28" fill="#1C1F4A"/>
-    <g fill="#BDB6D6">
-      <circle cx="272" cy="292" r="14"/>
-      <circle cx="316" cy="292" r="14"/>
-      <circle cx="360" cy="292" r="14"/>
-    </g>
-    <path d="M512 400C506 388 508 376 520 366" fill="none" stroke="#E4DEFF" stroke-width="14" stroke-linecap="round"/>
-    <g transform="translate(512 556) scale(.84) translate(-512 -552)">
-      <path d="M548 424C640 480 728 520 728 620C728 700 668 744 584 744H578C604 620 600 500 548 424ZM476 424C384 480 296 520 296 620C296 700 356 744 440 744H446C420 620 424 500 476 424Z" fill="url(#evl-clove)"/>
-      <path d="M512 360C560 440 572 590 540 744Q512 752 484 744C452 590 464 440 512 360Z" fill="#E4DEFF"/>
-    </g>
+  <defs>
+    <linearGradient id="evl-body" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2A6A56"/>
+      <stop offset="1" stop-color="#0F3529"/>
+    </linearGradient>
+    <radialGradient id="evl-view" cx="512" cy="590" r="330" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#1A4A3E"/>
+      <stop offset="1" stop-color="#0A231C"/>
+    </radialGradient>
+    <linearGradient id="evl-inset" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#000" stop-opacity=".45"/>
+      <stop offset=".14" stop-color="#000" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="evl-clove" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#D9C6A1"/>
+      <stop offset=".5" stop-color="#FCF7EC"/>
+      <stop offset="1" stop-color="#DECDAB"/>
+    </linearGradient>
+    <radialGradient id="evl-shade" cx="430" cy="540" r="300" gradientUnits="userSpaceOnUse">
+      <stop offset=".35" stop-color="#5A3E1E" stop-opacity="0"/>
+      <stop offset="1" stop-color="#5A3E1E" stop-opacity=".38"/>
+    </radialGradient>
+    <filter id="evl-grain" x="0" y="0" width="1" height="1">
+      <feTurbulence type="fractalNoise" baseFrequency=".85" numOctaves="2" stitchTiles="stitch"/>
+      <feColorMatrix values="0 0 0 0 .42 0 0 0 0 .34 0 0 0 0 .22 0 0 0 .22 0"/>
+      <feComposite in2="SourceGraphic" operator="in"/>
+    </filter>
+    <filter id="evl-soft" x="-.5" y="-.5" width="2" height="2">
+      <feGaussianBlur stdDeviation="8"/>
+    </filter>
+  </defs>
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#evl-body)" stroke="#FFFFFF" stroke-opacity=".12" stroke-width="4"/>
+  <rect x="200" y="240" width="624" height="544" rx="64" fill="#F3EDE0"/>
+  <rect x="200" y="240" width="624" height="544" rx="64" filter="url(#evl-grain)"/>
+  <g fill="#D2C6AC">
+    <circle cx="272" cy="292" r="14"/>
+    <circle cx="316" cy="292" r="14"/>
+    <circle cx="360" cy="292" r="14"/>
   </g>
-  <g transform="translate(312 184) scale(1.12)" fill="none" stroke="#1B1E45" stroke-width="18" stroke-linecap="round" stroke-linejoin="round">
+  <rect x="240" y="344" width="544" height="400" rx="28" fill="url(#evl-view)"/>
+  <rect x="240" y="344" width="544" height="400" rx="28" fill="url(#evl-inset)"/>
+  <g transform="translate(0 -10)">
+    <ellipse cx="512" cy="728" rx="176" ry="16" fill="#000" opacity=".4" filter="url(#evl-soft)"/>
+    <g fill="none" stroke="#CDBA92" stroke-width="2.2" stroke-linecap="round">
+      <path d="M468 714q0 8 -17 14M472 714q-6 13 -20 21M476 714q2 11 -12 19M480 714q-8 10 -18 17M484 714q-1 9 -12 15M488 714q-6 13 -14 22M492 714q1 12 -7 20M496 714q3 11 -3 18M500 714q-2 10 -6 16M504 714q-6 8 -8 14M508 714q3 13 1 21M512 714q0 11 0 19M516 714q-2 10 0 17M520 714q6 9 8 15M524 714q-3 13 2 22M528 714q3 12 8 20M532 714q5 11 12 18M536 714q0 10 9 16M540 714q7 8 17 14M544 714q-2 13 10 21M548 714q4 11 17 19M552 714q0 10 15 17M556 714q6 9 22 15"/>
+    </g>
+    <path d="M440 700Q512 716 584 700L578 716Q512 730 446 716Z" fill="#C2A97F"/>
+    <g fill="url(#evl-clove)">
+      <path d="M512 474C440 486 232 600 400 702Q420 718 440 702C346 616 476 492 512 474Z"/><path d="M512 474C476 492 346 616 440 702Q459 718 478 702C434 616 495 492 512 474Z"/><path d="M512 474C495 492 434 616 478 702Q498 718 518 702C526 616 515 492 512 474Z"/><path d="M512 474C515 492 526 616 518 702Q537 718 556 702C613 616 534 492 512 474Z"/><path d="M512 474C534 492 613 616 556 702Q574 718 592 702C696 616 552 492 512 474Z"/><path d="M512 474C552 492 696 616 592 702Q608 718 624 702C792 600 584 486 512 474Z"/>
+    </g>
+    <path d="M512 474C440 486 232 600 400 702Q420 718 440 702Q459 718 478 702Q498 718 518 702Q537 718 556 702Q574 718 592 702Q608 718 624 702C792 600 584 486 512 474Z" fill="url(#evl-shade)"/>
+    <path d="M512 500C453 488 272 606 414 706M512 500C464 490 310 611 427 706M512 500C483 492 377 616 453 706M512 500C489 492 406 616 466 706M512 500C502 492 466 616 492 706M512 500C509 492 496 616 505 706M512 500C522 492 556 616 531 706M512 500C528 492 585 616 544 706M512 500C540 492 642 616 569 706M512 500C546 492 670 616 580 706M512 500C563 490 730 610 603 706M512 500C574 488 761 605 614 706" fill="none" stroke="#B5848F" stroke-width="2" stroke-linecap="round" opacity=".45"/>
+    <path d="M512 474C476 492 346 616 440 702M512 474C495 492 434 616 478 702M512 474C515 492 526 616 518 702M512 474C534 492 613 616 556 702M512 474C552 492 696 616 592 702" fill="none" stroke="#A88B62" stroke-width="3.5" stroke-linecap="round" opacity=".85"/>
+    <path d="M512 474C440 486 232 600 400 702Q420 718 440 702Q459 718 478 702Q498 718 518 702Q537 718 556 702Q574 718 592 702Q608 718 624 702C792 600 584 486 512 474Z" fill="none" stroke="#B49870" stroke-width="3"/>
+    <ellipse cx="438" cy="566" rx="22" ry="58" fill="#FFFFFF" opacity=".5" transform="rotate(18 438 566)" filter="url(#evl-soft)"/>
+    <path d="M396 512C358 546 340 600 348 652C342 664 330 670 318 670C330 658 334 644 332 628C328 588 348 546 396 512Z" fill="#F8F1E2" stroke="#C4AD85" stroke-width="2" stroke-linejoin="round" opacity=".95"/>
+    <path d="M380 530C356 560 344 600 342 636" fill="none" stroke="#B5848F" stroke-width="1.5" opacity=".4"/>
+    <path d="M498 482C490 448 520 424 504 392L516 386C536 420 508 448 520 482Z" fill="#EFE4CC" stroke="#BFA57C" stroke-width="2" stroke-linejoin="round"/>
+    <path d="M520 482C532 452 498 430 512 400L520 396C510 428 540 452 530 482Z" fill="#D6C29C"/>
+    <path d="M506 390L498 374M512 388L514 370M518 389L528 376" fill="none" stroke="#D8C7A2" stroke-width="3" stroke-linecap="round"/>
+  </g>
+  </g>
+  <g transform="translate(312 184) scale(1.12)" fill="none" stroke="#12302A" stroke-width="18" stroke-linecap="round" stroke-linejoin="round">
     <path d="M9-50H91A41 41 0 1 0 81-24"/>
     <path d="M127-50H209A41 41 0 1 0 199-24"/>
     <path d="M249-91V48M249-50A41 41 0 1 0 331-50A41 41 0 1 0 249-50"/>
@@ -34,5 +72,5 @@
     <path d="M513-50H595A41 41 0 1 0 585-24"/>
     <path d="M629-91L656-9L683-91L710-9L737-91"/>
   </g>
-  <circle cx="844" cy="40" r="12.5" fill="#7A66F0"/>
+  <circle cx="844" cy="40" r="12.5" fill="#23896A"/>
 </svg>
