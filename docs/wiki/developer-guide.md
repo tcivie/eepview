@@ -1,3 +1,10 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/tcivie/eepview/main/assets/brand/eepview-logo-horizontal-dark.svg">
+    <img alt="eepview" src="https://raw.githubusercontent.com/tcivie/eepview/main/assets/brand/eepview-logo-horizontal-light.svg" width="280">
+  </picture>
+</p>
+
 # Developer guide
 
 Status: the browser shell is in a PR. Parts marked "(coming in v0.1)" are not on main yet.

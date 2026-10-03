@@ -1,3 +1,10 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/tcivie/eepview/main/assets/brand/eepview-logo-horizontal-dark.svg">
+    <img alt="eepview" src="https://raw.githubusercontent.com/tcivie/eepview/main/assets/brand/eepview-logo-horizontal-light.svg" width="280">
+  </picture>
+</p>
+
 # eepview wiki
 
 This wiki is generated from docs/wiki in the repository. Edit it there, in a PR. Each PR that changes a feature updates its page. See [AGENTS.md](https://github.com/tcivie/eepview/blob/main/AGENTS.md).
