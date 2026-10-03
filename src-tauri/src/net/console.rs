@@ -239,11 +239,11 @@ fn http_section(text: &str) -> Vec<(&str, &str)> {
 fn paths(table: &[(&str, &str)], env: &dyn Fn(&str) -> Option<String>) -> Vec<PathBuf> {
     let mut out = Vec::new();
     for (var, rest) in table {
-        let base = if var.is_empty() {
-            Some(PathBuf::new())
-        } else {
-            env(var).filter(|v| !v.is_empty()).map(PathBuf::from)
-        };
+        if var.is_empty() {
+            out.push(PathBuf::from(rest));
+            continue;
+        }
+        let base = env(var).filter(|v| !v.is_empty()).map(PathBuf::from);
         out.extend(base.map(|b| rest.split('/').fold(b, |path, part| path.join(part))));
     }
     out

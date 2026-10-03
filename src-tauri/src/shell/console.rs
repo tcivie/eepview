@@ -266,14 +266,16 @@ pub fn set_console<R: Runtime>(app: &AppHandle<R>, console: Option<VerifiedConso
 }
 
 /// Probes now (blocking), stores the result and answers its info. A found console is
-/// re-checked every 10 s; a miss is retried every 10 s for 2 minutes.
+/// re-checked every 10 s (misses count, R21); a miss here clears the stored console at once
+/// and is retried every 10 s for 2 minutes.
 pub fn detect_now<R: Runtime>(app: &AppHandle<R>) -> ConsoleInfo {
     let found = detect_here();
     let info = info_of(found.as_ref());
-    if found.is_some() {
-        set_console(app, found);
+    let hit = found.is_some();
+    set_console(app, found);
+    if hit {
         recheck(app);
-    } else if current(app).is_none() {
+    } else {
         retry(app);
     }
     info
