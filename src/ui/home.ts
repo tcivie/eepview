@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 import "./boot.ts";
-import { renderConsoleLinks, shownInActiveTab, wireConsoleClicks } from "./console-nav.ts";
+import { renderConsoleLink, shownInActiveTab, wireConsoleClicks } from "./console-nav.ts";
 import type { Bookmark, ConsoleInfo, RouterStatus } from "./contract.ts";
 import { all, byId, cloneTemplate, setText } from "./dom.ts";
 import { call, errorText, on } from "./ipc.ts";
@@ -73,7 +73,7 @@ function showVersion(): void {
 
 function renderConsole(info: ConsoleInfo): void {
   lastConsole = info;
-  renderConsoleLinks(
+  renderConsoleLink(
     { list: byId("console-links"), note: byId("console-note"), title: byId("console-title") },
     info,
   );

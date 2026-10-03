@@ -1,25 +1,11 @@
 // SPDX-FileCopyrightText: 2026 The eepview contributors
 // SPDX-License-Identifier: MIT
 
-import type { ConsoleInfo, ConsolePage, RouterStatus } from "../contract.ts";
+import type { ConsoleInfo, RouterStatus } from "../contract.ts";
 
 export const NO_CONSOLE_TEXT = "No router console found";
 
-export const CONSOLE_PAGE_ORDER: readonly ConsolePage[] = [
-  "home",
-  "tunnels",
-  "addressbook",
-  "config",
-  "logs",
-];
-
-export const CONSOLE_PAGE_LABELS: Record<ConsolePage, string> = {
-  home: "Console",
-  tunnels: "Tunnels",
-  addressbook: "Address book",
-  config: "Config",
-  logs: "Logs",
-};
+export const CONSOLE_LINK_TEXT = "I2P Router Console";
 
 const TITLES: Record<NonNullable<ConsoleInfo["kind"]>, string> = {
   java: "Java I2P console",
@@ -27,24 +13,16 @@ const TITLES: Record<NonNullable<ConsoleInfo["kind"]>, string> = {
 };
 
 export interface ConsoleLinkView {
-  page: ConsolePage;
-  label: string;
-}
-
-export interface ConsoleLinksView {
   found: boolean;
   note: string | null;
   title: string | null;
-  links: ConsoleLinkView[];
+  label: string | null;
 }
 
-export function consoleLinks(info: ConsoleInfo | null | undefined): ConsoleLinksView {
-  if (!info?.found) return { found: false, note: NO_CONSOLE_TEXT, title: null, links: [] };
-  const links = CONSOLE_PAGE_ORDER.filter((page) => info.pages.includes(page)).map((page) => ({
-    page,
-    label: CONSOLE_PAGE_LABELS[page],
-  }));
-  return { found: true, note: null, title: info.kind ? TITLES[info.kind] : null, links };
+export function consoleLink(info: ConsoleInfo | null | undefined): ConsoleLinkView {
+  if (!info?.found) return { found: false, note: NO_CONSOLE_TEXT, title: null, label: null };
+  const title = info.kind ? TITLES[info.kind] : null;
+  return { found: true, note: null, title, label: CONSOLE_LINK_TEXT };
 }
 
 export function routerVersion(

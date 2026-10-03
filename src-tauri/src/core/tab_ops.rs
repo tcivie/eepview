@@ -3,7 +3,7 @@
 
 //! Tab commands: new, close, select, move, reopen, cycle.
 
-use super::{Core, Effect, EngineOp, Event, WebOp};
+use super::{ConsoleOp, Core, Effect, EngineOp, Event, WebOp};
 use crate::nav::classify;
 use crate::tabs::Place;
 use crate::types::TabInfo;
@@ -38,11 +38,22 @@ impl Core {
             Vec::new()
         };
         let home = self.home_url();
-        let Some(closed) = self.tabs.close(id, &home) else {
+        let was_console = self.console_tab == Some(id);
+        // The console tab is never reopened: only `console_open` makes one.
+        let closed = if was_console {
+            self.tabs.close_forgotten(id, &home)
+        } else {
+            self.tabs.close(id, &home)
+        };
+        let Some(closed) = closed else {
             return fx;
         };
         if closed.web_js.is_some() {
             fx.push(Effect::Web(WebOp::Destroy(id)));
+        }
+        if was_console {
+            self.console_tab = None;
+            fx.push(Effect::Console(ConsoleOp::Close));
         }
         fx.extend(self.arrive());
         fx
@@ -98,7 +109,7 @@ impl Core {
     }
 
     /// Clears per-tab UI state (find, hover) before the active tab changes.
-    fn leave_tab(&mut self) -> Vec<Effect> {
+    pub(super) fn leave_tab(&mut self) -> Vec<Effect> {
         let mut fx = Vec::new();
         if let Some(find) = self.find.take() {
             fx.push(Effect::Web(WebOp::Engine(find.tab, EngineOp::FindClear)));

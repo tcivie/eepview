@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 import "./boot.ts";
-import { renderConsoleLinks, shownInActiveTab, wireConsoleClicks } from "./console-nav.ts";
+import { renderConsoleLink, shownInActiveTab, wireConsoleClicks } from "./console-nav.ts";
 import type { ConsoleInfo, RouterStatus, Settings } from "./contract.ts";
 import { all, announce, byId } from "./dom.ts";
 import { call, devMode, on } from "./ipc.ts";
@@ -138,7 +138,7 @@ function wireRouter(): void {
 }
 
 function renderConsole(info: ConsoleInfo): void {
-  renderConsoleLinks({ list: byId("console-links"), note: byId("console-note") }, info, ["config"]);
+  renderConsoleLink({ list: byId("console-links"), note: byId("console-note") }, info);
 }
 
 let lastStatus: RouterStatus | null = null;

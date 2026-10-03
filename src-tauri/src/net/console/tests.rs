@@ -23,14 +23,14 @@ use tauri::{App, AppHandle, Listener, Manager, Url};
 
 use crate::core::Core;
 use crate::net::console::{
-    ConsoleInfo, ConsoleKind, ConsoleNav, ConsolePage, I2PD_DEFAULT_PORT, JAVA_DEFAULT_PORT,
-    RECHECK_MISSES, after_recheck, candidates, console_version, detect, detect_here,
-    i2pd_config_files, i2pd_console_port, i2pd_port_in, java_config_dirs, java_console_port,
-    java_ports_in, judge, page_path, probe, probe_path,
+    ConsoleInfo, ConsoleKind, ConsoleNav, I2PD_DEFAULT_PORT, JAVA_DEFAULT_PORT, RECHECK_MISSES,
+    after_recheck, candidates, console_version, detect, detect_here, i2pd_config_files,
+    i2pd_console_port, i2pd_port_in, java_config_dirs, java_console_port, java_ports_in, judge,
+    probe, probe_path,
 };
 use crate::net::testing::FakeConsole;
 use crate::shell::console::{ConsoleWebview, current, detect_now, set_console, stop};
-use crate::shell::state::Shared;
+use crate::shell::state::{Shared, lock, shared};
 
 const JAVA_BODY: &str = r#"<link rel="stylesheet" href="/themes/console/light/console.css">"#;
 const I2PD_BODY: &str = r#"<a href="/?page=i2p_tunnels">Tunnels</a>"#;
@@ -669,123 +669,69 @@ fn r5_a_verified_console_reports_its_kind_port_and_origin() {
     );
 }
 
-// ---------------------------------------------------------------- R7: pages
+// ---------------------------------------------------------------- R7: home page
 
 #[test]
-fn r7_pages_are_listed_in_the_table_order_with_their_keys() {
-    // R7: home, tunnels, addressbook, config, logs.
-    use ConsolePage::{AddressBook, Config, Home, Logs, Tunnels};
-    assert_eq!(ConsolePage::ALL, [Home, Tunnels, AddressBook, Config, Logs]);
-    let keys: Vec<&str> = ConsolePage::ALL.iter().map(|p| p.key()).collect();
-    assert_eq!(keys, ["home", "tunnels", "addressbook", "config", "logs"]);
+fn r7_the_home_page_is_the_origin_plus_the_probe_path() {
+    // R7: Java I2P opens /home, i2pd opens /; it is the probe page of R3.
+    let java = FakeConsole::start(ConsoleKind::Java);
+    let base = format!("http://127.0.0.1:{}", java.port());
+    assert_eq!(java.verified().home().as_str(), format!("{base}/home"));
+    let i2pd = FakeConsole::start(ConsoleKind::I2pd);
+    let base = format!("http://127.0.0.1:{}", i2pd.port());
+    assert_eq!(i2pd.verified().home().as_str(), format!("{base}/"));
 }
 
 #[test]
-fn r7_page_keys_parse_back_and_unknown_keys_do_not() {
-    // R7 and R12: a known key parses, an unknown one is None.
-    for page in ConsolePage::ALL {
-        assert_eq!(ConsolePage::parse(page.key()), Some(page));
-    }
-    for bad in ["", "Home", "address-book", "/home", "settings", "home "] {
-        assert_eq!(ConsolePage::parse(bad), None, "{bad:?}");
-    }
-}
-
-#[test]
-fn r7_java_page_paths() {
-    // R7: Java I2P column.
-    use ConsolePage::{AddressBook, Config, Home, Logs, Tunnels};
-    let want = [
-        (Home, "/home"),
-        (Tunnels, "/tunnels"),
-        (AddressBook, "/dns"),
-        (Config, "/config"),
-        (Logs, "/logs"),
-    ];
-    for (page, path) in want {
-        assert_eq!(page_path(ConsoleKind::Java, page), Some(path), "{page:?}");
+fn r7_the_home_page_is_on_the_detected_origin_and_stays_in_the_console_view() {
+    // R7, R9 and R10: the home page is on the console origin, so the guard keeps it.
+    for (_fake, console) in consoles() {
+        let home = console.home();
+        assert_eq!(home.scheme(), "http");
+        assert_eq!(home.host_str(), Some("127.0.0.1"));
+        assert_eq!(home.port_or_known_default(), Some(console.port()));
+        assert_eq!(home.path(), probe_path(console.kind()));
+        assert_eq!(console.route(&home), ConsoleNav::Stay, "{home}");
+        assert!(console.engine_allows(home.as_str()), "{home}");
     }
 }
 
 #[test]
-fn r7_i2pd_page_paths_and_missing_pages() {
-    // R7: i2pd column; no address book and no logs.
-    use ConsolePage::{AddressBook, Config, Home, Logs, Tunnels};
-    assert_eq!(page_path(ConsoleKind::I2pd, Home), Some("/"));
-    assert_eq!(
-        page_path(ConsoleKind::I2pd, Tunnels),
-        Some("/?page=tunnels")
-    );
-    assert_eq!(
-        page_path(ConsoleKind::I2pd, Config),
-        Some("/?page=commands")
-    );
-    assert_eq!(page_path(ConsoleKind::I2pd, AddressBook), None);
-    assert_eq!(page_path(ConsoleKind::I2pd, Logs), None);
+fn r7_the_info_lists_no_pages() {
+    // R7: eepview links to no other console page, so ConsoleInfo has no `pages` field.
+    let java =
+        serde_json::to_value(FakeConsole::start(ConsoleKind::Java).verified().info()).unwrap();
+    let keys: Vec<&str> = java
+        .as_object()
+        .unwrap()
+        .keys()
+        .map(String::as_str)
+        .collect();
+    assert!(!keys.contains(&"pages"), "{keys:?}");
 }
 
 #[test]
-fn r7_a_console_lists_only_the_pages_its_router_has() {
-    // R7: a dash means no link.
-    use ConsolePage::{AddressBook, Config, Home, Logs, Tunnels};
-    let java = FakeConsole::start(ConsoleKind::Java).verified();
-    assert_eq!(java.pages(), [Home, Tunnels, AddressBook, Config, Logs]);
-    let i2pd = FakeConsole::start(ConsoleKind::I2pd).verified();
-    assert_eq!(i2pd.pages(), [Home, Tunnels, Config]);
-}
-
-#[test]
-fn r7_page_urls_are_the_origin_plus_the_path() {
-    // R7 and R9: the URL of a page is on the detected origin.
-    let fake = FakeConsole::start(ConsoleKind::Java);
-    let java = fake.verified();
-    let base = format!("http://127.0.0.1:{}", fake.port());
-    assert_eq!(
-        java.url(ConsolePage::Home).unwrap().as_str(),
-        format!("{base}/home")
-    );
-    assert_eq!(
-        java.url(ConsolePage::AddressBook).unwrap().as_str(),
-        format!("{base}/dns")
-    );
-    let fake = FakeConsole::start(ConsoleKind::I2pd);
-    let i2pd = fake.verified();
-    let base = format!("http://127.0.0.1:{}", fake.port());
-    assert_eq!(
-        i2pd.url(ConsolePage::Home).unwrap().as_str(),
-        format!("{base}/")
-    );
-    assert_eq!(
-        i2pd.url(ConsolePage::Config).unwrap().as_str(),
-        format!("{base}/?page=commands")
-    );
-    assert!(i2pd.url(ConsolePage::Logs).is_none());
-    assert!(i2pd.url(ConsolePage::AddressBook).is_none());
-}
-
-#[test]
-fn r7_info_lists_found_kind_origin_and_pages() {
-    // R7 and R13: the wire shape is camelCase with lower-case names.
+fn r7_info_lists_found_kind_origin_and_version() {
+    // R7 and R13: the wire shape is camelCase with lower-case names, and has no pages.
     let fake = FakeConsole::start(ConsoleKind::I2pd);
     let info = fake.verified().info();
     let want = json!({
         "found": true,
         "kind": "i2pd",
         "origin": format!("http://127.0.0.1:{}", fake.port()),
-        "pages": ["home", "tunnels", "config"],
         "version": "2.13.0",
     });
     assert_eq!(serde_json::to_value(&info).unwrap(), want);
 }
 
 #[test]
-fn r7_no_console_info_is_found_false_with_nulls_and_no_pages() {
-    // R15 and R13: none() is found false, kind and origin null, no pages.
+fn r7_no_console_info_is_found_false_with_nulls() {
+    // R15 and R13: none() is found false, kind, origin and version null.
     let none = ConsoleInfo::none();
     assert!(!none.found);
-    assert!(none.kind.is_none() && none.origin.is_none() && none.pages.is_empty());
+    assert!(none.kind.is_none() && none.origin.is_none());
     assert!(none.version.is_none());
-    let want = json!({"found": false, "kind": null, "origin": null, "pages": [], "version": null});
+    let want = json!({"found": false, "kind": null, "origin": null, "version": null});
     assert_eq!(serde_json::to_value(&none).unwrap(), want);
 }
 
@@ -905,15 +851,28 @@ fn r18_a_console_without_a_version_still_counts_and_reports_null() {
     let i2pd = Plain::start("200 OK", "", I2PD_BODY);
     let found = probe(ConsoleKind::I2pd, i2pd.port).expect("still a console");
     assert_eq!(found.version(), None);
-    assert_eq!(found.pages().len(), 3);
+    assert_eq!(found.home().path(), "/");
 }
 
 #[test]
-fn r18_the_version_does_not_change_the_pages_or_the_origin() {
+fn r18_the_version_does_not_change_the_home_page_or_the_origin() {
     // R18: it changes nothing else.
     let fake = FakeConsole::start(ConsoleKind::Java);
     let info = fake.verified().info();
-    assert_eq!(info.pages, ConsolePage::ALL);
+    assert_eq!(
+        serde_json::to_value(&info).unwrap().get("pages"),
+        None,
+        "no pages in the info"
+    );
+    let home = fake.verified().home();
+    assert_eq!(
+        home.as_str(),
+        format!("http://127.0.0.1:{}/home", fake.port())
+    );
+    let bare = Plain::start("200 OK", "", JAVA_BODY);
+    let without = probe(ConsoleKind::Java, bare.port).expect("a console without a version");
+    assert_eq!(without.home().path(), home.path());
+    assert_eq!(without.info().kind, info.kind);
     assert_eq!(
         info.origin,
         Some(format!("http://127.0.0.1:{}", fake.port()))
@@ -954,17 +913,6 @@ fn r10_the_detected_origin_stays_in_the_console_view() {
             "/a/b/c.css",
         ] {
             let target = url(&format!("{origin}{tail}"));
-            assert_eq!(console.route(&target), ConsoleNav::Stay, "{target}");
-        }
-    }
-}
-
-#[test]
-fn r10_every_page_of_the_router_stays() {
-    // R7 and R10: the page URLs are on the origin.
-    for (_fake, console) in consoles() {
-        for page in console.pages() {
-            let target = console.url(page).unwrap();
             assert_eq!(console.route(&target), ConsoleNav::Stay, "{target}");
         }
     }
@@ -1248,6 +1196,11 @@ fn mock_app() -> App<MockRuntime> {
     app
 }
 
+/// The core of `app`, locked.
+fn tab_core(app: &App<MockRuntime>) -> MutexGuard<'_, Core> {
+    lock(&shared(app.handle()).inner().core)
+}
+
 /// Calls `shell::console::stop` when dropped, also when the test fails, so the re-check
 /// and retry loops of one test never keep probing the ports during the next one.
 struct StopOnDrop(AppHandle<MockRuntime>);
@@ -1354,25 +1307,28 @@ fn r6_detect_now_with_nothing_listening_answers_no_console() {
 }
 
 #[test]
-fn r6_detect_now_replaces_a_stored_console_and_closes_its_window() {
-    // R6: a console that goes away closes the console window.
+fn r6_detect_now_replaces_a_stored_console_and_closes_the_console_tab() {
+    // R6 and R30: a console that goes away closes the console tab and its webview.
     let _guard = detect_lock();
     let Some((java, i2pd)) = default_spies() else {
         return;
     };
     java.set_up(false);
     i2pd.set_up(false);
-    let app = mock_app();
+    let mut app = mock_app();
     let _stop = stop_on_drop(app.handle());
+    crate::shell::chrome::build(&mut app).unwrap();
     let fake = FakeConsole::start(ConsoleKind::Java);
     let old = fake.verified();
     set_console(app.handle(), Some(old.clone()));
-    ConsoleWebview::open(app.handle(), &old, ConsolePage::Home).unwrap();
-    assert!(app.get_window("console-window").is_some());
+    ConsoleWebview::open(app.handle(), &old).unwrap();
+    assert!(app.get_webview("console").is_some());
+    assert!(tab_core(&app).console_tab().is_some());
     let info = detect_now(app.handle());
     assert!(!info.found);
     assert!(current(app.handle()).is_none());
     assert!(wait_until(10, || app.get_webview("console").is_none()));
+    assert!(wait_until(10, || tab_core(&app).console_tab().is_none()));
 }
 
 #[test]
@@ -1650,14 +1606,12 @@ fn r4_probe_gives_up_after_about_five_seconds_on_a_silent_server() {
 
 #[test]
 fn r4_wire_names_are_lower_case() {
-    // R7 and R4 interface: kinds and pages serialize in lower case.
+    // R4 interface: kinds serialize in lower case.
     let java = FakeConsole::start(ConsoleKind::Java).verified().info();
     let value = serde_json::to_value(&java).unwrap();
     assert_eq!(value["kind"], json!("java"));
-    assert_eq!(
-        value["pages"],
-        json!(["home", "tunnels", "addressbook", "config", "logs"])
-    );
+    let i2pd = FakeConsole::start(ConsoleKind::I2pd).verified().info();
+    assert_eq!(serde_json::to_value(&i2pd).unwrap()["kind"], json!("i2pd"));
 }
 
 // ---------------------------------------------------------------- R19: rule list
