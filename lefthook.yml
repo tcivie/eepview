@@ -19,8 +19,8 @@ pre-commit:
       glob: ".github/workflows/*.{yml,yaml}"
       run: actionlint {staged_files}
     - name: zizmor
-      glob: ".github/workflows/*.{yml,yaml}"
-      run: zizmor --offline --persona=pedantic .github/workflows
+      glob: ".github/**/*.{yml,yaml}"
+      run: zizmor --offline --persona=pedantic .
     - name: complexity
       glob: "*.{rs,ts}"
       run: ./scripts/complexity.sh

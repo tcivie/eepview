@@ -91,3 +91,4 @@ sha256sum --check --ignore-missing SHA256SUMS
 - [#24](https://github.com/tcivie/eepview/pull/24): release gates job without lint exclusions; the macOS app is signed inside the dmg.
 - [#37](https://github.com/tcivie/eepview/pull/37): Sigstore signatures for every release file, provenance without the private-repo guard, separate debug symbols, repeatable build environment.
 - [#39](https://github.com/tcivie/eepview/pull/39): the gate also reads the checks of the merged PR head.
+- [#47](https://github.com/tcivie/eepview/pull/47): permission comments in `release.yml`; zizmor runs with the pedantic persona.

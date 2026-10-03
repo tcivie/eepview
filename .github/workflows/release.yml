@@ -21,7 +21,7 @@ jobs:
     name: gates
     runs-on: ubuntu-24.04
     permissions:
-      checks: read # read the check runs of the tagged commit
+      checks: read # read the check runs of the tagged commit and its PR heads
       contents: read # check out the repo and read the ruleset
       pull-requests: read # find the PR that merged the commit
     steps:
