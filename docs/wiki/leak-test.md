@@ -53,9 +53,9 @@ python3 -m unittest discover -s tests/leak
 
 | OS | default (JS on) | js-off | Notes |
 | --- | --- | --- | --- |
-| ubuntu-24.04 | pending | pending | first CI run of the PR |
-| macos-15 | pending | pending | first CI run of the PR |
-| windows-2025 | pending | pending | first CI run of the PR |
+| ubuntu-24.04 | pass | pass | run on the browser shell head with this harness; 0 canary hits, only .i2p hosts upstream |
+| macos-15 | pass | pass | run on the browser shell head with this harness; 0 canary hits, only .i2p hosts upstream |
+| windows-2025 | pass | pass | run on the browser shell head with this harness; 0 canary hits, only .i2p hosts upstream |
 
 ## History
 
