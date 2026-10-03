@@ -387,3 +387,63 @@ fn a_flooding_client_is_dropped_at_the_byte_limit_long_before_one_second() {
         "flooding client",
     );
 }
+
+/// ADR "Connection limit": the gatekeeper handles at most 256 connections at once.
+const CONNECTION_LIMIT: usize = 256;
+
+/// Opens `count` connections that stay idle: the head is not finished.
+fn hold_connections(fx: &Fixture, count: usize) -> Vec<TcpStream> {
+    (0..count)
+        .map(|_| {
+            let mut stream = fx.connect(READ_LIMIT);
+            let _ = stream.write_all(b"GET http://site.i2p/ HT");
+            stream
+        })
+        .collect()
+}
+
+/// Asks for `http://site.i2p/` until the answer is a 200, and fails when 5 s pass. A connection
+/// that is still counted answers the busy 503 meanwhile; any other answer is a failure.
+fn assert_served_after_release(fx: &Fixture) {
+    let give_up = Instant::now() + READ_LIMIT;
+    loop {
+        let mut stream = fx.connect(READ_LIMIT);
+        let _ = stream.write_all(b"GET http://site.i2p/ HTTP/1.1\r\nHost: site.i2p\r\n\r\n");
+        let _ = stream.shutdown(Shutdown::Write);
+        let reply = read_reply(&mut stream);
+        if reply.status() == Some(200) {
+            return;
+        }
+        assert_eq!(reply.status(), Some(503), "{:?}", reply.text());
+        assert!(
+            Instant::now() < give_up,
+            "the gatekeeper stayed busy after the held connections closed"
+        );
+        thread::sleep(Duration::from_millis(50));
+    }
+}
+
+// Req: ADR "Connection limit": with 256 connections open and idle, connection 257 gets the busy
+// 503 whole, before its request is read (here a 32 KiB body stays unread), with no reset. Once the
+// held connections close, a new request is served normally.
+#[test]
+fn the_257th_connection_gets_a_whole_busy_503_and_the_limit_lifts_on_release() {
+    let fx = Fixture::new();
+    let held = hold_connections(&fx, CONNECTION_LIMIT);
+    // The gatekeeper accepts on its own thread: give it time to count all held connections.
+    thread::sleep(Duration::from_millis(500));
+    let raw = with_body(
+        &format!(
+            "POST http://site.i2p/ HTTP/1.1\r\nHost: site.i2p\r\nContent-Length: {BODY_SIZE}\r\n\r\n"
+        ),
+        &filler(BODY_SIZE),
+    );
+    for round in 0..REPEATS {
+        let mut stream = fx.connect(READ_LIMIT);
+        let _ = stream.write_all(&raw);
+        let reply = read_reply(&mut stream);
+        assert_delivered(&reply, 503, &format!("busy 503, round {round}"));
+    }
+    drop(held);
+    assert_served_after_release(&fx);
+}
