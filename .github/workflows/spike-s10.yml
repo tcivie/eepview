@@ -1,0 +1,62 @@
+name: spike-s10
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "spike/probe/**"
+      - ".github/workflows/spike-s10.yml"
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  # Microsoft's link for Fixed Version 154.0.4258.53 x64, from developer.microsoft.com/microsoft-edge/webview2.
+  WV2_CAB_URL: https://msedge.sf.dl.delivery.mp.microsoft.com/filestreamingservice/files/0b89c3a3-0043-4746-b39e-65830da7744d/Microsoft.WebView2.FixedVersionRuntime.154.0.4258.53.x64.cab
+  WV2_CAB_SHA256: ec12b2db6423d127fb8e1935d34e2e68abc70fe8ecb1f6162ba1c1ccc2825f6d
+
+jobs:
+  firewall:
+    name: L6 firewall probe (windows-2025)
+    runs-on: windows-2025
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Download, verify and install the Fixed Version runtime
+        shell: pwsh
+        run: |
+          $cab = Join-Path $env:RUNNER_TEMP 'wv2.cab'
+          $t = Measure-Command { Invoke-WebRequest -Uri $env:WV2_CAB_URL -OutFile $cab }
+          $hash = (Get-FileHash -Algorithm SHA256 $cab).Hash
+          if ($hash -ne $env:WV2_CAB_SHA256) { throw "SHA-256 mismatch: $hash" }
+          "download: $([math]::Round((Get-Item $cab).Length / 1MB)) MiB in $([math]::Round($t.TotalSeconds)) s, sha256 ok" |
+            Tee-Object -Append $env:GITHUB_STEP_SUMMARY
+          ./spike/probe/s10/firewall.ps1 -Action Install -Path $cab -Out "$env:ProgramFiles\eepview-probe\WebView2" |
+            Tee-Object -Append $env:GITHUB_STEP_SUMMARY
+      - name: Install the pinned Rust toolchain
+        shell: bash
+        run: rustup toolchain install
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: spike/probe
+      - name: Build the probe
+        run: cargo build --manifest-path spike/probe/Cargo.toml --locked
+      - name: Run the S10 harness
+        shell: pwsh
+        working-directory: spike/probe
+        run: python fw_harness.py --binary target/debug/eepview-probe.exe | Tee-Object -Append $env:GITHUB_STEP_SUMMARY
+      - name: Upload the S10 results
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: s10-results
+          path: |
+            spike/probe/s10-results.json
+            spike/probe/s10-dns.pcapng
+          if-no-files-found: warn

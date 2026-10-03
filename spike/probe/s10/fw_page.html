@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>s10 __MODE__</title>
+    <link rel="dns-prefetch" href="//pf-__TAG__.example.com" />
+    <link rel="preconnect" href="http://pc-__TAG__.example.com" />
+  </head>
+  <body>
+    <h1>eepview S10 firewall probe — __MODE__</h1>
+    <img src="http://img-__TAG__.example.com/i.png" alt="" />
+    <img src="http://1.0.0.1/img-__TAG__.png" alt="" />
+    <script>
+      const M = "__MODE__";
+      const rep = (k, v) =>
+        fetch(`/report?mode=${M}&k=${k}&v=${encodeURIComponent(v)}`).catch(() => {});
+      const probe = (name, url) =>
+        fetch(url, { mode: "no-cors", signal: AbortSignal.timeout(6000) })
+          .then(() => rep(name, "resolved"))
+          .catch((e) => rep(name, `rejected ${e.name}`));
+
+      function socket(name, url) {
+        const ws = new WebSocket(url);
+        ws.onopen = () => rep(name, "open");
+        ws.onerror = () => rep(name, "error");
+      }
+
+      async function webrtc() {
+        const pc = new RTCPeerConnection({
+          iceServers: [{ urls: ["stun:stun.l.google.com:19302", "stun:stun.cloudflare.com:3478"] }],
+        });
+        const found = [];
+        pc.onicecandidate = (e) => e.candidate && found.push(e.candidate.candidate);
+        pc.createDataChannel("probe");
+        await pc.setLocalDescription(await pc.createOffer());
+        setTimeout(() => rep("rtc_candidates", JSON.stringify(found)), 6000);
+      }
+
+      rep("js", "on");
+      probe("public_ip_http", "http://1.1.1.1/s10-__TAG__");
+      probe("public_ip_https", "https://1.1.1.1/s10-__TAG__");
+      probe("public_name", "http://pn-__TAG__-1-1-1-1.nip.io/");
+      probe("link_local", "http://169.254.169.254/s10-__TAG__");
+      probe("azure_host", "http://168.63.129.16/s10-__TAG__");
+      probe("lan_self", "http://__LAN__/lan-__TAG__");
+      probe("loopback", "http://127.0.0.1:__CANARY__/lb-__TAG__");
+      socket("websocket", "ws://1.1.1.1/s10-__TAG__");
+      webrtc().catch((e) => rep("rtc_error", String(e)));
+    </script>
+  </body>
+</html>

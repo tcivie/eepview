@@ -65,6 +65,8 @@ fn apply_windows_args<'a, R: Runtime, M: Manager<R>>(
     match probe.win_args.as_str() {
         "hardened" => builder.additional_browser_args(&hardened_windows_args(&probe.proxy)),
         "trap" => builder.additional_browser_args(WIN_DEFAULT_ARGS),
+        // S10: no proxy and no wry defaults, so the OS firewall is the only layer left.
+        "bare" => builder.additional_browser_args(""),
         _ => builder,
     }
 }
