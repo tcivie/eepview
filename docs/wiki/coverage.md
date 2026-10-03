@@ -21,6 +21,14 @@ Unit-test coverage gate for Rust and TypeScript.
 - Rust: `cargo install cargo-llvm-cov --locked`, `rustup component add llvm-tools-preview`, then `cargo llvm-cov --all-targets --summary-only` in `src-tauri`. Run `npm run build` first.
 - TypeScript: `npm run test` and `npm run test:coverage`. Node 22.18 or later is needed.
 
+## Test rule
+
+- A test checks a requirement, not the code. The requirement must be written in `docs/wiki/` (the ADRs and the IPC contract included) or in an issue.
+- A test uses the public interface: an exported function whose output the requirement defines, an IPC command, an event or the UI.
+- A test does not copy a constant from the code, check private state, snapshot today's output, repeat the algorithm, or exist only for coverage. Such tests are removed.
+- The person who writes a requirement test does not read the code under test.
+- The architecture test and the leak test enforce ADR 0001. They stay.
+
 ## Limits
 
 - The Rust gate checks lines only, not branches or functions.
