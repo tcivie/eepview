@@ -12,29 +12,28 @@
 :root {
   color-scheme: light;
 
-  /* Palette: brand paper ground, deep green ink, brand green accent. */
-  --color-bg: #f3ede0;
-  --color-surface: #faf7f0;
-  --color-surface-sunken: #e8e1d2;
+  /* Neutral surfaces and text; brand green only for the accent and status. */
+  --color-bg: #f6f6f6;
+  --color-surface: #ffffff;
+  --color-surface-sunken: #ececec;
   --color-surface-raised: #ffffff;
-  --color-border: #d3cab8;
-  --color-border-strong: #8f8a7c;
-  --color-text: #12302a;
-  --color-text-muted: #45574f;
-  --color-text-faint: #56685f;
+  --color-selected: #dcdcdc;
+  --color-border: #dcdcdc;
+  --color-border-strong: #8c8c8c;
+  --color-text: #1c1c1c;
+  --color-text-muted: #4d4d4d;
+  --color-text-faint: #5e5e5e;
   --color-accent: #2a6a56;
   --color-accent-hover: #0f3529;
   --color-accent-text: #ffffff;
   --color-accent-soft: #d3eadf;
-  --color-accent-line: #23896a;
   --color-success: #276338;
-  --color-success-soft: #d6eadb;
   --color-warning: #875000;
   --color-warning-soft: #f4e3c6;
   --color-danger: #a1252b;
   --color-danger-soft: #f6d9d8;
   --color-focus: #2a6a56;
-  --color-scrim: #12302a6b;
+  --color-scrim: #1c1c1c6b;
 
   /* Type. System faces only: nothing is fetched. */
   --font-sans:
@@ -74,7 +73,7 @@
 
   /* Borders and shadows. Shadows only on things that float. */
   --border-width: 1px;
-  --shadow-float: 0 1px 2px #12302a14, 0 8px 24px #12302a24;
+  --shadow-float: 0 1px 2px #1c1c1c14, 0 8px 24px #1c1c1c24;
   --shadow-inset: inset 0 1px 0 #ffffff99;
   --focus-ring: 0 0 0 2px var(--color-bg), 0 0 0 4px var(--color-focus);
 
@@ -88,22 +87,21 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
-    --color-bg: #0d2a23;
-    --color-surface: #12342b;
-    --color-surface-sunken: #0a211b;
-    --color-surface-raised: #173e33;
-    --color-border: #255044;
-    --color-border-strong: #5a8576;
-    --color-text: #eef2ea;
-    --color-text-muted: #abc0b6;
-    --color-text-faint: #97ada3;
+    --color-bg: #161616;
+    --color-surface: #1e1e1e;
+    --color-surface-sunken: #111111;
+    --color-surface-raised: #262626;
+    --color-selected: #2e2e2e;
+    --color-border: #333333;
+    --color-border-strong: #6b6b6b;
+    --color-text: #ececec;
+    --color-text-muted: #b3b3b3;
+    --color-text-faint: #9a9a9a;
     --color-accent: #6ccfa5;
     --color-accent-hover: #93dfbd;
-    --color-accent-text: #0d2a23;
+    --color-accent-text: #111111;
     --color-accent-soft: #1a4a3c;
-    --color-accent-line: #4fb48a;
     --color-success: #7fcb8f;
-    --color-success-soft: #1b3423;
     --color-warning: #e6ae5c;
     --color-warning-soft: #3a2b14;
     --color-danger: #f2918b;
@@ -117,22 +115,21 @@
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --color-bg: #0d2a23;
-  --color-surface: #12342b;
-  --color-surface-sunken: #0a211b;
-  --color-surface-raised: #173e33;
-  --color-border: #255044;
-  --color-border-strong: #5a8576;
-  --color-text: #eef2ea;
-  --color-text-muted: #abc0b6;
-  --color-text-faint: #97ada3;
+  --color-bg: #161616;
+  --color-surface: #1e1e1e;
+  --color-surface-sunken: #111111;
+  --color-surface-raised: #262626;
+  --color-selected: #2e2e2e;
+  --color-border: #333333;
+  --color-border-strong: #6b6b6b;
+  --color-text: #ececec;
+  --color-text-muted: #b3b3b3;
+  --color-text-faint: #9a9a9a;
   --color-accent: #6ccfa5;
   --color-accent-hover: #93dfbd;
-  --color-accent-text: #0d2a23;
+  --color-accent-text: #111111;
   --color-accent-soft: #1a4a3c;
-  --color-accent-line: #4fb48a;
   --color-success: #7fcb8f;
-  --color-success-soft: #1b3423;
   --color-warning: #e6ae5c;
   --color-warning-soft: #3a2b14;
   --color-danger: #f2918b;
