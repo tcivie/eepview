@@ -57,6 +57,14 @@ mod tests {
     const CSS: &str = include_str!("../../src/ui/theme.css");
 
     #[test]
+    fn a_missing_token_falls_back_to_plain_white_or_black() {
+        assert_eq!(surface_in("", DARK_RULE), None);
+        assert_eq!(surface_in(":root {}", LIGHT_RULE), None);
+        assert!(is_dark(Theme::System, true));
+        assert!(!is_dark(Theme::System, false));
+    }
+
+    #[test]
     fn hex_values_parse_and_bad_ones_do_not() {
         assert_eq!(parse_hex("#0a0b0c"), Some([10, 11, 12, 255]));
         assert_eq!(parse_hex("#abc"), None);

@@ -326,6 +326,44 @@ mod tests {
     }
 
     #[test]
+    fn a_failed_page_is_closed_without_a_history_entry() {
+        let app = bare();
+        let tab = core(&app).tabs().active().unwrap().id;
+        let mut c = core(&app);
+        c.navigate("a.i2p");
+        c.page_started(tab, "http://a.i2p/");
+        finished(&mut c, tab, "http://a.i2p/", true);
+        assert!(!c.tab_info(tab).unwrap().nav.loading);
+        assert!(
+            c.history_query(&crate::types::HistoryQuery::default())
+                .is_empty()
+        );
+        finished(&mut c, tab, "http://a.i2p/", false);
+        assert!(
+            c.history_query(&crate::types::HistoryQuery::default())
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn the_gatekeeper_failure_flag_reaches_the_shell() {
+        let app = bare();
+        assert!(!failed_page(app.handle(), "http://a.i2p/"));
+        let router = crate::net::testing::FakeRouter::start();
+        crate::shell::testing::open_gate(&app, &router);
+        assert!(!failed_page(app.handle(), "http://a.i2p/"));
+    }
+
+    #[test]
+    fn the_first_real_page_resets_the_background() {
+        let app = app();
+        let webview = app.get_webview("status").unwrap();
+        first_page_done(&webview, PageLoadEvent::Finished, &url(BLANK));
+        first_page_done(&webview, PageLoadEvent::Finished, &url("http://a.i2p/"));
+        first_page_done(&webview, PageLoadEvent::Started, &url("http://a.i2p/"));
+    }
+
+    #[test]
     fn windows_args_always_carry_the_proxy() {
         let args = windows_proxy_args("http://127.0.0.1:5555/");
         assert!(args.contains("--proxy-server=http://127.0.0.1:5555 "));
