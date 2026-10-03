@@ -172,3 +172,106 @@ pub fn check_fullscreen<R: Runtime>(app: &AppHandle<R>) {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::sync::atomic::Ordering;
+
+    use super::*;
+    use crate::core::router::status_of;
+    use crate::net::testing::FakeRouter;
+    use crate::net::verify::verify;
+    use crate::shell::apply::apply;
+    use crate::shell::testing::{Mock, app, bare, core, label, open_gate};
+
+    /// Verifies a fake router, then opens `url` in the active tab.
+    fn browse(app: &tauri::App<Mock>, gate: bool, url: &str) {
+        let router = FakeRouter::start();
+        if gate {
+            open_gate(app, &router);
+        }
+        let status = status_of(&verify(router.addr), "127.0.0.1:4444", gate);
+        let mut fx = core(app).router_changed(status);
+        fx.extend(core(app).navigate(url).1);
+        apply(app.handle(), fx);
+    }
+
+    fn internal_url(app: &tauri::App<Mock>) -> String {
+        app.get_webview("internal")
+            .unwrap()
+            .url()
+            .unwrap()
+            .to_string()
+    }
+
+    #[test]
+    fn nothing_to_place_without_the_window() {
+        let app = bare();
+        sync(app.handle());
+        status(app.handle(), None);
+        check_fullscreen(app.handle());
+        let rect = content_rect(app.handle());
+        assert!((rect.y - layout::TOOLBAR).abs() < f64::EPSILON);
+        assert!((rect.w - 1200.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn internal_pages_load_in_the_internal_webview() {
+        let app = app();
+        sync(app.handle());
+        assert!(
+            internal_url(&app).ends_with("src/ui/home.html"),
+            "{}",
+            internal_url(&app)
+        );
+        core(&app).navigate("eepview://bookmarks");
+        sync(app.handle());
+        assert!(internal_url(&app).ends_with("src/ui/bookmarks.html"));
+    }
+
+    #[test]
+    fn web_tabs_show_their_webview() {
+        let app = app();
+        browse(&app, true, "http://a.i2p/");
+        let tab = core(&app).tabs().active().unwrap().id;
+        assert_eq!(core(&app).view(), View::Web(tab));
+        assert!(label(&app, tab).is_some());
+        sync(app.handle());
+        core(&app).tab_new(None, crate::tabs::Place::End);
+        sync(app.handle());
+    }
+
+    #[test]
+    fn a_web_tab_without_a_webview_hides_the_internal_page() {
+        let app = app();
+        browse(&app, false, "http://a.i2p/");
+        sync(app.handle());
+        let tab = core(&app).tabs().active().unwrap().id;
+        assert_eq!(label(&app, tab), None);
+    }
+
+    #[test]
+    fn the_status_bubble_shows_and_hides() {
+        let app = app();
+        let text = HoverText {
+            text: "http://a.i2p/".into(),
+            blocked: false,
+        };
+        status(app.handle(), Some(&text));
+        status(app.handle(), None);
+        let window = app.get_window("main").unwrap();
+        raise_chrome(app.handle(), &window);
+        sync_stop_item(app.handle());
+    }
+
+    #[test]
+    fn fullscreen_changes_are_sent_once() {
+        let app = app();
+        let state = shared(app.handle());
+        state.fullscreen.store(true, Ordering::SeqCst);
+        check_fullscreen(app.handle());
+        assert!(!state.fullscreen.load(Ordering::SeqCst));
+        check_fullscreen(app.handle());
+        assert!(!state.fullscreen.load(Ordering::SeqCst));
+    }
+}

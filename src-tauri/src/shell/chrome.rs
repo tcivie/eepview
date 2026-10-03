@@ -78,11 +78,15 @@ fn internal_builder<R: Runtime>(app: &AppHandle<R>) -> WebviewBuilder<R> {
     WebviewBuilder::new("internal", WebviewUrl::App(HOME_PAGE.into()))
         .on_navigation(move |url| internal_navigation(&nav_app, url))
         .on_page_load(|webview, payload| {
-            if matches!(payload.event(), PageLoadEvent::Finished) {
-                let url = payload.url().clone();
-                with_core(webview.app_handle(), |core| core.internal_loaded(&url));
-            }
+            internal_page_load(webview.app_handle(), payload.event(), payload.url());
         })
+}
+
+/// A finished load of a bundled page tells the core which page shows.
+fn internal_page_load<R: Runtime>(app: &AppHandle<R>, event: PageLoadEvent, url: &Url) {
+    if matches!(event, PageLoadEvent::Finished) {
+        with_core(app, |core| core.internal_loaded(url));
+    }
 }
 
 fn internal_navigation<R: Runtime>(app: &AppHandle<R>, url: &Url) -> bool {
@@ -94,4 +98,60 @@ fn internal_navigation<R: Runtime>(app: &AppHandle<R>, url: &Url) -> bool {
     let fx = lock(&shared(app).core).navigate(&target).1;
     later(app, fx);
     false
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::shell::testing::{app, bare, core};
+
+    fn url(text: &str) -> Url {
+        Url::parse(text).unwrap()
+    }
+
+    #[test]
+    fn build_adds_the_three_bundled_webviews() {
+        let app = app();
+        for label in ["toolbar", "internal", "status"] {
+            assert!(app.get_webview(label).is_some(), "{label}");
+        }
+        assert!(lock(&shared(app.handle()).base).is_some());
+    }
+
+    #[test]
+    fn bundled_pages_stay_in_the_internal_webview() {
+        let app = bare();
+        assert!(internal_navigation(
+            app.handle(),
+            &url("tauri://localhost/x.html")
+        ));
+        *lock(&shared(app.handle()).base) = Some(url("http://localhost:1420/"));
+        assert!(internal_navigation(
+            app.handle(),
+            &url("http://localhost:1420/a.html")
+        ));
+        assert!(internal_navigation(
+            app.handle(),
+            &url("tauri://localhost/x.html")
+        ));
+    }
+
+    #[test]
+    fn links_to_sites_open_in_the_active_tab() {
+        let app = bare();
+        assert!(!internal_navigation(app.handle(), &url("http://a.i2p/")));
+        assert_eq!(core(&app).tabs().active().unwrap().url, "http://a.i2p/");
+        assert!(!internal_navigation(
+            app.handle(),
+            &url("https://example.com/")
+        ));
+    }
+
+    #[test]
+    fn finished_loads_tell_the_core() {
+        let app = bare();
+        let page = url("tauri://localhost/src/ui/history.html");
+        internal_page_load(app.handle(), PageLoadEvent::Started, &page);
+        internal_page_load(app.handle(), PageLoadEvent::Finished, &page);
+    }
 }

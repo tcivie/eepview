@@ -161,3 +161,6 @@ fn create<R: Runtime>(app: &AppHandle<R>, load: &Load) {
         Err(e) => log::error("content webview", &e.to_string()),
     }
 }
+
+#[cfg(test)]
+mod tests;

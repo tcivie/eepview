@@ -17,6 +17,10 @@ members = ["crates/eepview-platform"]
 name = "eepview_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
+[dev-dependencies]
+# The mock runtime (`tauri::test`) for the shell tests.
+tauri = { version = "2", default-features = false, features = ["test", "unstable", "wry"] }
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 

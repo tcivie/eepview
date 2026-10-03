@@ -71,3 +71,44 @@ pub fn now_ms() -> u64 {
         .duration_since(UNIX_EPOCH)
         .map_or(0, |d| u64::try_from(d.as_millis()).unwrap_or(u64::MAX))
 }
+
+#[cfg(test)]
+mod tests {
+    use std::thread;
+
+    use super::*;
+    use crate::shell::testing::{Mock, bare};
+
+    #[test]
+    fn labels_never_repeat() {
+        let state = Shared::<Mock>::new(Core::new(None, "127.0.0.1:4444", 0));
+        assert_eq!(state.next_label(3), "tab-3-0");
+        assert_eq!(state.next_label(3), "tab-3-1");
+        assert_eq!(state.next_label(4), "tab-4-2");
+    }
+
+    #[test]
+    fn lock_takes_the_data_of_a_poisoned_mutex() {
+        let m = Arc::new(Mutex::new(5));
+        let other = Arc::clone(&m);
+        let _ = thread::spawn(move || {
+            let _guard = other.lock().unwrap();
+            panic!("poison the mutex");
+        })
+        .join();
+        assert!(m.is_poisoned());
+        assert_eq!(*lock(&m), 5);
+    }
+
+    #[test]
+    fn now_is_unix_ms() {
+        assert!(now_ms() > 1_700_000_000_000);
+    }
+
+    #[test]
+    fn shared_reads_the_managed_state() {
+        let app = bare();
+        assert!(lock(&shared(app.handle()).gate).is_none());
+        assert!(lock(&shared(app.handle()).labels).is_empty());
+    }
+}

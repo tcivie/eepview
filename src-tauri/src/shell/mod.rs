@@ -18,15 +18,18 @@ pub mod env;
 pub mod log;
 pub mod menu;
 pub mod state;
+#[cfg(test)]
+mod testing;
 pub mod view;
 pub mod watch;
 
 use std::thread;
 use std::time::Duration;
 
-use tauri::{App, Manager, RunEvent, WindowEvent};
+use tauri::{App, AppHandle, Manager, RunEvent, Runtime, WindowEvent};
 
-use crate::core::{Core, Paths};
+use crate::core::{Core, Effect, Paths};
+use crate::net::loopback::LoopbackAddr;
 use state::{Shared, now_ms};
 
 /// Starts the browser and blocks until it exits.
@@ -42,16 +45,19 @@ pub fn run() -> tauri::Result<()> {
         .setup(|app| setup(app).map_err(Into::into))
         .build(tauri::generate_context!())?;
     app.run(|handle, event| {
-        if let RunEvent::WindowEvent {
-            event: WindowEvent::Resized(_),
-            ..
-        } = event
-        {
-            view::sync(handle);
-            view::check_fullscreen(handle);
+        if let RunEvent::WindowEvent { event, .. } = event {
+            on_window_event(handle, &event);
         }
     });
     Ok(())
+}
+
+/// A window resize lays the webviews out again.
+fn on_window_event<R: Runtime>(handle: &AppHandle<R>, event: &WindowEvent) {
+    if matches!(event, WindowEvent::Resized(_)) {
+        view::sync(handle);
+        view::check_fullscreen(handle);
+    }
 }
 
 /// Every IPC command of the contract, as one `generate_handler!` list.
@@ -101,11 +107,11 @@ macro_rules! contract_handler {
 }
 
 /// Every IPC command of the contract.
-fn handler() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static {
+fn handler<R: Runtime>() -> impl Fn(tauri::ipc::Invoke<R>) -> bool + Send + Sync + 'static {
     contract_handler!()
 }
 
-fn paths(app: &App) -> Option<Paths> {
+fn paths<R: Runtime>(app: &App<R>) -> Option<Paths> {
     let config = app.path().app_config_dir().ok()?;
     let data = app.path().app_data_dir().ok()?;
     Some(Paths {
@@ -116,33 +122,70 @@ fn paths(app: &App) -> Option<Paths> {
     })
 }
 
-fn setup(app: &mut App) -> tauri::Result<()> {
-    let mut core = Core::new(paths(app), &env::proxy_text(), now_ms());
-    if env::js_forced_off() {
-        core.force_js_off();
-    }
-    app.manage(Shared::<tauri::Wry>::new(core));
+fn setup<R: Runtime>(app: &mut App<R>) -> tauri::Result<()> {
+    let core = new_core(paths(app), &env::proxy_text(), env::js_forced_off());
+    app.manage(Shared::<R>::new(core));
     let menu = menu::build(app.handle())?;
     app.set_menu(menu)?;
+    start(app, Inputs::from_env())
+}
+
+/// The process inputs that [`start`] acts on.
+struct Inputs {
+    urls: Vec<String>,
+    proxy: Result<LoopbackAddr, String>,
+    exit_after: Option<u64>,
+}
+
+impl Inputs {
+    fn from_env() -> Self {
+        Self {
+            urls: env::start_urls(),
+            proxy: env::proxy(),
+            exit_after: env::exit_after(),
+        }
+    }
+}
+
+/// The core, with page JavaScript off everywhere when `js_off`.
+fn new_core(paths: Option<Paths>, proxy: &str, js_off: bool) -> Core {
+    let mut core = Core::new(paths, proxy, now_ms());
+    if js_off {
+        core.force_js_off();
+    }
+    core
+}
+
+/// Builds the window, opens the start URLs and starts the router watcher.
+fn start<R: Runtime>(app: &mut App<R>, inputs: Inputs) -> tauri::Result<()> {
     chrome::build(app)?;
     let handle = app.handle().clone();
-    for url in env::start_urls() {
-        let first = { state::lock(&state::shared(&handle).core).tabs().len() == 1 };
-        apply::with_core(&handle, |core| open_start(core, &url, first));
+    open_start_urls(&handle, &inputs.urls);
+    watch::start(&handle, inputs.proxy);
+    if let Some(seconds) = inputs.exit_after {
+        exit_later(handle, seconds);
     }
-    watch::start(&handle, env::proxy());
-    if let Some(seconds) = env::exit_after() {
-        thread::spawn(move || {
-            thread::sleep(Duration::from_secs(seconds));
-            handle.exit(0);
-        });
-    }
-    apply::later(app.handle(), vec![crate::core::Effect::Layout]);
+    apply::later(app.handle(), vec![Effect::Layout]);
     Ok(())
 }
 
+fn open_start_urls<R: Runtime>(handle: &AppHandle<R>, urls: &[String]) {
+    for url in urls {
+        let first = state::lock(&state::shared(handle).core).tabs().len() == 1;
+        apply::with_core(handle, |core| open_start(core, url, first));
+    }
+}
+
+/// Quits after `seconds` (`EEPVIEW_EXIT_AFTER`).
+fn exit_later<R: Runtime>(handle: AppHandle<R>, seconds: u64) {
+    thread::spawn(move || {
+        thread::sleep(Duration::from_secs(seconds));
+        handle.exit(0);
+    });
+}
+
 /// The first start URL replaces the home tab; the others open new tabs.
-fn open_start(core: &mut Core, url: &str, first: bool) -> Vec<crate::core::Effect> {
+fn open_start(core: &mut Core, url: &str, first: bool) -> Vec<Effect> {
     let home_only = first
         && core
             .tabs()
@@ -152,5 +195,77 @@ fn open_start(core: &mut Core, url: &str, first: bool) -> Vec<crate::core::Effec
         core.navigate(url).1
     } else {
         core.tab_new(Some(url), crate::tabs::Place::End).1
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use tauri::PhysicalSize;
+
+    use super::*;
+    use crate::shell::testing::{bare, core, wait_for};
+
+    fn inputs(urls: &[&str]) -> Inputs {
+        Inputs {
+            urls: urls.iter().map(|u| (*u).to_owned()).collect(),
+            proxy: Err("EEPVIEW_PROXY: test".into()),
+            exit_after: Some(86_400),
+        }
+    }
+
+    #[test]
+    fn start_builds_the_window_and_opens_the_urls() {
+        let mut app = bare();
+        start(&mut app, inputs(&["http://a.i2p/", "http://b.i2p/"])).unwrap();
+        assert!(app.get_webview("toolbar").is_some());
+        let urls: Vec<String> = core(&app).tabs().iter().map(|t| t.url.clone()).collect();
+        assert_eq!(urls, ["http://a.i2p/", "http://b.i2p/"]);
+        assert!(wait_for(|| core(&app).router().state == "down"));
+    }
+
+    #[test]
+    fn the_first_url_replaces_only_the_home_tab() {
+        let mut core = Core::new(None, env::DEFAULT_PROXY, 0);
+        open_start(&mut core, "http://a.i2p/", true);
+        assert_eq!(core.tabs().len(), 1);
+        open_start(&mut core, "http://b.i2p/", true);
+        assert_eq!(core.tabs().len(), 2);
+        open_start(&mut core, "http://c.i2p/", false);
+        assert_eq!(core.tabs().len(), 3);
+    }
+
+    #[test]
+    fn new_core_can_force_javascript_off() {
+        for js_off in [false, true] {
+            let core = new_core(None, "127.0.0.1:4445", js_off);
+            assert_eq!(core.router().proxy, "127.0.0.1:4445");
+        }
+        let env = Inputs::from_env();
+        assert_eq!(env.exit_after, env::exit_after());
+    }
+
+    #[test]
+    fn stores_live_in_the_app_folders() {
+        let app = bare();
+        let p = paths(&app).unwrap();
+        let names = [p.bookmarks, p.history, p.settings, p.sites]
+            .map(|path| path.file_name().unwrap().to_owned());
+        assert_eq!(
+            names,
+            [
+                "bookmarks.json",
+                "history.json",
+                "settings.json",
+                "sites.json"
+            ]
+        );
+    }
+
+    #[test]
+    fn resizes_lay_the_webviews_out() {
+        let app = bare();
+        let resized = WindowEvent::Resized(PhysicalSize::new(800, 600));
+        on_window_event(app.handle(), &resized);
+        on_window_event(app.handle(), &WindowEvent::Focused(true));
     }
 }

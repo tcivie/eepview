@@ -1,0 +1,185 @@
+// SPDX-FileCopyrightText: 2026 The eepview contributors
+// SPDX-License-Identifier: MIT
+
+//! IPC command tests on the Tauri mock runtime: each command runs through the real invoke
+//! handler, as the UI calls it, and changes the core as the contract says.
+
+use serde_json::{Value, json};
+use tauri::App;
+
+use super::*;
+use crate::net::testing::{FakeRouter, dead_addr};
+use crate::shell::testing::{Mock, app, core, gate_open, invoke, open_gate, wait_for};
+
+fn handle(app: &App<Mock>) -> AppHandle<Mock> {
+    app.handle().clone()
+}
+
+fn ok(app: &App<Mock>, cmd: &str, args: Value) -> Value {
+    invoke(app, cmd, args).unwrap_or_else(|e| panic!("{cmd}: {e}"))
+}
+
+#[test]
+fn tab_commands_change_the_tab_strip() {
+    let app = app();
+    let tab = ok(&app, "tab_new", json!({ "url": "http://a.i2p/" }));
+    let id = tab["id"].as_u64().unwrap();
+    assert_eq!(ok(&app, "tab_list", json!({})).as_array().unwrap().len(), 2);
+    ok(&app, "tab_move", json!({ "id": id, "index": 0 }));
+    ok(&app, "tab_select", json!({ "id": id }));
+    assert_eq!(
+        core(&app).tabs().active().unwrap().id,
+        u32::try_from(id).unwrap()
+    );
+    ok(&app, "tab_close", json!({ "id": id }));
+    assert_eq!(core(&app).tabs().len(), 1);
+}
+
+#[test]
+fn page_commands_run_on_the_active_tab() {
+    let app = app();
+    let nav = ok(&app, "navigate", json!({ "input": "http://a.i2p/" }));
+    assert!(nav["ok"].is_boolean());
+    for cmd in [
+        "go_back",
+        "go_forward",
+        "stop",
+        "home",
+        "find_close",
+        "zoom_in",
+        "zoom_out",
+        "zoom_reset",
+    ] {
+        assert_eq!(ok(&app, cmd, json!({})), Value::Null, "{cmd}");
+    }
+    ok(&app, "reload", json!({ "hard": true }));
+    ok(&app, "reload", json!({}));
+    let find = json!({ "query": "x", "forward": true, "matchCase": false });
+    ok(&app, "find", find);
+    ok(&app, "site_js_set", json!({ "host": "a.i2p", "on": false }));
+    ok(&app, "chrome_set_height", json!({ "px": 300.0 }));
+    assert!((core(&app).toolbar_request() - 300.0).abs() < f64::EPSILON);
+}
+
+#[test]
+fn bookmark_commands_round_trip() {
+    let app = app();
+    let added = ok(
+        &app,
+        "bookmark_add",
+        json!({ "bookmark": { "url": "http://a.i2p/", "title": "A" } }),
+    );
+    let found = ok(&app, "bookmark_find", json!({ "url": "http://a.i2p/" }));
+    assert_eq!(found["id"], added["id"]);
+    let mut renamed = added.clone();
+    renamed["title"] = json!("B");
+    ok(&app, "bookmark_update", json!({ "bookmark": renamed }));
+    let title = |app: &App<Mock>| {
+        ok(app, "bookmark_find", json!({ "url": "http://a.i2p/" }))["title"].clone()
+    };
+    assert_eq!(title(&app), json!("B"));
+    let export = ok(&app, "bookmarks_export", json!({}));
+    let count = ok(&app, "bookmarks_list", json!({}))
+        .as_array()
+        .unwrap()
+        .len();
+    ok(&app, "bookmark_remove", json!({ "id": added["id"] }));
+    assert_eq!(title(&app), Value::Null);
+    assert!(ok(&app, "bookmarks_import", json!({ "json": export })).is_u64());
+    assert_eq!(
+        ok(&app, "bookmarks_list", json!({}))
+            .as_array()
+            .unwrap()
+            .len(),
+        count
+    );
+    let bad = json!({ "bookmark": { "url": "https://example.com/" } });
+    assert!(invoke(&app, "bookmark_add", bad).is_err());
+    assert!(invoke(&app, "bookmarks_import", json!({ "json": "not json" })).is_err());
+}
+
+#[test]
+fn history_and_suggest_commands() {
+    let app = app();
+    assert_eq!(ok(&app, "history_query", json!({})), json!([]));
+    assert_eq!(
+        ok(&app, "history_query", json!({ "query": { "q": "a" } })),
+        json!([])
+    );
+    ok(&app, "history_remove", json!({ "id": "none" }));
+    assert_eq!(
+        ok(&app, "history_clear", json!({ "range": "all" })),
+        Value::Null
+    );
+    assert!(invoke(&app, "history_clear", json!({ "range": "year" })).is_err());
+    assert!(ok(&app, "suggest", json!({ "input": "a" })).is_array());
+}
+
+#[test]
+fn settings_commands() {
+    let app = app();
+    let before = ok(&app, "settings_get", json!({}));
+    assert_eq!(ok(&app, "settings_set", json!({ "patch": {} })), before);
+    assert!(invoke(&app, "settings_set", json!({ "patch": { "nope": 1 } })).is_err());
+}
+
+#[test]
+fn router_commands() {
+    let app = app();
+    assert_eq!(
+        ok(&app, "router_status", json!({}))["proxy"],
+        json!("127.0.0.1:4444")
+    );
+    assert!(ok(&app, "router_stats", json!({}))["history"].is_array());
+    let answer = ok(&app, "router_control", json!({ "action": "restart" }));
+    assert_eq!(answer, json!({ "ok": false, "reason": "external" }));
+    assert!(invoke(&app, "router_control", json!({ "action": "explode" })).is_err());
+    assert_eq!(ok(&app, "platform", json!({})), json!(PLATFORM));
+}
+
+#[test]
+fn pause_closes_the_gate_and_resume_verifies_again() {
+    let app = app();
+    let router = FakeRouter::start();
+    open_gate(&app, &router);
+    ok(&app, "connection_pause", json!({}));
+    assert!(!gate_open(&app));
+    assert!(core(&app).paused());
+    ok(&app, "connection_resume", json!({}));
+    assert!(!core(&app).paused());
+    resume(handle(&app), Ok(router.addr));
+    assert!(wait_for(|| gate_open(&app)));
+}
+
+#[test]
+fn resume_with_a_bad_proxy_keeps_the_gate_closed() {
+    let app = app();
+    resume(handle(&app), Err("EEPVIEW_PROXY: bad".into()));
+    assert!(wait_for(|| core(&app).router().state == "down"));
+    assert!(!gate_open(&app));
+}
+
+#[test]
+fn helper_stats_are_empty_without_a_helper() {
+    assert_eq!(helper_stats(None), RouterStats::default());
+    let dead = helper_stats(Some((dead_addr(), "token".into())));
+    assert_eq!(dead, RouterStats::default());
+}
+
+#[test]
+fn export_files_land_in_the_folder() {
+    let dir = std::env::temp_dir().join(format!("eepview-export-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = write_export(&dir, "[]", 0).unwrap();
+    assert_eq!(std::fs::read_to_string(&path).unwrap(), "[]");
+    assert!(write_export(&dir.join("missing"), "[]", 0).is_err());
+    std::fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
+fn direct_calls_match_the_ipc_answers() {
+    let app = app();
+    assert_eq!(tab_list(handle(&app)).len(), 1);
+    assert!(tab_new(handle(&app), None).is_ok());
+    assert_eq!(router_status(handle(&app)).proxy, "127.0.0.1:4444");
+}

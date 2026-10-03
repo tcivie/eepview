@@ -42,13 +42,25 @@ pub fn native_hooks<R: Runtime>(platform: &PlatformWebview, app: &AppHandle<R>, 
     if let Err(e) = eepview_platform::harden(platform) {
         super::log::error("harden", &e);
     }
-    let app = app.clone();
-    let hover = Box::new(move |link: Option<String>| {
-        with_core(&app, |core| core.hover_link(tab, link.as_deref()));
-    });
-    if let Err(e) = eepview_platform::on_hover(platform, hover) {
+    if let Err(e) = eepview_platform::on_hover(platform, hover_callback(app, tab)) {
         super::log::error("hover", &e);
     }
+}
+
+/// The callback that gets the link under the mouse in `tab`.
+fn hover_callback<R: Runtime>(app: &AppHandle<R>, tab: u32) -> Box<dyn Fn(Option<String>)> {
+    let app = app.clone();
+    Box::new(move |link: Option<String>| {
+        with_core(&app, |core| core.hover_link(tab, link.as_deref()));
+    })
+}
+
+/// The callback that gets the match count of a find in `tab`.
+fn count_callback<R: Runtime>(app: &AppHandle<R>, tab: u32) -> Box<dyn Fn(Option<u32>)> {
+    let app = app.clone();
+    Box::new(move |count: Option<u32>| {
+        with_core(&app, |core| core.find_counted(tab, count));
+    })
 }
 
 /// The bridge request of a find.
@@ -67,10 +79,7 @@ fn find_text<R: Runtime>(webview: &Webview<R>, tab: u32, find: &FindOp) -> tauri
     let (live, find) = (webview.clone(), find.clone());
     let app = webview.app_handle().clone();
     webview.with_webview(move |platform| {
-        let counted = Box::new(move |count: Option<u32>| {
-            with_core(&app, |core| core.find_counted(tab, count));
-        });
-        if !eepview_platform::find(&platform, &request, counted) {
+        if !eepview_platform::find(&platform, &request, count_callback(&app, tab)) {
             find_by_script(&live, tab, &find);
         }
     })
@@ -106,12 +115,17 @@ pub fn parse_count(result: &str) -> Option<Option<u32>> {
     Some(u32::try_from(n).ok())
 }
 
+/// The result of the find script: a fresh search reports its count.
+fn script_counted<R: Runtime>(app: &AppHandle<R>, tab: u32, out: &str) {
+    if let Some(count) = parse_count(out) {
+        with_core(app, |core| core.find_counted(tab, count));
+    }
+}
+
 fn find_by_script<R: Runtime>(webview: &Webview<R>, tab: u32, find: &FindOp) {
     let app = webview.app_handle().clone();
     let result = webview.eval_with_callback(find_script(find), move |out| {
-        if let Some(count) = parse_count(&out) {
-            with_core(&app, |core| core.find_counted(tab, count));
-        }
+        script_counted(&app, tab, &out);
     });
     if let Err(e) = result {
         super::log::error("find", &e.to_string());
@@ -121,6 +135,46 @@ fn find_by_script<R: Runtime>(webview: &Webview<R>, tab: u32, find: &FindOp) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::shell::testing::{app, core};
+
+    fn op(query: &str) -> FindOp {
+        FindOp {
+            query: query.into(),
+            forward: true,
+            match_case: false,
+            fresh: true,
+        }
+    }
+
+    #[test]
+    fn every_engine_call_runs() {
+        let app = app();
+        let webview = app.get_webview("status").unwrap();
+        for call in [
+            EngineOp::Reload,
+            EngineOp::Zoom(1.5),
+            EngineOp::Find(op("x")),
+            EngineOp::FindClear,
+            EngineOp::Back,
+            EngineOp::Forward,
+            EngineOp::HardReload,
+            EngineOp::Stop,
+        ] {
+            run(&webview, 1, &call);
+        }
+        find_by_script(&webview, 1, &op("x"));
+    }
+
+    #[test]
+    fn engine_callbacks_reach_the_core() {
+        let app = app();
+        let tab = core(&app).tabs().active().unwrap().id;
+        hover_callback(app.handle(), tab)(Some("http://a.i2p/".into()));
+        hover_callback(app.handle(), tab)(None);
+        count_callback(app.handle(), tab)(Some(2));
+        script_counted(app.handle(), tab, "4");
+        script_counted(app.handle(), tab, "-1");
+    }
 
     #[test]
     fn find_script_escapes_the_query() {

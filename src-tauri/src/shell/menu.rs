@@ -25,11 +25,9 @@ const GROUPS: [(Group, &str); 6] = [
 ///
 /// Fails when the OS menu cannot be built.
 pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
-    let table = shortcuts::table(cfg!(target_os = "macos"));
+    let table = shortcuts::table(MAC);
     let menu = Menu::new(app)?;
-    if cfg!(target_os = "macos") {
-        menu.append(&app_menu(app)?)?;
-    }
+    app_menu(app, &menu)?;
     for (group, title) in GROUPS {
         menu.append(&group_menu(app, &table, group, title)?)?;
     }
@@ -52,17 +50,40 @@ fn group_menu<R: Runtime>(
     Ok(sub)
 }
 
+/// The macOS menu layout: an app menu first, and the macOS accelerators.
+const MAC: bool = cfg!(target_os = "macos");
+
+/// The accelerator of a shortcut, `None` when it has none.
+fn accel(s: &Shortcut) -> Option<&str> {
+    (!s.accel.is_empty()).then_some(s.accel.as_str())
+}
+
+/// True for the Stop item, which starts disabled and follows the active tab's loading.
+fn is_stop(s: &Shortcut) -> bool {
+    s.id == "stop"
+}
+
 fn menu_item<R: Runtime>(app: &AppHandle<R>, s: &Shortcut) -> tauri::Result<MenuItem<R>> {
-    let accel = (!s.accel.is_empty()).then_some(s.accel.as_str());
-    let enabled = s.id != "stop";
-    let item = MenuItem::with_id(app, s.id.as_str(), &s.label, enabled, accel)?;
-    if s.id == "stop" {
+    let item = MenuItem::with_id(app, s.id.as_str(), &s.label, !is_stop(s), accel(s))?;
+    if is_stop(s) {
         *lock(&shared(app).stop_item) = Some(item.clone());
     }
     Ok(item)
 }
 
-fn app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Submenu<R>> {
+/// The macOS app menu (About, Hide, Quit); other systems have none.
+#[cfg(target_os = "macos")]
+fn app_menu<R: Runtime>(app: &AppHandle<R>, menu: &Menu<R>) -> tauri::Result<()> {
+    menu.append(&app_submenu(app)?)
+}
+
+#[cfg(not(target_os = "macos"))]
+fn app_menu<R: Runtime>(_app: &AppHandle<R>, _menu: &Menu<R>) -> tauri::Result<()> {
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+fn app_submenu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Submenu<R>> {
     let sub = Submenu::new(app, "eepview", true)?;
     let items = [
         PredefinedMenuItem::about(app, None, None),
@@ -106,5 +127,61 @@ fn append_all<R: Runtime, const N: usize>(
 pub fn on_event<R: Runtime>(app: &AppHandle<R>, id: &str) {
     if let Some(action) = shortcuts::action(id) {
         with_core(app, |core| core.shortcut(action, now_ms()));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::shell::testing::{bare, core};
+
+    #[test]
+    fn only_stop_starts_disabled() {
+        let table = shortcuts::table(MAC);
+        let stops: Vec<&str> = table
+            .iter()
+            .filter(|s| is_stop(s))
+            .map(|s| s.id.as_str())
+            .collect();
+        assert_eq!(stops, ["stop"]);
+    }
+
+    #[test]
+    fn empty_accelerators_are_none() {
+        let mut item = shortcuts::table(MAC)[0].clone();
+        assert_eq!(
+            accel(&item),
+            Some(item.accel.as_str()).filter(|a| !a.is_empty())
+        );
+        item.accel.clear();
+        assert_eq!(accel(&item), None);
+    }
+
+    #[test]
+    fn every_group_has_items() {
+        let table = shortcuts::table(MAC);
+        for (group, title) in GROUPS {
+            assert!(table.iter().any(|s| s.menu == group), "{title}");
+        }
+    }
+
+    #[test]
+    fn menu_events_run_the_shortcut() {
+        let app = bare();
+        on_event(app.handle(), "new-tab");
+        assert_eq!(core(&app).tabs().len(), 2);
+        on_event(app.handle(), "no-such-item");
+        assert_eq!(core(&app).tabs().len(), 2);
+    }
+
+    /// muda builds menus only on the main thread on macOS, and tests run on other threads.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn the_menu_bar_builds() {
+        let app = bare();
+        let menu = build(app.handle()).unwrap();
+        assert_eq!(menu.items().unwrap().len(), GROUPS.len());
+        assert!(lock(&shared(app.handle()).stop_item).is_some());
+        crate::shell::view::sync_stop_item(app.handle());
     }
 }

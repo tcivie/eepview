@@ -18,7 +18,7 @@
 //! No IPC: the capabilities name only the `toolbar` and `internal` webviews.
 
 use eepview_platform::Rules;
-use tauri::webview::{DownloadEvent, NewWindowResponse, PageLoadEvent, PageLoadPayload};
+use tauri::webview::{DownloadEvent, NewWindowResponse, PageLoadEvent};
 use tauri::{
     AppHandle, LogicalPosition, LogicalSize, Manager, Runtime, Url, Webview, WebviewBuilder,
     WebviewUrl, Window,
@@ -177,34 +177,44 @@ fn hooks<R: Runtime>(
 ) -> WebviewBuilder<R> {
     let (nav_app, win_app, dl_app) = (app.clone(), app.clone(), app.clone());
     builder
-        .on_navigation(move |url| {
-            // L4 first, before any state: nothing but an I2P URL passes this line.
-            let allowed = nav::guard(url);
-            let (core_ok, fx) = lock(&shared(&nav_app).core).tab_navigation(tab, url);
-            apply::later(&nav_app, fx);
-            allowed && core_ok
+        .on_navigation(move |url| navigation(&nav_app, tab, url))
+        .on_new_window(move |url, _features| new_window(&win_app, &url))
+        .on_download(move |_webview, event| download(&dl_app, &event))
+        .on_page_load(move |webview, payload| {
+            page_load(webview.app_handle(), tab, payload.event(), payload.url());
         })
-        .on_new_window(move |url, _features| {
-            with_core(&win_app, |core| core.new_window(&url));
-            NewWindowResponse::Deny
-        })
-        .on_download(move |_webview, event| {
-            if let DownloadEvent::Requested { url, .. } = event {
-                apply::later(&dl_app, Core::download_refused(url.as_str()));
-            }
-            false
-        })
-        .on_page_load(move |webview, payload| page_load(&webview, &payload, tab))
         .on_document_title_changed(move |webview, title| {
             with_core(webview.app_handle(), |core| core.title_changed(tab, &title));
         })
 }
 
-fn page_load<R: Runtime>(webview: &Webview<R>, payload: &PageLoadPayload<'_>, tab: u32) {
-    let url = payload.url().to_string();
-    let event = payload.event();
+/// A navigation of a tab: allowed only when L4 and the core both allow it.
+fn navigation<R: Runtime>(app: &AppHandle<R>, tab: u32, url: &Url) -> bool {
+    // L4 first, before any state: nothing but an I2P URL passes this line.
+    let allowed = nav::guard(url);
+    let (core_ok, fx) = lock(&shared(app).core).tab_navigation(tab, url);
+    apply::later(app, fx);
+    allowed && core_ok
+}
+
+/// A page asked for a new window: the core may open a tab, the engine never opens one.
+fn new_window<R: Runtime>(app: &AppHandle<R>, url: &Url) -> NewWindowResponse<R> {
+    with_core(app, |core| core.new_window(url));
+    NewWindowResponse::Deny
+}
+
+/// Downloads are refused, with a toast.
+fn download<R: Runtime>(app: &AppHandle<R>, event: &DownloadEvent<'_>) -> bool {
+    if let DownloadEvent::Requested { url, .. } = event {
+        apply::later(app, Core::download_refused(url.as_str()));
+    }
+    false
+}
+
+fn page_load<R: Runtime>(app: &AppHandle<R>, tab: u32, event: PageLoadEvent, url: &Url) {
+    let url = url.to_string();
     super::log::page(tab, matches!(event, PageLoadEvent::Started), &url);
-    with_core(webview.app_handle(), |core| match event {
+    with_core(app, |core| match event {
         PageLoadEvent::Started => core.page_started(tab, &url),
         PageLoadEvent::Finished => core.page_finished(tab, &url, now_ms()),
     });
@@ -212,7 +222,75 @@ fn page_load<R: Runtime>(webview: &Webview<R>, payload: &PageLoadPayload<'_>, ta
 
 #[cfg(test)]
 mod tests {
+    use std::path::PathBuf;
+
     use super::*;
+    use crate::shell::testing::{app, bare, core};
+
+    fn url(text: &str) -> Url {
+        Url::parse(text).unwrap()
+    }
+
+    #[test]
+    fn navigation_needs_the_guard_and_the_core() {
+        let app = bare();
+        let tab = core(&app).tabs().active().unwrap().id;
+        assert!(!navigation(app.handle(), tab, &url("https://example.com/")));
+        assert!(!navigation(app.handle(), tab, &url("file:///etc/passwd")));
+        navigation(app.handle(), tab, &url("http://a.i2p/"));
+    }
+
+    #[test]
+    fn new_windows_are_always_denied() {
+        let app = bare();
+        let response = new_window(app.handle(), &url("http://a.i2p/"));
+        assert!(matches!(response, NewWindowResponse::Deny));
+    }
+
+    #[test]
+    fn downloads_are_refused() {
+        let app = bare();
+        let mut destination = PathBuf::from("/tmp/x");
+        let requested = DownloadEvent::Requested {
+            url: url("http://a.i2p/f.zip"),
+            destination: &mut destination,
+        };
+        assert!(!download(app.handle(), &requested));
+        let finished = DownloadEvent::Finished {
+            url: url("http://a.i2p/f.zip"),
+            path: None,
+            success: false,
+        };
+        assert!(!download(app.handle(), &finished));
+    }
+
+    #[test]
+    fn page_loads_reach_the_core() {
+        let app = bare();
+        let tab = core(&app).tabs().active().unwrap().id;
+        page_load(
+            app.handle(),
+            tab,
+            PageLoadEvent::Started,
+            &url("http://a.i2p/"),
+        );
+        page_load(
+            app.handle(),
+            tab,
+            PageLoadEvent::Finished,
+            &url("http://a.i2p/"),
+        );
+    }
+
+    #[test]
+    fn the_first_load_waits_for_the_filter() {
+        let app = app();
+        let webview = app.get_webview("status").unwrap();
+        load_after_rules(webview.clone(), url("http://a.i2p/"))(Err("no filter".into()));
+        assert_ne!(webview.url().unwrap().as_str(), "http://a.i2p/");
+        load_after_rules(webview.clone(), url("http://a.i2p/"))(Ok(()));
+        assert_eq!(webview.url().unwrap().as_str(), "http://a.i2p/");
+    }
 
     #[test]
     fn windows_args_always_carry_the_proxy() {
