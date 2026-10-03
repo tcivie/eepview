@@ -2,3 +2,4 @@
 # SPDX-License-Identifier: MIT
 
 language: rust
+base_os_version: ubuntu-24-04
