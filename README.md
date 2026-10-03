@@ -5,7 +5,11 @@
   </picture>
 </p>
 
-<p align="center"><strong>Browse the I2P network. Nothing else, nothing leaks.</strong></p>
+<h1 align="center">eepview</h1>
+
+<p align="center"><strong>Browse the I2P network. Nothing else, nothing leaks.</strong><br>That is what eepview is built to do.</p>
+
+> **Early development.** The no-leak protections are being built. Do not rely on eepview for anonymity until v0.1.
 
 <p align="center">
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue"></a>
@@ -15,17 +19,17 @@
 
 ## What is eepview?
 
-I2P is a private network with its own sites, which end in `.i2p`. To reach them you need a router, and the setup is not easy. A normal browser can also leak your real IP address if one setting is wrong. eepview is a small browser made for I2P and nothing else. It finds or installs a router for you, and its pages cannot reach the normal internet.
+I2P is a private network with its own sites, which end in `.i2p`. To reach them you need a router, and the setup is not easy. A normal browser can also leak your real IP address if one setting is wrong. eepview is a small browser made for I2P and nothing else. It is built to find or install a router for you (planned), and to keep its pages off the normal internet.
 
 ## Why eepview
 
-- **Plug and play.** eepview finds a router or installs one for you. It asks before every network action.
-- **I2P only.** Pages cannot reach the normal internet. This is by design, not a setting you can get wrong.
-- **Private by default.** Cookies are cleared when you quit. WebRTC is off.
-- **Familiar.** Tabs, bookmarks, history and find in page work the way you expect.
+- **Plug and play (planned).** eepview will find a router or install one for you. It will ask before every network action.
+- **I2P only.** Pages are built so they cannot reach the normal internet. This is by design, not a setting you can get wrong.
+- **Private by default.** Cookies are cleared when you quit (coming in v0.1). WebRTC is off.
+- **Familiar (coming in v0.1).** Tabs, bookmarks, history and find in page.
 - **Light.** It uses the web engine already on your system, so the download is small.
 
-Some of these are not in a release yet. They arrive with v0.1.
+Items marked "coming in v0.1" or "planned" are not in a release yet.
 
 ## Screenshots
 
@@ -55,11 +59,13 @@ Some of these are not in a release yet. They arrive with v0.1.
 
 ## Get started
 
-1. Download eepview from [GitHub Releases](https://github.com/tcivie/eepview/releases). The first release, v0.1, is coming.
-2. Start it. eepview looks for an I2P router on your computer.
-3. If it finds none, it offers to install one. Nothing happens until you say yes. When the router is ready, open a `.i2p` site.
+eepview has no release yet. v0.1 is the browser shell. Router detection and the managed install come after it, as planned steps.
 
-The [wiki](https://github.com/tcivie/eepview/wiki) has the full install steps.
+1. Download eepview from [GitHub Releases](https://github.com/tcivie/eepview/releases) when v0.1 is out.
+2. Planned: on first start, eepview looks for an I2P router on your computer.
+3. Planned: if it finds none, it offers to install one. Nothing happens until you say yes.
+
+The [wiki](https://github.com/tcivie/eepview/wiki) has the install steps.
 
 ## Learn more
 
