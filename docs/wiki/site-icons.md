@@ -15,7 +15,7 @@ Tabs, bookmark tiles, the bookmarks page and history rows show the icon of each 
 2. When `H` has a bookmark or a history entry, and eepview has not asked `H` in the last 24 h, the shell asks for an icon.
 3. `net::icons` sends one `GET http://H/favicon.ico` to the gatekeeper on loopback. The gatekeeper checks the host as for every page request and forwards it to the router.
 4. `icons::sanitize` checks the magic bytes, decodes the image, and draws it again as a 32 x 32 and a 64 x 64 PNG. No byte of the original file reaches the UI.
-5. The store writes the two PNG files under the app data folder. The file name is a hash of the host.
+5. The store writes the two PNG files under the app data folder. The file name is a hash of the host, so the host does not show in a file listing (see R22).
 6. The shell sends `icons-changed` and `tabs-changed`. The UI reads the icons from `TabInfo.icon`, `Bookmark.icon` and `HistoryEntry.icon`.
 
 ## Requirements
@@ -36,10 +36,10 @@ Each requirement is a test target. The tests check these rules, not the code.
 
 - **R6.** A fetch starts only after a web tab reports that a page on `H` finished loading. Internal pages, blocked pages and pages that never finish start no fetch.
 - **R7.** A fetch starts only when `H` has a bookmark, or a history entry after this visit is recorded. With history off and no bookmark for `H`, nothing is fetched and nothing is stored.
-- **R8.** eepview asks a host at most once in 24 h, whether the earlier attempt worked or not. The time of the last attempt per host survives a restart.
+- **R8.** eepview asks a host at most once in 24 h, whether the earlier attempt worked or not. The attempt time is recorded when the request starts, so a host whose fetch still runs is not asked again. The time of the last attempt per host survives a restart. An attempt time later than now (the clock went back) counts as expired.
 - **R9.** After 24 h, the next finished page load on `H` asks again. When that attempt fails, the stored icon stays.
 - **R10.** At most 2 fetches run at the same time. Other hosts wait in a queue, in order, each host at most once. A waiting host starts when a running fetch ends.
-- **R11.** Without a gatekeeper (router not verified, or paused), no fetch is sent. The attempt counts as a failure.
+- **R11.** Without a gatekeeper (router not verified, or paused), no fetch is sent. An attempt that never reached the site does not count for R8: no gatekeeper, no connection to the gatekeeper, the 30 s timeout, or a 502 or 503 (the gatekeeper and the router answer these by themselves). The attempt time from before comes back, and the next page load on `H` may ask again. Every other failure counts.
 
 ### Limits
 
@@ -60,14 +60,14 @@ Each requirement is a test target. The tests check these rules, not the code.
 
 ### Storage
 
-- **R22.** Icons live in the folder `icons/` under the app data folder: `icons/<sha256(H)>.png` (64 px) and `icons/<sha256(H)>-32.png` (32 px). `<sha256(H)>` is 64 lower-case hex characters of the SHA-256 of the host text. The host never appears in a file name.
+- **R22.** Icons live in the folder `icons/` under the app data folder: `icons/<sha256(H)>.png` (64 px) and `icons/<sha256(H)>-32.png` (32 px). `<sha256(H)>` is 64 lower-case hex characters of the SHA-256 of the host text. The host never appears in a file name. The hash keeps the host out of a file listing. It does not hide the host from someone who has the disk: I2P host names are public, so a hash is easy to check, and `history.json` holds the visited URLs anyway.
 - **R23.** The attempt times live in `icons/attempts.json`, keyed by the same hash. The host never appears in this file.
 - **R24.** `bookmarks.json`, `history.json` and the bookmark export never contain icon data. The `icon` field there is absent or `null`.
 - **R25.** A failed fetch never deletes or changes an icon that is already stored.
 
 ### Clearing
 
-- **R26.** An icon, its attempt time and its files are kept only while `H` has at least one bookmark or history entry. eepview deletes them as soon as the last one goes: `history_remove`, `history_clear` (any range), `bookmark_remove`, and `bookmark_update` that moves a bookmark to another host.
+- **R26.** An icon, its attempt time and its files are kept only while `H` has at least one bookmark or history entry. eepview deletes them as soon as the last one goes: `history_remove`, `history_clear` (any range), `bookmark_remove`, `bookmark_update` that moves a bookmark to another host, and a visit that pushes the oldest history entry out at the 10 000 cap.
 - **R27.** `history_clear("all")` (clear browsing data) deletes the icon of every host that has no bookmark.
 - **R28.** At start, eepview deletes every file in `icons/` that belongs to no bookmarked or visited host, and every file it did not write.
 - **R29.** After a host is cleared, the next visit asks for its icon again (the 24 h rule starts fresh).
@@ -109,6 +109,10 @@ pub enum FetchError {
     Chunked,       // R14: Transfer-Encoding present
     Malformed,     // not HTTP, or body shorter than Content-Length (R14, R15)
     Timeout,       // R12
+}
+impl FetchError {
+    /// False for NotI2p, Io, Timeout, Status(502) and Status(503): no request reached the site (R11).
+    pub fn reached_site(&self) -> bool;
 }
 
 /// The exact request bytes for `host` (R3), or `None` when `host` is not an I2P host.
@@ -168,6 +172,10 @@ impl IconStore {
     /// Deletes the icons, attempt times and stray files of every host not in `live` (R26, R28).
     /// True when something was deleted.
     pub fn retain(&mut self, live: &[String]) -> io::Result<bool>;
+    /// Puts back the attempt time of `host` from before a fetch that did not count (R11).
+    pub fn restore_attempt(&mut self, host: &str, before: Option<u64>) -> io::Result<()>;
+    /// Deletes the files and the attempt time of one host (R26, history cap). True when one existed.
+    pub fn forget(&mut self, host: &str) -> io::Result<bool>;
 }
 ```
 
@@ -183,10 +191,15 @@ impl Core {
     /// A fetch for `host` ended: `Some` with the sanitized icon, `None` on any failure.
     /// Stores it, sends Icons and TabsChanged, and starts the next waiting host (R10).
     pub fn icon_fetched(&mut self, host: &str, icon: Option<Icon>, now: u64) -> Vec<Effect>;
+    /// A fetch for `host` never reached the site (R11): the attempt does not count.
+    /// Frees the slot and starts the next waiting host.
+    pub fn icon_unreached(&mut self, host: &str, now: u64) -> Vec<Effect>;
 }
 ```
 
-`Core::page_finished` returns `Effect::FetchIcon(H)` when R6 to R11 allow it. The shell runs `net::icons::fetch` and `icons::sanitize` on a worker thread, then calls `Core::icon_fetched`.
+`Core::page_finished` returns `Effect::FetchIcon(H)` when R6 to R11 allow it. The shell runs `net::icons::fetch` and `icons::sanitize` on a worker thread, then calls `Core::icon_fetched`, or `Core::icon_unreached` when there is no gatekeeper or `FetchError::reached_site` is false.
+
+`History::visit` returns the entry the 10 000 cap pushed out, if any.
 
 ### IPC (contract v1.4)
 
@@ -213,6 +226,9 @@ export function siteMark(icon: string | null | undefined, letter: string): SiteM
 
 - Only `/favicon.ico`. A site that names its icon only in `<link rel="icon">` shows the letter.
 - A chunked or compressed icon response is refused.
+- The body cap is 64 KiB. A `favicon.ico` with a large uncompressed entry (one 256 x 256 entry is 256 KiB) is refused, and the site shows the letter. The cap is a design choice: it bounds what eepview reads from a site it did not ask to send anything.
+- The request head is fixed and minimal. A site can tell this request apart from the engine's own requests, and so learn that the visitor uses eepview and when the daily icon check runs. Copying an engine head would need its exact `User-Agent` and headers, which differ per system and version, and would still not match. The page requests reveal the engine anyway. This is a recorded decision.
+- Each record carries its own icon as a data URL. A 32 px icon is at most about 6 KB in base64, a 64 px icon at most about 22 KB. A history page of 50 rows stays under about 300 KB over local IPC. This keeps the contract simple: each record shows its icon without a second lookup.
 
 ## History
 

@@ -3,7 +3,7 @@
 
 //! When to ask a site for its icon, and when to forget it (`docs/wiki/site-icons.md`).
 
-use std::collections::{BTreeSet, HashMap, VecDeque};
+use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
 
 use super::{Core, Effect, Event};
 use crate::icons::{Icon, MAX_IN_FLIGHT, REFETCH_MS};
@@ -13,7 +13,8 @@ use crate::types::{Bookmark, HistoryEntry};
 /// The fetches that run and the hosts that wait for a free slot.
 #[derive(Debug, Default)]
 pub(super) struct IconJobs {
-    running: BTreeSet<String>,
+    /// Each running host, with the attempt time it had before this fetch.
+    running: BTreeMap<String, Option<u64>>,
     waiting: VecDeque<String>,
 }
 
@@ -34,19 +35,57 @@ impl Core {
         self.start_icon(host, now)
     }
 
+    /// True when `host` may be asked now. An attempt time later than `now` (the clock went
+    /// back) counts as expired.
     fn icon_due(&self, host: &str, now: u64) -> bool {
         let asked = self
             .icons
             .last_attempt(host)
-            .is_some_and(|t| now.saturating_sub(t) < REFETCH_MS);
-        !asked && !self.icon_jobs.running.contains(host) && self.host_is_live(host)
+            .is_some_and(|t| t <= now && now - t < REFETCH_MS);
+        !asked && !self.icon_jobs.running.contains_key(host) && self.host_is_live(host)
     }
 
+    /// Records the attempt when the request starts, so a running host is not asked again.
     fn start_icon(&mut self, host: String, now: u64) -> Vec<Effect> {
+        let before = self.icons.last_attempt(&host);
         let mut fx = Self::saved(self.icons.record_attempt(&host, now), "site icons");
-        self.icon_jobs.running.insert(host.clone());
+        self.icon_jobs.running.insert(host.clone(), before);
         fx.push(Effect::FetchIcon(host));
         fx
+    }
+
+    /// A fetch for `host` never reached the site: no gatekeeper, the gatekeeper refused it,
+    /// or the router did not answer in time. The attempt does not count: the time from
+    /// before it comes back. Starts the next waiting host.
+    pub fn icon_unreached(&mut self, host: &str, now: u64) -> Vec<Effect> {
+        let mut fx = Vec::new();
+        if let Some(before) = self.icon_jobs.running.remove(host) {
+            fx.extend(Self::saved(
+                self.icons.restore_attempt(host, before),
+                "site icons",
+            ));
+        }
+        fx.extend(self.next_icon(now));
+        fx
+    }
+
+    /// Deletes the icon of the host of an entry the history cap pushed out, when that host
+    /// has no bookmark and no history entry left.
+    pub(super) fn forget_icon_of(&mut self, evicted: Option<&HistoryEntry>) -> Vec<Effect> {
+        let Some(host) = evicted.and_then(|e| host_of(&e.url)) else {
+            return Vec::new();
+        };
+        if self.host_is_live(&host) {
+            return Vec::new();
+        }
+        match self.icons.forget(&host) {
+            Ok(true) => icons_changed(),
+            Ok(false) => Vec::new(),
+            Err(e) => vec![Self::toast(
+                "warn",
+                format!("Could not clear site icons: {e}"),
+            )],
+        }
     }
 
     /// A fetch for `host` ended: `Some` with the sanitized icon, `None` on any failure.

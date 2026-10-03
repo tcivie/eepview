@@ -298,6 +298,40 @@ impl IconStore {
         self.save_attempts()
     }
 
+    /// Puts back the attempt time `host` had before (`None`: no attempt on record).
+    ///
+    /// # Errors
+    ///
+    /// Fails when the file cannot be written.
+    pub fn restore_attempt(&mut self, host: &str, before: Option<u64>) -> io::Result<()> {
+        let stem = file_stem(host);
+        match before {
+            Some(t) => self.attempts.insert(stem, t),
+            None => self.attempts.remove(&stem),
+        };
+        self.save_attempts()
+    }
+
+    /// Deletes the icon files and the attempt time of one host. True when one existed.
+    ///
+    /// # Errors
+    ///
+    /// Fails when a file cannot be deleted or the attempt times cannot be saved.
+    pub fn forget(&mut self, host: &str) -> io::Result<bool> {
+        let stem = file_stem(host);
+        let mut changed = self.attempts.remove(&stem).is_some();
+        changed |= self.memory.remove(&stem).is_some();
+        if let Some(dir) = &self.dir {
+            let (small, large) = Self::files(dir, &stem);
+            changed |= remove_if_there(&small)?;
+            changed |= remove_if_there(&large)?;
+        }
+        if changed {
+            self.save_attempts()?;
+        }
+        Ok(changed)
+    }
+
     fn save_attempts(&self) -> io::Result<()> {
         let Some(dir) = &self.dir else {
             return Ok(());
@@ -369,6 +403,15 @@ fn sweep(dir: &Path, keep: &BTreeSet<String>) -> io::Result<bool> {
         changed = true;
     }
     Ok(changed)
+}
+
+/// Deletes a file. False when it was not there.
+fn remove_if_there(path: &Path) -> io::Result<bool> {
+    match fs::remove_file(path) {
+        Ok(()) => Ok(true),
+        Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(false),
+        Err(e) => Err(e),
+    }
 }
 
 /// Writes `bytes` to `path` through a temp file and a rename.

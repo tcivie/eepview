@@ -77,6 +77,19 @@ impl fmt::Display for FetchError {
 
 impl std::error::Error for FetchError {}
 
+impl FetchError {
+    /// False when the request never reached the site: the host was refused here, the
+    /// gatekeeper could not be reached or did not answer in time, or the gatekeeper or the
+    /// router answered 502 or 503 by itself. Such an attempt does not count.
+    #[must_use]
+    pub fn reached_site(&self) -> bool {
+        !matches!(
+            self,
+            Self::NotI2p | Self::Io(_) | Self::Timeout | Self::Status(502 | 503)
+        )
+    }
+}
+
 /// The exact request bytes for `host`, or `None` when it is not an I2P host.
 #[must_use]
 pub fn request(host: &str) -> Option<Vec<u8>> {

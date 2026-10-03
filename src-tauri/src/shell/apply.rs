@@ -93,14 +93,29 @@ fn fetch_icon<R: Runtime>(app: &AppHandle<R>, host: String) {
     let spawned = thread::Builder::new()
         .name("site-icon".into())
         .spawn(move || {
-            let icon = gate
-                .and_then(|g| net::icons::fetch(&g, &host).ok())
-                .and_then(|body| icons::sanitize(&body).ok());
-            with_core(&worker, |core| core.icon_fetched(&host, icon, now_ms()));
+            let outcome = gate.map(|g| net::icons::fetch(&g, &host));
+            with_core(&worker, |core| icon_done(core, &host, outcome));
         });
     if let Err(e) = spawned {
         log::error("site icon", &e.to_string());
-        with_core(app, |core| core.icon_fetched(&name, None, now_ms()));
+        with_core(app, |core| core.icon_unreached(&name, now_ms()));
+    }
+}
+
+/// Hands a fetch result to the core. No gatekeeper, or no request that reached the site,
+/// does not count as an attempt; any other failure does.
+fn icon_done(
+    core: &mut Core,
+    host: &str,
+    outcome: Option<Result<Vec<u8>, net::icons::FetchError>>,
+) -> Vec<Effect> {
+    match outcome {
+        None => core.icon_unreached(host, now_ms()),
+        Some(Err(e)) if !e.reached_site() => core.icon_unreached(host, now_ms()),
+        Some(result) => {
+            let icon = result.ok().and_then(|body| icons::sanitize(&body).ok());
+            core.icon_fetched(host, icon, now_ms())
+        }
     }
 }
 

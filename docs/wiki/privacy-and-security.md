@@ -19,6 +19,7 @@ See [No-leak architecture](no-leak-architecture.md) for the full design.
 
 ## What eepview does NOT protect
 
+- **That you use eepview, from the icon request.** The daily icon request has a fixed, minimal form. A site can tell it apart from the page requests and learn that you use eepview. See [Site icons](site-icons.md).
 - **What you type into a site.** If you give a site your name, it knows your name. I2P hides where you are. It does not hide what you say.
 - **Files you download.** Downloads are refused for now. When they arrive, a file you open outside eepview can reach the clearnet.
 - **Fingerprinting.** eepview uses the web engine of your system. Your engine version, screen size and fonts can still make you recognizable. eepview does not match the uniformity of Tor Browser.
