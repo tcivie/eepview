@@ -10,9 +10,8 @@
 use eepview_lib::nav::{Target, classify, guard, is_allowed_web};
 use eepview_lib::net::host::is_i2p_host;
 use eepview_lib::net::http::{Head, Plan, plan, rewrite_response};
-use eepview_lib::net::rules::{content_rule_list, csp_header, engine_allows};
+use eepview_lib::net::rules::{csp_header, engine_allows};
 use proptest::prelude::*;
-use regex::Regex;
 use tauri::Url;
 
 /// Printable text, tricky ASCII, IDN, userinfo, ports, IPv6 literals, trailing dots.
@@ -32,17 +31,32 @@ fn plain_i2p_host() -> impl Strategy<Value = String> {
     "[a-ac-z0-9][a-z0-9-]{0,10}(\\.[a-ac-z0-9][a-z0-9]{0,10}){0,3}\\.i2p"
 }
 
-/// The L3b allow rule, read from the rule list the engine gets.
-fn l3_allow_pattern() -> Regex {
-    let rules = content_rule_list();
-    let pattern = rules
-        .as_array()
-        .and_then(|list| list.get(1))
-        .and_then(|rule| rule["trigger"]["url-filter"].as_str())
-        .unwrap_or("^$")
-        .to_owned();
-    Regex::new(&pattern).unwrap_or_else(|_| Regex::new("^$").unwrap_or_else(|_| unreachable!()))
+#[cfg(test)]
+mod adr {
+    use std::sync::LazyLock;
+
+    use eepview_lib::net::rules::{I2P_URL_PATTERN, LOCAL_URL_PATTERNS};
+    use regex::Regex;
+
+    /// The L3 allow rule of ADR 0001, compiled once from the constant the rule list uses.
+    /// `rule_list_blocks_then_allows_i2p` pins the rule list to this constant.
+    pub static L3_ALLOW: LazyLock<Regex> = LazyLock::new(|| Regex::new(I2P_URL_PATTERN).unwrap());
+
+    /// The local forms the ADR rule also allows (`about:`, `data:`, `blob:`), one regex each.
+    static L3_LOCAL: LazyLock<Vec<Regex>> = LazyLock::new(|| {
+        LOCAL_URL_PATTERNS
+            .iter()
+            .map(|p| Regex::new(p).unwrap())
+            .collect()
+    });
+
+    /// The ADR rule as an oracle that does not call the code under test.
+    pub fn allows(url: &str) -> bool {
+        L3_ALLOW.is_match(url) || L3_LOCAL.iter().any(|re| re.is_match(url))
+    }
 }
+
+use adr::L3_ALLOW;
 
 fn head_of(text: &str) -> Option<Head> {
     Head::parse(text.as_bytes())
@@ -77,8 +91,7 @@ proptest! {
         let url = format!("http://{authority}/x?y=1");
         let parsed = Url::parse(&url).map_err(|e| TestCaseError::fail(e.to_string()))?;
         prop_assert!(guard(&parsed), "L4 refuses {url}");
-        prop_assert!(engine_allows(&url), "L3b refuses {url}");
-        prop_assert!(l3_allow_pattern().is_match(parsed.as_str()), "L3 rule refuses {url}");
+        prop_assert!(L3_ALLOW.is_match(parsed.as_str()), "the ADR L3 rule refuses {url}");
         let head = head_of(&format!("GET {url} HTTP/1.1\r\n\r\n"));
         let accepted = matches!(head.map(|h| plan(&h, false)), Some(Plan::Http { .. }));
         prop_assert!(accepted, "L1 refuses {url}");
@@ -123,14 +136,18 @@ proptest! {
         prop_assert!(!load(format!("http://{host}:65536/")), "port 65536");
     }
 
-    // Req: ADR L4 "only the same .i2p rule": a URL the guard allows is allowed by the L3 rule
-    // list too, and the guard only ever allows http(s) .i2p URLs without user info.
+    // Req: ADR L4 "only the same .i2p rule": a URL the guard allows is allowed by the ADR L3
+    // rule too, the engine filter allows nothing beyond the rule, and the guard only ever allows http(s) .i2p URLs without user info.
     #[test]
     fn guard_is_never_wider_than_the_engine_rule(input in tricky()) {
         let Ok(url) = Url::parse(&input) else { return Ok(()); };
         if guard(&url) {
-            prop_assert!(engine_allows(url.as_str()), "{url}");
-            prop_assert!(l3_allow_pattern().is_match(url.as_str()) || url.scheme() == "about");
+            prop_assert!(L3_ALLOW.is_match(url.as_str()) || url.scheme() == "about", "{url}");
+        }
+        // Req: ADR L3b "block all, then allow .i2p and about:, data:, blob:": the engine filter
+        // is never wider than that rule (checked against the ADR patterns, not against `guard`).
+        if engine_allows(url.as_str()) {
+            prop_assert!(adr::allows(url.as_str()), "the engine filter allows {url}");
         }
         if is_allowed_web(&url) {
             prop_assert!(matches!(url.scheme(), "http" | "https"));
@@ -227,20 +244,6 @@ proptest! {
                 prop_assert!(is_i2p_host(&host));
             }
             Plan::Refuse(_) => {}
-        }
-    }
-
-    // Req: ADR L1 "forwards only to hosts of the URL the engine asked for": for an absolute
-    // URI the host the planner forwards is the host of that URI, read by the same URL rules
-    // the engine uses (no userinfo, backslash and fragment tricks).
-    #[test]
-    fn planner_host_is_the_host_of_the_uri(target in tricky()) {
-        let text = format!("GET {target} HTTP/1.1\r\n\r\n");
-        let Some(head) = head_of(&text) else { return Ok(()); };
-        if let Plan::Http { host, .. } = plan(&head, false) {
-            let parsed = Url::parse(&target).map_err(|e| TestCaseError::fail(e.to_string()))?;
-            prop_assert_eq!(parsed.host_str(), Some(host.as_str()));
-            prop_assert!(parsed.username().is_empty() && parsed.password().is_none());
         }
     }
 
@@ -381,13 +384,54 @@ fn very_long_input_is_handled() {
         let dots = ".a".repeat(len / 2);
         let long = [
             "a".repeat(len),
-            format!("http://{dots}.i2p/"),
-            format!("{dots}i2p"),
+            format!("http://a{dots}.i2p/"),
+            format!("a{dots}.i2p"),
             "é".repeat(len),
         ];
         for input in long {
             let _ = classify(&input);
             let _ = is_i2p_host(&input);
+        }
+    }
+}
+
+// Req: ADR L1 "forwards a request only when its host passes is_i2p_host", for absolute URIs
+// that engines read in a tricky way. The expected reading is the WHATWG one that WebKit and
+// WebView2 follow: `None` means the engine reads a non-I2P host (or user info), so the planner
+// must refuse; `Some(host)` means a forwarded request may name only that host.
+#[test]
+fn tricky_absolute_uris_name_the_engine_host() {
+    let table: [(&str, Option<&str>); 17] = [
+        ("http://foo.i2p@evil.com/", None),
+        ("http://evil.com#@foo.i2p/", None),
+        ("http://evil.com?@foo.i2p/", None),
+        ("http://evil.com/@foo.i2p/", None),
+        ("http://evil.com\\@foo.i2p/", None),
+        ("http://evil.com\\.i2p/", None),
+        ("http://evil.com:80@foo.i2p/", None),
+        ("http://user:pw@foo.i2p/", None),
+        ("http://foo.i2p%2eevil.com/", None),
+        ("http://foo.i2p./", None),
+        ("http://foo.i2p..evil.com/", None),
+        ("http://[::1]/", None),
+        ("http://2130706433/", None),
+        ("http://0x7f.1/", None),
+        ("http://foo.i2p\\@evil.com/", Some("foo.i2p")),
+        ("http://foo.i2p#.evil.com/", Some("foo.i2p")),
+        ("http://FOO.I2P/", Some("foo.i2p")),
+    ];
+    for (target, want) in table {
+        let head = head_of(&format!("GET {target} HTTP/1.1\r\n\r\n")).unwrap();
+        match (plan(&head, true), want) {
+            (Plan::Http { host, .. }, Some(want)) => assert_eq!(host, want, "{target}"),
+            (Plan::Refuse(_), _) => {}
+            (other, _) => panic!("{target}: {other:?}"),
+        }
+        if want.is_none() {
+            assert!(
+                !matches!(plan(&head, true), Plan::Http { .. }),
+                "{target} was forwarded"
+            );
         }
     }
 }

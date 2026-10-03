@@ -58,6 +58,8 @@ impl Answer {
 fn exchange(fx: &Fixture, chunks: &[&[u8]], limit: Duration) -> Answer {
     let mut stream = fx.connect();
     stream.set_read_timeout(Some(limit)).unwrap();
+    // A gatekeeper that stops reading must fail the test, not hang `write_all`.
+    stream.set_write_timeout(Some(limit)).unwrap();
     for chunk in chunks {
         let _ = stream.write_all(chunk);
         let _ = stream.flush();
@@ -153,14 +155,14 @@ impl Req {
     }
 
     /// Req: ADR L1 "everything else gets 403 with no upstream connection": true when the target
-    /// names a host the engine would read as non-I2P (read with the URL rules the engine uses),
-    /// or a CONNECT to anything but `*.i2p:80` (and `:443` on Windows).
+    /// is not a clean absolute `http://` URL on an I2P host (https, authority form, origin form,
+    /// `*`, any other scheme), or a CONNECT to anything but `*.i2p:80` (and `:443` on Windows).
     fn must_refuse(&self) -> bool {
         if self.method == "CONNECT" {
             return !connect_allowed(&self.target);
         }
         if !self.target.starts_with("http://") {
-            return false;
+            return true;
         }
         match Url::parse(&self.target) {
             Ok(url) => {

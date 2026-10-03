@@ -34,19 +34,47 @@ fn config(cases: u32) -> ProptestConfig {
     }
 }
 
-/// A fresh directory with the four store paths in it.
-fn paths() -> Paths {
+/// The four store paths in a fresh directory. The directory goes away when this drops, also
+/// when a failing case returns early or panics.
+struct TempPaths(Paths);
+
+impl std::ops::Deref for TempPaths {
+    type Target = Paths;
+
+    fn deref(&self) -> &Paths {
+        &self.0
+    }
+}
+
+impl Drop for TempPaths {
+    fn drop(&mut self) {
+        if let Some(dir) = self.0.history.parent() {
+            let _ = fs::remove_dir_all(dir);
+        }
+    }
+}
+
+fn paths() -> TempPaths {
     let n = NEXT.fetch_add(1, Ordering::SeqCst);
     let dir: PathBuf =
         std::env::temp_dir().join(format!("eepview-robust-{}-{n}", std::process::id()));
     let _ = fs::remove_dir_all(&dir);
     let _ = fs::create_dir_all(&dir);
-    Paths {
+    TempPaths(Paths {
         bookmarks: dir.join("bookmarks.json"),
         history: dir.join("history.json"),
         settings: dir.join("settings.json"),
         sites: dir.join("sites.json"),
-    }
+    })
+}
+
+/// The JS flag a new tab for `url` loads with (needs a verified router).
+fn site_js(core: &mut Core, url: &str) -> Option<bool> {
+    let (_, fx) = core.tab_new(Some(url), Place::End);
+    fx.iter().find_map(|e| match e {
+        Effect::Web(WebOp::Load(load)) => Some(load.js),
+        _ => None,
+    })
 }
 
 fn files(paths: &Paths) -> [&PathBuf; 4] {
@@ -56,12 +84,6 @@ fn files(paths: &Paths) -> [&PathBuf; 4] {
         &paths.settings,
         &paths.sites,
     ]
-}
-
-fn cleanup(paths: &Paths) {
-    if let Some(dir) = paths.history.parent() {
-        let _ = fs::remove_dir_all(dir);
-    }
 }
 
 fn ok_status() -> RouterStatus {
@@ -216,7 +238,6 @@ proptest! {
             }
         }
         same_after_reload(&core, &paths)?;
-        cleanup(&paths);
     }
 
     // Req: robustness brief "a corrupted file is handled without data loss beyond that file":
@@ -228,7 +249,8 @@ proptest! {
         let mut core = Core::new(Some(paths.clone()), "127.0.0.1:4444", 0);
         let _ = core.bookmark_add(&new_bookmark("http://keep.i2p/", "keep"), 1);
         visit(&mut core, 1, 2);
-        let _ = core.settings_set(&json!({ "jsDefault": false }));
+        // The site choice differs from the default (JS on), so the sites file keeps it.
+        let _ = core.settings_set(&json!({ "keepCookies": true }));
         core.site_js_set("keep.i2p", false);
         let want_bookmarks = core.bookmarks_list();
         let want_history = all_history(&core);
@@ -236,6 +258,7 @@ proptest! {
         let target = files(&paths)[which].clone();
         fs::write(&target, &junk).map_err(|e| TestCaseError::fail(e.to_string()))?;
         let mut core = Core::new(Some(paths.clone()), "127.0.0.1:4444", 0);
+        core.router_changed(ok_status());
         prop_assert_eq!(core.tabs().len(), 1);
         if which != 0 {
             prop_assert_eq!(core.bookmarks_list(), want_bookmarks);
@@ -244,13 +267,16 @@ proptest! {
             prop_assert_eq!(all_history(&core), want_history);
         }
         if which != 2 {
-            prop_assert!(!core.settings().js_default, "settings lost");
+            prop_assert!(core.settings().keep_cookies, "settings lost");
+        }
+        if which != 3 {
+            // Req: IPC `site_js_set`: the per-site choice is remembered across a restart.
+            prop_assert_eq!(site_js(&mut core, "http://keep.i2p/"), Some(false), "sites lost");
         }
         let _ = core.bookmark_add(&new_bookmark("http://after.i2p/", "after"), 3);
         visit(&mut core, 2, 4);
-        let _ = core.settings_set(&json!({ "jsDefault": true }));
+        let _ = core.settings_set(&json!({ "keepCookies": false }));
         same_after_reload(&core, &paths)?;
-        cleanup(&paths);
     }
 }
 
@@ -302,7 +328,6 @@ fn an_oversized_history_file_is_cut_to_the_cap() {
         "{} entries",
         all_history(&core).len()
     );
-    cleanup(&paths);
 }
 
 // Req: IPC "Nothing is recorded while `history.enabled` is false".
@@ -464,7 +489,6 @@ fn a_clearnet_homepage_in_the_settings_file_never_loads() {
                 "{homepage}: Load of {url}"
             );
         }
-        cleanup(&paths);
     }
 }
 
