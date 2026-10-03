@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-router-control"
+description = "Enables the router_control command without any pre-configured scope."
+commands.allow = ["router_control"]
+
+[[permission]]
+identifier = "deny-router-control"
+description = "Denies the router_control command without any pre-configured scope."
+commands.deny = ["router_control"]

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-connection-pause"
+description = "Enables the connection_pause command without any pre-configured scope."
+commands.allow = ["connection_pause"]
+
+[[permission]]
+identifier = "deny-connection-pause"
+description = "Denies the connection_pause command without any pre-configured scope."
+commands.deny = ["connection_pause"]

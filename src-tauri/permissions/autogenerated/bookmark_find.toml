@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-bookmark-find"
+description = "Enables the bookmark_find command without any pre-configured scope."
+commands.allow = ["bookmark_find"]
+
+[[permission]]
+identifier = "deny-bookmark-find"
+description = "Denies the bookmark_find command without any pre-configured scope."
+commands.deny = ["bookmark_find"]

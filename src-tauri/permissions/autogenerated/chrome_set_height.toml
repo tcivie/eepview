@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-chrome-set-height"
+description = "Enables the chrome_set_height command without any pre-configured scope."
+commands.allow = ["chrome_set_height"]
+
+[[permission]]
+identifier = "deny-chrome-set-height"
+description = "Denies the chrome_set_height command without any pre-configured scope."
+commands.deny = ["chrome_set_height"]

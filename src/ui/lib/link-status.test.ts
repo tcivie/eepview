@@ -3,7 +3,7 @@
 
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { linkStatus } from "./link-status.ts";
+import { linkStatus, pillSize } from "./link-status.ts";
 
 describe("[ipc-contract events] link-hover bubble", () => {
   it("[ipc-contract events] empty text hides the bubble", () => {
@@ -30,5 +30,13 @@ describe("[ipc-contract events] link-hover bubble", () => {
     const text = `http://notbob.i2p/${"a".repeat(62)}`;
     assert.equal(text.length, 80);
     assert.equal(linkStatus({ text, blocked: false }).text, text);
+  });
+});
+
+describe("[ipc-contract events] status-size", () => {
+  it("[ipc-contract events] never reports less than the pill needs", () => {
+    const size = pillSize({ width: 90.2, height: 19.01 });
+    assert.ok(size.width >= 90.2 && size.height >= 19.01);
+    assert.ok(Number.isInteger(size.width) && Number.isInteger(size.height));
   });
 });

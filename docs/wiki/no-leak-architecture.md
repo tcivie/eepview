@@ -1,9 +1,31 @@
 # No-leak architecture
 
-Status: in progress.
+Status: shipped in [#29](https://github.com/tcivie/eepview/pull/29).
 
-Five layers that keep the web engine from reaching the clearnet. ADR 0001 lands with the browser shell PR, as adr-0001-no-leak-architecture.md in this wiki.
+Five independent layers keep the web engine away from the clearnet and from local services. A leak needs all five to fail. The full decision is [ADR 0001](adr-0001-no-leak-architecture.md).
 
-Work: branch `feat/browser-shell`
+## How it works
 
-Page is completed by the PR that ships the feature.
+| Layer | What it does |
+|---|---|
+| L1 gatekeeper | eepview's own proxy on loopback. It forwards only `.i2p` requests, and only to the verified router proxy. |
+| L2 engine proxy | Every web tab uses the gatekeeper as its proxy. |
+| L3 request filter | A page policy on every response (L3a), and an engine rule list attached before the first load (L3b, macOS and Windows). |
+| L4 navigation guard | Only `http(s)://*.i2p` may load in a tab or open a new one. |
+| L5 WebRTC off | WebRTC sends UDP outside the proxy, so it is removed in every frame. |
+
+JavaScript is on. The layers sit below JavaScript, so they hold with it on. You can turn it off per site.
+
+## How to use / run locally
+
+- `cargo test --workspace` in `src-tauri` runs the architecture test (`tests/architecture.rs`), which fails if a layer is removed.
+- The [leak test](leak-test.md) runs the real binary against canaries.
+
+## Limits
+
+- No OS-level layer yet (L6, see the [roadmap](roadmap.md)).
+- Linux has no engine rule list yet (L3b); the page policy covers it.
+
+## History
+
+- 2026-10-03 — Five layers, the platform bridge and the architecture test — [#29](https://github.com/tcivie/eepview/pull/29)

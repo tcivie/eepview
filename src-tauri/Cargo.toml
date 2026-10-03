@@ -12,10 +12,17 @@ edition = "2024"
 rust-version = "1.96"
 publish = false
 
+[workspace]
+members = ["crates/eepview-platform"]
+
 [lib]
 # The `_lib` suffix keeps the lib name apart from the bin name (cargo#8519 on Windows).
 name = "eepview_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
+
+[dev-dependencies]
+# The mock runtime (`tauri::test`) for the shell tests.
+tauri = { version = "2", default-features = false, features = ["test", "unstable", "wry"] }
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
@@ -24,10 +31,21 @@ tauri-build = { version = "2", features = [] }
 # Tauri default features without `compression` (brotli for the embedded assets), `dbus`
 # (Linux theme portal) and `dynamic-acl` (capabilities added at runtime; eepview only
 # uses the static capabilities in capabilities/).
-tauri = { version = "2", default-features = false, features = ["common-controls-v6", "wry", "x11"] }
+# `unstable` gives one window with several webviews; `macos-proxy` gives `proxy_url` on macOS 14+.
+tauri = { version = "2", default-features = false, features = [
+  "common-controls-v6",
+  "macos-proxy",
+  "unstable",
+  "wry",
+  "x11",
+] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+eepview-platform = { path = "crates/eepview-platform" }
 
 [lints.rust]
 unsafe_code = "deny"
+missing_docs = "warn"
 
 [lints.clippy]
 pedantic = { level = "warn", priority = -1 }
@@ -37,6 +55,10 @@ too_many_lines = "warn"
 too_many_arguments = "warn"
 excessive_nesting = "warn"
 fn_params_excessive_bools = "warn"
+# No panics in production code; tests may unwrap (clippy.toml).
+unwrap_used = "warn"
+expect_used = "warn"
+panic = "warn"
 
 # Repeatable and hardened. See docs/wiki/reproducible-builds.md.
 [profile.release]

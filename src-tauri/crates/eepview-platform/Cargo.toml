@@ -1,0 +1,83 @@
+# SPDX-FileCopyrightText: 2026 The eepview contributors
+# SPDX-License-Identifier: MIT
+
+[package]
+name = "eepview-platform"
+version = "0.1.0"
+description = "The one place with unsafe engine calls: safe wrappers over WKWebView, WebView2 and WebKitGTK APIs that Tauri does not expose"
+license = "MIT"
+edition = "2024"
+rust-version = "1.96"
+publish = false
+
+# Every engine crate below is already in Cargo.lock through wry, at these versions.
+[dependencies]
+tauri = { version = "2", default-features = false, features = ["wry"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+block2 = "0.6.2"
+objc2 = "0.6.4"
+objc2-app-kit = { version = "0.3.2", default-features = false, features = [
+  "std",
+  "objc2-core-foundation",
+  "NSButton",
+  "NSControl",
+  "NSResponder",
+  "NSView",
+  "NSWindow",
+] }
+objc2-foundation = { version = "0.3.2", default-features = false, features = [
+  "std",
+  "NSError",
+  "NSGeometry",
+  "NSObject",
+  "NSString",
+  "NSValue",
+] }
+objc2-web-kit = { version = "0.3.2", default-features = false, features = [
+  "std",
+  "block2",
+  "objc2-app-kit",
+  "WKContentRuleList",
+  "WKContentRuleListStore",
+  "WKContentWorld",
+  "WKFindConfiguration",
+  "WKFindResult",
+  "WKFrameInfo",
+  "WKNavigation",
+  "WKPreferences",
+  "WKScriptMessage",
+  "WKScriptMessageHandler",
+  "WKUserContentController",
+  "WKUserScript",
+  "WKWebView",
+  "WKWebViewConfiguration",
+] }
+
+[target.'cfg(windows)'.dependencies]
+webview2-com = "0.39.1"
+windows = "0.62.2"
+windows-core = "0.62.2"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+webkit2gtk = "2.0.2"
+
+# Unsafe is allowed in this crate only, under strict rules: every unsafe block names its
+# invariant, holds one unsafe operation, and unsafe fns stay unsafe inside.
+[lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
+missing_docs = "warn"
+
+[lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+undocumented_unsafe_blocks = "deny"
+multiple_unsafe_ops_per_block = "deny"
+missing_safety_doc = "deny"
+cognitive_complexity = "warn"
+too_many_lines = "warn"
+too_many_arguments = "warn"
+excessive_nesting = "warn"
+fn_params_excessive_bools = "warn"
+unwrap_used = "warn"
+expect_used = "warn"
+panic = "warn"

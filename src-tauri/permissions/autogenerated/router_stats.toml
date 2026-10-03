@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-router-stats"
+description = "Enables the router_stats command without any pre-configured scope."
+commands.allow = ["router_stats"]
+
+[[permission]]
+identifier = "deny-router-stats"
+description = "Denies the router_stats command without any pre-configured scope."
+commands.deny = ["router_stats"]

@@ -429,6 +429,7 @@ export const mockBackend: Backend = {
     bus.addEventListener(event, listener);
     return Promise.resolve(() => bus.removeEventListener(event, listener));
   },
+  emit: () => Promise.resolve(),
 };
 
 export function emitForReview(event: EventName, payload: unknown): void {

@@ -146,6 +146,12 @@ export interface Events {
   "link-hover": { text: string; blocked: boolean };
   "fullscreen-changed": boolean;
   "chrome-insets-changed": ChromeInsets;
+  "status-side": "left" | "right";
+}
+
+/** Events a page sends to the shell. */
+export interface UiEvents {
+  "status-size": { width: number; height: number };
 }
 
 export type CommandName = keyof Commands;

@@ -3,7 +3,7 @@
 ## Now (v0.1)
 
 - Browser shell: tabs, navigation, bookmarks, history, find in page.
-- Five-layer no-leak architecture. See [Decisions](decisions.md) (ADR 0001 lands with the browser shell).
+- Five-layer no-leak architecture. See [ADR 0001](adr-0001-no-leak-architecture.md).
 - A permanent cross-OS leak test.
 - Release pipeline.
 - Coverage gate.
@@ -28,6 +28,8 @@ Goal: the web engine cannot reach anything but the local gatekeeper. The OS enfo
 
 ## Later: other
 
+- Upstream the bridge: for each eepview-platform function, open a wry or Tauri PR that exposes the API safely, then delete our copy.
+- Engine rule list (L3b) on Linux once webkit2gtk binds `WebKitUserContentFilter`.
 - Tauri 3 when it is stable.
 - Drop the glib advisory when wry moves to gtk 0.19.
 - CodeQL, Scorecard, secret scanning and badges when the repo is public. See [Going public](going-public.md).

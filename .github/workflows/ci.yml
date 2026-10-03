@@ -84,8 +84,15 @@ jobs:
       - name: Rust line coverage gate
         working-directory: src-tauri
         run: |
-          cargo llvm-cov --all-targets --summary-only
+          cargo llvm-cov --workspace --all-targets --summary-only
           cargo llvm-cov report --fail-under-lines 0
+      # Branch coverage needs a nightly compiler. One dated nightly is used for this
+      # measurement only; everything else builds on the pinned stable toolchain.
+      - name: Install the pinned nightly for branch coverage
+        run: rustup toolchain install nightly-2026-10-01 --profile minimal --component llvm-tools-preview
+      - name: Rust branch coverage (measured, gate follows)
+        working-directory: src-tauri
+        run: cargo +nightly-2026-10-01 llvm-cov --workspace --all-targets --branch --summary-only
       - run: npm run test:coverage
 
   # Not a required check yet. See docs/wiki/reproducible-builds.md.

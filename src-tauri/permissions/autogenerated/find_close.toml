@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-find-close"
+description = "Enables the find_close command without any pre-configured scope."
+commands.allow = ["find_close"]
+
+[[permission]]
+identifier = "deny-find-close"
+description = "Denies the find_close command without any pre-configured scope."
+commands.deny = ["find_close"]
