@@ -27,6 +27,8 @@ pub struct Tab {
     pub web_url: Option<String>,
     /// The title of the page in the live `tab-*` webview.
     pub web_title: String,
+    /// The page of the current load failed (an error page): it is not saved in history.
+    pub failed: bool,
 }
 
 impl Tab {
@@ -40,6 +42,7 @@ impl Tab {
             web_js: None,
             web_url: None,
             web_title: String::new(),
+            failed: false,
         }
     }
 }

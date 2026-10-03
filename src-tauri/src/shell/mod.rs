@@ -8,12 +8,14 @@
 //!   `popup`).
 //! - [`popup`]: places and shows the toolbar popups.
 //! - [`content`]: the only factory of remote `tab-*` webviews (ADR 0001).
+//! - [`console`]: the only factory of the `console` webview (the router's own pages).
 //! - [`engine`]: back, forward, stop, find and zoom with page JavaScript off.
 //! - [`commands`]: the IPC commands.
 
 pub mod apply;
 pub mod chrome;
 pub mod commands;
+pub mod console;
 pub mod content;
 pub mod engine;
 pub mod env;
@@ -21,10 +23,12 @@ pub mod log;
 pub mod menu;
 pub mod popup;
 pub mod state;
+pub mod surface;
 #[cfg(test)]
 mod testing;
 pub mod view;
 pub mod watch;
+pub mod webrtc;
 
 use std::thread;
 use std::time::Duration;
@@ -47,10 +51,10 @@ pub fn run() -> tauri::Result<()> {
         .on_menu_event(|app, event| menu::on_event(app, event.id().as_ref()))
         .setup(|app| setup(app).map_err(Into::into))
         .build(tauri::generate_context!())?;
-    app.run(|handle, event| {
-        if let RunEvent::WindowEvent { event, .. } = event {
-            on_window_event(handle, &event);
-        }
+    app.run(|handle, event| match event {
+        RunEvent::WindowEvent { event, .. } => on_window_event(handle, &event),
+        RunEvent::Exit => console::stop(handle),
+        _ => {}
     });
     Ok(())
 }
@@ -111,6 +115,9 @@ macro_rules! contract_handler {
             commands::connection_pause,
             commands::connection_resume,
             commands::router_control,
+            commands::console_status,
+            commands::console_detect,
+            commands::console_open,
             commands::chrome_set_height,
             commands::platform,
             commands::chrome_insets,
@@ -178,6 +185,7 @@ fn start<R: Runtime>(app: &mut App<R>, inputs: Inputs) -> tauri::Result<()> {
     chrome::build(app)?;
     let handle = app.handle().clone();
     view::place_buttons(&handle);
+    surface::paint_window(&handle);
     open_start_urls(&handle, &inputs.urls);
     watch::start(&handle, inputs.proxy);
     if let Some(seconds) = inputs.exit_after {

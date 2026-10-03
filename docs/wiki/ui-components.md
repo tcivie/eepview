@@ -31,6 +31,7 @@ The stylesheets are split into cascade layers. A later layer always wins, so a p
 | Input | `.field`, `.field-label`, `.field-error`, `.input`, `.input-sm`, `.select`, `.input-icon`, `.check`, `.choices`, `.segmented`, `.switch` | Settings, Bookmarks, History, Setup, find bar |
 | List row | `.list`, `.list-row`, `.row-link`, `.row-title`, `.row-actions`, `.addr` | Bookmarks, History, Home tiles |
 | Empty state | `.empty` | Home, History |
+| Console links | `.console-title`, `.console-list` of `.btn` ([Router console](router-console.md)) | Home, Settings, router panel |
 | Banner | `.banner`, `.banner-lg`, `data-tone="warning"` or `"danger"` | History, Settings, Setup, Blocked, Router stopped |
 | Status dot | `.dot` in a parent with `data-tone`, and `.chip::before` | Toolbar, router panel, chips |
 | Chip | `.chip` with `data-tone="ready"`, `"building"` or `"stopped"` | Home, Network, Setup, Router stopped |

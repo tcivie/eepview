@@ -24,6 +24,11 @@ export function renderRouterSummary(targets: RouterSummaryTargets, status: Route
   targets.chip.dataset.tone = view.tone;
   targets.chip.textContent = view.label;
   targets.text.textContent = view.text;
-  targets.proxy.textContent = status.proxy || NO_PROXY;
+  targets.proxy.textContent = proxyText(status);
   return view;
+}
+
+/** The proxy text for a page: the proxy, or a dash while it is not known. */
+export function proxyText(status: { proxy: string }): string {
+  return status.proxy || NO_PROXY;
 }

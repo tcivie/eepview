@@ -12,7 +12,7 @@
 //!   filter on Windows), attached through `eepview-platform` before the first load. The
 //!   webview starts on `about:blank` and loads the page only once the filter is on.
 //! - L4: [`nav::guard`] on every navigation and new-window request.
-//! - L5: WebRTC removed in every frame ([`webrtc_off`]); `WebKitGTK` also turns it off in the
+//! - L5: WebRTC removed in every frame (`webrtc::webrtc_off`); `WebKitGTK` also turns it off in the
 //!   engine settings.
 //!
 //! No IPC: the capabilities name only the `toolbar` and `internal` webviews.
@@ -26,6 +26,7 @@ use tauri::{
 
 use super::apply::{self, with_core};
 use super::state::{lock, now_ms, shared};
+use super::webrtc::webrtc_off;
 use crate::core::{Core, Load};
 use crate::layout::Rect;
 use crate::nav;
@@ -34,21 +35,6 @@ use crate::net::rules;
 
 /// The first document of every content webview, until the engine filter is on.
 const BLANK: &str = "about:blank";
-
-/// Removes the WebRTC constructors in every frame, before any page script runs.
-pub const WEBRTC_OFF_SCRIPT: &str = r"
-for (const name of ['RTCPeerConnection', 'webkitRTCPeerConnection', 'RTCDataChannel',
-                    'RTCSessionDescription', 'RTCIceCandidate', 'RTCRtpSender',
-                    'RTCRtpReceiver', 'RTCRtpTransceiver']) {
-  try { Object.defineProperty(window, name, { value: undefined, writable: false, configurable: false }); }
-  catch (e) {}
-}
-try {
-  if (navigator.mediaDevices) {
-    Object.defineProperty(navigator, 'mediaDevices', { value: undefined, writable: false, configurable: false });
-  }
-} catch (e) {}
-";
 
 /// `WebView2` features off: the out-of-process UI and `SmartScreen` calls home.
 const WINDOWS_FEATURES_OFF: &str = "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection";
@@ -62,12 +48,6 @@ pub fn windows_proxy_args(gatekeeper_url: &str) -> String {
         "{WINDOWS_FEATURES_OFF} --proxy-server={proxy} --proxy-bypass-list=<-loopback> \
          --force-webrtc-ip-handling-policy=disable_non_proxied_udp"
     )
-}
-
-/// The init script that removes WebRTC in every frame.
-#[must_use]
-pub fn webrtc_off() -> &'static str {
-    WEBRTC_OFF_SCRIPT
 }
 
 /// A remote webview for one tab.
@@ -96,6 +76,7 @@ impl ContentWebview {
         let mut builder = WebviewBuilder::new(label, WebviewUrl::External(blank))
             .proxy_url(proxy)
             .incognito(load.private)
+            .background_color(super::surface::color(window.app_handle()))
             .initialization_script_for_all_frames(webrtc_off());
         if !load.js {
             builder = builder.disable_javascript();
@@ -122,8 +103,9 @@ fn arm<R: Runtime>(webview: &Webview<R>, tab: u32, url: Url) -> tauri::Result<()
         super::engine::native_hooks(&platform, &app, tab);
         let json = rules::content_rule_list().to_string();
         let rules = Rules {
+            id: rules::CONTENT_RULES_ID,
             json: &json,
-            allow: rules::engine_allows,
+            allow: Box::new(rules::engine_allows),
         };
         eepview_platform::attach_rules(&platform, rules, load_after_rules(live, url));
     })
@@ -183,6 +165,7 @@ fn hooks<R: Runtime>(
         .on_download(move |_webview, event| download(&dl_app, &event))
         .on_page_load(move |webview, payload| {
             page_load(webview.app_handle(), tab, payload.event(), payload.url());
+            first_page_done(&webview, payload.event(), payload.url());
         })
         .on_document_title_changed(move |webview, title| {
             with_core(webview.app_handle(), |core| core.title_changed(tab, &title));
@@ -212,13 +195,41 @@ fn download<R: Runtime>(app: &AppHandle<R>, event: &DownloadEvent<'_>) -> bool {
     false
 }
 
+/// The first real page of a tab is up: the webview goes back to the engine default
+/// background, so a page with no background of its own stays readable in dark mode.
+fn first_page_done<R: Runtime>(webview: &Webview<R>, event: PageLoadEvent, url: &Url) {
+    if matches!(event, PageLoadEvent::Finished) && url.as_str() != BLANK {
+        let _ = webview.set_background_color(None);
+    }
+}
+
 fn page_load<R: Runtime>(app: &AppHandle<R>, tab: u32, event: PageLoadEvent, url: &Url) {
     let url = url.to_string();
     super::log::page(tab, matches!(event, PageLoadEvent::Started), &url);
-    with_core(app, |core| match event {
-        PageLoadEvent::Started => core.page_started(tab, &url),
-        PageLoadEvent::Finished => core.page_finished(tab, &url, now_ms()),
-    });
+    match event {
+        PageLoadEvent::Started => with_core(app, |core| core.page_started(tab, &url)),
+        PageLoadEvent::Finished => {
+            let failed = failed_page(app, &url);
+            with_core(app, |core| finished(core, tab, &url, failed));
+        }
+    }
+}
+
+/// True when the gatekeeper saw an error answer for `url` (a 5xx, or a refusal).
+fn failed_page<R: Runtime>(app: &AppHandle<R>, url: &str) -> bool {
+    let gate = lock(&shared(app).gate).clone();
+    gate.is_some_and(|g| g.take_failure(url))
+}
+
+/// A page finished: first mark it failed when it was an error page, then close the load.
+fn finished(core: &mut Core, tab: u32, url: &str, failed: bool) -> Vec<crate::core::Effect> {
+    let mut fx = if failed {
+        core.page_failed(tab, url)
+    } else {
+        Vec::new()
+    };
+    fx.extend(core.page_finished(tab, url, now_ms()));
+    fx
 }
 
 #[cfg(test)]
@@ -293,6 +304,44 @@ mod tests {
         assert!(wait_for(
             || webview.url().unwrap().as_str() == "http://a.i2p/"
         ));
+    }
+
+    #[test]
+    fn a_failed_page_is_closed_without_a_history_entry() {
+        let app = bare();
+        let tab = core(&app).tabs().active().unwrap().id;
+        let mut c = core(&app);
+        c.navigate("a.i2p");
+        c.page_started(tab, "http://a.i2p/");
+        finished(&mut c, tab, "http://a.i2p/", true);
+        assert!(!c.tab_info(tab).unwrap().nav.loading);
+        assert!(
+            c.history_query(&crate::types::HistoryQuery::default())
+                .is_empty()
+        );
+        finished(&mut c, tab, "http://a.i2p/", false);
+        assert!(
+            c.history_query(&crate::types::HistoryQuery::default())
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn the_gatekeeper_failure_flag_reaches_the_shell() {
+        let app = bare();
+        assert!(!failed_page(app.handle(), "http://a.i2p/"));
+        let router = crate::net::testing::FakeRouter::start();
+        crate::shell::testing::open_gate(&app, &router);
+        assert!(!failed_page(app.handle(), "http://a.i2p/"));
+    }
+
+    #[test]
+    fn the_first_real_page_resets_the_background() {
+        let app = app();
+        let webview = app.get_webview("status").unwrap();
+        first_page_done(&webview, PageLoadEvent::Finished, &url(BLANK));
+        first_page_done(&webview, PageLoadEvent::Finished, &url("http://a.i2p/"));
+        first_page_done(&webview, PageLoadEvent::Started, &url("http://a.i2p/"));
     }
 
     #[test]

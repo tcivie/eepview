@@ -661,6 +661,18 @@
     color: var(--color-text-muted);
   }
 
+  /* Console links: the router console pages, as a row of buttons. */
+
+  .console-title {
+    margin-bottom: var(--space-2);
+  }
+
+  .console-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
   /* Empty state */
 
   .empty {

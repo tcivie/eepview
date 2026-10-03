@@ -34,6 +34,17 @@ Every engine runs page content in a separate, OS-sandboxed content process with 
 
 **Gatekeeper answers** (owner decision). A non-`.i2p` host gets 403, a malformed request 400 (two `Content-Length` headers count as malformed), and a chunked request body 411. None of them opens an upstream connection, and the connection closes. An `.i2p` URL may carry an explicit port 1–65535 and is forwarded with it; `CONNECT` stays limited to `:80` and `:443`. When the client ends before the request body does, the gatekeeper closes both sides at once.
 
+**Gatekeeper timing and close** (owner decision).
+
+- **Dead router.** The connect to the router proxy times out after 500 ms. When the router is gone, the client gets the 502 within 1 s on every OS. Without this bound, Windows retries a refused loopback connect for about 2 s. The read and write timeouts on an open upstream connection do not change.
+- **Connection limit.** The gatekeeper handles at most 256 connections at once. A connection over that limit gets `503 Service Unavailable` before its request is read, and closes like the other early answers below. At most 256 of these busy answers drain at once; beyond that a busy answer closes without the drain.
+- **Early answers reach the client.** The gatekeeper can answer before it has read the whole request: the busy 503, and a 403, 400 or 411 sent while request bytes are still unread. After such an answer it closes in this order:
+  1. It shuts down its write side, so the client sees the end of the answer.
+  2. It reads and discards the unread input, until the client closes, 1 s passes, or 64 KiB have been read, whichever comes first.
+  3. It closes the socket.
+
+  If unread input is still in the buffer when the socket closes, the OS sends a reset in place of a normal close. On Windows the reset makes the client drop the answer it already received. With this order, the client gets the full answer, and one connection costs at most 1 s and 64 KiB.
+
 ## Construction rules
 
 These make the wrong code hard to write.
@@ -46,8 +57,24 @@ These make the wrong code hard to write.
    - a socket type appears outside `net/`;
    - `unsafe` appears in the app crate (it lives only in `crates/eepview-platform`, whose lints are checked too);
    - `content.rs` stops calling a layer: `gatekeeper.url()`, `proxy_url`, `windows_proxy_args`, `rules::content_rule_list`, `rules::engine_allows`, `attach_rules`, `nav::guard`, `webrtc_off`, the `about:blank` first load;
-   - a capability names a webview other than `toolbar`, `internal` or `status`, grants by window or remote URL, or gives `status` more than events.
+   - a capability names a webview other than `toolbar`, `internal` or `status`, grants by window or remote URL, or gives `status` more than events;
+   - the router console view breaks its own rules (see [Router console exception](#router-console-exception)).
+
+   The router console view is the one other remote webview. The test allows it only in `src/shell/console.rs`: `WebviewBuilder::new`, `on_navigation` and `add_child` (with `content.rs` and `chrome.rs`), `WebviewUrl::External` (with `content.rs`, and only for `about:blank`), and `WebviewWindowBuilder` (only there). `proxy_url` stays in `content.rs` only.
 5. **Fail closed at runtime.** The gatekeeper runs only while VERIFY passes. VERIFY asks the router proxy for `http://proxy.i2p/` every 5 s and needs 200 with "I2P HTTP proxy OK". It never asks for a non-`.i2p` host: on a router with an outproxy, that request would itself reach the clearnet. The architecture test fails if `verify.rs` or `gatekeeper.rs` names a non-`.i2p` host. When the router goes down, or you pause, the gatekeeper closes and every `tab-*` webview is destroyed.
+
+## Router console exception
+
+Amended in [#54](https://github.com/tcivie/eepview/pull/54). eepview shows router information but never changes the router configuration. It opens the router's own console pages instead, in one `console` webview. That view loads a loopback page, so it is an exception to the goal above. It is confined like this:
+
+- **Sealed input.** `ConsoleWebview::open(&VerifiedConsole, …)` in `src/shell/console.rs` is the only constructor. Only the detector in `src/net/console.rs` makes a `VerifiedConsole`, after one loopback `GET` shows that console's marker.
+- **One origin.** The view loads only `http://127.0.0.1:<detected port>`. It starts on `about:blank` and loads the page only after an engine rule list is attached that allows only that origin and `about:`, `data:`, `blob:` (macOS and Windows; fail closed). Linux has no engine filter yet, the same limit as L3b for tabs.
+- **Navigation guard.** The console origin stays. An `http(s)://*.i2p` link opens in a normal tab through the tab guard (L4). Anything else is cancelled. New windows are never engine windows.
+- **No IPC, no proxy, WebRTC off.** No capability names `console`. It has no `proxy_url` and never sees the gatekeeper. WebRTC is removed in every frame, downloads are refused, and it runs incognito.
+- **Tabs unchanged.** The `tab-*` webviews keep all five layers. A `tab-*` webview never gets a loopback URL.
+- **No probe at start.** Detection runs only when a page that shows the console links opens, so the leak test sees no extra socket.
+
+See [Router console](router-console.md) for the requirements (R1–R21).
 
 ## The platform bridge
 

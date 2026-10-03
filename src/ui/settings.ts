@@ -2,9 +2,12 @@
 // SPDX-License-Identifier: MIT
 
 import "./boot.ts";
-import type { Settings } from "./contract.ts";
+import { renderConsoleLinks, shownInActiveTab, wireConsoleClicks } from "./console-nav.ts";
+import type { ConsoleInfo, RouterStatus, Settings } from "./contract.ts";
 import { all, announce, byId } from "./dom.ts";
 import { call, devMode, on } from "./ipc.ts";
+import { shouldRedetect } from "./lib/console-links.ts";
+import { versionText } from "./lib/router-view.ts";
 import {
   type HomepageMode,
   homepageAddress,
@@ -14,6 +17,7 @@ import {
 } from "./lib/settings-form.ts";
 import { runAndAnnounce } from "./shared/events.ts";
 import { checkMatching, setFieldError } from "./shared/form.ts";
+import { proxyText } from "./shared/router-summary.ts";
 import { getThemePref, isThemePref, onThemeChange, setThemePref, type ThemePref } from "./theme.ts";
 
 const HOMEPAGE_HINT = "Saved when you leave the field.";
@@ -38,6 +42,8 @@ function onThemePicked(event: Event): void {
   const value = (event.target as HTMLInputElement).value;
   if (!isThemePref(value)) return;
   setThemePref(value);
+  // The shell paints the window and new tabs from the saved theme, so tell it.
+  call("settings_set", { patch: { theme: value } }).catch(() => undefined);
   announce(status(), `Theme set to ${value}.`);
 }
 
@@ -119,11 +125,50 @@ function wireSettings(): void {
   on("settings-changed", showSettings).catch(() => undefined);
 }
 
+function showRouter(router: RouterStatus): void {
+  byId("connect-proxy").textContent = proxyText(router);
+  byId("about-router").textContent = versionText(router);
+}
+
+function wireRouter(): void {
+  call("router_status", {})
+    .then(showRouter)
+    .catch(() => undefined);
+  on("router-status", showRouter).catch(() => undefined);
+}
+
+function renderConsole(info: ConsoleInfo): void {
+  renderConsoleLinks({ list: byId("console-links"), note: byId("console-note") }, info, ["config"]);
+}
+
+let lastStatus: RouterStatus | null = null;
+
+function redetectWhenReady(status: RouterStatus): void {
+  const ready = shouldRedetect(lastStatus, status);
+  lastStatus = status;
+  if (!ready) return;
+  shownInActiveTab("settings")
+    .then((shown) => (shown ? call("console_detect", {}).then(renderConsole) : undefined))
+    .catch(() => undefined);
+}
+
+function wireConsole(): void {
+  call("router_status", {})
+    .then((status) => {
+      lastStatus = status;
+    })
+    .catch(() => undefined);
+  on("router-status", redetectWhenReady).catch(() => undefined);
+  wireConsoleClicks(byId("console-links"));
+  shownInActiveTab("settings")
+    .catch(() => false)
+    .then((shown) => call(shown ? "console_detect" : "console_status", {}))
+    .then(renderConsole)
+    .catch(() => undefined);
+  on("console-changed", renderConsole).catch(() => undefined);
+}
+
 function wireRouterPreview(): void {
-  const range = byId<HTMLInputElement>("share");
-  range.addEventListener("input", () => {
-    byId<HTMLOutputElement>("share-out").value = `${range.value}%`;
-  });
   byId("router-preview").hidden = devMode;
   for (const button of all<HTMLButtonElement>("[data-grant], #restore-btn")) {
     button.disabled = !devMode;
@@ -132,4 +177,6 @@ function wireRouterPreview(): void {
 
 wireTheme();
 wireSettings();
+wireRouter();
 wireRouterPreview();
+wireConsole();

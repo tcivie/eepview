@@ -22,7 +22,20 @@ impl Core {
             Target::Web(_) if !self.router.is_ok() => NavResult::refused("router-down"),
             _ => NavResult::ok(),
         };
-        (result, self.open_target(id, &target, input))
+        let mut fx = self.open_target(id, &target, input);
+        fx.extend(self.focus_plan(id, matches!(target, Target::Web(_))));
+        (result, fx)
+    }
+
+    /// Keyboard focus after an address-bar navigation: at once for an internal page (or while
+    /// the router is down), on the first commit for a web page.
+    fn focus_plan(&mut self, id: u32, web: bool) -> Option<Effect> {
+        self.focus_on_commit = None;
+        if web && self.router.is_ok() {
+            self.focus_on_commit = Some(id);
+            return None;
+        }
+        Some(Effect::FocusContent)
     }
 
     /// The `eepview://` or `http://` string a target lands on.

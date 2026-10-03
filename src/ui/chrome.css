@@ -562,6 +562,11 @@
     margin-top: var(--space-0-5);
   }
 
+  .rp-console {
+    padding-top: var(--space-3);
+    border-top: var(--border-width) solid var(--color-border);
+  }
+
   .rp-proxy .mono {
     color: var(--color-text);
   }

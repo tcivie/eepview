@@ -41,6 +41,12 @@
     font-size: var(--fs-sm);
   }
 
+  .router-card-console {
+    grid-column: 1 / -1;
+    padding-top: var(--space-4);
+    border-top: var(--border-width) solid var(--color-border);
+  }
+
   .tiles {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(196px, 1fr));
@@ -298,31 +304,6 @@
     margin-left: calc(var(--space-4) + var(--space-3));
   }
 
-  .bw-limits {
-    display: flex;
-    gap: var(--space-3);
-  }
-
-  .bw-limits .input {
-    width: 7rem;
-  }
-
-  .share {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
-  }
-
-  .share input {
-    width: 160px;
-    accent-color: var(--color-accent);
-  }
-
-  .share output {
-    min-width: 3ch;
-    font-weight: var(--fw-medium);
-  }
-
   .about-versions {
     padding: var(--space-5) 0;
     border-bottom: var(--border-width) solid var(--color-border);
@@ -351,6 +332,10 @@
 
   .route-clear {
     color: var(--color-warning);
+  }
+
+  .route-local {
+    color: var(--color-text-muted);
   }
 
   .grants {
