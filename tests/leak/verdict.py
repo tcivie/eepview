@@ -111,8 +111,19 @@ def page_rows(log: EventLog, run: Run) -> list[tuple]:
 
 def script_rows(log: EventLog, run: str) -> list[tuple]:
     done, frame = report(log, run, "done"), report(log, run, "frame_js")
+    form, location = report(log, run, "nav_form"), report(log, run, "nav_location")
     return [
         ("script fired every vector", "pass" if done else "FAIL", f"done={done}"),
+        (
+            "form submit vector fired",
+            "pass" if form else "FAIL",
+            f"nav_form={form}",
+        ),
+        (
+            "location vector fired",
+            "pass" if location else "FAIL",
+            f"nav_location={location}",
+        ),
         (
             "cross-origin iframe script ran",
             "pass" if frame else "FAIL",
@@ -159,11 +170,22 @@ def process_row(run: Run) -> tuple:
     )
 
 
+SEND_CALLS = ("connect", "sendto", "sendmsg", "sendmmsg")
 STRACE_LINE = re.compile(r"^(\d+)\s+(\w+)\((\d+),(.*)$")
 STRACE_V4 = re.compile(r'sin_port=htons\((\d+)\), sin_addr=inet_addr\("([\d.]+)"\)')
 STRACE_V6 = re.compile(r'sin6_port=htons\((\d+)\).*?inet_pton\(AF_INET6, "([^"]+)"')
-# glibc reaches systemd-resolved and nscd over Unix sockets, not over port 53.
+# glibc reaches systemd-resolved and nscd over Unix sockets, not over port 53. Only a connect
+# that succeeded counts: glibc probes /var/run/nscd/socket on any passwd lookup and gets ENOENT.
 STRACE_RESOLVER = re.compile(r'sun_path="([^"]*(?:resolve|nscd)[^"]*)"')
+STRACE_OK = re.compile(r"\)\s*=\s*(?:0|-1 EINPROGRESS)\b")
+
+
+def resolver_sockets(text: str) -> set[str]:
+    found = set()
+    for line in text.splitlines():
+        if (m := STRACE_RESOLVER.search(line)) and STRACE_OK.search(line):
+            found.add(m.group(1))
+    return found
 
 
 def strace_address(rest: str) -> tuple[str, int] | None:
@@ -197,10 +219,7 @@ def parse_strace(text: str) -> tuple[set[int], list[tuple[str, int]], set[str]]:
     """Ports the app listens on, every inet destination it sent to, and resolver sockets."""
     calls = strace_calls(text)
     sent = [a for call, _fd, a in calls if call in SEND_CALLS and a]
-    return listening_ports(calls), sent, set(STRACE_RESOLVER.findall(text))
-
-
-SEND_CALLS = ("connect", "sendto", "sendmsg")
+    return listening_ports(calls), sent, resolver_sockets(text)
 
 
 def is_loopback(address: str) -> bool:

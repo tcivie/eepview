@@ -46,7 +46,7 @@ def app_env(ports: dict, run: str, exit_after: int) -> dict:
 def app_command(args, strace_log: Path | None) -> list[str]:
     cmd = [str(Path(args.binary).resolve())]
     if strace_log:
-        trace = "trace=connect,sendto,sendmsg,bind,listen,getsockname"
+        trace = "trace=connect,sendto,sendmsg,sendmmsg,bind,listen,getsockname"
         cmd = ["strace", "-f", "-qq", "-e", trace, "-o", str(strace_log), *cmd]
     if args.xvfb:
         cmd = ["xvfb-run", "-a", *cmd]
@@ -117,7 +117,7 @@ def parse_args(argv: list[str]):
     ap.add_argument(
         "--runs", default=",".join(RUNS), help=f"comma list from {list(RUNS)}"
     )
-    ap.add_argument("--exit-after", type=int, default=20)
+    ap.add_argument("--exit-after", type=int, default=30)
     ap.add_argument(
         "--xvfb", action="store_true", help="run the app under xvfb-run (Linux CI)"
     )

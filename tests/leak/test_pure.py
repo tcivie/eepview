@@ -66,6 +66,20 @@ class Strace(unittest.TestCase):
             self.assertFalse(is_loopback(address), address)
 
 
+class StraceFixes(unittest.TestCase):
+    def test_failed_nscd_probe_is_not_a_resolver(self) -> None:
+        text = '7 connect(5, {sa_family=AF_UNIX, sun_path="/var/run/nscd/socket"}, 110) = -1 ENOENT (No such file or directory)\n'
+        self.assertEqual(parse_strace(text)[2], set())
+
+    def test_successful_nscd_connect_is_a_resolver(self) -> None:
+        text = '7 connect(5, {sa_family=AF_UNIX, sun_path="/var/run/nscd/socket"}, 110) = 0\n'
+        self.assertEqual(parse_strace(text)[2], {"/var/run/nscd/socket"})
+
+    def test_sendmmsg_to_clearnet_is_seen(self) -> None:
+        text = '9 sendmmsg(8, [{msg_hdr={msg_name={sa_family=AF_INET, sin_port=htons(3478), sin_addr=inet_addr("198.51.100.9")}, msg_namelen=16}, msg_len=20}], 1, 0) = 1\n'
+        self.assertEqual(parse_strace(text)[1], [("198.51.100.9", 3478)])
+
+
 class WebRtc(unittest.TestCase):
     def test_real_ip_candidate(self) -> None:
         host = "candidate:1 1 udp 2113937151 192.168.1.5 50000 typ host generation 0"

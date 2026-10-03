@@ -13,7 +13,7 @@ of [ADR 0001](adr-0001-no-leak-architecture.md).
 - `EEPVIEW_PROXY` points at a fake I2P proxy. The proxy passes VERIFY (`GET http://proxy.i2p/`),
   serves `leaktest.i2p` and `frame.leaktest.i2p`, answers clearnet with `503 No Outproxy
   Configured`, and logs the host of every request.
-- `EEPVIEW_START_URL=http://leaktest.i2p/` and `EEPVIEW_EXIT_AFTER=20`.
+- `EEPVIEW_START_URL=http://leaktest.i2p/` and `EEPVIEW_EXIT_AFTER=30`.
 - Canaries: TCP on `127.0.0.1` and `::1` (one port), TCP and UDP on the LAN address, UDP on
   `127.0.0.1` for STUN.
 
@@ -59,4 +59,4 @@ python3 -m unittest discover -s tests/leak
 
 ## History
 
-- Added in PR_LINK.
+- Added in [#41](https://github.com/tcivie/eepview/pull/41).

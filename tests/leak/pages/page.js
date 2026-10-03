@@ -41,8 +41,10 @@ async function main() {
   await Promise.all(subresourceVectors());
   await report("done", "1");
   await sleep(4000); // let the frame finish before a navigation could unload the page
+  await report("nav_form", "1"); // reported first: a slow or blocked navigation must not hide a skipped one
   document.getElementById("clearnet-form").submit();
   await sleep(3000);
+  await report("nav_location", "1");
   window.location = "http://example.com/";
 }
 
