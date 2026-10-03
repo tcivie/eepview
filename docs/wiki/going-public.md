@@ -34,8 +34,12 @@ Then remove the `if: ${{ !github.event.repository.private }}` lines. They are no
 
 Add these checks to the required checks:
 
-- The CodeQL analyze checks.
-- Scorecard.
+- `codeql (actions)`
+- `codeql (javascript-typescript)`
+- `codeql (rust)`
+- `dependency-review`
+
+Do not add Scorecard. `scorecard.yml` has no `pull_request` trigger, so no PR reports it. A required Scorecard check would block every PR.
 
 ## 3. Turn on GitHub security features
 
