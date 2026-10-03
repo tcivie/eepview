@@ -97,6 +97,7 @@ impl ContentWebview {
         let mut builder = WebviewBuilder::new(label, WebviewUrl::External(blank))
             .proxy_url(proxy)
             .incognito(load.private)
+            .background_color(super::surface::color(window.app_handle()))
             .initialization_script_for_all_frames(webrtc_off());
         if !load.js {
             builder = builder.disable_javascript();
@@ -196,6 +197,7 @@ fn hooks<R: Runtime>(
         .on_download(move |_webview, event| download(&dl_app, &event))
         .on_page_load(move |webview, payload| {
             page_load(webview.app_handle(), tab, payload.event(), payload.url());
+            first_page_done(&webview, payload.event(), payload.url());
         })
         .on_document_title_changed(move |webview, title| {
             with_core(webview.app_handle(), |core| core.title_changed(tab, &title));
@@ -225,12 +227,40 @@ fn download<R: Runtime>(app: &AppHandle<R>, event: &DownloadEvent<'_>) -> bool {
     false
 }
 
+/// The first real page of a tab is up: the webview goes back to the engine default
+/// background, so a page with no background of its own stays readable in dark mode.
+fn first_page_done<R: Runtime>(webview: &Webview<R>, event: PageLoadEvent, url: &Url) {
+    if matches!(event, PageLoadEvent::Finished) && url.as_str() != BLANK {
+        let _ = webview.set_background_color(None);
+    }
+}
+
 fn page_load<R: Runtime>(app: &AppHandle<R>, tab: u32, event: PageLoadEvent, url: &Url) {
     let url = url.to_string();
-    with_core(app, |core| match event {
-        PageLoadEvent::Started => core.page_started(tab, &url),
-        PageLoadEvent::Finished => core.page_finished(tab, &url, now_ms()),
-    });
+    match event {
+        PageLoadEvent::Started => with_core(app, |core| core.page_started(tab, &url)),
+        PageLoadEvent::Finished => {
+            let failed = failed_page(app, &url);
+            with_core(app, |core| finished(core, tab, &url, failed));
+        }
+    }
+}
+
+/// True when the gatekeeper saw an error answer for `url` (a 5xx, or a refusal).
+fn failed_page<R: Runtime>(app: &AppHandle<R>, url: &str) -> bool {
+    let gate = lock(&shared(app).gate).clone();
+    gate.is_some_and(|g| g.take_failure(url))
+}
+
+/// A page finished: first mark it failed when it was an error page, then close the load.
+fn finished(core: &mut Core, tab: u32, url: &str, failed: bool) -> Vec<crate::core::Effect> {
+    let mut fx = if failed {
+        core.page_failed(tab, url)
+    } else {
+        Vec::new()
+    };
+    fx.extend(core.page_finished(tab, url, now_ms()));
+    fx
 }
 
 #[cfg(test)]
@@ -305,6 +335,44 @@ mod tests {
         assert!(wait_for(
             || webview.url().unwrap().as_str() == "http://a.i2p/"
         ));
+    }
+
+    #[test]
+    fn a_failed_page_is_closed_without_a_history_entry() {
+        let app = bare();
+        let tab = core(&app).tabs().active().unwrap().id;
+        let mut c = core(&app);
+        c.navigate("a.i2p");
+        c.page_started(tab, "http://a.i2p/");
+        finished(&mut c, tab, "http://a.i2p/", true);
+        assert!(!c.tab_info(tab).unwrap().nav.loading);
+        assert!(
+            c.history_query(&crate::types::HistoryQuery::default())
+                .is_empty()
+        );
+        finished(&mut c, tab, "http://a.i2p/", false);
+        assert!(
+            c.history_query(&crate::types::HistoryQuery::default())
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn the_gatekeeper_failure_flag_reaches_the_shell() {
+        let app = bare();
+        assert!(!failed_page(app.handle(), "http://a.i2p/"));
+        let router = crate::net::testing::FakeRouter::start();
+        crate::shell::testing::open_gate(&app, &router);
+        assert!(!failed_page(app.handle(), "http://a.i2p/"));
+    }
+
+    #[test]
+    fn the_first_real_page_resets_the_background() {
+        let app = app();
+        let webview = app.get_webview("status").unwrap();
+        first_page_done(&webview, PageLoadEvent::Finished, &url(BLANK));
+        first_page_done(&webview, PageLoadEvent::Finished, &url("http://a.i2p/"));
+        first_page_done(&webview, PageLoadEvent::Started, &url("http://a.i2p/"));
     }
 
     #[test]

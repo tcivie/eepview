@@ -16,6 +16,7 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::thread;
 use std::time::{Duration, Instant};
 
+use super::failures::{Failures, is_server_error};
 use super::http::{self, Head, Plan, Refusal};
 use super::loopback::LoopbackAddr;
 use super::verify::VerifiedUpstream;
@@ -42,6 +43,7 @@ const ESTABLISHED: &[u8] = b"HTTP/1.1 200 Connection established\r\n\r\n";
 pub struct Gatekeeper {
     addr: LoopbackAddr,
     open: Arc<AtomicBool>,
+    failures: Arc<Failures>,
 }
 
 #[derive(Debug, Clone)]
@@ -53,6 +55,7 @@ struct Shared {
     draining: Arc<AtomicUsize>,
     limit: usize,
     allow_tls: bool,
+    failures: Arc<Failures>,
 }
 
 impl Gatekeeper {
@@ -88,17 +91,30 @@ impl Gatekeeper {
             draining: Arc::new(AtomicUsize::new(0)),
             limit,
             allow_tls,
+            failures: Arc::new(Failures::default()),
         };
+        let failures = Arc::clone(&shared.failures);
         thread::Builder::new()
             .name("gatekeeper".into())
             .spawn(move || accept_loop(&listener, &shared))?;
-        Ok(Self { addr, open })
+        Ok(Self {
+            addr,
+            open,
+            failures,
+        })
     }
 
     /// `http://127.0.0.1:<port>`, the proxy URL for content webviews.
     #[must_use]
     pub fn url(&self) -> String {
         self.addr.http_url()
+    }
+
+    /// True once when the last answer to a request for exactly `url` was an upstream 5xx or a
+    /// gatekeeper refusal. The flag clears when read.
+    #[must_use]
+    pub fn take_failure(&self, url: &str) -> bool {
+        self.failures.take(url)
     }
 
     /// The loopback address it listens on. Site icon requests (`net::icons`) go here.
@@ -325,25 +341,46 @@ struct Request<'a> {
     head: &'a Head,
 }
 
+impl Request<'_> {
+    /// The URL of the page this request asks for.
+    fn url(&self) -> String {
+        format!("http://{}{}", self.host, self.path)
+    }
+}
+
+/// Refuses a request for an I2P page, and remembers the page failed.
+fn refuse_page(
+    client: &mut TcpStream,
+    req: &Request,
+    shared: &Shared,
+    reason: Refusal,
+) -> io::Result<()> {
+    shared.failures.note(&req.url(), true);
+    refuse(client, reason)
+}
+
 fn forward(client: &mut TcpStream, rest: &[u8], req: &Request, shared: &Shared) -> io::Result<()> {
     let length = match req.head.body_length() {
         Ok(n) => n,
-        Err(reason) => return refuse(client, reason),
+        Err(reason) => return refuse_page(client, req, shared, reason),
     };
     let Ok(mut upstream) = shared
         .upstream
         .connect_bounded(UPSTREAM_CONNECT, UPSTREAM_TIMEOUT)
     else {
-        return refuse(client, Refusal::Upstream);
+        return refuse_page(client, req, shared, Refusal::Upstream);
     };
     upstream.write_all(&http::upstream_request(
         req.method, req.host, req.path, req.head,
     ))?;
     send_body(client, rest, length, &mut upstream)?;
     let Some((head, body)) = read_head(&mut upstream)? else {
-        return refuse(client, Refusal::Upstream);
+        return refuse_page(client, req, shared, Refusal::Upstream);
     };
     upstream_status(&head);
+    shared
+        .failures
+        .note(&req.url(), is_server_error(&head.start));
     client.write_all(&http::rewrite_response(head))?;
     client.write_all(&body)?;
     io::copy(&mut upstream, client)?;

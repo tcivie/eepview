@@ -2,9 +2,10 @@
 // SPDX-License-Identifier: MIT
 
 import "./boot.ts";
-import type { Settings } from "./contract.ts";
+import type { RouterStatus, Settings } from "./contract.ts";
 import { all, announce, byId } from "./dom.ts";
 import { call, devMode, on } from "./ipc.ts";
+import { versionText } from "./lib/router-view.ts";
 import {
   type HomepageMode,
   homepageAddress,
@@ -14,6 +15,7 @@ import {
 } from "./lib/settings-form.ts";
 import { runAndAnnounce } from "./shared/events.ts";
 import { checkMatching, setFieldError } from "./shared/form.ts";
+import { proxyText } from "./shared/router-summary.ts";
 import { getThemePref, isThemePref, onThemeChange, setThemePref, type ThemePref } from "./theme.ts";
 
 const HOMEPAGE_HINT = "Saved when you leave the field.";
@@ -38,6 +40,8 @@ function onThemePicked(event: Event): void {
   const value = (event.target as HTMLInputElement).value;
   if (!isThemePref(value)) return;
   setThemePref(value);
+  // The shell paints the window and new tabs from the saved theme, so tell it.
+  call("settings_set", { patch: { theme: value } }).catch(() => undefined);
   announce(status(), `Theme set to ${value}.`);
 }
 
@@ -119,6 +123,18 @@ function wireSettings(): void {
   on("settings-changed", showSettings).catch(() => undefined);
 }
 
+function showRouter(router: RouterStatus): void {
+  byId("connect-proxy").textContent = proxyText(router);
+  byId("about-router").textContent = versionText(router);
+}
+
+function wireRouter(): void {
+  call("router_status", {})
+    .then(showRouter)
+    .catch(() => undefined);
+  on("router-status", showRouter).catch(() => undefined);
+}
+
 function wireRouterPreview(): void {
   const range = byId<HTMLInputElement>("share");
   range.addEventListener("input", () => {
@@ -139,5 +155,6 @@ function wireDeleteLogs(): void {
 
 wireTheme();
 wireSettings();
+wireRouter();
 wireDeleteLogs();
 wireRouterPreview();

@@ -8,10 +8,12 @@ Run with: python3 -m unittest discover -s tests/leak
 
 from __future__ import annotations
 
+import tempfile
 import unittest
+from pathlib import Path
 
 from servers import is_i2p, normalize_host
-from verdict import REAL_IP_CANDIDATE, is_loopback, parse_strace
+from verdict import REAL_IP_CANDIDATE, is_loopback, parse_strace, strace_row
 
 GATE = '1 listen(7, 1024) = 0\n1 getsockname(7, {sa_family=AF_INET, sin_port=htons(41000), sin_addr=inet_addr("127.0.0.1")}, [16]) = 0\n'
 
@@ -45,6 +47,28 @@ class Strace(unittest.TestCase):
         self.assertEqual(listening, {41000})
         self.assertEqual(sent, [("127.0.0.1", 41000)])
         self.assertEqual(resolvers, set())
+
+    def test_a_call_split_by_another_thread_is_joined(self) -> None:
+        text = (
+            "1 listen(7, <unfinished ...>\n"
+            "2 connect(9, {sa_family=AF_INET, sin_port=htons(41001), "
+            'sin_addr=inet_addr("127.0.0.1")}, 16) = 0\n'
+            "1 <... listen resumed>1024) = 0\n"
+            "1 getsockname(7, <unfinished ...>\n"
+            '1 <... getsockname resumed>{sa_family=AF_INET, sin_port=htons(41000), sin_addr=inet_addr("127.0.0.1")}, [16]) = 0\n'
+        )
+        listening, sent, _resolvers = parse_strace(text)
+        self.assertEqual(listening, {41000})
+        self.assertEqual(sent, [("127.0.0.1", 41001)])
+
+    def test_an_unknown_gatekeeper_port_fails_closed(self) -> None:
+        path = Path(tempfile.mkdtemp()) / "strace.log"
+        path.write_text("")
+        row = strace_row(path, 41001)
+        self.assertEqual(row[1], "FAIL")
+        self.assertIn("gatekeeper port unknown", row[2])
+        path.write_text(GATE + connect_v4("127.0.0.1", 41001))
+        self.assertEqual(strace_row(path, 41001)[1], "pass")
 
     def test_client_socket_port_is_not_listening(self) -> None:
         text = '3 getsockname(5, {sa_family=AF_INET, sin_port=htons(50000), sin_addr=inet_addr("127.0.0.1")}, [16]) = 0\n'

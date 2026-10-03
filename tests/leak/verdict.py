@@ -172,6 +172,8 @@ def process_row(run: Run) -> tuple:
 
 SEND_CALLS = ("connect", "sendto", "sendmsg", "sendmmsg")
 STRACE_LINE = re.compile(r"^(\d+)\s+(\w+)\((\d+),(.*)$")
+STRACE_UNFINISHED = re.compile(r"^(\d+)\s+(\w+\(.*?)\s*<unfinished \.\.\.>\s*$")
+STRACE_RESUMED = re.compile(r"^(\d+)\s+<\.\.\. \w+ resumed>(.*)$")
 STRACE_V4 = re.compile(r'sin_port=htons\((\d+)\), sin_addr=inet_addr\("([\d.]+)"\)')
 STRACE_V6 = re.compile(r'sin6_port=htons\((\d+)\).*?inet_pton\(AF_INET6, "([^"]+)"')
 # glibc reaches systemd-resolved and nscd over Unix sockets, not over port 53. Only a connect
@@ -195,10 +197,26 @@ def strace_address(rest: str) -> tuple[str, int] | None:
     return None
 
 
+def join_split_calls(text: str) -> list[str]:
+    """Whole lines. `strace -f` splits a call that another thread interrupts into
+    `pid call(args <unfinished ...>` and `pid <... call resumed>rest`; this joins the two."""
+    pending: dict[str, str] = {}
+    lines = []
+    for line in text.splitlines():
+        if m := STRACE_UNFINISHED.match(line):
+            pending[m.group(1)] = f"{m.group(1)} {m.group(2)}"
+        elif m := STRACE_RESUMED.match(line):
+            if head := pending.pop(m.group(1), None):
+                lines.append(head + m.group(2))
+        else:
+            lines.append(line)
+    return lines
+
+
 def strace_calls(text: str) -> list[tuple[str, str, tuple[str, int] | None]]:
     """(syscall, fd, inet address or None) for every traced call."""
     calls = []
-    for line in text.splitlines():
+    for line in join_split_calls(text):
         if m := STRACE_LINE.match(line):
             calls.append((m.group(2), m.group(3), strace_address(m.group(4))))
     return calls
@@ -233,6 +251,14 @@ def strace_row(path: Path | None, upstream: int) -> tuple:
     if not path.exists():
         return ("strace: sockets", "FAIL", f"{path} is missing")
     listening, sent, resolvers = parse_strace(path.read_text(errors="ignore"))
+    if not listening:
+        # Fail closed: with no gatekeeper port the allowed list is only the upstream, and the
+        # check would pass or fail for the wrong reason.
+        return (
+            "strace: sockets",
+            "FAIL",
+            "gatekeeper port unknown: no listening socket in the trace",
+        )
     allowed = listening | {upstream}
     bad = {
         f"{a}:{p}" for a, p in sent if p == 53 or not is_loopback(a) or p not in allowed

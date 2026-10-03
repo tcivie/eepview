@@ -162,3 +162,22 @@ fn engine_calls_and_destroy() {
     assert_eq!(label(&app, 1), None);
     assert!(tab_webview(app.handle(), 1).is_none());
 }
+
+#[test]
+fn focus_content_focuses_the_shown_webview() {
+    let app = app();
+    apply(app.handle(), vec![Effect::FocusContent]);
+    let router = FakeRouter::start();
+    open_gate(&app, &router);
+    let fx = {
+        let mut c = core(&app);
+        c.router_changed(crate::core::router::status_of(
+            &crate::net::verify::verify(router.addr),
+            "127.0.0.1:4444",
+            true,
+        ));
+        c.navigate("http://a.i2p/").1
+    };
+    apply(app.handle(), fx);
+    apply(app.handle(), vec![Effect::FocusContent]);
+}
