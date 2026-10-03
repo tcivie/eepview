@@ -123,6 +123,9 @@ fn emit<R: Runtime>(app: &AppHandle<R>, event: &Event) {
     if matches!(event, Event::TabUpdated(_) | Event::TabsChanged) {
         view::sync_stop_item(app);
     }
+    if matches!(event, Event::Settings) {
+        super::surface::paint_window(app);
+    }
     if let Event::Hover(text) = event {
         view::status(app, text.as_ref());
     }

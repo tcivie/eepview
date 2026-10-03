@@ -893,3 +893,41 @@ fn ux1_7_reopen_restores_an_internal_page() {
     c.tab_reopen();
     assert_eq!(c.tabs().active().unwrap().url, "eepview://settings");
 }
+
+#[test]
+fn the_router_version_comes_from_the_statistics_and_survives_verify() {
+    let mut c = core();
+    assert!(c.router_version(None).is_empty());
+    let fx = c.router_version(Some("2.10.0"));
+    assert!(has(&fx, &Effect::Emit(Event::Router)));
+    assert!(c.router_version(Some("2.10.0")).is_empty());
+    c.router_changed(ok_status());
+    assert_eq!(c.router().version.as_deref(), Some("2.10.0"));
+    c.router_changed(down_status());
+    assert_eq!(c.router().version, None);
+}
+
+#[test]
+fn focusing_the_address_bar_cancels_the_page_focus() {
+    let mut c = core();
+    c.navigate("stats.i2p");
+    c.shortcut(Action::FocusAddress, 0);
+    let id = c.tabs().active_id();
+    assert_eq!(focus_content_count(&c.page_started(id, STATS)), 0);
+}
+
+#[test]
+fn a_failed_page_does_not_rename_its_history_entry() {
+    let mut c = core();
+    visit(&mut c, STATS);
+    c.title_changed(1, "Stats");
+    c.navigate("stats.i2p");
+    let id = c.tabs().active_id();
+    c.page_started(id, STATS);
+    c.title_changed(id, "Broken");
+    c.page_failed(id, STATS);
+    c.title_changed(id, "Broken again");
+    c.page_finished(id, STATS, 9);
+    let h = c.history_query(&HistoryQuery::default());
+    assert_eq!((h.len(), h[0].title.as_str(), h[0].visits), (1, "Stats", 1));
+}

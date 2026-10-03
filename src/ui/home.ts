@@ -6,7 +6,7 @@ import type { Bookmark, RouterStatus } from "./contract.ts";
 import { all, byId, cloneTemplate, setText } from "./dom.ts";
 import { call, errorText, on } from "./ipc.ts";
 import { displayUrl, hostOf } from "./lib/address.ts";
-import { hopStates } from "./lib/router-view.ts";
+import { hopStates, versionText } from "./lib/router-view.ts";
 import { renderRouterSummary } from "./shared/router-summary.ts";
 
 const MAX_TILES = 11;
@@ -41,7 +41,7 @@ function renderRouter(status: RouterStatus): void {
     { chip: byId("router-chip"), text: byId("router-text"), proxy: byId("router-proxy") },
     status,
   );
-  byId("router-version").textContent = status.version ? `I2P ${status.version}` : "Unknown";
+  byId("router-version").textContent = versionText(status);
   const states = hopStates(view.tone, all("#router-hops .hop").length);
   all<HTMLElement>("#router-hops .hop").forEach((hop, i) => {
     const state = states[i];

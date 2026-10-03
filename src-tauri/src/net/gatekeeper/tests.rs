@@ -162,6 +162,7 @@ fn dead_router_gives_bad_gateway() {
         active: Arc::new(AtomicUsize::new(0)),
         limit: MAX_CONNECTIONS,
         allow_tls: true,
+        failures: Arc::default(),
     };
     let (client_side, server_side) = socket_pair();
     let worker = thread::spawn(move || handle(server_side, &dead));

@@ -5,11 +5,49 @@
 
 use crate::store::settings::Theme;
 
-/// The `--color-surface` token of the theme as `[red, green, blue, alpha]`. `system_dark` says
-/// whether the operating system is in dark mode; it counts only for [`Theme::System`].
+const CSS: &str = include_str!("../../src/ui/theme.css");
+/// The rule that holds the light tokens, and the rule that holds the dark ones.
+const LIGHT_RULE: &str = ":root {";
+const DARK_RULE: &str = ":root[data-theme=\"dark\"] {";
+
+/// True when the theme shows dark surfaces. `system_dark` says whether the operating system
+/// is in dark mode; it counts only for [`Theme::System`].
 #[must_use]
-pub fn surface_rgba(_theme: Theme, _system_dark: bool) -> [u8; 4] {
-    [0, 0, 0, 0]
+pub fn is_dark(theme: Theme, system_dark: bool) -> bool {
+    match theme {
+        Theme::Dark => true,
+        Theme::Light => false,
+        Theme::System => system_dark,
+    }
+}
+
+/// The `--color-surface` token of the theme as `[red, green, blue, alpha]`, read from
+/// `theme.css`, the one place that holds the palette.
+#[must_use]
+pub fn surface_rgba(theme: Theme, system_dark: bool) -> [u8; 4] {
+    if is_dark(theme, system_dark) {
+        surface_in(CSS, DARK_RULE).unwrap_or([0, 0, 0, 255])
+    } else {
+        surface_in(CSS, LIGHT_RULE).unwrap_or([255; 4])
+    }
+}
+
+/// The `--color-surface` value in the first `rule` of `css`.
+fn surface_in(css: &str, rule: &str) -> Option<[u8; 4]> {
+    let from = css.find(rule)?;
+    let value = css[from..]
+        .split_once("--color-surface:")?
+        .1
+        .split_once(';')?
+        .0;
+    parse_hex(value.trim())
+}
+
+/// `#rrggbb` as an opaque colour.
+fn parse_hex(value: &str) -> Option<[u8; 4]> {
+    let hex = value.strip_prefix('#').filter(|h| h.len() == 6)?;
+    let [_, red, green, blue] = u32::from_str_radix(hex, 16).ok()?.to_be_bytes();
+    Some([red, green, blue, 255])
 }
 
 #[cfg(test)]
@@ -17,6 +55,15 @@ mod tests {
     use super::*;
 
     const CSS: &str = include_str!("../../src/ui/theme.css");
+
+    #[test]
+    fn hex_values_parse_and_bad_ones_do_not() {
+        assert_eq!(parse_hex("#0a0b0c"), Some([10, 11, 12, 255]));
+        assert_eq!(parse_hex("#abc"), None);
+        assert_eq!(parse_hex("red"), None);
+        assert_eq!(parse_hex("#gggggg"), None);
+        assert_eq!(surface_in("a { b: c }", ":root {"), None);
+    }
 
     /// The `--color-surface` value of the block that starts with `header`, as RGBA.
     fn token(header: &str) -> Option<[u8; 4]> {
