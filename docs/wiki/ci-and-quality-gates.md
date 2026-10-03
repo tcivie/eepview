@@ -4,7 +4,7 @@ Every change to main passes lint, complexity limits, security scans and a rulese
 
 ## How it works
 
-- `.github/workflows/lint.yml` runs rustfmt and clippy (pedantic, `-D warnings`), biome and tsc, taplo, shellcheck, lizard complexity, actionlint and `reuse lint` (SPDX headers, with `REUSE.toml` for files that cannot hold a comment). The `reuse` tool is pinned by hash in `scripts/requirements-lint.txt`.
+- `.github/workflows/lint.yml` runs rustfmt and clippy (pedantic, `-D warnings`), biome and tsc, taplo, shellcheck, lizard complexity, actionlint and `reuse lint` (SPDX headers, with `REUSE.toml` for files that cannot hold a comment). The `reuse` tool and its build backend are pinned by hash in `scripts/requirements-reuse.txt` and `scripts/requirements-reuse-build.txt`.
 - `.github/workflows/dco.yml` runs the `dco` job on each PR. It checks that every commit has a `Signed-off-by` line that matches its author. Dependabot commits are skipped. It is not a required check yet.
 - `.github/workflows/ci.yml` builds and tests the app.
 - `.github/workflows/security.yml` runs cargo-deny, gitleaks and zizmor.

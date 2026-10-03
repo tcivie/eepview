@@ -27,15 +27,16 @@ jobs:
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
         run: |
           set -euo pipefail
+          if [ "$PR_AUTHOR" = "dependabot[bot]" ]; then
+            echo "skip: the pull request is from dependabot"
+            exit 0
+          fi
           status=0
           while read -r sha; do
             author="$(git log -1 --format='%an <%ae>' "$sha")"
-            if [ "$(git log -1 --format='%an' "$sha")" = "dependabot[bot]" ]; then
-              echo "skip $sha: dependabot"
-              continue
-            fi
             if git log -1 --format='%(trailers:key=Signed-off-by,valueonly)' "$sha" | grep -qxF "$author"; then
               echo "ok   $sha"
             else

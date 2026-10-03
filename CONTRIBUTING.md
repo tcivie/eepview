@@ -9,7 +9,7 @@ eepview is a small desktop browser for I2P sites. It uses Tauri 2, Rust, TypeScr
 - On Linux, the WebKitGTK packages. The list is in `.github/workflows/ci.yml`.
 - The tools that the git hooks use: lefthook, taplo, shellcheck, actionlint, gitleaks, and lizard.
 
-Install lizard and reuse with `pip install --no-deps --require-hashes -r scripts/requirements-lint.txt`. The reuse install needs Python 3.12 on Linux x86_64. On another system, use `pipx install reuse`.
+Install lizard with `pip install --no-deps --require-hashes -r scripts/requirements-lint.txt`. Install reuse with `pipx install 'reuse[charset-normalizer]'`. CI installs reuse from `scripts/requirements-reuse.txt`.
 
 ## Setup
 
@@ -45,7 +45,7 @@ This adds a line like `Signed-off-by: Your Name <you@example.com>`. The name and
 
 ## Licensing headers
 
-Each source file starts with two SPDX lines: `SPDX-FileCopyrightText: 2026 The eepview contributors` and `SPDX-License-Identifier: MIT`. Use the comment syntax of the file type. Files that cannot hold a comment, such as JSON and images, are listed in `REUSE.toml`. Run `reuse lint` before you push. See [Coding standards](https://github.com/tcivie/eepview/wiki/coding-standards).
+Each source file starts with two SPDX lines: `SPDX-FileCopyrightText: 2026 The eepview contributors` and `SPDX-License-Identifier: MIT`. Use the comment syntax of the file type. Files that cannot hold a comment, such as JSON and images, are listed in `REUSE.toml`. Run `reuse lint` before you push. The git hook runs `reuse lint-file` on the staged files. See [Coding standards](https://github.com/tcivie/eepview/wiki/coding-standards).
 
 ## Tests
 

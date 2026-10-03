@@ -27,4 +27,4 @@ pre-commit:
     - name: gitleaks
       run: gitleaks git --staged --no-banner --redact
     - name: reuse
-      run: reuse lint
+      run: reuse lint-file {staged_files}

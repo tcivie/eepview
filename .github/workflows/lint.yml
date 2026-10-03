@@ -94,7 +94,8 @@ jobs:
           PIP_DISABLE_PIP_VERSION_CHECK: "1"
         run: |
           python3 -m venv "$RUNNER_TEMP/reuse-venv"
-          "$RUNNER_TEMP/reuse-venv/bin/pip" install --quiet --no-deps --require-hashes -r scripts/requirements-lint.txt
+          "$RUNNER_TEMP/reuse-venv/bin/pip" install --quiet --require-hashes -r scripts/requirements-reuse-build.txt
+          "$RUNNER_TEMP/reuse-venv/bin/pip" install --quiet --no-build-isolation --no-deps --require-hashes -r scripts/requirements-reuse.txt
           "$RUNNER_TEMP/reuse-venv/bin/reuse" lint
       - name: actionlint
         env:
