@@ -215,12 +215,13 @@ impl RouterStatus {
     }
 }
 
-/// The `router_control` answer.
+/// The `router_control` and `console_open` answer.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct ControlResult {
     /// True when the router did what was asked.
     pub ok: bool,
-    /// Why not: `external` while eepview does not run the router.
+    /// Why not: `external` while eepview does not run the router; `no-console` or `no-page`
+    /// for `console_open`.
     pub reason: Option<&'static str>,
 }
 

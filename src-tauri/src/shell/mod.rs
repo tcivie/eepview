@@ -8,12 +8,14 @@
 //!   `popup`).
 //! - [`popup`]: places and shows the toolbar popups.
 //! - [`content`]: the only factory of remote `tab-*` webviews (ADR 0001).
+//! - [`console`]: the only factory of the `console` webview (the router's own pages).
 //! - [`engine`]: back, forward, stop, find and zoom with page JavaScript off.
 //! - [`commands`]: the IPC commands.
 
 pub mod apply;
 pub mod chrome;
 pub mod commands;
+pub mod console;
 pub mod content;
 pub mod engine;
 pub mod env;
@@ -111,6 +113,9 @@ macro_rules! contract_handler {
             commands::connection_pause,
             commands::connection_resume,
             commands::router_control,
+            commands::console_status,
+            commands::console_detect,
+            commands::console_open,
             commands::chrome_set_height,
             commands::platform,
             commands::chrome_insets,

@@ -82,6 +82,12 @@ impl LoopbackAddr {
         Ok(stream)
     }
 
+    /// The port.
+    #[must_use]
+    pub fn port(&self) -> u16 {
+        self.0.port()
+    }
+
     /// `http://host:port`, for engine proxy settings.
     #[must_use]
     pub fn http_url(&self) -> String {

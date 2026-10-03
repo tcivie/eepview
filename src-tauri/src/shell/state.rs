@@ -12,6 +12,7 @@ use tauri::menu::MenuItem;
 use tauri::{Manager, Runtime, Url};
 
 use crate::core::Core;
+use crate::net::console::VerifiedConsole;
 use crate::net::gatekeeper::Gatekeeper;
 use crate::popup::Popups;
 
@@ -21,6 +22,10 @@ pub struct Shared<R: Runtime> {
     pub core: Mutex<Core>,
     /// The running gatekeeper; `None` while the router is not verified.
     pub gate: Mutex<Option<Arc<Gatekeeper>>>,
+    /// The detected router console; `None` until a detection finds one.
+    pub console: Mutex<Option<VerifiedConsole>>,
+    /// True while the console re-check thread runs.
+    pub console_watch: AtomicBool,
     /// The label of the live webview of each tab.
     pub labels: Mutex<HashMap<u32, String>>,
     /// The origin of the bundled pages (`tauri://localhost` or the dev server).
@@ -43,6 +48,8 @@ impl<R: Runtime> Shared<R> {
         Self {
             core: Mutex::new(core),
             gate: Mutex::new(None),
+            console: Mutex::new(None),
+            console_watch: AtomicBool::new(false),
             labels: Mutex::new(HashMap::new()),
             base: Mutex::new(None),
             stop_item: Mutex::new(None),

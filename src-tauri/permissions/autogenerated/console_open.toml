@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-console-open"
+description = "Enables the console_open command without any pre-configured scope."
+commands.allow = ["console_open"]
+
+[[permission]]
+identifier = "deny-console-open"
+description = "Denies the console_open command without any pre-configured scope."
+commands.deny = ["console_open"]

@@ -14,6 +14,7 @@ use super::popup::Anchor;
 use super::state::{lock, now_ms, shared};
 use crate::core::find::Zoom;
 use crate::core::{Core, Effect};
+use crate::net::console::{ConsoleInfo, ConsolePage};
 use crate::net::loopback::LoopbackAddr;
 use crate::net::stats::RouterStats;
 use crate::popup::Kind;
@@ -493,6 +494,58 @@ pub fn router_control(action: &str) -> Res<ControlResult> {
         }),
         other => Err(format!("unknown action: {other}")),
     }
+}
+
+/// `console_status()`: the stored router console detection; no probe.
+#[tauri::command]
+#[must_use]
+pub fn console_status<R: Runtime>(app: AppHandle<R>) -> ConsoleInfo {
+    let console = super::console::current(&app);
+    drop(app);
+    super::console::info_of(console.as_ref())
+}
+
+/// `console_detect()`: probes for the router console now, off the main thread.
+#[tauri::command]
+pub async fn console_detect<R: Runtime>(app: AppHandle<R>) -> ConsoleInfo {
+    let detect = tauri::async_runtime::spawn_blocking(move || super::console::detect_now(&app));
+    detect.await.unwrap_or_else(|_| ConsoleInfo::none())
+}
+
+/// `console_open({page})`: opens a page of the detected router console in the console
+/// window. Async, so the window is never built inside a main-thread command.
+///
+/// # Errors
+///
+/// Fails for an unknown page key, or when the window cannot be built.
+#[tauri::command]
+pub async fn console_open<R: Runtime>(app: AppHandle<R>, page: String) -> Res<ControlResult> {
+    let page = ConsolePage::parse(&page).ok_or_else(|| format!("unknown console page: {page}"))?;
+    open_console(&app, page)
+}
+
+/// Opens `page` of the stored console: `no-console` without one, `no-page` when this
+/// router has no such page.
+///
+/// # Errors
+///
+/// Fails when the window cannot be built.
+pub fn open_console<R: Runtime>(app: &AppHandle<R>, page: ConsolePage) -> Res<ControlResult> {
+    let refused = |reason| ControlResult {
+        ok: false,
+        reason: Some(reason),
+    };
+    let Some(console) = super::console::current(app) else {
+        return Ok(refused("no-console"));
+    };
+    if console.url(page).is_none() {
+        return Ok(refused("no-page"));
+    }
+    super::console::ConsoleWebview::open(app, &console, page).map_err(|e| e.to_string())?;
+    Ok(ControlResult {
+        ok: true,
+        reason: None,
+    })
 }
 
 /// `chrome_set_height(px)`: the toolbar reports its find bar (124 or more: open). The toolbar
