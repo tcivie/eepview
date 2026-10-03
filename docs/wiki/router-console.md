@@ -5,7 +5,7 @@ SPDX-License-Identifier: MIT
 
 # Router console
 
-Status: in progress, branch `feat/router-console-links`.
+Status: in progress in [#54](https://github.com/tcivie/eepview/pull/54).
 
 eepview shows router information. It does not change the router configuration. All router configuration goes through the router's own console pages. eepview finds the console of the router in use and gives quick links to it.
 
@@ -15,7 +15,7 @@ eepview shows router information. It does not change the router configuration. A
 2. **Show.** The quick links show in the router panel, on the home page and in Settings. With no console, they are hidden and one line says "No router console found".
 3. **Open.** A quick link opens the `console` view: a webview in its own window, `Router console`. It loads only the detected console origin, `http://127.0.0.1:<port>`.
 
-The console view is not a web tab. It is built in `src-tauri/src/shell/console.rs` only. It never uses the gatekeeper, and the gatekeeper never sees it. The `tab-*` webviews keep all five layers and still cannot reach loopback.
+The console view is not a web tab. It is built in `src-tauri/src/shell/console.rs` only. It never uses the gatekeeper, and the gatekeeper never sees it. An engine rule list confines it to the console origin (R19). The `tab-*` webviews keep all five layers and still cannot reach loopback. [ADR 0001](adr-0001-no-leak-architecture.md#router-console-exception) records this exception.
 
 ## Requirements
 
@@ -27,7 +27,7 @@ The console view is not a web tab. It is built in `src-tauri/src/shell/console.r
   3. the Java I2P default, `7657`;
   4. the i2pd default, `7070`.
 - **R2 Configuration files.**
-  - Java I2P: in the configuration folder, every file in `clients.config.d/` (by file name), then `clients.config`. The console is the client whose `clientApp.<n>.main` is `net.i2p.router.web.RouterConsoleRunner`. Its port is the first number in `clientApp.<n>.args` (for example `7657 ::1,127.0.0.1 ./webapps/`). A number after `-s` is a TLS port and is skipped. A client with `clientApp.<n>.startOnLoad=false` gives no port.
+  - Java I2P: in the configuration folder, every file in `clients.config.d/` (by file name), then `clients.config`. The console is the client whose `clientApp.<n>.main` is `net.i2p.router.web.RouterConsoleRunner`. Its port is the first whitespace-separated token of `clientApp.<n>.args` that parses fully as a non-zero `u16` and does not follow `-s` (for example `7657 ::1,127.0.0.1 ./webapps/` gives `7657`). The token after `-s` is a TLS port and is skipped, so the TLS-only `-s 7667 ::1,127.0.0.1 ./webapps/` gives no port; `127.0.0.1` is not a `u16` token. A client with `clientApp.<n>.startOnLoad=false` gives no port.
   - i2pd: the `port` key in the `[http]` section of `i2pd.conf`. `enabled = false` in that section gives no port. Keys outside `[http]` are ignored. `#` starts a comment.
   - Folders. Java I2P: macOS `$HOME/Library/Application Support/i2p`; Linux `$HOME/.i2p` and `/var/lib/i2p/i2p-config`; Windows `%LOCALAPPDATA%\I2P` and `%APPDATA%\I2P`. i2pd: macOS `$HOME/Library/Application Support/i2pd/i2pd.conf`; Linux `$HOME/.i2pd/i2pd.conf` and `/etc/i2pd/i2pd.conf`; Windows `%APPDATA%\i2pd\i2pd.conf`. A path whose variable is not set is left out. A missing or unreadable file gives no port.
 - **R3 Verification.** A candidate counts only when one `GET` to `http://127.0.0.1:<port><probe path>` answers `200` and the body has the marker of that console:
@@ -38,9 +38,9 @@ The console view is not a web tab. It is built in `src-tauri/src/shell/console.r
   | i2pd | `/` | `?page=i2p_tunnels` |
 
   A closed port, another status, a body without the marker, or the console of the other router type does not count. The markers do not depend on the console language.
-- **R4 Loopback only.** The probe connects only through `LoopbackAddr` to `127.0.0.1`. It sends only `GET` with `Host: 127.0.0.1:<port>`. It never follows a redirect. The probe code lives in `src-tauri/src/net/` (ADR 0001 rule 2).
+- **R4 Loopback only.** The probe connects only through `LoopbackAddr` to `127.0.0.1`, with a 5 s timeout. It sends one `GET <path> HTTP/1.0` in origin form, with `Host: 127.0.0.1:<port>`, so the answer is never chunked. It never follows a redirect. The probe code lives in `src-tauri/src/net/` (ADR 0001 rule 2).
 - **R5 Result.** The first candidate that passes R3 is the console. If none passes, there is no console. Only the detector makes a `VerifiedConsole`.
-- **R6 On demand.** eepview never probes at start. Detection runs only on `console_detect()`. The UI calls it when the router panel opens, and when the home page or the Settings page loads while it is the active tab. While a console is known, eepview checks it again every 10 s; when none is known, it does not repeat. So a run that never shows these pages, such as the leak test with `EEPVIEW_START_URL`, opens no extra socket. When the result changes, eepview emits `console-changed`. When the console goes away or moves to another port, the console window closes.
+- **R6 On demand.** eepview never probes at start. Detection runs only on `console_detect()`. The UI calls it when the router panel opens, and when the home page or the Settings page loads while it is the active tab. While a console is known, eepview checks it again every 10 s (R21). When a trigger finds none, eepview retries (R20). A run that never shows these pages, such as the leak test with `EEPVIEW_START_URL`, opens no extra socket. When the result changes, eepview emits `console-changed`. When the console goes away (R21) or moves to another port, the console window closes.
 
 ### Pages
 
@@ -66,7 +66,7 @@ The console view is not a web tab. It is built in `src-tauri/src/shell/console.r
   - anything else: cancelled.
 
   A new-window request on the same origin loads in the console view. One for `*.i2p` opens a new tab. Anything else is dropped. The engine never opens a window by itself.
-- **R11 Hardening.** The console view has no `proxy_url` (it is loopback), no IPC capability, WebRTC off in every frame (the same script as the tabs), downloads refused, and JavaScript on (the console needs it). It runs incognito, so nothing persists after exit.
+- **R11 Hardening.** The console view has no `proxy_url` (it is loopback), the engine rule list of R19, no IPC capability, WebRTC off in every frame (the same script as the tabs), downloads refused, and JavaScript on (the console needs it). It runs incognito, so nothing persists after exit.
 - **R12 `console_open(page)`.** With no console: `{ok: false, reason: "no-console"}`. For a page the router does not have: `{ok: false, reason: "no-page"}`. For an unknown page key: an error. Otherwise it opens the console window, or reuses the open one, loads the page, focuses it and answers `{ok: true}`.
 - **R13 `console_status()`.** It answers the current `ConsoleInfo`. It does not probe.
 
@@ -77,12 +77,18 @@ The console view is not a web tab. It is built in `src-tauri/src/shell/console.r
 ### UI
 
 - **R15 Quick links.** The router panel and the home page show the links of R7 for the detected router, in that order. They are buttons that call `console_open`. No page holds an `http://127.0.0.1` link. With no console, no link shows and one line says "No router console found".
-- **R16 No router configuration in eepview.** No eepview page changes router configuration. The Settings page has no bandwidth, share, relay (transit) or subscription control. Its Router section links to the console Config page instead. Pause and resume of the connection stay.
+- **R16 No router configuration in eepview.** No eepview page changes router configuration. The Settings page has no bandwidth, share, relay (transit) or subscription control. Its Router section links to the console Config page instead. Pause and resume of the connection stay. The Router updates and Restore controls stay: they are managed-install controls (a disabled Phase 3 preview), not router configuration. The About list "Where eepview connects" names the console probe and the console view.
 - **R17 Leak test.** The leak test passes unchanged.
 
 ### Router version
 
 - **R18 Version, display only.** `ConsoleInfo.version` is the router version read from the probe page, or `null` when it is not found. It costs no extra request. Java I2P: the version in the console stylesheet link, `console.css?<version>`. i2pd: the first `:</b> <version><br>` value, where `<version>` is digits and dots (the label before it is translated). The router panel and the home page show it when `RouterStatus.version` is `null`. It changes nothing else.
+
+### Confinement and retries
+
+- **R19 Console rule list.** Before its first load, the console view gets an engine rule list: block every URL, then allow only URLs on the console origin (R9) and `about:`, `data:`, `blob:`. The view starts on `about:blank` and loads the page only after the list is attached. If it cannot be attached, nothing loads (fail closed). On Windows the same rule answers each `WebResourceRequested` with 403. Linux has no engine filter yet (the same limit as L3b for tabs); there the console view relies on R10 and the router's own pages.
+- **R20 Retry after a miss.** When a `console_detect()` finds no console, eepview retries every 10 s for 2 minutes (12 retries), and stops at the first console found. A new trigger during the retries does not start a second retry loop. The UI also calls `console_detect()` when `router-status` turns `ok` (from any other state, not paused) while a page with the links shows: the home page or Settings as the active tab, or the open router panel.
+- **R21 Re-check misses.** While a console is known, a re-check runs every 10 s. A re-check that finds a different console (another port or type) replaces it at once. A re-check that finds none counts a miss; the known console stays, with no event, until 3 misses in a row. The third miss clears it: `console-changed` with `found: false`, and the console window closes. A re-check that finds the same console resets the count.
 
 ## Interface
 
@@ -92,10 +98,12 @@ The console view is not a web tab. It is built in `src-tauri/src/shell/console.r
 pub const JAVA_DEFAULT_PORT: u16 = 7657;
 pub const I2PD_DEFAULT_PORT: u16 = 7070;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]   // "java" | "i2pd"
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "lowercase")]                        // "java" | "i2pd"
 pub enum ConsoleKind { Java, I2pd }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]   // "home" | "tunnels" | "addressbook" | "config" | "logs"
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "lowercase")]       // "home" | "tunnels" | "addressbook" | "config" | "logs"
 pub enum ConsolePage { Home, Tunnels, AddressBook, Config, Logs }
 impl ConsolePage {
     pub const ALL: [ConsolePage; 5];                      // the R7 order
@@ -131,7 +139,14 @@ impl VerifiedConsole {
     pub fn route(&self, url: &Url) -> ConsoleNav;         // R10
     pub fn version(&self) -> Option<&str>;               // R18
     pub fn info(&self) -> ConsoleInfo;
+    pub fn rule_list(&self) -> serde_json::Value;         // R19, WKContentRuleList JSON
+    pub fn engine_allows(&self, url: &str) -> bool;       // R19, the same rule for one URL
 }
+
+pub const RECHECK_MISSES: u32 = 3;                                                // R21
+/// R21: the known console and miss count after one re-check that found `found`.
+pub fn after_recheck(known: Option<&VerifiedConsole>, misses: u32,
+                     found: Option<VerifiedConsole>) -> (Option<VerifiedConsole>, u32);
 
 pub fn console_version(kind: ConsoleKind, body: &str) -> Option<String>;          // R18
 
@@ -162,6 +177,8 @@ impl ConsoleWebview {
 /// Stores a detection result: emits `console-changed` when it changed, and closes the
 /// console window when the console went away or moved.
 pub fn set_console<R: Runtime>(app: &AppHandle<R>, console: Option<VerifiedConsole>);
+pub const RETRY_EVERY: Duration = Duration::from_secs(10);   // R20, R21
+pub const RETRY_FOR: Duration = Duration::from_secs(120);    // R20
 /// Probes now (blocking), stores the result with `set_console`, and answers its info.
 pub fn detect_now<R: Runtime>(app: &AppHandle<R>) -> ConsoleInfo;
 /// The stored detection result.
@@ -174,7 +191,7 @@ pub fn close<R: Runtime>(app: &AppHandle<R>);
 
 - `console_status() -> ConsoleInfo`: the stored result, no probe.
 - `console_detect() -> ConsoleInfo`: probes now (R6), off the main thread, stores and answers the result.
-- `console_open({page: ConsolePage}) -> {ok: boolean, reason?: "no-console" | "no-page"}`
+- `console_open({page: ConsolePage}) -> {ok: boolean, reason?: "no-console" | "no-page"}`. The command takes the page key as a string and answers an error when `ConsolePage::parse` refuses it.
 - Event `console-changed: ConsoleInfo`
 
 ```ts
@@ -199,21 +216,23 @@ export interface ConsoleLinksView {
 export function consoleLinks(info: ConsoleInfo | null | undefined): ConsoleLinksView;
 /** R18: the version to show. statusVersion first; else the console version; else null. */
 export function routerVersion(statusVersion: string | null, info: ConsoleInfo | null | undefined): string | null;
+/** R20: true when next is ok, not paused, and prev was not ok (or not known). */
+export function shouldRedetect(prev: RouterStatus | null, next: RouterStatus): boolean;
 ```
 
 ### Where the requirement tests live
 
-- `src-tauri/src/net/console/tests.rs` (R1–R7, R9, R10, R18)
-- `src-tauri/src/shell/console/tests.rs` (R6, R8, R10–R13; the mock runtime fixtures in `crate::shell::testing`)
+- `src-tauri/src/net/console/tests.rs` (R1–R7, R9, R10, R18, R19, R21)
+- `src-tauri/src/shell/console/tests.rs` (R6, R8, R10–R13, R20, R21; the mock runtime fixtures in `crate::shell::testing`)
 - `src-tauri/tests/architecture.rs` (R4, R8, R11, R14)
-- `src/ui/lib/console-links.test.ts` (R15, R18)
+- `src/ui/lib/console-links.test.ts` (R15, R18, R20)
 
 ## Limits
 
 - A console behind a password (Java I2P console password, i2pd `http.auth`) is not detected.
 - i2pd with a `webroot` other than `/`, or with `http.address` other than `127.0.0.1`, is not detected.
-- The console view has no engine request filter (L3b). It loads only the router's own pages; see [No-leak architecture](no-leak-architecture.md).
+- Linux: the console view has no engine rule list yet (R19); see [No-leak architecture](no-leak-architecture.md).
 
 ## History
 
-- 2026-10-03 — Requirements and interface — branch `feat/router-console-links`
+- 2026-10-03 — Router console detection, quick links and the console view — [#54](https://github.com/tcivie/eepview/pull/54)

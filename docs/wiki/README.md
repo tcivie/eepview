@@ -32,7 +32,7 @@ This wiki is generated from docs/wiki in the repository. Edit it there, in a PR.
 | Browser UI | shipped | [Browser UI](browser-ui.md) | [#19](https://github.com/tcivie/eepview/pull/19) |
 | Browser shell | shipped | [Browser shell](browser-shell.md) | [#29](https://github.com/tcivie/eepview/pull/29), popups [#55](https://github.com/tcivie/eepview/pull/55) |
 | IPC contract | shipped | [IPC contract](ipc-contract.md) | [#29](https://github.com/tcivie/eepview/pull/29) |
-| Router console | in progress | [Router console](router-console.md) | branch `feat/router-console-links` |
+| Router console | in progress | [Router console](router-console.md) | [#54](https://github.com/tcivie/eepview/pull/54) |
 | No-leak architecture | shipped | [No-leak architecture](no-leak-architecture.md) | [#29](https://github.com/tcivie/eepview/pull/29) |
 | Site icons | shipped | [Site icons](site-icons.md) | [#53](https://github.com/tcivie/eepview/pull/53) |
 | Robustness tests | in progress | [Robustness tests](robustness-tests.md) | [#52](https://github.com/tcivie/eepview/pull/52) |
