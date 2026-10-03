@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <script src="/theme-boot.js"></script>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Network</title>
+    <link rel="stylesheet" href="./theme.css" />
+    <link rel="stylesheet" href="./ui.css" />
+    <link rel="stylesheet" href="./pages.css" />
+    <script type="module" src="./stats.ts"></script>
+  </head>
+  <body>
+    <div class="shell">
+      <aside class="rail">
+        <a class="brand" href="./home.html">
+          <svg class="mark" viewBox="0 0 28 28" aria-hidden="true">
+            <rect x="1.75" y="1.75" width="24.5" height="24.5" rx="8" />
+            <rect x="6.5" y="6.5" width="15" height="15" rx="5" />
+            <rect class="core" x="11" y="11" width="6" height="6" rx="2" />
+          </svg>
+          eepview
+        </a>
+        <nav class="rail-nav" aria-label="eepview pages">
+          <ul>
+            <li>
+              <a href="./home.html">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M4.5 11 12 4.5l7.5 6.5M6.5 9.5V19h11V9.5" />
+                </svg>
+                Home
+              </a>
+            </li>
+            <li>
+              <a href="./bookmarks.html">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M7 4.5h10v15l-5-3.5-5 3.5z" />
+                </svg>
+                Bookmarks
+              </a>
+            </li>
+            <li>
+              <a href="./history.html">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <circle cx="12" cy="12" r="7.5" />
+                  <path d="M12 8v4l3 2" />
+                </svg>
+                History
+              </a>
+            </li>
+            <li>
+              <a href="./stats.html" aria-current="page">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M3.5 12h4l2-5 4 10 2-5h5" />
+                </svg>
+                Network
+              </a>
+            </li>
+            <li>
+              <a href="./settings.html">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M4 7h10m4 0h2M4 17h4m4 0h8" />
+                  <circle cx="16" cy="7" r="2" />
+                  <circle cx="10" cy="17" r="2" />
+                </svg>
+                Settings
+              </a>
+            </li>
+          </ul>
+        </nav>
+        <p class="rail-foot">These pages live inside eepview. Opening them sends nothing.</p>
+      </aside>
+
+      <main class="content" id="main">
+        <header class="page-head">
+          <div>
+            <h1>Network</h1>
+            <p>What your I2P router is doing right now. Figures refresh every few seconds.</p>
+          </div>
+          <p role="status"><span class="chip" id="net-chip" data-tone="building">Checking</span></p>
+        </header>
+
+        <section class="section panel bandwidth" aria-labelledby="bw-title">
+          <div class="bandwidth-head">
+            <h2 id="bw-title">Bandwidth</h2>
+            <dl class="bandwidth-now">
+              <div class="bw-in">
+                <dt>In now</dt>
+                <dd class="num" id="bw-in-now">—</dd>
+              </div>
+              <div class="bw-out">
+                <dt>Out now</dt>
+                <dd class="num" id="bw-out-now">—</dd>
+              </div>
+            </dl>
+          </div>
+          <figure class="spark">
+            <svg
+              class="spark-svg"
+              viewBox="0 0 600 140"
+              preserveAspectRatio="none"
+              role="img"
+              aria-describedby="spark-summary"
+            >
+              <title>Bandwidth in and out over the last 10 minutes</title>
+              <line class="spark-grid" x1="0" y1="10" x2="600" y2="10" />
+              <line class="spark-grid" x1="0" y1="75" x2="600" y2="75" />
+              <line class="spark-base" x1="0" y1="140" x2="600" y2="140" />
+              <path class="spark-area" id="spark-in-area" d="M0 140" />
+              <path class="spark-line spark-line-in" id="spark-in" d="M0 140" />
+              <path class="spark-line spark-line-out" id="spark-out" d="M0 140" />
+            </svg>
+            <span class="spark-max num" id="spark-max">—</span>
+            <figcaption class="spark-axis">
+              <span>10 minutes ago</span>
+              <span class="visually-hidden" id="spark-summary">No bandwidth figures yet.</span>
+              <span>Now</span>
+            </figcaption>
+          </figure>
+        </section>
+
+        <section class="section" aria-labelledby="tunnels-title">
+          <div class="section-head">
+            <h2 id="tunnels-title">Tunnels</h2>
+            <span class="muted tunnel-note">Each tunnel lasts 10 minutes, then the router builds a fresh one.</span>
+          </div>
+          <dl class="panel figures figures-row">
+            <div>
+              <dt>Client tunnels</dt>
+              <dd class="num" id="client-tunnels">—</dd>
+              <dd class="figure-note">Carry your own traffic</dd>
+            </div>
+            <div>
+              <dt>Participating tunnels</dt>
+              <dd class="num" id="participating-tunnels">—</dd>
+              <dd class="figure-note">Traffic you relay for others</dd>
+            </div>
+            <div>
+              <dt>Tunnel build success</dt>
+              <dd class="num" id="build-rate">—</dd>
+              <dd class="figure-note">
+                <svg class="rate" viewBox="0 0 100 6" preserveAspectRatio="none" aria-hidden="true">
+                  <rect class="rate-track" width="100" height="6" rx="3" />
+                  <rect class="rate-fill" id="build-rate-bar" width="0" height="6" rx="3" />
+                </svg>
+                Last 10 minutes
+              </dd>
+            </div>
+          </dl>
+        </section>
+
+        <section class="section" aria-labelledby="router-title">
+          <div class="section-head">
+            <h2 id="router-title">Router</h2>
+          </div>
+          <dl class="facts panel router-facts">
+            <div>
+              <dt>Network status</dt>
+              <dd id="network-status">—</dd>
+            </div>
+            <div>
+              <dt>Running for</dt>
+              <dd id="uptime">—</dd>
+            </div>
+            <div>
+              <dt>Router</dt>
+              <dd id="router-kind">—</dd>
+            </div>
+            <div>
+              <dt>Java</dt>
+              <dd id="java-version">—</dd>
+            </div>
+            <div>
+              <dt>Known routers</dt>
+              <dd class="num" id="known-routers">—</dd>
+            </div>
+            <div>
+              <dt>Floodfills</dt>
+              <dd class="num" id="floodfills">—</dd>
+            </div>
+            <div>
+              <dt>Proxy</dt>
+              <dd class="mono" id="router-proxy">—</dd>
+            </div>
+          </dl>
+          <p class="muted router-detail" id="router-detail"></p>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>
