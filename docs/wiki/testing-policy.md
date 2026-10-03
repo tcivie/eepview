@@ -11,6 +11,25 @@ Status: shipped.
 - A change to the no-leak design needs a test too. The architecture test and the leak test must stay green. See [Leak test](leak-test.md).
 - Add no coverage exclusion and no skipped test.
 
+## Tests check requirements, not code
+
+Tests validate the requirements of the product owner (PO). They do not validate the code.
+
+- The agent that writes the tests is not the agent that writes the code.
+- The test writer gets only the requirement and the public interface. The requirement is the issue, the ADR, a `docs/wiki` page or the IPC contract. The public interface is the function signatures, the IPC commands, the events and the UI.
+- The test writer does not read the implementation. It does not care how the code works.
+- Each test names the requirement it checks. Use a link to the doc, or write the requirement text in the test name or in a comment.
+- These tests are not allowed: a test that copies constants from the code, a test that asserts private state, a test that calls internal helpers, and a test that snapshots whatever the code prints today.
+- When the code and the test disagree, the requirement decides. Never edit a test to match the code, unless the PO approves a change to the requirement first.
+
+The flow:
+
+1. Write down the requirement.
+2. A blind test writer writes the tests from the requirement and the public interface.
+3. The tests fail.
+4. The implementer makes them pass.
+5. Refactor with the tests green.
+
 ## How to run all suites
 
 ```sh
