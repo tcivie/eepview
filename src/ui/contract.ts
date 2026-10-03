@@ -104,6 +104,7 @@ export interface Events {
   "settings-changed": Settings;
   shortcut: { action: string };
   toast: Toast;
+  "link-hover": { text: string; blocked: boolean };
 }
 
 export type CommandName = keyof Commands;
