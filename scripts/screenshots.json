@@ -23,6 +23,17 @@
     { "name": "setup-download", "page": "setup.html", "query": "step=download" },
     { "name": "setup-tunnels", "page": "setup.html", "query": "step=tunnels" },
     { "name": "setup-ready", "page": "setup.html", "query": "step=ready" },
+    {
+      "name": "setup-download-failed",
+      "page": "setup.html",
+      "query": "step=download-failed"
+    },
+    {
+      "name": "setup-tunnels-failed",
+      "page": "setup.html",
+      "query": "step=tunnels-failed"
+    },
+    { "name": "setup-later", "page": "setup.html", "query": "step=later" },
     { "name": "toolbar", "page": "toolbar.html", "query": "dev=1" },
     { "name": "toolbar-windows", "page": "toolbar.html", "query": "dev=1&platform=windows" },
     { "name": "toolbar-find", "page": "toolbar.html", "query": "dev=1&find=i2p" },
