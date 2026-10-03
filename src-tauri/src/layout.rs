@@ -25,8 +25,6 @@ pub fn chrome_inset(buttons: Option<(f64, f64)>, fullscreen: bool) -> f64 {
         _ => 0.0,
     }
 }
-const STATUS_CHAR: f64 = 7.0;
-const STATUS_PAD: f64 = 20.0;
 
 /// A rectangle in logical pixels.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -74,20 +72,53 @@ pub fn split(width: f64, height: f64, toolbar: f64, find_open: bool) -> (Rect, R
     (bar, content)
 }
 
-/// The status bubble at the bottom left of the content area, sized for `chars` characters.
+/// The widest status bubble, as a share of the content width.
+pub const STATUS_MAX_SHARE: f64 = 0.5;
+
+/// The bottom corner of the content area that holds the status bubble.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Side {
+    /// Bottom left (the default).
+    Left,
+    /// Bottom right: the mouse is over the bottom-left spot.
+    Right,
+}
+
+impl Side {
+    /// The name the status page uses.
+    #[must_use]
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Left => "left",
+            Self::Right => "right",
+        }
+    }
+}
+
+/// The status bubble for a pill of `size` (width, height) measured by the status page. It
+/// is at most [`STATUS_MAX_SHARE`] of the content width (the page ends longer text with an
+/// ellipsis). It sits bottom left, or bottom right when `cursor` is over that spot.
 #[must_use]
-pub fn status(content: Rect, chars: usize) -> Rect {
-    let count = f64::from(u32::try_from(chars).unwrap_or(u32::MAX));
-    let w = (count * STATUS_CHAR + STATUS_PAD)
-        .min(content.w * 0.6)
-        .max(40.0);
-    let h = STATUS_HEIGHT.min(content.h);
-    Rect {
+pub fn status(content: Rect, size: (f64, f64), cursor: Option<(f64, f64)>) -> (Rect, Side) {
+    let w = size.0.min(content.w * STATUS_MAX_SHARE).max(1.0);
+    let h = size.1.min(STATUS_HEIGHT * 2.0).min(content.h).max(1.0);
+    let left = Rect {
         x: content.x,
         y: content.y + content.h - h,
         w,
         h,
+    };
+    let covered = cursor.is_some_and(|(x, y)| {
+        x >= left.x && x <= left.x + left.w && y >= left.y && y <= left.y + left.h
+    });
+    if covered {
+        let right = Rect {
+            x: content.x + content.w - w,
+            ..left
+        };
+        return (right, Side::Right);
     }
+    (left, Side::Left)
 }
 
 #[cfg(test)]
@@ -137,18 +168,37 @@ mod tests {
         assert!((tiny_bar.h - 50.0).abs() < 1e-9 && tiny.h.abs() < 1e-9);
     }
 
-    #[test]
-    fn status_bubble() {
-        let content = Rect {
+    fn content() -> Rect {
+        Rect {
             x: 0.0,
             y: 84.0,
             w: 1000.0,
             h: 700.0,
-        };
-        let r = status(content, 10);
-        assert!((r.w - 90.0).abs() < 1e-9);
+        }
+    }
+
+    #[test]
+    fn status_bubble_fits_the_pill() {
+        let (r, side) = status(content(), (90.0, 20.0), None);
+        assert_eq!(side, Side::Left);
+        assert!((r.w - 90.0).abs() < 1e-9 && r.x.abs() < 1e-9);
         assert!((r.y + r.h - 784.0).abs() < 1e-9);
-        assert!((status(content, 500).w - 600.0).abs() < 1e-9);
-        assert!((status(content, 0).w - 40.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn status_bubble_width_is_capped() {
+        let (r, _) = status(content(), (5000.0, 20.0), None);
+        assert!((r.w - 500.0).abs() < 1e-9);
+        let (tiny, _) = status(content(), (0.0, 0.0), None);
+        assert!((tiny.w - 1.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn status_bubble_moves_away_from_the_mouse() {
+        let (r, side) = status(content(), (90.0, 20.0), Some((40.0, 775.0)));
+        assert_eq!((side, side.name()), (Side::Right, "right"));
+        assert!((r.x - 910.0).abs() < 1e-9);
+        let (_, away) = status(content(), (90.0, 20.0), Some((400.0, 775.0)));
+        assert_eq!(away.name(), "left");
     }
 }

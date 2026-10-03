@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="status-page">
   <head>
     <script src="/theme-boot.js"></script>
     <meta charset="UTF-8" />
@@ -12,9 +12,10 @@
     <script type="module" src="./status.ts"></script>
   </head>
   <body class="status-body">
-    <p class="link-status" id="link-status" data-visible="false" aria-hidden="true">
+    <p class="link-status" id="link-status" data-visible="false" data-side="left" aria-hidden="true">
       <span class="link-blocked" id="link-blocked" hidden>Blocked:</span>
       <span class="link-text" id="link-text"></span>
     </p>
+    <p class="link-status link-measure" id="link-measure" aria-hidden="true"></p>
   </body>
 </html>

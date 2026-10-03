@@ -592,6 +592,8 @@
   }
 }
 
+.status-page,
+.status-page body,
 .status-body {
   min-height: 0;
   height: 100vh;
@@ -599,31 +601,48 @@
   background: transparent;
 }
 
+/* The pill. The shell sizes the webview to it and keeps it off the pointer, so it never
+   covers what the user points at and never takes a click. */
 .link-status {
   position: fixed;
   bottom: 0;
   left: 0;
   display: flex;
   gap: 0.35em;
-  max-width: 100%;
+  max-width: 100vw;
   margin: 0;
-  padding: 3px 10px 4px 8px;
+  padding: 2px 8px;
   border: var(--border-width) solid var(--color-border);
   border-bottom: 0;
   border-left: 0;
-  border-radius: 0 var(--radius-md) 0 0;
+  border-radius: 0 4px 0 0;
   background: var(--color-surface-raised);
-  color: var(--color-text);
-  font-size: 12px;
-  line-height: 1.35;
+  color: var(--color-text-muted);
+  font:
+    12px / 1.4 system-ui,
+    var(--font-sans);
   white-space: nowrap;
+  pointer-events: none;
+  user-select: none;
   opacity: 0;
-  transition: opacity 150ms ease-out;
+}
+
+.link-status[data-side="right"] {
+  left: auto;
+  right: 0;
+  border-left: var(--border-width) solid var(--color-border);
+  border-right: 0;
+  border-radius: 4px 0 0 0;
 }
 
 .link-status[data-visible="true"] {
   opacity: 1;
-  transition-duration: 80ms;
+}
+
+.link-measure {
+  max-width: none;
+  width: max-content;
+  visibility: hidden;
 }
 
 .link-blocked {
@@ -642,19 +661,8 @@
   text-overflow: ellipsis;
 }
 
-.link-status:has(.link-blocked:not([hidden])) {
-  background: color-mix(in srgb, var(--color-danger-soft) 55%, var(--color-surface-raised));
-}
-
 .status-preview {
   background: var(--color-bg);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .link-status,
-  .link-status[data-visible="true"] {
-    transition: none;
-  }
 }
 
 .status-anchor {

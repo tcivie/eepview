@@ -110,6 +110,7 @@ macro_rules! contract_handler {
             commands::chrome_set_height,
             commands::platform,
             commands::chrome_insets,
+            commands::window_fullscreen,
         ]
     };
 }

@@ -86,10 +86,10 @@ fn with_core_runs_the_effects() {
 }
 
 #[test]
-fn hover_hides_after_the_delay() {
+fn hover_shows_after_the_delay() {
     let app = app();
     apply(app.handle(), vec![Effect::HoverLater(0)]);
-    thread::sleep(Duration::from_millis(HIDE_DELAY_MS * 3));
+    thread::sleep(Duration::from_millis(SHOW_DELAY_MS * 3));
 }
 
 #[test]

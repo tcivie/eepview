@@ -372,6 +372,15 @@ pub fn chrome_insets<R: Runtime>(app: AppHandle<R>) -> ChromeInsets {
     insets
 }
 
+/// `window_fullscreen()`: whether the window is in full screen now.
+#[tauri::command]
+#[must_use]
+pub fn window_fullscreen<R: Runtime>(app: AppHandle<R>) -> bool {
+    let window = app.get_window("main");
+    drop(app);
+    window.is_some_and(|w| w.is_fullscreen().unwrap_or(false))
+}
+
 /// `platform()`: `macos`, `windows` or `linux`.
 #[tauri::command]
 #[must_use]

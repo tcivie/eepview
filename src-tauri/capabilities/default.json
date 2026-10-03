@@ -43,6 +43,7 @@
     "allow-chrome-set-height",
     "allow-platform",
     "allow-chrome-insets",
+    "allow-window-fullscreen",
     "allow-connection-pause",
     "allow-connection-resume",
     "allow-router-control"

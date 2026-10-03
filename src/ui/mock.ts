@@ -362,6 +362,7 @@ const handlers: Record<CommandName, Handler> = {
   chrome_set_height: () => undefined,
   platform: () => platformFromParams(),
   window_fullscreen: () => params.has("fullscreen"),
+  chrome_insets: () => ({ left: params.has("fullscreen") ? 0 : 88 }),
   bookmarks_export_file: () => data.exportPath,
 };
 
@@ -378,6 +379,7 @@ export const mockBackend: Backend = {
     bus.addEventListener(event, listener);
     return Promise.resolve(() => bus.removeEventListener(event, listener));
   },
+  emit: () => Promise.resolve(),
 };
 
 export function emitForReview(event: EventName, payload: unknown): void {

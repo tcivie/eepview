@@ -10,7 +10,7 @@ use crate::nav::is_allowed_web;
 /// Longest text shown; longer text loses its middle.
 pub const MAX_CHARS: usize = 80;
 /// Delay before the bubble hides, in ms (it shows at once).
-pub const HIDE_DELAY_MS: u64 = 150;
+pub const SHOW_DELAY_MS: u64 = 100;
 
 /// What the bubble shows.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
@@ -109,17 +109,43 @@ pub fn shorten(text: &str) -> String {
     out
 }
 
-/// Shows at once, hides after [`HIDE_DELAY_MS`] unless something new shows first.
+/// What [`Debounce::point`] asks for.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Step {
+    /// Show this text now (the bubble is already up).
+    Show(HoverText),
+    /// Show after [`SHOW_DELAY_MS`], then call [`Debounce::expire`] with this generation.
+    Wait(u64),
+    /// Nothing changes.
+    Keep,
+}
+
+/// Shows after [`SHOW_DELAY_MS`] of hovering (at once while the bubble is already up, so
+/// moving between links does not flicker), and hides at once when the mouse leaves.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Debounce {
     generation: u64,
+    pending: Option<HoverText>,
     shown: Option<HoverText>,
 }
 
 impl Debounce {
-    /// New text: show it now. Returns the text when it changed.
-    pub fn show(&mut self, text: HoverText) -> Option<HoverText> {
+    /// The mouse points at a link with this text.
+    pub fn point(&mut self, text: HoverText) -> Step {
+        if self.shown.is_some() {
+            return self.show_now(text).map_or(Step::Keep, Step::Show);
+        }
+        if self.pending.as_ref() == Some(&text) {
+            return Step::Keep;
+        }
         self.generation += 1;
+        self.pending = Some(text);
+        Step::Wait(self.generation)
+    }
+
+    /// Shows `text` now. Returns it when it changed.
+    pub fn show_now(&mut self, text: HoverText) -> Option<HoverText> {
+        self.pending = None;
         if self.shown.as_ref() == Some(&text) {
             return None;
         }
@@ -127,19 +153,21 @@ impl Debounce {
         Some(text)
     }
 
-    /// The mouse left: returns the generation to hide at after the delay.
-    pub fn leave(&mut self) -> u64 {
+    /// The mouse left. True when the bubble was up and must hide now.
+    pub fn leave(&mut self) -> bool {
         self.generation += 1;
-        self.generation
+        self.pending = None;
+        self.shown.take().is_some()
     }
 
-    /// The delay passed. True when the bubble must hide now.
-    pub fn expire(&mut self, generation: u64) -> bool {
-        let hide = generation == self.generation && self.shown.is_some();
-        if hide {
-            self.shown = None;
+    /// The show delay of `generation` passed: the text to show, unless the mouse moved on.
+    pub fn expire(&mut self, generation: u64) -> Option<HoverText> {
+        if generation != self.generation {
+            return None;
         }
-        hide
+        let text = self.pending.take()?;
+        self.shown = Some(text.clone());
+        Some(text)
     }
 
     /// The text on screen.
@@ -221,14 +249,29 @@ mod tests {
     fn debounce() {
         let mut d = Debounce::default();
         let a = link("http://a.i2p/").unwrap();
-        assert_eq!(d.show(a.clone()), Some(a.clone()));
-        assert_eq!(d.show(a.clone()), None);
-        let g = d.leave();
-        assert_eq!(d.show(a.clone()), None);
-        assert!(!d.expire(g));
-        let g2 = d.leave();
-        assert!(d.expire(g2));
-        assert!(d.shown().is_none());
-        assert!(!d.expire(g2));
+        let b = link("http://b.i2p/").unwrap();
+        assert_eq!(d.point(a.clone()), Step::Wait(1));
+        assert_eq!(d.point(a.clone()), Step::Keep);
+        assert_eq!(d.expire(0), None);
+        assert_eq!(d.expire(1), Some(a.clone()));
+        assert_eq!(d.point(b.clone()), Step::Show(b.clone()));
+        assert_eq!(d.point(b), Step::Keep);
+    }
+
+    #[test]
+    fn debounce_hides_at_once() {
+        let mut d = Debounce::default();
+        let a = link("http://a.i2p/").unwrap();
+        d.show_now(a.clone());
+        assert!(d.leave());
+        assert!(!d.leave());
+        let Step::Wait(g) = d.point(a.clone()) else {
+            panic!("no wait")
+        };
+        assert!(!d.leave());
+        assert_eq!(d.expire(g), None);
+        assert_eq!(d.show_now(a.clone()), Some(a.clone()));
+        assert_eq!(d.show_now(a), None);
+        assert!(d.shown().is_some());
     }
 }

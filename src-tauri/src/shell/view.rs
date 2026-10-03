@@ -111,23 +111,39 @@ fn show_internal<R: Runtime>(app: &AppHandle<R>, page: &str, rect: Rect) {
     let _ = webview.show();
 }
 
-/// Shows the status bubble with `text`, or hides it.
+/// Hides the status bubble at once when the text goes. New text shows once the status page
+/// has measured its pill ([`status_sized`]), so the webview always fits the pill.
 pub fn status<R: Runtime>(app: &AppHandle<R>, text: Option<&HoverText>) {
+    if text.is_none() {
+        hide(app, "status");
+    }
+}
+
+/// The status page measured its pill: fit the webview to it and show it, while there is
+/// text to show.
+pub fn status_sized<R: Runtime>(app: &AppHandle<R>, size: (f64, f64)) {
     let Some(webview) = app.get_webview("status") else {
         return;
     };
-    match text {
-        Some(t) => {
-            place(
-                &webview,
-                layout::status(content_rect(app), t.text.chars().count()),
-            );
-            let _ = webview.show();
-        }
-        None => {
-            let _ = webview.hide();
-        }
+    if lock(&shared(app).core).hover_text().is_none() {
+        return;
     }
+    let (rect, corner) = layout::status(content_rect(app), size, cursor(app));
+    let _ = tauri::Emitter::emit_to(app, "status", "status-side", corner.name());
+    place(&webview, rect);
+    let _ = webview.show();
+}
+
+/// The mouse in window points, when the window knows it.
+fn cursor<R: Runtime>(app: &AppHandle<R>) -> Option<(f64, f64)> {
+    let window = app.get_window("main")?;
+    let at = window.cursor_position().ok()?;
+    let origin = window.inner_position().ok()?;
+    let scale = window.scale_factor().unwrap_or(1.0);
+    Some((
+        (at.x - f64::from(origin.x)) / scale,
+        (at.y - f64::from(origin.y)) / scale,
+    ))
 }
 
 /// Puts the toolbar and the status bubble above the tab webviews again: a new child webview
@@ -313,6 +329,8 @@ mod tests {
             blocked: false,
         };
         status(app.handle(), Some(&text));
+        status_sized(app.handle(), (90.0, 20.0));
+        core(&app).hover_link(1, Some("http://a.i2p/"));
         status(app.handle(), None);
         let window = app.get_window("main").unwrap();
         raise_chrome(app.handle(), &window);

@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { BLOCKED_PREFIX, cleanStatusText, linkStatus, MAX_STATUS_CHARS } from "./link-status.ts";
+import {
+  BLOCKED_PREFIX,
+  cleanStatusText,
+  linkStatus,
+  MAX_STATUS_CHARS,
+  pillSize,
+} from "./link-status.ts";
 
 describe("linkStatus", () => {
   it("hides for empty or missing text", () => {
@@ -31,5 +37,12 @@ describe("cleanStatusText", () => {
     const cleaned = cleanStatusText(long);
     assert.equal(cleaned.length, MAX_STATUS_CHARS);
     assert.equal(cleaned.endsWith("…"), true);
+  });
+});
+
+describe("pillSize", () => {
+  it("rounds up so the pill is never cut", () => {
+    assert.deepEqual(pillSize({ width: 90.2, height: 19.01 }), { width: 91, height: 20 });
+    assert.deepEqual(pillSize({ width: 90, height: 20 }), { width: 90, height: 20 });
   });
 });

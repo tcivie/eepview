@@ -150,32 +150,41 @@ impl Core {
             return Vec::new();
         }
         self.pointed = target.and_then(|t| Url::parse(t).ok());
-        match target.and_then(hover::link) {
-            Some(text) => self.show_hover(Some(text)),
+        match target.and_then(hover::link).map(|t| self.hover.point(t)) {
+            Some(hover::Step::Show(text)) => vec![Effect::Emit(Event::Hover(Some(text)))],
+            Some(hover::Step::Wait(generation)) => vec![Effect::HoverLater(generation)],
+            Some(hover::Step::Keep) => Vec::new(),
             None => self.hover_out(),
         }
     }
 
     fn show_hover(&mut self, text: Option<hover::HoverText>) -> Vec<Effect> {
-        text.and_then(|t| self.hover.show(t))
+        text.and_then(|t| self.hover.show_now(t))
             .map(|t| Effect::Emit(Event::Hover(Some(t))))
             .into_iter()
             .collect()
     }
 
     fn hover_out(&mut self) -> Vec<Effect> {
-        if self.hover.shown().is_none() {
-            return Vec::new();
-        }
-        vec![Effect::HoverLater(self.hover.leave())]
-    }
-
-    /// The hide delay of generation `generation` passed.
-    pub fn hover_expire(&mut self, generation: u64) -> Vec<Effect> {
-        if self.hover.expire(generation) {
+        if self.hover.leave() {
             vec![Effect::Emit(Event::Hover(None))]
         } else {
             Vec::new()
         }
+    }
+
+    /// The text the status bubble shows, if any.
+    #[must_use]
+    pub fn hover_text(&self) -> Option<&hover::HoverText> {
+        self.hover.shown()
+    }
+
+    /// The show delay of generation `generation` passed.
+    pub fn hover_expire(&mut self, generation: u64) -> Vec<Effect> {
+        self.hover
+            .expire(generation)
+            .map(|t| Effect::Emit(Event::Hover(Some(t))))
+            .into_iter()
+            .collect()
     }
 }

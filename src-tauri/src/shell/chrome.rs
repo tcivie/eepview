@@ -5,9 +5,10 @@
 //! only bundled pages (`WebviewUrl::App`); remote pages live in `content.rs`.
 
 use tauri::webview::PageLoadEvent;
+use tauri::window::Color;
 use tauri::window::WindowBuilder;
 use tauri::{
-    App, AppHandle, LogicalPosition, LogicalSize, Manager, Runtime, Url, WebviewBuilder,
+    App, AppHandle, Listener, LogicalPosition, LogicalSize, Manager, Runtime, Url, WebviewBuilder,
     WebviewUrl, Window,
 };
 
@@ -45,15 +46,39 @@ pub fn build<R: Runtime>(app: &mut App<R>) -> tauri::Result<Window<R>> {
         LogicalPosition::new(content.x, content.y),
         LogicalSize::new(content.w, content.h),
     )?;
-    let status = WebviewBuilder::new("status", WebviewUrl::App(STATUS_PAGE.into()));
+    // Transparent, so only the pill shows; the webview is also sized to the pill, for
+    // engines where transparency is weak.
+    let status = WebviewBuilder::new("status", WebviewUrl::App(STATUS_PAGE.into()))
+        .background_color(Color(0, 0, 0, 0));
     let status = window.add_child(
         status,
         LogicalPosition::new(0.0, h - 24.0),
         LogicalSize::new(200.0, 24.0),
     )?;
     status.hide()?;
+    listen_status_size(app.handle());
     view::raise_chrome(app.handle(), &window);
     Ok(window)
+}
+
+/// The status page reports the size of its pill (`status-size`); the shell fits the
+/// webview to it.
+fn listen_status_size<R: Runtime>(app: &AppHandle<R>) {
+    let handle = app.clone();
+    app.listen("status-size", move |event| {
+        if let Some(size) = pill_size(event.payload()) {
+            let app = handle.clone();
+            let _ = handle.run_on_main_thread(move || view::status_sized(&app, size));
+        }
+    });
+}
+
+/// Parses `{width, height}`; refuses sizes that are not finite and positive.
+fn pill_size(payload: &str) -> Option<(f64, f64)> {
+    let v: serde_json::Value = serde_json::from_str(payload).ok()?;
+    let w = v.get("width")?.as_f64()?;
+    let h = v.get("height")?.as_f64()?;
+    (w.is_finite() && h.is_finite() && w > 0.0 && h > 0.0).then_some((w.ceil(), h.ceil()))
 }
 
 /// The main window from `tauri.conf.json` (`create: false`): on macOS the title bar is an
@@ -103,6 +128,17 @@ fn internal_navigation<R: Runtime>(app: &AppHandle<R>, url: &Url) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn pill_sizes_are_checked() {
+        assert_eq!(
+            pill_size(r#"{"width": 90.2, "height": 19.5}"#),
+            Some((91.0, 20.0))
+        );
+        assert_eq!(pill_size(r#"{"width": 0, "height": 20}"#), None);
+        assert_eq!(pill_size(r#"{"width": "x"}"#), None);
+        assert_eq!(pill_size("nope"), None);
+    }
     use crate::shell::testing::{app, bare, core};
 
     fn url(text: &str) -> Url {

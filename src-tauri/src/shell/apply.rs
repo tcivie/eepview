@@ -14,7 +14,7 @@ use super::content::ContentWebview;
 use super::state::{lock, shared};
 use super::{engine, log, view};
 use crate::core::{Core, Effect, Event, Load, WebOp};
-use crate::hover::HIDE_DELAY_MS;
+use crate::hover::SHOW_DELAY_MS;
 
 /// The webviews that receive contract events.
 const LISTENERS: [&str; 3] = ["toolbar", "internal", "status"];
@@ -55,7 +55,7 @@ pub fn apply<R: Runtime>(app: &AppHandle<R>, fx: Vec<Effect>) {
             Effect::Emit(event) => emit(app, &event),
             Effect::Web(op) => web(app, op),
             Effect::FocusToolbar => focus_toolbar(app),
-            Effect::HoverLater(generation) => hide_later(app, generation),
+            Effect::HoverLater(generation) => show_later(app, generation),
             Effect::Layout => {}
         }
     }
@@ -70,10 +70,10 @@ fn focus_toolbar<R: Runtime>(app: &AppHandle<R>) {
     }
 }
 
-fn hide_later<R: Runtime>(app: &AppHandle<R>, generation: u64) {
+fn show_later<R: Runtime>(app: &AppHandle<R>, generation: u64) {
     let app = app.clone();
     thread::spawn(move || {
-        thread::sleep(Duration::from_millis(HIDE_DELAY_MS));
+        thread::sleep(Duration::from_millis(SHOW_DELAY_MS));
         with_core(&app, |core| core.hover_expire(generation));
     });
 }

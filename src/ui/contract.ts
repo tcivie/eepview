@@ -126,6 +126,7 @@ export interface Commands {
   chrome_set_height: { args: { px: number }; result: undefined };
   platform: { args: Record<string, never>; result: Platform };
   window_fullscreen: { args: Record<string, never>; result: boolean };
+  chrome_insets: { args: Record<string, never>; result: { left: number } };
 }
 
 export interface Events {
@@ -140,6 +141,13 @@ export interface Events {
   toast: Toast;
   "link-hover": { text: string; blocked: boolean };
   "fullscreen-changed": boolean;
+  "chrome-insets-changed": { left: number };
+  "status-side": "left" | "right";
+}
+
+/** Events a page sends to the shell. */
+export interface UiEvents {
+  "status-size": { width: number; height: number };
 }
 
 export type CommandName = keyof Commands;

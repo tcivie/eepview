@@ -95,9 +95,7 @@ impl Core {
         if let Some(find) = self.find.take() {
             fx.push(Effect::Web(WebOp::Engine(find.tab, EngineOp::FindClear)));
         }
-        if self.hover.shown().is_some() {
-            let generation = self.hover.leave();
-            self.hover.expire(generation);
+        if self.hover.leave() {
             fx.push(Effect::Emit(Event::Hover(None)));
         }
         fx

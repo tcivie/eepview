@@ -448,20 +448,38 @@ fn hover_bubble() {
     let mut c = core();
     visit(&mut c, STATS);
     let fx = c.hover_link(1, Some("http://reg.i2p/a%20b"));
-    assert!(
-        matches!(&fx[0], Effect::Emit(Event::Hover(Some(t))) if t.text == "http://reg.i2p/a b")
-    );
-    assert!(c.hover_link(2, Some(REG)).is_empty());
-    let fx = c.hover_link(1, None);
     let Effect::HoverLater(generation) = fx[0] else {
         panic!("{fx:?}")
     };
-    assert_eq!(
-        c.hover_expire(generation),
-        vec![Effect::Emit(Event::Hover(None))]
+    let fx = c.hover_expire(generation);
+    assert!(
+        matches!(&fx[0], Effect::Emit(Event::Hover(Some(t))) if t.text == "http://reg.i2p/a b")
     );
     assert!(c.hover_expire(generation).is_empty());
+}
+
+#[test]
+fn hover_moves_at_once_and_hides_at_once() {
+    let mut c = core();
+    visit(&mut c, STATS);
+    let Effect::HoverLater(generation) = c.hover_link(1, Some(REG))[0] else {
+        panic!("no delay")
+    };
+    c.hover_expire(generation);
+    assert!(c.hover_link(2, Some(REG)).is_empty());
+    let fx = c.hover_link(1, Some(STATS));
+    assert!(matches!(&fx[0], Effect::Emit(Event::Hover(Some(t))) if t.text == STATS));
+    assert_eq!(
+        c.hover_link(1, None),
+        vec![Effect::Emit(Event::Hover(None))]
+    );
     assert!(c.hover_link(1, None).is_empty());
+}
+
+#[test]
+fn loading_shows_in_the_bubble() {
+    let mut c = core();
+    visit(&mut c, STATS);
     let fx = c.page_started(1, REG);
     assert!(
         fx.iter().any(

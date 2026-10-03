@@ -42,6 +42,7 @@ const COMMANDS: &[&str] = &[
     "chrome_set_height",
     "platform",
     "chrome_insets",
+    "window_fullscreen",
 ];
 
 fn main() {

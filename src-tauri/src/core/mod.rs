@@ -52,7 +52,7 @@ pub enum Effect {
     FocusToolbar,
     /// Lay the webviews out again and show the right one.
     Layout,
-    /// Call [`Core::hover_expire`] with this generation after the hide delay.
+    /// Call [`Core::hover_expire`] with this generation after the show delay.
     HoverLater(u64),
 }
 
