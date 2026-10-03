@@ -8,9 +8,8 @@ import { hostOf } from "../lib/address.ts";
 import { jsToggleLabel } from "../lib/js-toggle.ts";
 import { panelState } from "../lib/router-panel.ts";
 import { routerView } from "../lib/router-view.ts";
-import { zoomText } from "../lib/tab-strip.ts";
 import { bindClicks } from "../shared/events.ts";
-import { closePanel } from "./router-panel.ts";
+import { closePopup, onPopupClosed, openKind, openPopup, wireToggle } from "./popups.ts";
 import { activeTab } from "./state.ts";
 
 const TOAST_MS = 4000;
@@ -51,7 +50,6 @@ export function renderNav(tab: TabInfo | undefined): void {
   renderReload(tab?.loading ?? false);
   renderStar(tab);
   renderJs(tab);
-  byId("zoom-value").textContent = zoomText(tab?.zoom ?? 1);
 }
 
 export function renderStatus(status: RouterStatus): void {
@@ -92,59 +90,42 @@ function reloadOrStop(): void {
   (stop ? call("stop", {}) : call("reload", {})).catch(quiet);
 }
 
-function setTip(open: boolean): void {
-  byId("status-tip").hidden = !open;
+/** The router hint: shown on hover, never over the menu or the router panel (rule 6, 7). */
+function showHint(): void {
+  const kind = openKind();
+  if (kind === "menu" || kind === "router") return;
+  const data = {
+    title: byId("status-title").textContent ?? "",
+    text: byId("status-text").textContent ?? "",
+  };
+  openPopup("hint", byId("status"), data);
 }
 
-function setMenu(open: boolean): void {
-  if (open) closePanel(false);
-  byId("menu").hidden = !open;
-  byId("menu-btn").setAttribute("aria-expanded", String(open));
-  if (open) byId("menu").querySelector<HTMLElement>("button")?.focus();
+function setExpanded(id: string, open: boolean): void {
+  byId(id).setAttribute("aria-expanded", String(open));
 }
 
-const MENU_COMMANDS: Record<string, () => Promise<unknown>> = {
-  "new-tab": () => call("tab_new", {}),
-  "zoom-in": () => call("zoom_in", {}),
-  "zoom-out": () => call("zoom_out", {}),
-  "zoom-reset": () => call("zoom_reset", {}),
-};
-
-function onMenuClick(event: MouseEvent): void {
-  const item = (event.target as Element).closest<HTMLElement>("[data-open],[data-command]");
-  if (!item) return;
-  const command = MENU_COMMANDS[item.dataset.command ?? ""];
-  const open = item.dataset.open;
-  if (command) command().catch(quiet);
-  if (open) call("navigate", { input: open }).catch(quiet);
-  if (open || item.dataset.command === "new-tab") setMenu(false);
-}
-
-function wireStatus(): void {
-  const status = byId("status");
-  status.addEventListener("mouseenter", () => setTip(byId("router-panel").hidden === true));
-  status.addEventListener("mouseleave", () => setTip(false));
-  status.addEventListener("click", () => setTip(false));
-}
-
-function closePopups(): void {
-  setMenu(false);
-  setTip(false);
-}
-
-function closeMenuOutside(event: MouseEvent): void {
-  if (!byId("menu").contains(event.target as Node)) setMenu(false);
-}
-
-function wireMenu(): void {
-  byId("menu-btn").addEventListener("click", (e) => {
-    e.stopPropagation();
-    setMenu(byId("menu").hidden === true);
+function opener(kind: "menu" | "router", buttonId: string): void {
+  const button = byId(buttonId);
+  wireToggle(button, kind, () => {
+    openPopup(kind, button);
+    setExpanded(buttonId, true);
   });
-  byId("menu").addEventListener("click", onMenuClick);
-  document.addEventListener("click", closeMenuOutside);
+  onPopupClosed(kind, (refocus) => {
+    setExpanded(buttonId, false);
+    if (refocus) button.focus();
+  });
+}
+
+function wirePopupButtons(): void {
+  const status = byId("status");
+  status.addEventListener("mouseenter", showHint);
+  status.addEventListener("mouseleave", () => closePopup("hint"));
+  status.addEventListener("pointerdown", () => closePopup("hint"));
+  opener("router", "status");
+  opener("menu", "menu-btn");
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") closePopups();
+    if (e.key === "Escape") closePopup("hint");
   });
 }
 
@@ -160,10 +141,10 @@ export function wireNav(): void {
     },
     byId,
   );
-  wireMenu();
-  wireStatus();
+  wirePopupButtons();
 }
 
-export function openMenuForReview(): void {
-  setMenu(true);
+export function openForReview(kind: "menu" | "router" | "hint"): void {
+  if (kind === "hint") showHint();
+  else openPopup(kind, byId(kind === "menu" ? "menu-btn" : "status"));
 }

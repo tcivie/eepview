@@ -2,21 +2,17 @@
 // SPDX-License-Identifier: MIT
 
 import type { ChromeInsets } from "../contract.ts";
-import { all, byId } from "../dom.ts";
+import { byId } from "../dom.ts";
 import { call, on } from "../ipc.ts";
 import { chromeHeight, insetPx } from "../lib/chrome-height.ts";
 
-const POPUPS = ".suggestions, .menu, .tooltip, .router-panel";
 const quiet = (): undefined => undefined;
 let lastHeight = 0;
 let pending = 0;
 
+/** The toolbar reports its find bar only: popups show in their own webview. */
 function measure(): number {
-  const open = all<HTMLElement>(POPUPS).filter((el) => !el.hidden);
-  return chromeHeight({
-    findOpen: !byId("findbar").hidden,
-    popupBottoms: open.map((el) => el.getBoundingClientRect().bottom),
-  });
+  return chromeHeight({ findOpen: !byId("findbar").hidden });
 }
 
 function syncHeight(): void {

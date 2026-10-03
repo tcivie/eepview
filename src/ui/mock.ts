@@ -343,6 +343,14 @@ function platformFromParams(): Platform {
 }
 
 let statsTick = 0;
+let popupId = 0;
+
+const nothing = (): undefined => undefined;
+
+function nextPopupId(): number {
+  popupId += 1;
+  return popupId;
+}
 
 function wave(i: number, base: number, swing: number): number {
   return Math.max(2048, base + Math.sin(i / 7) * swing + Math.sin(i * 1.7) * swing * 0.35);
@@ -377,14 +385,14 @@ const handlers: Record<CommandName, Handler> = {
   navigate: (a) => navigate(arg(a, "input")),
   go_back: () => step("back"),
   go_forward: () => step("forward"),
-  reload: () => undefined,
+  reload: nothing,
   stop: () => {
     const current = activeTab();
     if (current) updateTab(current.id, { loading: false });
   },
   home: () => navigate(settings.homepage),
   find: (a) => find(arg(a, "query"), arg(a, "forward")),
-  find_close: () => undefined,
+  find_close: nothing,
   zoom_in: () => zoomBy(0.1),
   zoom_out: () => zoomBy(-0.1),
   zoom_reset: () => zoomBy(0),
@@ -416,13 +424,16 @@ const handlers: Record<CommandName, Handler> = {
     navigate("eepview://router-down?reason=paused");
   },
   connection_resume: () => setRouter({ paused: false }),
-  chrome_set_height: () => undefined,
+  chrome_set_height: nothing,
   platform: () => platformFromParams(),
   window_fullscreen: () => params.has("fullscreen"),
   chrome_insets: () => ({
     left: platformFromParams() === "macos" && !params.has("fullscreen") ? data.macInsetLeft : 0,
   }),
   bookmarks_export_file: () => data.exportPath,
+  popup_open: nextPopupId,
+  popup_size: nothing,
+  popup_close: nothing,
 };
 
 export const mockBackend: Backend = {
