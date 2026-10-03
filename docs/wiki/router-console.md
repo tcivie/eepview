@@ -11,7 +11,7 @@ eepview shows router information. It does not change the router configuration. A
 
 ## How it works
 
-1. **Detect.** eepview reads the console port from the router configuration files, when it finds them. Then it sends one loopback `GET` to each candidate port. A port counts only when the answer looks like that router's console.
+1. **Detect.** When a page that shows the links opens, eepview reads the console port from the router configuration files, when it finds them. Then it sends one loopback `GET` to each candidate port. A port counts only when the answer looks like that router's console.
 2. **Show.** The quick links show in the router panel, on the home page and in Settings. With no console, they are hidden and one line says "No router console found".
 3. **Open.** A quick link opens the `console` view: a webview in its own window, `Router console`. It loads only the detected console origin, `http://127.0.0.1:<port>`.
 
@@ -40,7 +40,7 @@ The console view is not a web tab. It is built in `src-tauri/src/shell/console.r
   A closed port, another status, a body without the marker, or the console of the other router type does not count. The markers do not depend on the console language.
 - **R4 Loopback only.** The probe connects only through `LoopbackAddr` to `127.0.0.1`. It sends only `GET` with `Host: 127.0.0.1:<port>`. It never follows a redirect. The probe code lives in `src-tauri/src/net/` (ADR 0001 rule 2).
 - **R5 Result.** The first candidate that passes R3 is the console. If none passes, there is no console. Only the detector makes a `VerifiedConsole`.
-- **R6 Refresh.** Detection runs at start and then every 10 s. When the result changes, eepview emits `console-changed`. When the console goes away or moves to another port, the console window closes.
+- **R6 On demand.** eepview never probes at start. Detection runs only on `console_detect()`. The UI calls it when the router panel opens, and when the home page or the Settings page loads while it is the active tab. While a console is known, eepview checks it again every 10 s; when none is known, it does not repeat. So a run that never shows these pages, such as the leak test with `EEPVIEW_START_URL`, opens no extra socket. When the result changes, eepview emits `console-changed`. When the console goes away or moves to another port, the console window closes.
 
 ### Pages
 
@@ -113,6 +113,7 @@ pub fn candidates(env: &dyn Fn(&str) -> Option<String>) -> Vec<(ConsoleKind, u16
 pub fn judge(kind: ConsoleKind, answer: &crate::net::verify::Answer) -> bool;    // R3
 pub fn probe(kind: ConsoleKind, port: u16) -> Option<VerifiedConsole>;           // R3, R4
 pub fn detect(candidates: &[(ConsoleKind, u16)]) -> Option<VerifiedConsole>;     // R5
+pub fn detect_here() -> Option<VerifiedConsole>;  // detect(&candidates(<process environment>))
 
 /// A console that passed R3. Private fields: only `probe` and `detect` make one.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -153,6 +154,8 @@ impl ConsoleWebview {
 /// Stores a detection result: emits `console-changed` when it changed, and closes the
 /// console window when the console went away or moved.
 pub fn set_console<R: Runtime>(app: &AppHandle<R>, console: Option<VerifiedConsole>);
+/// Probes now (blocking), stores the result with `set_console`, and answers its info.
+pub fn detect_now<R: Runtime>(app: &AppHandle<R>) -> ConsoleInfo;
 /// The stored detection result.
 pub fn current<R: Runtime>(app: &AppHandle<R>) -> Option<VerifiedConsole>;
 /// Closes the console window, if open.
@@ -161,7 +164,8 @@ pub fn close<R: Runtime>(app: &AppHandle<R>);
 
 ### IPC (contract v1.4)
 
-- `console_status() -> ConsoleInfo`
+- `console_status() -> ConsoleInfo`: the stored result, no probe.
+- `console_detect() -> ConsoleInfo`: probes now (R6), off the main thread, stores and answers the result.
 - `console_open({page: ConsolePage}) -> {ok: boolean, reason?: "no-console" | "no-page"}`
 - Event `console-changed: ConsoleInfo`
 
@@ -190,7 +194,7 @@ export function consoleLinks(info: ConsoleInfo | null | undefined): ConsoleLinks
 ### Where the requirement tests live
 
 - `src-tauri/src/net/console/tests.rs` (R1–R7, R9, R10)
-- `src-tauri/src/shell/console/tests.rs` (R6, R8, R11–R13; the mock runtime fixtures in `crate::shell::testing`)
+- `src-tauri/src/shell/console/tests.rs` (R6, R8, R10–R13; the mock runtime fixtures in `crate::shell::testing`)
 - `src-tauri/tests/architecture.rs` (R4, R8, R11, R14)
 - `src/ui/lib/console-links.test.ts` (R15)
 
