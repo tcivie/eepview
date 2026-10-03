@@ -1355,9 +1355,7 @@ fn r6_detect_now_replaces_a_stored_console_and_closes_its_window() {
     let info = detect_now(app.handle());
     assert!(!info.found);
     assert!(current(app.handle()).is_none());
-    assert!(wait_until(10, || app
-        .get_window("console-window")
-        .is_none()));
+    assert!(wait_until(10, || app.get_webview("console").is_none()));
 }
 
 #[test]

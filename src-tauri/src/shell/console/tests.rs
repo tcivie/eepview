@@ -226,7 +226,7 @@ fn r6_the_window_closes_when_the_console_goes_away() {
     open(&app, &found, ConsolePage::Home);
     assert!(window_open(&app));
     set_console(app.handle(), None);
-    assert!(wait_for(|| !window_open(&app)));
+    assert!(wait_for(|| app.get_webview(CONSOLE_LABEL).is_none()));
 }
 
 #[test]
@@ -238,7 +238,7 @@ fn r6_the_window_closes_when_the_console_moves_to_another_port() {
     set_console(app.handle(), Some(first.clone()));
     open(&app, &first, ConsolePage::Home);
     set_console(app.handle(), Some(second));
-    assert!(wait_for(|| !window_open(&app)));
+    assert!(wait_for(|| app.get_webview(CONSOLE_LABEL).is_none()));
 }
 
 #[test]
@@ -261,7 +261,7 @@ fn r6_close_closes_the_window_and_is_safe_when_none_is_open() {
     let (_fake, found) = console(ConsoleKind::Java);
     open(&app, &found, ConsolePage::Home);
     close(app.handle());
-    assert!(wait_for(|| !window_open(&app)));
+    assert!(wait_for(|| app.get_webview(CONSOLE_LABEL).is_none()));
 }
 
 // ---------------------------------------------------------------- R12
