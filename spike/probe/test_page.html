@@ -18,9 +18,9 @@
       const rep = (k, v) =>
         fetch(`/report?mode=${M}&k=${k}&v=${encodeURIComponent(v)}`).catch(() => {});
       const probe = (name, url) =>
-        fetch(url, { mode: "no-cors" })
+        fetch(url, { mode: "no-cors", signal: AbortSignal.timeout(5000) })
           .then(() => rep(name, "resolved"))
-          .catch(() => rep(name, "rejected"));
+          .catch((e) => rep(name, `rejected ${e.name}`));
 
       async function webrtc(prefix) {
         rep(`${prefix}rtc_type`, typeof window.RTCPeerConnection);
@@ -39,6 +39,7 @@
       rep("js", "on");
       probe("lb_ip", `http://127.0.0.1:__CANARY__/lb-ip-${M}`);
       probe("lb_name", `http://localhost:__CANARY__/lb-name-${M}`);
+      probe("lan_ip", `http://__LAN__/lan-ip-${M}`);
       probe("clear_ip", `http://203.0.113.7/ip-${M}`);
       try {
         const ws = new WebSocket(`ws://ws-${M}.clear.example/`);

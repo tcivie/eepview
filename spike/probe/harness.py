@@ -30,6 +30,7 @@ MODES = {
     "js-off": {"PROBE_HARDEN": "1", "PROBE_JS": "off", "PROBE_WIN_ARGS": "hardened"},
     "win-trap": {"PROBE_HARDEN": "1", "PROBE_JS": "on", "PROBE_WIN_ARGS": "trap"},
 }
+TRAP_MODES = {"win-trap"}
 
 
 class EventLog:
@@ -48,7 +49,7 @@ class EventLog:
 
 def render(template: str, mode: str, ports: dict) -> bytes:
     text = template.replace("__MODE__", mode).replace("__CANARY__", str(ports["canary"]))
-    return text.replace("__UDP__", str(ports["udp"])).encode()
+    return text.replace("__UDP__", str(ports["udp"])).replace("__LAN__", ports["lan"]).encode()
 
 
 class ProbeServer(ThreadingHTTPServer):
@@ -56,8 +57,8 @@ class ProbeServer(ThreadingHTTPServer):
 
     daemon_threads = True
 
-    def __init__(self, handler: type[BaseHTTPRequestHandler], log: EventLog, ports: dict) -> None:
-        super().__init__(("127.0.0.1", 0), handler)
+    def __init__(self, handler: type[BaseHTTPRequestHandler], log: EventLog, ports: dict, host: str) -> None:
+        super().__init__((host, 0), handler)
         self.log = log
         self.ports = ports
 
@@ -67,6 +68,10 @@ class QuietHandler(BaseHTTPRequestHandler):
 
     def log_message(self, *_args) -> None:
         return
+
+    def log_error(self, *args) -> None:
+        # Unsupported methods and broken requests land here; record them so nothing is invisible.
+        self.server.log.add("http_error", detail=args[0] % args[1:], method=str(self.command))
 
     def reply(self, status: int, body: bytes, ctype: str = "text/html") -> None:
         self.send_response(status)
@@ -104,6 +109,7 @@ class ProxyHandler(QuietHandler):
 
     do_POST = do_GET
     do_HEAD = do_GET
+    do_OPTIONS = do_GET
 
     def serve_probe(self, url) -> None:
         query = {k: v[0] for k, v in parse_qs(url.query).items()}
@@ -117,15 +123,28 @@ class ProxyHandler(QuietHandler):
 
 
 class CanaryHandler(QuietHandler):
-    """Records any request that reaches loopback without the proxy."""
+    """Records any request that reaches a canary without the proxy."""
 
     def do_GET(self) -> None:
-        self.server.log.add("canary", path=self.path)
-        self.reply(200, b"")
+        kind = "loopback" if self.server.server_address[0] == "127.0.0.1" else "lan"
+        self.server.log.add(kind, path=self.path)
+        self.reply(200, b"<h1>canary</h1>")
+
+    do_OPTIONS = do_GET
 
 
-def serve_http(handler: type[BaseHTTPRequestHandler], log: EventLog, ports: dict) -> ProbeServer:
-    server = ProbeServer(handler, log, ports)
+def lan_address() -> str:
+    """The address of the default route. A UDP connect sends no packet."""
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+        try:
+            sock.connect(("192.0.2.1", 9))
+            return sock.getsockname()[0]
+        except OSError:
+            return "127.0.0.1"
+
+
+def serve_http(handler: type[BaseHTTPRequestHandler], log: EventLog, ports: dict, host: str = "127.0.0.1") -> ProbeServer:
+    server = ProbeServer(handler, log, ports, host)
     threading.Thread(target=server.serve_forever, daemon=True).start()
     return server
 
@@ -156,6 +175,9 @@ def run_mode(mode: str, ports: dict, log: EventLog, args) -> None:
     env = {**os.environ, **MODES[mode], "PROBE_SECONDS": str(args.seconds)}
     env["PROBE_PROXY"] = f"http://127.0.0.1:{ports['proxy']}"
     env["PROBE_PAGE"] = f"http://probe.i2p/test.html?mode={mode}"
+    if mode in TRAP_MODES:
+        # A trap drops the proxy, so probe.i2p cannot load; open the LAN canary to prove the bypass.
+        env["PROBE_PAGE"] = f"http://{ports['lan']}/trap-{mode}"
     log.mode = mode
     try:
         subprocess.run(probe_command(args.binary, mode, args), env=env, timeout=args.seconds + 60, check=False)
@@ -184,12 +206,17 @@ def page_result(log: EventLog, mode: str) -> tuple[str, str]:
     return "FAIL", "no page request"
 
 
-def loopback_result(log: EventLog, mode: str, tag: str) -> tuple[str, str]:
-    if any(tag in e["path"] for e in log.of(mode, "canary")):
-        return "LEAK", "the request reached the loopback canary directly"
+def direct_result(log: EventLog, mode: str, tag: str, canary: str) -> tuple[str, str]:
+    """Did a request tagged `tag` reach the `canary` directly, go to the proxy, or never leave?"""
+    direct = [e["path"] for e in log.of(mode, canary) if tag in e["path"]]
+    if direct:
+        return "LEAK", f"reached the {canary} canary directly: {direct[:3]}"
     if any(tag in e.get("path", "") for e in log.of(mode, "proxy")):
         return "pass", "sent to the proxy, which refused it"
-    return "pass", "blocked by the engine (no request seen)"
+    if report_value(log, mode, "js") != "on":
+        return "info", "not tested: the page script did not run"
+    seen = report_value(log, mode, tag.removesuffix(f"-{mode}").replace("-", "_"))
+    return "warn", f"seen at neither the proxy nor the canary; the page saw: {seen}"
 
 
 LEAKY_CANDIDATE = re.compile(r"candidate:\S+ \d+ \S+ \d+ (?!\S+\.local\b)(\S+) \d+ typ (host|srflx)")
@@ -207,6 +234,8 @@ def rtc_result(log: EventLog, mode: str, prefix: str) -> tuple[str, str]:
 
 
 STRACE_V4 = re.compile(r'sin_port=htons\((\d+)\), sin_addr=inet_addr\("([\d.]+)"\)')
+# glibc reaches systemd-resolved and nscd over Unix sockets, not port 53.
+STRACE_RESOLVER = re.compile(r'sun_path="([^"]*(?:resolve|nscd)[^"]*)"')
 STRACE_V6 = re.compile(r'sin6_port=htons\((\d+)\).*?inet_pton\(AF_INET6, "([^"]+)"')
 
 
@@ -217,6 +246,7 @@ def strace_result(mode: str) -> tuple[str, str]:
     text = path.read_text(errors="ignore")
     found = [(int(p), a) for rx in (STRACE_V4, STRACE_V6) for p, a in rx.findall(text)]
     bad = sorted({f"{a}:{p}" for p, a in found if p == 53 or not (a.startswith("127.") or a == "::1")})
+    bad += sorted(set(STRACE_RESOLVER.findall(text)))
     return ("LEAK", f"direct connects: {bad[:8]}") if bad else ("pass", f"{len(found)} connects, all loopback, no DNS")
 
 
@@ -236,13 +266,16 @@ def evaluate(log: EventLog, mode: str) -> list[tuple[str, str, str]]:
         ("https image via proxy", *(("pass", "") if via_proxy(log, m, f"img-https-{m}") else ("info", "not seen"))),
         ("clearnet IP fetch via proxy", *(("pass", "") if via_proxy(log, m, "203.0.113.7") else ("info", "not seen"))),
         ("WebSocket via proxy", *(("pass", "") if via_proxy(log, m, f"ws-{m}") else ("info", "not seen"))),
-        ("loopback 127.0.0.1", *loopback_result(log, m, f"lb-ip-{m}")),
-        ("loopback localhost", *loopback_result(log, m, f"lb-name-{m}")),
+        ("loopback 127.0.0.1", *direct_result(log, m, f"lb-ip-{m}", "loopback")),
+        ("loopback localhost", *direct_result(log, m, f"lb-name-{m}", "loopback")),
+        ("LAN IP", *direct_result(log, m, f"lan-ip-{m}", "lan")),
         ("WebRTC main frame", *rtc_result(log, m, "")),
         ("WebRTC iframe", *rtc_result(log, m, "frame_")),
         ("UDP to STUN canary", *(("LEAK", "UDP left the engine") if log.of(m, "udp") else ("pass", "no packets"))),
         ("strace connects", *strace_result(m)),
     ]
+    if m in TRAP_MODES:
+        rows.insert(1, ("trap page on the LAN canary", *direct_result(log, m, f"trap-{m}", "lan")))
     return rows
 
 
@@ -265,10 +298,13 @@ def parse_args():
 
 
 def main() -> int:
+    sys.stdout.reconfigure(encoding="utf-8")
     args = parse_args()
     log = EventLog()
     ports = {"udp": serve_udp(log).getsockname()[1]}
     ports["canary"] = serve_http(CanaryHandler, log, ports).server_port
+    lan = lan_address()
+    ports["lan"] = f"{lan}:{serve_http(CanaryHandler, log, ports, lan).server_port}"
     ports["proxy"] = serve_http(ProxyHandler, log, ports).server_port
     modes = args.modes.split(",")
     for mode in modes:
