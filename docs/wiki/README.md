@@ -12,6 +12,8 @@ This wiki is generated from docs/wiki in the repository. Edit it there, in a PR.
 | No-leak architecture | in progress | [No-leak architecture](no-leak-architecture.md) | branch `feat/browser-shell` |
 | Leak test | in progress | [Leak test](leak-test.md) | branch `test/leak-harness` |
 | Release pipeline | shipped | [Release pipeline](release-pipeline.md) | [#14](https://github.com/tcivie/eepview/pull/14) |
+| Reproducible builds | shipped | [Reproducible builds](reproducible-builds.md) | [#37](https://github.com/tcivie/eepview/pull/37) |
+| Release and support | in progress | [Release and support](release-and-support.md) | [#37](https://github.com/tcivie/eepview/pull/37) |
 | Coverage | shipped | [Coverage](coverage.md) | [#13](https://github.com/tcivie/eepview/pull/13) |
 | Score ratchet | shipped | [Score ratchet](score-ratchet.md) | [#40](https://github.com/tcivie/eepview/pull/40) |
 | Brand | in progress | [Brand](brand.md) | [#11](https://github.com/tcivie/eepview/pull/11) |
