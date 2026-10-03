@@ -21,3 +21,4 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Keep the macOS traffic lights off the first tab (#23)
 - Polish the setup flow and add the router panel to the toolbar (#27)
 - Release gates job replaces the reusable-workflow calls; the macOS app is ad-hoc signed inside the dmg (#24)
+- Sign releases with Sigstore, build the Linux binary repeatably, harden the release profile (#37)
