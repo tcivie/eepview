@@ -17,8 +17,12 @@ All files are in `assets/brand/`.
 | `eepview-mark-mono.svg` | Single-colour variant (`currentColor`), for toolbars and the tray |
 | `eepview-logo-horizontal-light.svg`, `eepview-logo-horizontal-dark.svg` | Mark plus wordmark, for light and dark backgrounds |
 | `app-icon-1024.png` | The master mark rendered at 1024 px with a soft drop shadow, the source for the icon set |
-| `preview.html`, `preview-light.png`, `preview-dark.png` | Preview sheet at every size, plus a Dock and a taskbar mock |
+| `preview-bulb.html`, `preview-bulb-light.png`, `preview-bulb-dark.png` | Preview sheet of the bulb mark: master, small 64/48/32/24/16, mono, horizontal logo |
+| `clove/` | Option under review: a single garlic clove, traced with tools, in the same five file roles as above |
+| `preview-clove.html`, `preview-clove-light.png`, `preview-clove-dark.png` | The same preview sheet for the clove option |
 | `concepts/*.svg` | The three early concept sketches |
+
+Open a preview page with `#light` or `#dark` to force a theme.
 
 ## Palette
 
@@ -38,9 +42,12 @@ All files are in `assets/brand/`.
 
 ## Small and mono variants
 
-- The small variant is the bulb silhouette on green, with three tonal cloves, a pointed neck and a root block. Every coordinate is a multiple of 64, so each edge lands on a whole pixel at 16 px and at 32 px.
-- The mono variant is the bulb silhouette only, on the same grid, filled with `currentColor`.
+All variants are the same artwork. None is redrawn.
+
+- The small variant is the master artwork, scaled to a full-bleed body. It drops the rootlets and the rose streaks, and keeps the same outline, tilt and tones.
+- The mono variant is the exact silhouette of the master: the union of its shapes, filled with `currentColor`.
 - The neck and the root overlap the bulb, so no background shows through at the joints.
+- For the clove option, the small variant is traced from the same source with a stronger speckle filter, and the mono variant is the traced outline of the same mask.
 
 ## How to regenerate the icons
 
