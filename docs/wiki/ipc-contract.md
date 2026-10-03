@@ -179,9 +179,9 @@ type ConsoleInfo = { found: boolean; kind: "java" | "i2pd" | null; origin: strin
 
 ## Keyboard shortcuts
 
-Cmd on macOS, Ctrl elsewhere. Rust handles them as menu accelerators.
+Cmd on macOS, Ctrl elsewhere. Rust handles them. They work wherever the keyboard focus is, also in a web page with JavaScript off. The full table is in [Links, menus and shortcuts](links-and-shortcuts.md#keyboard).
 
-New tab T, close tab W, reopen closed tab Shift+T, next and previous tab Ctrl+Tab and Ctrl+Shift+Tab, tab 1–8 and last 9, address bar L, find F, find next G, find previous Shift+G, reload R, hard reload Shift+R, back [ and Alt+Left, forward ] and Alt+Right, home Shift+H, bookmark D, bookmarks Shift+B, history Y (macOS) or H (others), zoom + − 0, stop Esc while loading, settings comma.
+New tab T, new window N (a new tab), close tab W, reopen closed tab Shift+T, next and previous tab Ctrl+Tab and Ctrl+Shift+Tab, tab 1–8 and last 9, address bar L, find F, find next G, find previous Shift+G, reload R, hard reload Shift+R, back [ (and Alt+Left on Windows and Linux), forward ] (and Alt+Right on Windows and Linux), home Shift+H, bookmark D, bookmarks Shift+B, history Y (macOS) or H (others), zoom + − 0, stop Esc while loading, settings comma.
 
 ## Security rules
 
