@@ -1,6 +1,6 @@
 import { all, byId } from "../dom.ts";
-import { call } from "../ipc.ts";
-import { chromeHeight, tabStripInset } from "../lib/chrome-height.ts";
+import { call, on } from "../ipc.ts";
+import { chromeHeight } from "../lib/chrome-height.ts";
 
 const POPUPS = ".suggestions, .menu, .tooltip";
 const quiet = (): undefined => undefined;
@@ -28,8 +28,11 @@ function scheduleSync(): void {
 }
 
 function applyPlatform(platform: string): void {
-  document.body.dataset.platform = platform;
-  byId("tabstrip").style.setProperty("--tabstrip-inset", `${tabStripInset(platform)}px`);
+  document.documentElement.dataset.platform = platform;
+}
+
+function applyFullscreen(fullscreen: boolean): void {
+  document.documentElement.toggleAttribute("data-fullscreen", fullscreen);
 }
 
 export function wireLayout(): void {
@@ -41,5 +44,7 @@ export function wireLayout(): void {
     attributeFilter: ["hidden"],
   });
   call("platform", {}).then(applyPlatform).catch(quiet);
+  on("fullscreen-changed", applyFullscreen).catch(quiet);
+  call("window_fullscreen", {}).then(applyFullscreen).catch(quiet);
   scheduleSync();
 }

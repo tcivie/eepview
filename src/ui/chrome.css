@@ -25,8 +25,12 @@
   align-items: flex-end;
   gap: var(--space-1);
   height: var(--tabstrip-h);
-  padding: 0 var(--space-2) 0 calc(var(--space-2) + var(--tabstrip-inset, 0px));
+  padding: 0 var(--space-2);
   background: var(--chrome-strip);
+}
+
+:root[data-platform="macos"]:not([data-fullscreen]) .tabstrip {
+  padding-left: 78px;
 }
 
 .tab-drag {
