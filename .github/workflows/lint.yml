@@ -79,7 +79,7 @@ jobs:
           PIP_DISABLE_PIP_VERSION_CHECK: "1"
         run: |
           python3 -m venv "$RUNNER_TEMP/lint-venv"
-          "$RUNNER_TEMP/lint-venv/bin/pip" install --quiet --require-hashes -r scripts/requirements-lint.txt
+          "$RUNNER_TEMP/lint-venv/bin/pip" install --quiet --no-deps --require-hashes -r scripts/requirements-lint.txt
           PATH="$RUNNER_TEMP/lint-venv/bin:$PATH" ./scripts/complexity.sh
       - name: actionlint
         run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
