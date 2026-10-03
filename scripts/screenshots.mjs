@@ -9,8 +9,10 @@ import { setTimeout as sleep } from "node:timers/promises";
 
 const config = JSON.parse(readFileSync(new URL("./screenshots.json", import.meta.url), "utf8"));
 const baseUrl = process.env.SCREENSHOT_BASE ?? "";
-const DEBUG_PORT = 9339;
-const debugUrl = `http://127.0.0.1:${DEBUG_PORT}`;
+const DEVTOOLS_LINE = /DevTools listening on (ws:\/\/\S+)/;
+const PAINTED = `document.fonts.ready.then(
+  () => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))),
+)`;
 
 const CHROME_PATHS = {
   darwin: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
@@ -24,16 +26,29 @@ function launchChrome(profile) {
     "--headless=new",
     "--hide-scrollbars",
     "--no-first-run",
-    `--remote-debugging-port=${DEBUG_PORT}`,
+    "--remote-debugging-port=0",
     `--user-data-dir=${profile}`,
     "about:blank",
   ];
-  return spawn(binary, args, { stdio: "ignore" });
+  return spawn(binary, args, { stdio: ["ignore", "ignore", "pipe"] });
 }
 
-async function pageSocketUrl() {
+function devtoolsOrigin(chrome) {
+  return new Promise((resolve, reject) => {
+    let output = "";
+    chrome.once("error", reject);
+    chrome.once("exit", (code) => reject(new Error(`Chrome exited early with code ${code}`)));
+    chrome.stderr.on("data", (chunk) => {
+      output += chunk;
+      const match = DEVTOOLS_LINE.exec(output);
+      if (match) resolve(`http://${new URL(match[1]).host}`);
+    });
+  });
+}
+
+async function pageSocketUrl(origin) {
   for (let tries = 0; tries < config.startupTries; tries += 1) {
-    const targets = await fetch(`${debugUrl}/json/list`).then(
+    const targets = await fetch(`${origin}/json/list`).then(
       (r) => r.json(),
       () => [],
     );
@@ -70,8 +85,20 @@ function connect(url) {
 }
 
 async function evaluate(cdp, expression) {
-  const { result } = await cdp.send("Runtime.evaluate", { expression, returnByValue: true });
+  const { result } = await cdp.send("Runtime.evaluate", {
+    expression,
+    returnByValue: true,
+    awaitPromise: true,
+  });
   return result.value;
+}
+
+async function navigate(cdp, url) {
+  const loaded = cdp.once("Page.loadEventFired");
+  const { errorText } = await cdp.send("Page.navigate", { url });
+  if (errorText) throw new Error(`Could not open ${url}: ${errorText}`);
+  await loaded;
+  await evaluate(cdp, PAINTED);
 }
 
 async function prepare(cdp, shot, theme) {
@@ -81,19 +108,17 @@ async function prepare(cdp, shot, theme) {
     mobile: false,
   });
   await cdp.send("Emulation.setEmulatedMedia", {
-    features: [{ name: "prefers-color-scheme", value: theme }],
+    features: [
+      { name: "prefers-color-scheme", value: theme },
+      { name: "prefers-reduced-motion", value: "reduce" },
+    ],
   });
-  const loaded = cdp.once("Page.loadEventFired");
-  await cdp.send("Page.navigate", {
-    url: `${baseUrl}/src/ui/${shot.page}?${shot.query}&theme=${theme}`,
-  });
-  await loaded;
-  await sleep(config.settleMs);
+  await navigate(cdp, `${baseUrl}/src/ui/${shot.page}?${shot.query}&theme=${theme}`);
 }
 
 async function click(cdp, selector) {
   await evaluate(cdp, `document.querySelector(${JSON.stringify(selector)}).click()`);
-  await sleep(config.clickSettleMs);
+  await evaluate(cdp, PAINTED);
 }
 
 async function clipFor(cdp, shot) {
@@ -129,18 +154,24 @@ async function captureAll(cdp) {
   }
 }
 
+async function stopChrome(chrome) {
+  if (chrome.pid === undefined || chrome.exitCode !== null || chrome.signalCode !== null) return;
+  const exited = once(chrome, "exit");
+  chrome.kill();
+  await exited;
+}
+
 async function main() {
   if (!baseUrl) throw new Error("Set SCREENSHOT_BASE to the preview server URL");
   const profile = mkdtempSync(join(tmpdir(), "eepview-shots-"));
   const chrome = launchChrome(profile);
   try {
-    const cdp = await connect(await pageSocketUrl());
+    const origin = await devtoolsOrigin(chrome);
+    const cdp = await connect(await pageSocketUrl(origin));
     await captureAll(cdp);
     cdp.close();
   } finally {
-    const exited = once(chrome, "exit");
-    chrome.kill();
-    await exited;
+    await stopChrome(chrome);
     rmSync(profile, { recursive: true, force: true, maxRetries: config.cleanupRetries });
   }
 }

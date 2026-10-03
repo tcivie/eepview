@@ -117,7 +117,7 @@ a:hover {
   stroke-linejoin: round;
 }
 
-/* Mark: three nested layers, the innermost one is the message. */
+/* Brand: the bulb mark next to the name. It appears once per screen. */
 
 .mark {
   display: block;
