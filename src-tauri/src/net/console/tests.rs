@@ -11,7 +11,7 @@ use std::net::{TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::mpsc::{Receiver, channel};
-use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
+use std::sync::{Arc, Mutex, MutexGuard};
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 
@@ -31,6 +31,7 @@ use crate::net::console::{
 use crate::net::testing::FakeConsole;
 use crate::shell::console::{ConsoleWebview, current, detect_now, set_console, stop};
 use crate::shell::state::{Shared, lock, shared};
+use crate::shell::testing::detect_lock;
 
 const JAVA_BODY: &str = r#"<link rel="stylesheet" href="/themes/console/light/console.css">"#;
 const I2PD_BODY: &str = r#"<a href="/?page=i2p_tunnels">Tunnels</a>"#;
@@ -1086,14 +1087,6 @@ fn r10_property_arbitrary_urls_never_stay_off_the_origin() {
 }
 
 // ---------------------------------------------------------------- R6: on demand
-
-/// Tests that probe the default console ports run one at a time: they listen on 7657 and
-/// 7070, and any other detection would count as a connection.
-static DETECT_LOCK: Mutex<()> = Mutex::new(());
-
-fn detect_lock() -> MutexGuard<'static, ()> {
-    DETECT_LOCK.lock().unwrap_or_else(PoisonError::into_inner)
-}
 
 /// A listener on a fixed loopback port that counts connections. While `up` it answers
 /// with the console marker, else with 404.

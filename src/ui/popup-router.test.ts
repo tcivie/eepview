@@ -10,26 +10,39 @@ import { sleep, stubShell, until } from "./testing/shell-stub.ts";
 
 const stub = stubShell("popup.html");
 const { doc } = stub;
-const history = { stepSeconds: 5, inBps: [100, 400, 250, 900], outBps: [50, 60, 70, 80] };
+const history = [
+  { t: 1000, in: 100, out: 50 },
+  { t: 6000, in: 400, out: 60 },
+  { t: 11_000, in: 250, out: 70 },
+  { t: 16_000, in: 900, out: 80 },
+];
+// The router_stats answer in the IPC contract v1.7 shape (docs/wiki/ipc-contract.md).
 const FULL = {
+  version: "2.50.1",
+  uptimeMs: 3_700_000,
+  uptimeResolutionMs: 1,
   networkStatus: "OK",
-  uptimeSeconds: 3700,
-  routerKind: "i2pd",
-  routerVersion: "2.50.1",
-  javaVersion: null,
-  bandwidthInBps: 1536,
-  bandwidthOutBps: 2048,
-  history,
-  clientTunnels: 2,
-  inboundTunnels: 3,
-  outboundTunnels: 4,
-  activePeers: 77,
-  participatingTunnels: 5,
-  buildSuccessRate: 0.5,
   knownRouters: 1,
   floodfills: 1,
+  activePeers: 77,
+  tunnels: { in: 3, out: 4, participating: 5, client: 2, exploratory: null },
+  bandwidthBytesPerSecond: { in1s: 1536, out1s: 2048, in5m: null, out5m: null },
+  tunnelBuildSuccessPercent: { exploratory: null, client: null, total: 50 },
+  history,
 };
-const EMPTY = Object.fromEntries(Object.keys(FULL).map((k) => [k, null]));
+const EMPTY = {
+  version: null,
+  uptimeMs: null,
+  uptimeResolutionMs: null,
+  networkStatus: null,
+  knownRouters: null,
+  floodfills: null,
+  activePeers: null,
+  tunnels: { in: null, out: null, participating: null, client: null, exploratory: null },
+  bandwidthBytesPerSecond: { in1s: null, out1s: null, in5m: null, out5m: null },
+  tunnelBuildSuccessPercent: { exploratory: null, client: null, total: null },
+  history: [],
+};
 let status = {
   state: "ok",
   proxy: "127.0.0.1:4444",
@@ -109,6 +122,21 @@ describe("the router panel: more figures", () => {
   it("[browser-ui panel] shows the build success as a percentage with one decimal", async () => {
     await showPanel(status, FULL);
     assert.equal(text("rp-build"), "50.0%");
+  });
+
+  it("[R43] shows client and exploratory tunnels when the router gives no in and out split", async () => {
+    const tunnels = { in: null, out: null, participating: 5, client: 2, exploratory: 6 };
+    await showPanel(status, { ...FULL, tunnels });
+    const line = text("rp-tunnels");
+    for (const part of ["2 client", "6 exploratory", "5 participating"]) {
+      assert.ok(line.includes(part), `${line} must show ${part}`);
+    }
+    assert.ok(!line.includes(" in "), line);
+  });
+
+  it('[R42] shows an uptime of 8 hours with a resolution of 1 hour as "8 h"', async () => {
+    await showPanel(status, { ...FULL, uptimeMs: 28_800_000, uptimeResolutionMs: 3_600_000 });
+    assert.equal(text("rp-uptime"), "8 h");
   });
 
   it("[browser-ui panel] shows the state with its own tone and title", async () => {

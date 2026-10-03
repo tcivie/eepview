@@ -28,6 +28,8 @@ pub struct Shared<R: Runtime> {
     /// The console loop epoch: `console::stop` moves it on, and a loop of an older epoch
     /// ends at its next tick.
     pub console_epoch: AtomicU64,
+    /// True after `console::stop` until the next detection: no console request runs.
+    pub console_stopped: AtomicBool,
     /// The epoch of the running console re-check loop, or 0.
     pub console_watch: AtomicU64,
     /// The epoch of the running console retry loop, or 0.
@@ -61,6 +63,7 @@ impl<R: Runtime> Shared<R> {
             gate: Mutex::new(None),
             console: Mutex::new(None),
             console_epoch: AtomicU64::new(1),
+            console_stopped: AtomicBool::new(false),
             console_watch: AtomicU64::new(0),
             console_retry: AtomicU64::new(0),
             console_armed: AtomicBool::new(false),

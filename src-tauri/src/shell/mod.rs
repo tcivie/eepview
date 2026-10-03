@@ -27,7 +27,7 @@ pub mod report;
 pub mod state;
 pub mod surface;
 #[cfg(test)]
-mod testing;
+pub(crate) mod testing;
 pub mod view;
 pub mod watch;
 pub mod webrtc;

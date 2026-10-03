@@ -135,13 +135,36 @@ pub struct FakeConsole {
     lines: Arc<Mutex<Vec<String>>>,
 }
 
+/// A page the fake console serves for one request target.
+#[derive(Clone)]
+struct Page {
+    path: String,
+    status: u16,
+    body: String,
+}
+
 impl FakeConsole {
     /// Starts the fake console.
     pub fn start(kind: ConsoleKind) -> Self {
+        Self::run(kind, None)
+    }
+
+    /// Starts the fake console. A request for exactly `path` (query included) gets `status`
+    /// and `body`; every other request gets what [`FakeConsole::start`] serves.
+    pub fn serving(kind: ConsoleKind, path: &str, status: u16, body: &str) -> Self {
+        let page = Page {
+            path: path.to_owned(),
+            status,
+            body: body.to_owned(),
+        };
+        Self::run(kind, Some(page))
+    }
+
+    fn run(kind: ConsoleKind, page: Option<Page>) -> Self {
         let (listener, addr) = LoopbackAddr::listen_any().unwrap();
         let lines = Arc::new(Mutex::new(Vec::new()));
         let log = Arc::clone(&lines);
-        thread::spawn(move || serve_console(&listener, kind, &log));
+        thread::spawn(move || serve_console(&listener, kind, page.as_ref(), &log));
         Self { kind, addr, lines }
     }
 
@@ -161,17 +184,35 @@ impl FakeConsole {
     }
 }
 
-fn serve_console(listener: &TcpListener, kind: ConsoleKind, log: &Mutex<Vec<String>>) {
+fn serve_console(
+    listener: &TcpListener,
+    kind: ConsoleKind,
+    page: Option<&Page>,
+    log: &Mutex<Vec<String>>,
+) {
     for stream in listener.incoming().flatten() {
-        console_answer(stream, kind, log);
+        console_answer(stream, kind, page, log);
     }
 }
 
-fn console_answer(mut stream: TcpStream, kind: ConsoleKind, log: &Mutex<Vec<String>>) {
+fn console_answer(
+    mut stream: TcpStream,
+    kind: ConsoleKind,
+    page: Option<&Page>,
+    log: &Mutex<Vec<String>>,
+) {
     let Some((head, _)) = read_head(&mut stream) else {
         return;
     };
     log.lock().unwrap().push(head.start.clone());
+    if let Some(page) = page.filter(|p| head.start.split(' ').nth(1) == Some(p.path.as_str())) {
+        let reply = format!(
+            "HTTP/1.0 {} Fake\r\nContent-Type: text/html\r\n\r\n{}",
+            page.status, page.body
+        );
+        let _ = stream.write_all(reply.as_bytes());
+        return;
+    }
     let body = match kind {
         ConsoleKind::Java => {
             "<html><head><link href=\"/themes/console/light/console.css?2.13.0\"></head></html>"
@@ -182,4 +223,38 @@ fn console_answer(mut stream: TcpStream, kind: ConsoleKind, log: &Mutex<Vec<Stri
     };
     let reply = format!("HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n{body}");
     let _ = stream.write_all(reply.as_bytes());
+}
+
+/// A fake router helper on a free loopback port. It answers every request with `200` and
+/// a JSON body.
+pub struct FakeHelper {
+    addr: LoopbackAddr,
+}
+
+impl FakeHelper {
+    /// Starts the fake helper; every request gets `200` and `json`.
+    pub fn serving(json: &str) -> Self {
+        let (listener, addr) = LoopbackAddr::listen_any().unwrap();
+        let body = json.to_owned();
+        thread::spawn(move || serve_helper(&listener, &body));
+        Self { addr }
+    }
+
+    /// The address it listens on.
+    pub fn addr(&self) -> LoopbackAddr {
+        self.addr
+    }
+}
+
+fn serve_helper(listener: &TcpListener, body: &str) {
+    for mut stream in listener.incoming().flatten() {
+        if read_head(&mut stream).is_none() {
+            continue;
+        }
+        let reply = format!(
+            "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+            body.len()
+        );
+        let _ = stream.write_all(reply.as_bytes());
+    }
 }

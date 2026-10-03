@@ -6,25 +6,21 @@
   "macInsetLeft": 86,
   "stats": {
     "samples": 60,
-    "stepSeconds": 10,
+    "stepSeconds": 5,
     "inBps": 45000,
     "inSwing": 14000,
     "outBps": 30000,
     "outSwing": 9000,
     "fixed": {
-      "networkStatus": "OK, reachable",
-      "uptimeSeconds": 11520,
-      "routerKind": "bundled",
-      "routerVersion": "2.10.0",
-      "javaVersion": "Temurin 21.0.8",
-      "clientTunnels": 6,
-      "inboundTunnels": 3,
-      "outboundTunnels": 3,
-      "activePeers": 187,
-      "participatingTunnels": 214,
-      "buildSuccessRate": 0.68,
+      "version": "2.10.0",
+      "uptimeMs": 11520000,
+      "uptimeResolutionMs": 1,
+      "networkStatus": "OK",
       "knownRouters": 4812,
-      "floodfills": 1136
+      "floodfills": 1136,
+      "activePeers": 187,
+      "tunnels": { "in": 3, "out": 3, "participating": 214, "client": 6, "exploratory": 6 },
+      "tunnelBuildSuccessPercent": { "exploratory": 68, "client": 70, "total": 68 }
     }
   },
   "bookmarks": [

@@ -5,6 +5,7 @@ import "./boot.ts";
 import type { RouterStats, RouterStatus } from "./contract.ts";
 import { byId } from "./dom.ts";
 import { call, on } from "./ipc.ts";
+import { statsView } from "./lib/router-stats.ts";
 import { areaPath, linePath, scaleMax } from "./lib/sparkline.ts";
 import { formatRate, MISSING, statsText } from "./lib/stats-view.ts";
 import { renderRouterSummary } from "./shared/router-summary.ts";
@@ -32,7 +33,7 @@ function clearChart(): void {
   byId("spark-summary").textContent = "No bandwidth figures yet.";
 }
 
-function renderChart(history: RouterStats["history"]): void {
+function renderChart(history: ReturnType<typeof statsView>["history"]): void {
   if (!history || history.inBps.length < 2) {
     clearChart();
     return;
@@ -46,10 +47,11 @@ function renderChart(history: RouterStats["history"]): void {
 }
 
 function renderStats(stats: RouterStats): void {
-  const view = statsText(stats);
+  const figures = statsView(stats);
+  const view = statsText(figures);
   for (const [id, key] of Object.entries(TEXT_TARGETS)) byId(id).textContent = String(view[key]);
   byId("build-rate-bar").setAttribute("width", String(view.buildRateBar));
-  renderChart(stats.history);
+  renderChart(figures.history);
 }
 
 function renderRouter(status: RouterStatus): void {
@@ -59,11 +61,15 @@ function renderRouter(status: RouterStatus): void {
   );
 }
 
+/** Loads the figures while the page shows: a hidden page asks the router nothing. */
 function refresh(): void {
+  if (document.visibilityState !== "visible") return;
   call("router_stats", {}).then(renderStats).catch(quiet);
 }
 
 call("router_status", {}).then(renderRouter).catch(quiet);
 on("router-status", renderRouter).catch(quiet);
 refresh();
+call("console_detect", {}).then(refresh).catch(quiet);
+document.addEventListener("visibilitychange", refresh);
 window.setInterval(refresh, REFRESH_MS);
