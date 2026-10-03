@@ -10,6 +10,7 @@
 //! - [`http`]: message heads for the gatekeeper.
 //! - [`rules`]: the engine request rules (layer L3).
 //! - [`stats`]: router statistics from the router helper.
+//! - `testing` (tests only): a fake router proxy, so tests outside `net/` open no socket.
 
 pub mod gatekeeper;
 pub mod host;
@@ -17,4 +18,6 @@ pub mod http;
 pub mod loopback;
 pub mod rules;
 pub mod stats;
+#[cfg(test)]
+pub(crate) mod testing;
 pub mod verify;
