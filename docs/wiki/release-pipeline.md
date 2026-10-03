@@ -43,4 +43,4 @@ A `v*` tag builds installers for four targets, adds SBOMs and checksums, and mak
 
 - [#14](https://github.com/tcivie/eepview/pull/14): release pipeline with SBOM, checksums and provenance.
 - [#24](https://github.com/tcivie/eepview/pull/24): release gates job without lint exclusions; the macOS app is signed inside the dmg.
-- [#28](https://github.com/tcivie/eepview/pull/28): the gate also reads the checks of the merged PR head.
+- [#39](https://github.com/tcivie/eepview/pull/39): the gate also reads the checks of the merged PR head.
