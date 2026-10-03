@@ -7,7 +7,7 @@ use tauri::Url;
 
 use super::{Core, Effect, EngineOp, Event, WebOp};
 use crate::hover;
-use crate::nav::{guard, host_of, internal_from_file, internal_with, is_web};
+use crate::nav::{guard, host_of, internal_from_file, internal_with, is_allowed, is_web};
 use crate::tabs::Place;
 
 impl Core {
@@ -44,7 +44,8 @@ impl Core {
         let Some(tab) = self.tabs.get_mut(id) else {
             return Vec::new();
         };
-        if !is_web(url) {
+        if !is_allowed(url) {
+            // Only an I2P address may enter tab state, so it can never be replayed.
             return Vec::new();
         }
         if tab.web_js.is_some_and(|live| live != js) {
@@ -75,7 +76,7 @@ impl Core {
         let Some(tab) = self.tabs.get_mut(id) else {
             return Vec::new();
         };
-        if !is_web(url) {
+        if !is_allowed(url) {
             return Vec::new();
         }
         tab.loading = false;

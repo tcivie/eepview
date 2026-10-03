@@ -276,7 +276,15 @@ fn send_body(
     let have = usize::try_from(length).map_or(rest.len(), |n| n.min(rest.len()));
     upstream.write_all(&rest[..have])?;
     let missing = length.saturating_sub(have as u64);
-    io::copy(&mut client.take(missing), upstream)?;
+    let copied = io::copy(&mut client.take(missing), upstream)?;
+    if copied < missing {
+        // The client ended before the body did: close both sides now, do not wait for the
+        // router to time out.
+        return Err(io::Error::new(
+            io::ErrorKind::UnexpectedEof,
+            "request body cut short",
+        ));
+    }
     Ok(())
 }
 

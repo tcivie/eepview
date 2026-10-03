@@ -32,6 +32,8 @@ One host predicate, `net::host::is_i2p_host`, is the single source of truth for 
 
 Every engine runs page content in a separate, OS-sandboxed content process with no direct network access: `WKWebView` WebContent, `WebView2` renderer, WebKitGTK web process. All network traffic leaves through one network process. That network process is what the five layers confine. An OS-level layer that confines it from outside (L6) is on the [roadmap](roadmap.md).
 
+**Gatekeeper answers** (owner decision). A non-`.i2p` host gets 403, a malformed request 400 (two `Content-Length` headers count as malformed), and a chunked request body 411. None of them opens an upstream connection, and the connection closes. An `.i2p` URL may carry an explicit port 1–65535 and is forwarded with it; `CONNECT` stays limited to `:80` and `:443`. When the client ends before the request body does, the gatekeeper closes both sides at once.
+
 ## Construction rules
 
 These make the wrong code hard to write.

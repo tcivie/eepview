@@ -112,12 +112,9 @@ fn navigate_classifies_input() {
             .url
             .starts_with("eepview://blocked?url=http")
     );
-    assert_eq!(c.navigate("   ").0, NavResult::refused("invalid"));
-    c.navigate("forum search");
-    assert_eq!(
-        c.tabs().active().unwrap().url,
-        "eepview://history?q=forum+search"
-    );
+    assert_eq!(c.navigate("   "), (NavResult::ok(), Vec::new()));
+    c.navigate("forum");
+    assert_eq!(c.tabs().active().unwrap().url, "eepview://history?q=forum");
     c.navigate("eepview://settings");
     assert_eq!(c.tab_info(1).unwrap().title, "Settings");
     assert_eq!(c.tab_info(1).unwrap().kind, "internal");
@@ -652,5 +649,31 @@ fn hidden_web_view_cannot_pull_the_tab_back() {
         c.history_query(&HistoryQuery::default())
             .iter()
             .all(|e| e.url != REG)
+    );
+}
+
+#[test]
+fn a_clearnet_url_never_enters_tab_state() {
+    let mut c = core();
+    c.navigate("a.i2p");
+    assert!(c.page_started(1, "http://evil.com/").is_empty());
+    assert!(c.page_finished(1, "http://evil.com/", 2).is_empty());
+    c.router_changed(down_status());
+    let fx = c.router_changed(ok_status());
+    assert!(loads(&fx).iter().all(|l| l.url == "http://a.i2p/"));
+    assert_eq!(c.tabs().active().unwrap().url, "http://a.i2p/");
+}
+
+#[test]
+fn the_load_choke_point_refuses_clearnet() {
+    let mut c = core();
+    let fx = c.load(1, "http://example.com/");
+    assert!(loads(&fx).is_empty());
+    assert!(
+        c.tabs()
+            .active()
+            .unwrap()
+            .url
+            .starts_with("eepview://blocked")
     );
 }

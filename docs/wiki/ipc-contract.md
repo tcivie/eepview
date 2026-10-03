@@ -51,11 +51,12 @@ Only `toolbar` and `internal` may call them (`src-tauri/capabilities/`). Argumen
 ### Navigation (active tab)
 
 - `navigate(input) -> NavResult`.
-  - `foo.i2p` becomes `http://foo.i2p/`.
-  - An `http(s)` URL on a `.i2p` or `.b32.i2p` host loads.
+  - Blank or whitespace-only input is ignored.
+  - `foo.i2p` becomes `http://foo.i2p/`. The host is lower-cased and one trailing dot is dropped.
+  - An `http(s)` URL on a `.i2p` or `.b32.i2p` host loads, with or without an explicit port 1–65535.
   - `eepview://x` opens an internal page.
-  - Text with no dot and no scheme searches history and bookmarks (`eepview://history?q=…`).
-  - Anything else is refused with `{ok: false, reason: "not-i2p"}` and shows `eepview://blocked?url=…`.
+  - One word with no dot, no colon and no scheme searches history and bookmarks (`eepview://history?q=…`).
+  - Anything else that parses is refused with `{ok: false, reason: "not-i2p"}` and shows `eepview://blocked?url=…` (`localhost:8080` is `not-i2p`). Input that does not parse is `invalid`.
 - `go_back()`, `go_forward()`, `reload(hard?)`, `stop()`, `home()`. They work with page JavaScript off: they call the engine's native API.
 
 ### Find, zoom, JavaScript
@@ -67,7 +68,7 @@ Only `toolbar` and `internal` may call them (`src-tauri/capabilities/`). Argumen
 ### Bookmarks
 
 - `bookmarks_list() -> Bookmark[]`
-- `bookmark_add({bookmark: {url, title, folder?}}) -> Bookmark`
+- `bookmark_add({bookmark: {url, title, folder?}}) -> Bookmark`. A non-I2P URL is refused with the error `not-i2p`.
 - `bookmark_update({bookmark: Bookmark})`, `bookmark_remove(id)`, `bookmark_find(url) -> Bookmark | null`
 - `bookmarks_export() -> string` (JSON), `bookmarks_import(json) -> number`
 - `bookmarks_export_file() -> string`: writes `eepview-bookmarks-<YYYYMMDD>.json` to the Downloads folder and returns its path.

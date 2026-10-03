@@ -4,13 +4,17 @@
 //! Address-bar navigation, back/forward, reload and stop.
 
 use super::{Core, Effect, EngineOp, Event, Load, WebOp, internal_title};
-use crate::nav::{Target, classify, host_of, internal_with, is_web};
+use crate::nav::{Target, classify, host_of, internal_with, is_allowed, is_web};
 use crate::session::{Step, Traverse};
 use crate::types::NavResult;
 
 impl Core {
     /// `navigate(input)` on the active tab.
     pub fn navigate(&mut self, input: &str) -> (NavResult, Vec<Effect>) {
+        if input.trim().is_empty() {
+            // Blank input is ignored (owner decision).
+            return (NavResult::ok(), Vec::new());
+        }
         let id = self.tabs.active_id();
         let target = classify(input);
         let result = match &target {
@@ -71,7 +75,14 @@ impl Core {
 
     /// Loads an allowed URL in the tab webview, building it when needed. Nothing happens
     /// while the router is not verified: no `tab-*` webview exists then.
+    ///
+    /// This is the one place a `WebOp::Load` is made: a URL that fails the I2P rule never
+    /// reaches an engine, whatever path brought it here.
     pub(super) fn load(&mut self, id: u32, url: &str) -> Vec<Effect> {
+        if !is_allowed(url) {
+            let page = internal_with("blocked", &[("url", url)]);
+            return self.go_internal(id, &page);
+        }
         if !self.router.is_ok() {
             return Vec::new();
         }

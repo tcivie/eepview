@@ -109,7 +109,7 @@ impl Bookmarks {
     ///
     /// Fails when the URL is not an I2P site or an internal page.
     pub fn add(&mut self, new: &NewBookmark, now: u64) -> Result<Bookmark, String> {
-        let url = normalise(&new.url).ok_or_else(|| format!("not an I2P address: {}", new.url))?;
+        let url = normalise(&new.url).ok_or_else(|| "not-i2p".to_owned())?;
         if let Some(existing) = self.find(&url) {
             return Ok(existing.clone());
         }

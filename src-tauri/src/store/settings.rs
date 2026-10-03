@@ -83,7 +83,16 @@ impl Settings {
     /// Reads the file, or the defaults.
     #[must_use]
     pub fn load(path: &Path) -> Self {
-        read_json::<File>(path).map_or_else(Self::default, |f| f.settings)
+        read_json::<File>(path).map_or_else(Self::default, |f| f.settings.checked())
+    }
+
+    /// A hand-edited file is not trusted: a homepage that is not an I2P site or an internal
+    /// page falls back to the default, and the zoom is clamped.
+    #[must_use]
+    pub fn checked(mut self) -> Self {
+        self.homepage = normalise(&self.homepage).unwrap_or_else(|| Self::default().homepage);
+        self.zoom_default = clamp_zoom(self.zoom_default);
+        self
     }
 
     /// Writes the file.
@@ -176,6 +185,29 @@ mod tests {
         assert_eq!(home.homepage, "http://stats.i2p/");
         let zoom = s.patched(&json!({"zoomDefault": 9.0})).unwrap();
         assert!((zoom.zoom_default - ZOOM_RANGE.1).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn a_hand_edited_homepage_is_checked() {
+        for bad in [
+            "http://example.com/",
+            "file:///etc/passwd",
+            "javascript:alert(1)",
+        ] {
+            let s = Settings {
+                homepage: bad.into(),
+                zoom_default: 99.0,
+                ..Settings::default()
+            }
+            .checked();
+            assert_eq!(s.homepage, "eepview://home", "{bad}");
+            assert!((s.zoom_default - ZOOM_RANGE.1).abs() < f64::EPSILON);
+        }
+        let ok = Settings {
+            homepage: "http://stats.i2p/".into(),
+            ..Settings::default()
+        };
+        assert_eq!(ok.checked().homepage, "http://stats.i2p/");
     }
 
     #[test]

@@ -211,3 +211,47 @@ fn accept_errors_back_off() {
 fn tls_tunnels_only_where_the_engine_filters() {
     assert_eq!(TLS_TUNNELS, cfg!(windows));
 }
+
+#[test]
+fn a_cut_body_closes_both_sides_at_once() {
+    let (_router, gate, _) = setup();
+    let mut stream = gate.addr.connect(Duration::from_secs(5)).unwrap();
+    stream
+        .write_all(b"POST http://site.i2p/ HTTP/1.1\r\nContent-Length: 100\r\n\r\nab")
+        .unwrap();
+    stream.shutdown(std::net::Shutdown::Write).unwrap();
+    stream
+        .set_read_timeout(Some(Duration::from_secs(5)))
+        .unwrap();
+    let started = std::time::Instant::now();
+    let mut out = Vec::new();
+    let read = stream.read_to_end(&mut out);
+    assert!(read.is_ok(), "the gatekeeper kept the connection: {read:?}");
+    assert!(started.elapsed() < Duration::from_secs(2));
+    assert!(!String::from_utf8_lossy(&out).contains("hello body"));
+}
+
+#[test]
+fn duplicate_lengths_are_refused() {
+    let (router, gate, base) = setup();
+    let out = send(
+        &gate,
+        "POST http://site.i2p/ HTTP/1.1\r\nContent-Length: 2\r\nContent-Length: 2\r\n\r\nab",
+    );
+    assert!(out.starts_with("HTTP/1.1 400"), "{out}");
+    assert_eq!(router.connections(), base);
+}
+
+#[test]
+fn explicit_ports_are_forwarded() {
+    let (router, gate, _) = setup();
+    let out = send(&gate, "GET http://site.i2p:8080/x HTTP/1.1\r\n\r\n");
+    assert!(out.starts_with("HTTP/1.1 200"), "{out}");
+    assert!(
+        router
+            .lines()
+            .contains(&"GET http://site.i2p:8080/x HTTP/1.1".to_owned())
+    );
+    let zero = send(&gate, "GET http://site.i2p:0/x HTTP/1.1\r\n\r\n");
+    assert!(zero.starts_with("HTTP/1.1 403"), "{zero}");
+}

@@ -97,8 +97,16 @@ impl Head {
         if self.header("transfer-encoding").is_some() {
             return Err(Refusal::LengthRequired);
         }
-        self.header("content-length")
-            .map_or(Ok(0), |v| v.parse().map_err(|_| Refusal::BadRequest))
+        let mut lengths = self
+            .headers
+            .iter()
+            .filter(|(n, _)| n.eq_ignore_ascii_case("content-length"));
+        let first = lengths.next();
+        if lengths.next().is_some() {
+            // Two lengths, equal or not, are a smuggling risk: refuse.
+            return Err(Refusal::BadRequest);
+        }
+        first.map_or(Ok(0), |(_, v)| v.parse().map_err(|_| Refusal::BadRequest))
     }
 }
 
@@ -216,11 +224,19 @@ fn plan_absolute(method: &str, target: &str) -> Plan {
     }
 }
 
-/// The host of an `http://` URL on port 80 with no user info, when it is an I2P host.
+/// `host` or `host:port` of an `http://` URL with no user info, when it is an I2P host. An
+/// explicit port must be 1–65535.
 fn i2p_host(url: &Url) -> Option<String> {
-    let clean = url.username().is_empty() && url.password().is_none() && url.port().is_none();
+    let clean = url.username().is_empty() && url.password().is_none();
     let host = url.host_str()?;
-    (clean && is_i2p_host(host)).then(|| host.to_owned())
+    if !clean || !is_i2p_host(host) {
+        return None;
+    }
+    match url.port() {
+        None => Some(host.to_owned()),
+        Some(0) => None,
+        Some(port) => Some(format!("{host}:{port}")),
+    }
 }
 
 fn path_of(url: &Url) -> String {
@@ -371,7 +387,7 @@ mod tests {
             "GET http://u@stats.i2p/ HTTP/1.1",
             "GET http://stats.i2p./ HTTP/1.1",
             "GET http://bücher.i2p/ HTTP/1.1",
-            "GET http://stats.i2p:8080/ HTTP/1.1",
+            "GET http://stats.i2p:0/ HTTP/1.1",
             "GET https://stats.i2p/ HTTP/1.1",
             "GET /relative HTTP/1.1",
             "GET ftp://stats.i2p/ HTTP/1.1",

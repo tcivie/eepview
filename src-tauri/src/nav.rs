@@ -111,8 +111,10 @@ fn scheme_of(text: &str) -> Option<String> {
     (rest.starts_with("//") || opaque || scheme == INTERNAL_SCHEME).then_some(scheme)
 }
 
+/// One word with no dot and no colon (owner decision): `stats` searches, `a b`, `a.b` and
+/// `localhost:8080` do not.
 fn is_search(text: &str) -> bool {
-    text.chars().any(char::is_whitespace) || !text.contains(['.', ':', '/'])
+    !text.chars().any(char::is_whitespace) && !text.contains(['.', ':'])
 }
 
 fn web_target(mut url: Url) -> Target {
@@ -174,7 +176,8 @@ pub fn is_allowed_web(url: &Url) -> bool {
     let scheme_ok = matches!(url.scheme(), "http" | "https");
     let no_userinfo = url.username().is_empty() && url.password().is_none();
     let host_ok = url.host_str().is_some_and(is_i2p_host);
-    scheme_ok && no_userinfo && host_ok
+    let port_ok = url.port() != Some(0);
+    scheme_ok && no_userinfo && host_ok && port_ok
 }
 
 /// The host of an allowed web URL string, for per-site settings.
@@ -184,7 +187,13 @@ pub fn host_of(url: &str) -> Option<String> {
     is_allowed_web(&parsed).then(|| parsed.host_str().map(str::to_owned))?
 }
 
-/// True for `http(s)://` page addresses (as opposed to `eepview://`).
+/// True for an `http(s)` URL on an I2P host (text form of [`is_allowed_web`]).
+#[must_use]
+pub fn is_allowed(url: &str) -> bool {
+    Url::parse(url).is_ok_and(|u| is_allowed_web(&u))
+}
+
+/// True for an `http(s)` address (allowed or not); see [`is_allowed`] for the I2P rule.
 #[must_use]
 pub fn is_web(url: &str) -> bool {
     url.starts_with("http://") || url.starts_with("https://")
@@ -329,6 +338,9 @@ mod tests {
     fn trailing_dot_is_trimmed_in_the_address_bar() {
         assert_eq!(web("foo.i2p."), "http://foo.i2p/");
         assert_eq!(web("http://foo.i2p./x"), "http://foo.i2p/x");
+        assert_eq!(web("Foo.I2P."), "http://foo.i2p/");
+        assert_eq!(web("http://foo.i2p:8080/"), "http://foo.i2p:8080/");
+        assert_eq!(refused("http://foo.i2p:0/"), Refusal::NotI2p);
     }
 
     #[test]
@@ -352,10 +364,8 @@ mod tests {
 
     #[test]
     fn search_and_invalid() {
-        assert_eq!(
-            classify("hello world"),
-            Target::Search("hello world".into())
-        );
+        assert_eq!(refused("hello world"), Refusal::Invalid);
+        assert_eq!(refused("localhost:8080"), Refusal::NotI2p);
         assert_eq!(classify("forum"), Target::Search("forum".into()));
         assert_eq!(refused("   "), Refusal::Invalid);
         assert_eq!(refused("http://"), Refusal::Invalid);

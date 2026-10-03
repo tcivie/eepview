@@ -51,10 +51,19 @@ impl History {
     /// Reads the file, or starts empty.
     #[must_use]
     pub fn load(path: &Path) -> Self {
-        read_json::<File>(path).map_or_else(Self::default, |f| Self {
-            seq: f.entries.len() as u64,
-            entries: f.entries,
-        })
+        read_json::<File>(path).map_or_else(Self::default, |f| Self::checked(f.entries))
+    }
+
+    /// A hand-edited file is not trusted: only I2P addresses, newest first, at most
+    /// [`MAX_ENTRIES`].
+    fn checked(mut entries: Vec<HistoryEntry>) -> Self {
+        entries.retain(|e| crate::nav::is_allowed(&e.url));
+        entries.sort_by_key(|e| std::cmp::Reverse(e.visited));
+        entries.truncate(MAX_ENTRIES);
+        Self {
+            seq: entries.len() as u64,
+            entries,
+        }
     }
 
     /// Writes the file.
@@ -251,6 +260,25 @@ mod tests {
         assert_eq!(range_ms("day"), Ok(Some(24 * HOUR_MS)));
         assert_eq!(range_ms("week"), Ok(Some(168 * HOUR_MS)));
         assert!(range_ms("year").is_err());
+    }
+
+    #[test]
+    fn a_hand_edited_file_is_capped_and_checked() {
+        let entry = |i: usize, url: String| HistoryEntry {
+            id: i.to_string(),
+            url,
+            title: String::new(),
+            visited: i as u64,
+            visits: 1,
+        };
+        let mut entries: Vec<HistoryEntry> = (0..12_000)
+            .map(|i| entry(i, format!("http://p{i}.i2p/")))
+            .collect();
+        entries.push(entry(99_999, "http://example.com/".into()));
+        let h = History::checked(entries);
+        assert_eq!(h.entries().len(), MAX_ENTRIES);
+        assert_eq!(h.entries()[0].url, "http://p11999.i2p/");
+        assert!(h.entries().iter().all(|e| e.url.contains(".i2p")));
     }
 
     #[test]
