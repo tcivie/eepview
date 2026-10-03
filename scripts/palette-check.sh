@@ -96,6 +96,18 @@ check_svgs() {
   done < <(tracked 'assets/brand/*.svg' 'src/ui/assets/*.svg')
 }
 
+dark_block() {
+  awk -v start="$1" 'index($0, start) { on = 1; next } on && /^[[:space:]]*}/ { exit } on { gsub(/^[[:space:]]+/, ""); print }' "$THEME"
+}
+
+check_dark_blocks() {
+  local system forced
+  system="$(dark_block ':root:not([data-theme="light"]) {')"
+  forced="$(dark_block ':root[data-theme="dark"] {')"
+  [ -n "$system" ] && [ "$system" = "$forced" ] && return 0
+  fail "$THEME: the system dark block and the [data-theme=dark] block must hold the same tokens"
+}
+
 check_named_in_brand() {
   local hex
   while IFS= read -r hex; do
@@ -107,4 +119,5 @@ check_sources
 check_theme
 check_svgs
 check_named_in_brand
+check_dark_blocks
 exit "$status"
