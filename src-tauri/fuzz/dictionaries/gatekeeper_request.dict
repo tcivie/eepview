@@ -1,0 +1,21 @@
+# SPDX-FileCopyrightText: 2026 The eepview contributors
+# SPDX-License-Identifier: MIT
+
+"GET "
+"CONNECT "
+"HEAD "
+"POST "
+" HTTP/1.1"
+" HTTP/1.0"
+"\x0d\x0a"
+"\x0d\x0a\x0d\x0a"
+"http://"
+"stats.i2p"
+":80"
+":443"
+"Host: "
+"Content-Length: "
+"Transfer-Encoding: chunked"
+".i2p"
+"user@"
+"127.0.0.1"

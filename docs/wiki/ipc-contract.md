@@ -15,6 +15,7 @@ Change it in a PR that changes both sides, or keep the old form working as a shi
 - v1.3: `chrome_insets`, `chrome-insets-changed`, `window_fullscreen`, `status-size`, `status-side`; the bubble shows after 100 ms and hides at once.
 - v1.4: `TabInfo.icon`, `Bookmark.icon`, `HistoryEntry.icon`, `icons-changed`. See [Site icons](site-icons.md). [#53](https://github.com/tcivie/eepview/pull/53)
 - v1.2: `connection_pause`, `connection_resume`, `router_control`, `RouterStatus.paused` and `.managed`, `RouterStats.history`. The `outproxy` state is gone: VERIFY no longer asks for a clearnet host.
+- v1.3: `report_preview`, `report_open`, `diag_crash_status`, `diag_crash_dismiss`, `diag_logs_delete` (internal webview only); the `eepview://report` page; `EEPVIEW_LOG` is gone. See [Diagnostics and bug reports](diagnostics-and-bug-reports.md). Added in [#56](https://github.com/tcivie/eepview/pull/56).
 - Shipped in [#29](https://github.com/tcivie/eepview/pull/29).
 - v1.4: the `popup` webview, `popup_open`, `popup_size`, `popup_close`, `popup-show`, `popup-closed`, `popup-select`. `chrome_set_height` reports the find bar only; the toolbar never grows for a popup — [#55](https://github.com/tcivie/eepview/pull/55).
 - v1.5: `console_status`, `console_detect`, `console_open`, `console-changed`, `ConsoleInfo`, the `console` webview ([#54](https://github.com/tcivie/eepview/pull/54)).
@@ -117,6 +118,16 @@ eepview shows router information and never changes the router configuration; the
 - `window_fullscreen() -> boolean`
 - `chrome_insets() -> {left: number}`: the space the tab strip leaves on the left for the macOS window buttons. The shell centers the buttons on the tab row (y = 22), measures their frames, and answers their right edge plus their left margin, so the gap after the buttons equals the margin before them. 0 in full screen, and 0 on Windows and Linux (native title bar; the UI picks its own margin).
 
+### Diagnostics and reports
+
+Only the `internal` webview may call these (`capabilities/report.json`). `toolbar`, `status` and `tab-*` cannot.
+
+- `report_preview({kind, description, includeLog}) -> string`: exactly the text that goes out, scrubbed.
+- `report_open({kind, description, includeLog}) -> {file: string, trimmed: boolean}`: saves the report in Downloads, shows it in the file manager, and opens the prefilled GitHub issue in the system browser. `file` is the file name, no folder.
+- `diag_crash_status() -> boolean`: the last run crashed and the banner was not dismissed.
+- `diag_crash_dismiss()`
+- `diag_logs_delete()`: deletes the diagnostics log and the crash marker.
+
 ## Events
 
 Rust sends them to `toolbar`, `internal`, `status` and `popup`.
@@ -201,7 +212,6 @@ See [ADR 0001](adr-0001-no-leak-architecture.md).
 | `EEPVIEW_EXIT_AFTER` | Quits with exit code 0 after this many seconds. |
 | `EEPVIEW_JS` | `off` turns page JavaScript off for every site. |
 | `EEPVIEW_ROUTER_STATUS`, `EEPVIEW_ROUTER_STATUS_TOKEN` | The router helper address and the file with its token, for `router_stats`. |
-| `EEPVIEW_LOG` | `1` prints load timings and router changes to stderr. |
 
 They exist in the release binary, for the leak test. None of them can weaken a layer.
 

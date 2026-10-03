@@ -30,6 +30,9 @@ pre-commit:
     - name: palette
       glob: "*.{css,html,ts,svg,md,txt}"
       run: ./scripts/palette-check.sh
+    - name: style
+      glob: "*.{css,html,ts,mjs}"
+      run: ./scripts/style-check.sh
     - name: gitleaks
       run: gitleaks git --staged --no-banner --redact
     - name: reuse

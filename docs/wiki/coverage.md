@@ -8,7 +8,7 @@ Unit-test coverage gate for Rust and TypeScript.
 
 - The `coverage` job in `.github/workflows/ci.yml` runs on ubuntu-24.04 only.
 - Rust lines (stable toolchain): `cargo llvm-cov --workspace --all-targets --summary-only --fail-under-lines <N>`. The gate is on the run itself, because `cargo llvm-cov report` has no `--workspace` and would gate the root crate only. Every file of both crates counts. There are no exclusions.
-- Rust branches (pinned `nightly-2026-10-01`): the same tests with `--branch --json`. cargo-llvm-cov has no `--fail-under-branches`, so `jq` prints `totals.branches.percent` and fails below the floor.
+- Rust branches (pinned nightly, named in `scripts/nightly-toolchain.txt`): the same tests with `--branch --json`. cargo-llvm-cov has no `--fail-under-branches`, so `jq` prints `totals.branches.percent` and fails below the floor.
 - TypeScript: `npm run test:coverage` first runs `scripts/check-tested.sh`, the traceability check. Then it runs the Node built-in test runner with coverage thresholds. It adds no npm package.
 - Traceability: every numbered requirement under "Requirements" in [Browser UI](browser-ui.md), and every IPC contract section the UI depends on, must be named by at least one test title. The script fails when a requirement has no test.
   - Tag a test title with `[browser-ui N]` for requirement N on the Browser UI page.
@@ -27,7 +27,7 @@ Unit-test coverage gate for Rust and TypeScript.
 
 - Rust: `cargo install cargo-llvm-cov --locked`, `rustup component add llvm-tools-preview`, then in `src-tauri`:
   - lines: `cargo llvm-cov --workspace --all-targets --summary-only`
-  - branches: `rustup toolchain install nightly-2026-10-01 --component llvm-tools-preview`, then `cargo +nightly-2026-10-01 llvm-cov --workspace --all-targets --branch --summary-only`
+  - branches: `rustup toolchain install "$(cat scripts/nightly-toolchain.txt)" --component llvm-tools-preview`, then `cargo "+$(cat scripts/nightly-toolchain.txt)" llvm-cov --workspace --all-targets --branch --summary-only`
   - Run `npm run build` first. CI measures on Linux; macOS and Windows compile other platform code, so their numbers differ.
 - TypeScript: `npm run test` and `npm run test:coverage`. Node 22.18 or later is needed.
 

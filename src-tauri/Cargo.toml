@@ -22,8 +22,9 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 
 [dev-dependencies]
 # Property tests of the robustness suite (tests/robust_*.rs), the site icons
-# (tests/site_icons_props.rs), the popup placement (tests/popups.rs) and the router console
-# navigation route (R10). No default features: no fork, no timeout.
+# (tests/site_icons_props.rs), the popup placement (tests/popups.rs), the router console
+# navigation route (R10) and the diagnostics privacy rules (tests/diag_*.rs). No default
+# features: no fork, no timeout.
 proptest = { version = "1.11.0", default-features = false, features = ["std"] }
 # The L3 rule is a regex; the tests run the real rule against the same URLs as the guard.
 # Already in the tree through Tauri.
@@ -71,6 +72,14 @@ image = { version = "0.25", default-features = false, features = [
 sha2 = "0.10"
 # The `data:image/png;base64,` URLs the UI gets.
 base64 = "0.23"
+# Opens the prefilled issue page in the system browser and shows the report file
+# (docs/wiki/diagnostics-and-bug-reports.md). Only the Rust report command calls it.
+tauri-plugin-opener = "2"
+
+[target.'cfg(unix)'.dependencies]
+# `O_NOFOLLOW` for the diagnostics files: a symbolic link in their place is never followed.
+# Already in the tree through Tauri.
+libc = "0.2"
 
 [lints.rust]
 unsafe_code = "deny"

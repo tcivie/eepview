@@ -7,12 +7,14 @@ Working rules for any human or AI agent on this repo.
 - Start one branch per unit of work from main.
 - Commit small after each working change.
 - Write Conventional Commits.
-- Open a PR to main. Enable squash auto-merge: `gh pr merge --auto --squash`.
+- Open a PR to main. Turn on squash auto-merge as soon as the PR is ready: `gh pr merge <n> --squash --auto`. Spike PRs are the exception: never turn on auto-merge for them.
 - Never use `--admin`. Never bypass the ruleset. Never use `--no-verify`.
-- Keep the branch up to date with main.
-- Before you finish, fix and resolve every review thread. Zero unresolved.
-- Before you finish, make sure every required check is green.
-- Own your PR until it is merged. Do not stop while it is open: update the branch when it is behind, fix failing checks, and fix and resolve every review thread. Spike PRs are the exception: they close with a comment that says where the findings live.
+- A PR does not need to be up to date with main. Merge main in only when the PR has a conflict (DIRTY).
+- Resolve review threads while CI runs, not after. Fix each thread, then resolve it. Resolve after an answer only when the reviewer agrees or the thread is a question. Never resolve a thread with a reply to avoid a fix. Auto-merge does not fire while a thread is open. Zero unresolved.
+- When any check turns red, fix it at once. Do not wait for the other checks to finish. Fix a red test in the code, or ask the test agent. Never edit the test to match the code. A push cancels the other running jobs, so they restart after it.
+- If a check is red on main too, the cause is on main. Look for an open issue about it first and comment there; open a new issue only if none exists. Do not change the gate in your PR. Keep watching: when main turns green, re-run the failed check on your PR.
+- You own your PR until it is MERGED. Do not stop while it is open: fix failing checks and resolve every review thread. Spike PRs are the exception: they close with a comment that says where the findings live.
+- After your PR merges, remove your worktree (`git worktree remove <path>`) and any CARGO_TARGET_DIR or scratch folder you created. Leave nothing behind.
 
 ## Quality
 
@@ -51,6 +53,8 @@ Working rules for any human or AI agent on this repo.
 - Update the status in `docs/wiki/README.md`.
 - Do not edit CHANGELOG.md in a pull request. The release job generates it from the commit titles, so write a clear Conventional Commit PR title.
 - Get the number with `gh pr view --json number` after you open the PR. Then push the docs commit.
+- A PR that changes the UI runs scripts/screenshots.sh and commits the updated images.
+- A UI change uses the shared components in src/ui/ui.css (docs/wiki/ui-components.md). scripts/style-check.sh fails on a raw spacing, radius or font size and on an inline style.
 - CI (`docs-check`) fails a `feat` PR that does not change a page under `docs/wiki/`, and any PR that edits `CHANGELOG.md`.
 
 ## Writing style
