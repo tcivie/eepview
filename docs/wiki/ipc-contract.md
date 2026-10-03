@@ -5,7 +5,7 @@ SPDX-License-Identifier: MIT
 
 # IPC contract
 
-Version 1.5. The Rust shell (`src-tauri/`) and the UI (`src/ui/`) build against this page.
+Version 1.7. The Rust shell (`src-tauri/`) and the UI (`src/ui/`) build against this page.
 Change it in a PR that changes both sides, or keep the old form working as a shim.
 
 ## History
@@ -20,6 +20,7 @@ Change it in a PR that changes both sides, or keep the old form working as a shi
 - v1.4: the `popup` webview, `popup_open`, `popup_size`, `popup_close`, `popup-show`, `popup-closed`, `popup-select`. `chrome_set_height` reports the find bar only; the toolbar never grows for a popup — [#55](https://github.com/tcivie/eepview/pull/55).
 - v1.5: `console_status`, `console_detect`, `console_open`, `console-changed`, `ConsoleInfo`, the `console` webview ([#54](https://github.com/tcivie/eepview/pull/54)).
 - v1.6: the console tab. `TabInfo.kind` adds `"console"`. `console_open()` takes no argument and opens the console home page in the console tab. `ConsoleInfo.pages`, `ConsolePage` and the `no-page` reason are gone ([#76](https://github.com/tcivie/eepview/pull/76)).
+- v1.7: `RouterStats.uptimeResolutionMs`, `.floodfills`, `.tunnels.client`, `.tunnels.exploratory`, `.tunnelBuildSuccessPercent.total`. `router_stats` reads the detected router console when there is no router helper. The UI reads this shape (`src/ui/contract.ts`). See [Router console](router-console.md#router-statistics-from-the-console).
 
 ## Window layout
 
@@ -96,7 +97,7 @@ At most 10 000 entries. Nothing is recorded while `history.enabled` is false.
 ### Router and connection
 
 - `router_status() -> RouterStatus`
-- `router_stats() -> RouterStats`. Every field may be `null`: an external router has no helper.
+- `router_stats() -> RouterStats`. Every field may be `null`. The source is the router helper when it answers, else the detected router console (read only, one loopback `GET`), else none: see [Router console](router-console.md#router-statistics-from-the-console), R31–R46.
 - `connection_pause()`: closes the gatekeeper, destroys every `tab-*` webview and shows `eepview://router-down?reason=paused`.
 - `connection_resume()`: runs VERIFY again. The gatekeeper opens and the active tab reloads only when VERIFY passes. If it fails, everything stays closed.
 - `router_control({action: "stop" | "start" | "restart"}) -> {ok: boolean, reason?: string}`. It answers `{ok: false, reason: "external"}` until eepview runs its own router (Phase 3).
@@ -173,13 +174,17 @@ type Settings = { homepage: string; theme: "system" | "light" | "dark"; jsDefaul
 type RouterStatus = { state: "verifying" | "ok" | "building" | "down" | "not-i2p";
   proxy: string; version: string | null; detail: string | null;
   paused: boolean; managed: boolean };
-type RouterStats = { version: string | null; uptimeMs: number | null; networkStatus: string | null;
-  knownRouters: number | null; activePeers: number | null;
-  tunnels: { in: number | null; out: number | null; participating: number | null };
-  bandwidthBytesPerSecond: { in1s: number | null; out1s: number | null;
+type RouterStats = { version: string | null; uptimeMs: number | null;
+  uptimeResolutionMs: number | null;  // uptimeMs is rounded down to a multiple of this
+  networkStatus: string | null;
+  knownRouters: number | null; floodfills: number | null; activePeers: number | null;
+  tunnels: { in: number | null; out: number | null; participating: number | null;
+    client: number | null; exploratory: number | null };  // client, exploratory: in + out
+  bandwidthBytesPerSecond: { in1s: number | null; out1s: number | null;  // the shortest window: "now"
     in5m: number | null; out5m: number | null };
-  tunnelBuildSuccessPercent: { exploratory: number | null; client: number | null };
-  history: { t: number; in: number; out: number }[] };  // last 10 min, one sample per 5 s
+  tunnelBuildSuccessPercent: { exploratory: number | null; client: number | null;
+    total: number | null };
+  history: { t: number; in: number; out: number }[] };  // last 10 min; the UI draws the last contiguous run (R41)
 type ConsoleInfo = { found: boolean; kind: "java" | "i2pd" | null; origin: string | null;
   version: string | null };  // origin and version: display only
 ```

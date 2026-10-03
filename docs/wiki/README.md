@@ -32,7 +32,7 @@ This wiki is generated from docs/wiki in the repository. Edit it there, in a PR.
 | Browser UI | shipped | [Browser UI](browser-ui.md) | [#19](https://github.com/tcivie/eepview/pull/19) |
 | Browser shell | shipped | [Browser shell](browser-shell.md) | [#29](https://github.com/tcivie/eepview/pull/29), popups [#55](https://github.com/tcivie/eepview/pull/55), UX batch 1 [#57](https://github.com/tcivie/eepview/pull/57) |
 | IPC contract | shipped | [IPC contract](ipc-contract.md) | [#29](https://github.com/tcivie/eepview/pull/29) |
-| Router console | in progress | [Router console](router-console.md) | [#54](https://github.com/tcivie/eepview/pull/54), console tab [#76](https://github.com/tcivie/eepview/pull/76) |
+| Router console | in progress | [Router console](router-console.md) | [#54](https://github.com/tcivie/eepview/pull/54), console tab [#76](https://github.com/tcivie/eepview/pull/76), statistics [#78](https://github.com/tcivie/eepview/pull/78) |
 | No-leak architecture | shipped | [No-leak architecture](no-leak-architecture.md) | [#29](https://github.com/tcivie/eepview/pull/29) |
 | Diagnostics and bug reports | in progress | [Diagnostics and bug reports](diagnostics-and-bug-reports.md) | [#56](https://github.com/tcivie/eepview/pull/56) |
 | Site icons | shipped | [Site icons](site-icons.md) | [#53](https://github.com/tcivie/eepview/pull/53) |

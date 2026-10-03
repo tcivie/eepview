@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="shortcut icon" href="data:image/png;base64,AAAA">
+  <title>Purple I2P Webconsole</title>
+<style>body { font: 100%/1.5em sans-serif; }</style>
+</head>
+<body>
+<div class="header"><b>i2pd</b> webconsole</div>
+<div class="wrapper">
+<div class="menu">
+  <a href="/">Main page</a><br><br>
+  <a href="/?page=commands">Router commands</a><br>
+  <a href="/?page=local_destinations">Local Destinations</a><br>
+  <a href="/?page=tunnels">Tunnels</a><br>
+  <a href="/?page=transit_tunnels">Transit Tunnels</a><br>
+  <a href="/?page=transports">Transports</a><br>
+  <a href="/?page=i2p_tunnels">I2P tunnels</a><br>
+</div>
+
+<div class="content">
+
+<b>Uptime:</b> 1 day, 2 hours, 3 minutes, 4 seconds<br>
+<b>Network status:</b> OK<br>
+<b>Tunnel creation success rate:</b> 42%<br>
+<b>Received:</b> 1.23 GiB (12.34 KiB/s)<br>
+<b>Sent:</b> 987.65 MiB (5.67 KiB/s)<br>
+<b>Transit:</b> 456.78 MiB (3.21 KiB/s)<br>
+<b>Data path:</b> /var/lib/i2pd<br>
+<div class='slide'><label for="slide-info">Hidden content. Press on text to see.</label>
+<input type="checkbox" id="slide-info" />
+<div class="slidecontent">
+<b>Router Ident:</b> AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=<br>
+<b>Router Caps:</b> LR<br>
+<b>Version:</b> 2.58.0<br>
+<b>Our external address:</b><br>
+<table class="extaddr">
+<tbody>
+<tr>
+<td>NTCP2</td>
+<td style="padding-left: 0.5em;">203.0.113.7:12345</td>
+</tr>
+<tr>
+<td>SSU2</td>
+<td style="padding-left: 0.5em;">203.0.113.7:12345</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<b>Routers:</b> 3021&nbsp;&nbsp;&nbsp;<b>Floodfills:</b> 812&nbsp;&nbsp;&nbsp;<b>LeaseSets:</b> 15<br>
+<b>Client Tunnels:</b> 14&nbsp;&nbsp;&nbsp;<b>Transit Tunnels:</b> 157<br>
+<br>
+<table class="services">
+<caption>Services</caption>
+<tbody>
+<tr><td>HTTP Proxy</td><td class='enabled'>Enabled</td></tr>
+<tr><td>SOCKS Proxy</td><td class='enabled'>Enabled</td></tr>
+<tr><td>BOB</td><td class='disabled'>Disabled</td></tr>
+<tr><td>SAM</td><td class='enabled'>Enabled</td></tr>
+<tr><td>I2CP</td><td class='disabled'>Disabled</td></tr>
+<tr><td>I2PControl</td><td class='disabled'>Disabled</td></tr>
+</tbody>
+</table>
+<br>
+</div>
+</div>
+</body>
+</html>

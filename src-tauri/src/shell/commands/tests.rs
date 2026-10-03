@@ -10,7 +10,7 @@ use tauri::async_runtime::block_on;
 
 use super::*;
 use crate::net::testing::{FakeRouter, dead_addr};
-use crate::shell::testing::{Mock, app, core, gate_open, invoke, open_gate, wait_for};
+use crate::shell::testing::{Mock, app, core, detect_lock, gate_open, invoke, open_gate, wait_for};
 
 fn handle(app: &App<Mock>) -> AppHandle<Mock> {
     app.handle().clone()
@@ -186,4 +186,339 @@ fn direct_calls_match_the_ipc_answers() {
         block_on(router_status(handle(&app))).unwrap().proxy,
         "127.0.0.1:4444"
     );
+}
+
+// ------------------------------------------------ router statistics (R31, R34, R40)
+
+mod stats_from_console {
+    use super::*;
+    use crate::net::console::{ConsoleKind, stats_path};
+    use crate::net::stats::{RouterStats, Sample};
+    use crate::net::testing::{FakeConsole, FakeHelper};
+    use crate::shell::console::{detect_now, set_console, stop};
+
+    const JAVA: &str =
+        include_str!("../../../tests/fixtures/console/java-2.13.0-xhr1-summaryframe.txt");
+    const I2PD: &str =
+        include_str!("../../../tests/fixtures/console/i2pd-2.58.0-main-synthetic.txt");
+
+    /// A fake Java I2P console that answers its stats path with the fixture, stored as the
+    /// detected console of `app`.
+    fn java_console(app: &App<Mock>) -> FakeConsole {
+        let fake =
+            FakeConsole::serving(ConsoleKind::Java, stats_path(ConsoleKind::Java), 200, JAVA);
+        set_console(app.handle(), Some(fake.verified()));
+        fake
+    }
+
+    fn stats_requests(fake: &FakeConsole) -> usize {
+        let path = stats_path(ConsoleKind::Java);
+        fake.requests()
+            .iter()
+            .filter(|line| line.split(' ').nth(1) == Some(path))
+            .count()
+    }
+
+    #[test]
+    fn r31_with_no_helper_and_no_console_every_field_is_null() {
+        // R31 step 3: no source, every field null; the history is empty.
+        let app = app();
+        assert_eq!(current_stats(&handle(&app), None), RouterStats::default());
+    }
+
+    #[test]
+    fn r31_current_stats_never_runs_detection() {
+        // R31: "with no stored console it does not probe". A console that runs but was
+        // never stored by detection gets no request.
+        let app = app();
+        let fake =
+            FakeConsole::serving(ConsoleKind::Java, stats_path(ConsoleKind::Java), 200, JAVA);
+        let stats = current_stats(&handle(&app), None);
+        assert_eq!(stats, RouterStats::default());
+        assert!(
+            fake.requests().is_empty(),
+            "requests: {:?}",
+            fake.requests()
+        );
+    }
+
+    fn check_java_uptime_and_bandwidth(stats: &RouterStats) {
+        assert_eq!(stats.uptime_ms, Some(28_800_000));
+        assert_eq!(stats.uptime_resolution_ms, Some(3_600_000));
+        assert_eq!(stats.network_status.as_deref(), Some("OK"));
+        assert_eq!(stats.bandwidth_bytes_per_second.in1s, Some(53_910));
+        assert_eq!(stats.bandwidth_bytes_per_second.out1s, Some(37_370));
+        assert_eq!(stats.bandwidth_bytes_per_second.in5m, Some(37_830));
+        assert_eq!(stats.bandwidth_bytes_per_second.out5m, Some(33_060));
+    }
+
+    fn check_java_counts(stats: &RouterStats) {
+        assert_eq!(stats.active_peers, Some(1678));
+        assert_eq!(stats.known_routers, Some(4905));
+        assert_eq!(stats.floodfills, Some(1570));
+        assert_eq!(stats.tunnels.participating, Some(398));
+        assert_eq!(stats.tunnels.client, Some(2));
+        assert_eq!(stats.tunnels.exploratory, Some(11));
+        assert_eq!(stats.version, None);
+    }
+
+    #[test]
+    fn r31_current_stats_reads_the_stored_java_console() {
+        let app = app();
+        let _fake = java_console(&app);
+        let stats = current_stats(&handle(&app), None);
+        check_java_uptime_and_bandwidth(&stats);
+        check_java_counts(&stats);
+    }
+
+    #[test]
+    fn r31_current_stats_reads_the_stored_i2pd_console() {
+        let app = app();
+        let fake = FakeConsole::serving(ConsoleKind::I2pd, "/", 200, I2PD);
+        set_console(app.handle(), Some(fake.verified()));
+        let stats = current_stats(&handle(&app), None);
+        assert_eq!(stats.uptime_ms, Some(93_784_000));
+        assert_eq!(stats.uptime_resolution_ms, Some(1_000));
+        assert_eq!(stats.bandwidth_bytes_per_second.in1s, Some(12_636));
+        assert_eq!(stats.bandwidth_bytes_per_second.out1s, Some(5_806));
+        assert_eq!(stats.known_routers, Some(3021));
+        assert_eq!(stats.floodfills, Some(812));
+        assert_eq!(
+            stats.tunnels.client, None,
+            "R38: i2pd gives no client count"
+        );
+        assert_eq!(stats.tunnels.participating, Some(157));
+        assert_eq!(stats.tunnel_build_success_percent.total, Some(42));
+    }
+
+    #[test]
+    fn r31_a_helper_that_does_not_answer_falls_back_to_the_console() {
+        // R31: the helper first; no answer from it, the console is next.
+        let app = app();
+        let _fake = java_console(&app);
+        let stats = current_stats(&handle(&app), Some((dead_addr(), "token".into())));
+        assert_eq!(stats.tunnels.participating, Some(398));
+    }
+
+    #[test]
+    fn r31_a_console_that_does_not_answer_200_gives_all_null_and_no_sample() {
+        // R31 step 3, R40: no source, no history sample.
+        let app = app();
+        let fake =
+            FakeConsole::serving(ConsoleKind::Java, stats_path(ConsoleKind::Java), 503, JAVA);
+        set_console(app.handle(), Some(fake.verified()));
+        assert_eq!(current_stats(&handle(&app), None), RouterStats::default());
+    }
+
+    #[test]
+    fn r34_each_call_makes_at_most_one_console_request() {
+        // R34: "each `router_stats()` call makes at most one console request".
+        let app = app();
+        let fake = java_console(&app);
+        let _ = current_stats(&handle(&app), None);
+        assert_eq!(stats_requests(&fake), 1);
+        let _ = current_stats(&handle(&app), None);
+        assert_eq!(stats_requests(&fake), 2);
+    }
+
+    #[test]
+    fn r34_no_stored_console_means_no_request_at_all() {
+        let app = app();
+        let fake = java_console(&app);
+        set_console(app.handle(), None);
+        let before = fake.requests().len();
+        let _ = current_stats(&handle(&app), None);
+        assert_eq!(fake.requests().len(), before);
+    }
+
+    #[test]
+    fn r40_an_answer_from_the_console_includes_its_bandwidth_sample() {
+        // R40: "The `history` of the answer includes the new sample."
+        let app = app();
+        let _fake = java_console(&app);
+        let stats = current_stats(&handle(&app), None);
+        assert_eq!(stats.history.len(), 1);
+        let sample: Sample = stats.history[0];
+        assert_eq!(sample.inbound, 53_910);
+        assert_eq!(sample.out, 37_370);
+    }
+
+    #[test]
+    fn r40_two_answers_less_than_4_seconds_apart_add_one_sample() {
+        // R40: the panel and the Network page together still add one sample per 5 s.
+        let app = app();
+        let _fake = java_console(&app);
+        let first = current_stats(&handle(&app), None);
+        let second = current_stats(&handle(&app), None);
+        assert_eq!(first.history.len(), 1);
+        assert_eq!(
+            second.history.len(),
+            1,
+            "the second call is inside the 4 s gap"
+        );
+        assert_eq!(second.history[0].t, first.history[0].t);
+    }
+
+    #[test]
+    fn r40_a_console_sample_is_added_again_after_the_gap() {
+        let app = app();
+        let _fake = java_console(&app);
+        let first = current_stats(&handle(&app), None);
+        std::thread::sleep(std::time::Duration::from_millis(4_100));
+        let second = current_stats(&handle(&app), None);
+        assert_eq!(first.history.len(), 1);
+        assert_eq!(second.history.len(), 2, "4.1 s later the sample is kept");
+        assert!(second.history[1].t >= second.history[0].t + 4_000);
+    }
+
+    fn check_shape_figures(value: &Value) {
+        assert_eq!(value["uptimeMs"], json!(28_800_000));
+        assert_eq!(value["uptimeResolutionMs"], json!(3_600_000));
+        assert_eq!(value["floodfills"], json!(1570));
+        assert_eq!(value["activePeers"], json!(1678));
+        assert_eq!(value["knownRouters"], json!(4905));
+        assert_eq!(value["networkStatus"], json!("OK"));
+    }
+
+    fn check_shape_groups(value: &Value) {
+        assert_eq!(value["tunnels"]["participating"], json!(398));
+        assert_eq!(value["tunnels"]["client"], json!(2));
+        assert_eq!(value["tunnels"]["exploratory"], json!(11));
+        assert_eq!(value["tunnels"]["in"], Value::Null);
+        assert_eq!(value["tunnels"]["out"], Value::Null);
+        assert_eq!(value["bandwidthBytesPerSecond"]["in1s"], json!(53_910));
+        assert_eq!(value["bandwidthBytesPerSecond"]["out5m"], json!(33_060));
+        assert_eq!(value["tunnelBuildSuccessPercent"]["total"], Value::Null);
+        assert_eq!(value["version"], Value::Null);
+    }
+
+    fn check_shape_history(value: &Value) {
+        let history = value["history"].as_array().unwrap();
+        assert_eq!(history.len(), 1);
+        assert_eq!(history[0]["in"], json!(53_910));
+        assert_eq!(history[0]["out"], json!(37_370));
+        assert!(history[0]["t"].is_u64());
+    }
+
+    #[test]
+    fn r41_the_router_stats_command_answers_the_contract_v1_6_shape() {
+        // R39, R41, IPC contract v1.7: camelCase keys, the new fields, history samples.
+        let app = app();
+        let _fake = java_console(&app);
+        let value = ok(&app, "router_stats", json!({}));
+        check_shape_figures(&value);
+        check_shape_groups(&value);
+        check_shape_history(&value);
+    }
+
+    #[test]
+    fn r41_the_router_stats_command_with_no_source_answers_all_null() {
+        let app = app();
+        let value = ok(&app, "router_stats", json!({}));
+        for key in [
+            "uptimeMs",
+            "uptimeResolutionMs",
+            "floodfills",
+            "activePeers",
+            "version",
+        ] {
+            assert_eq!(value[key], Value::Null, "{key}");
+        }
+        assert_eq!(value["tunnels"]["client"], Value::Null);
+        assert_eq!(value["tunnelBuildSuccessPercent"]["total"], Value::Null);
+        assert_eq!(value["history"], json!([]));
+    }
+
+    // ------------------------------------------------ R45: no console request after stop
+
+    const HELPER_JSON: &str = r#"{"version":"helper-2.10.0","uptimeMs":5000}"#;
+
+    /// Calls `stop` when dropped, also when the test fails, so the loops that `detect_now`
+    /// starts never keep probing the ports during the next test.
+    struct StopOnDrop(AppHandle<Mock>);
+
+    impl Drop for StopOnDrop {
+        fn drop(&mut self) {
+            stop(&self.0);
+        }
+    }
+
+    /// An app with a stored Java console, stopped. The fake has seen no request since.
+    fn stopped_app() -> (App<Mock>, FakeConsole, usize) {
+        let app = app();
+        let fake = java_console(&app);
+        stop(&handle(&app));
+        let seen = fake.requests().len();
+        (app, fake, seen)
+    }
+
+    #[test]
+    fn r45_after_stop_current_stats_sends_no_request_to_the_console() {
+        let (app, fake, seen) = stopped_app();
+        let _ = current_stats(&handle(&app), None);
+        let _ = current_stats(&handle(&app), None);
+        assert_eq!(
+            fake.requests().len(),
+            seen,
+            "requests after stop: {:?}",
+            fake.requests()
+        );
+    }
+
+    #[test]
+    fn r45_after_stop_with_no_helper_every_field_is_null_and_the_history_is_empty() {
+        let (app, _fake, _) = stopped_app();
+        let stats = current_stats(&handle(&app), None);
+        assert_eq!(stats, RouterStats::default());
+    }
+
+    #[test]
+    fn r45_after_stop_the_router_stats_command_answers_all_null_and_asks_no_console() {
+        let (app, fake, seen) = stopped_app();
+        let value = ok(&app, "router_stats", json!({}));
+        assert_eq!(fake.requests().len(), seen);
+        assert_eq!(value["tunnels"]["participating"], Value::Null);
+        assert_eq!(value["uptimeMs"], Value::Null);
+        assert_eq!(value["history"], json!([]));
+    }
+
+    #[test]
+    fn r45_after_stop_a_helper_that_answers_still_gives_the_figures_and_no_console_sample() {
+        let (app, fake, seen) = stopped_app();
+        let helper = FakeHelper::serving(HELPER_JSON);
+        let stats = current_stats(&handle(&app), Some((helper.addr(), "token".into())));
+        assert_eq!(stats.version.as_deref(), Some("helper-2.10.0"));
+        assert_eq!(stats.uptime_ms, Some(5_000));
+        assert_eq!(stats.tunnels.participating, None, "no console figure");
+        assert_eq!(fake.requests().len(), seen, "the console is not asked");
+        assert!(
+            stats.history.iter().all(|s| s.inbound != 53_910),
+            "no console sample: {:?}",
+            stats.history
+        );
+    }
+
+    #[test]
+    fn r45_after_stop_a_helper_that_does_not_answer_gives_all_null_not_the_console() {
+        let (app, fake, seen) = stopped_app();
+        let dead = Some((dead_addr(), "token".into()));
+        let stats = current_stats(&handle(&app), dead);
+        assert_eq!(stats, RouterStats::default());
+        assert_eq!(fake.requests().len(), seen);
+    }
+
+    #[test]
+    fn r45_after_detect_now_the_console_is_queried_again() {
+        // R45: "until `detect_now` runs again". `detect_now` probes the default ports and
+        // stores what it finds; the stored console is then the fake.
+        let _lock = detect_lock();
+        let (app, fake, _) = stopped_app();
+        let _guard = StopOnDrop(handle(&app));
+        let _ = detect_now(&handle(&app));
+        set_console(app.handle(), Some(fake.verified()));
+        let before = stats_requests(&fake);
+        let stats = current_stats(&handle(&app), None);
+        assert_eq!(stats_requests(&fake), before + 1, "one request again");
+        assert_eq!(stats.tunnels.participating, Some(398));
+    }
 }
