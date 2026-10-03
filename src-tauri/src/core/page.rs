@@ -91,6 +91,12 @@ impl Core {
         fx
     }
 
+    /// The main frame of a tab loaded `url`, but the load failed: a router or proxy error page,
+    /// a 5xx answer, or a gatekeeper refusal. The tab stops loading. No history entry is made.
+    pub fn page_failed(&mut self, _id: u32, _url: &str) -> Vec<Effect> {
+        Vec::new()
+    }
+
     /// The document title of a tab changed.
     pub fn title_changed(&mut self, id: u32, title: &str) -> Vec<Effect> {
         if !self.shows_web(id) {

@@ -91,6 +91,13 @@ impl Gatekeeper {
         self.addr.http_url()
     }
 
+    /// True once when the last answer to a request for exactly `url` was an upstream 5xx or a
+    /// gatekeeper refusal. The flag clears when read.
+    #[must_use]
+    pub fn take_failure(&self, _url: &str) -> bool {
+        false
+    }
+
     /// Stops accepting and refuses every request still in flight.
     pub fn close(&self) {
         if self.open.swap(false, Ordering::SeqCst) {

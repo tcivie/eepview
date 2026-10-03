@@ -18,6 +18,7 @@ pub mod shortcuts;
 pub mod store;
 pub mod suggest;
 pub mod tabs;
+pub mod theme;
 pub mod types;
 
 /// Starts the eepview application and blocks until it exits.

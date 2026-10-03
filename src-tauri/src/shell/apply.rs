@@ -13,7 +13,7 @@ use tauri::{AppHandle, Emitter, Manager, Runtime, Url, Webview};
 use super::content::ContentWebview;
 use super::state::{lock, shared};
 use super::{engine, log, view};
-use crate::core::{Core, Effect, Event, Load, WebOp};
+use crate::core::{Core, Effect, Event, Load, View, WebOp};
 use crate::hover::SHOW_DELAY_MS;
 
 /// The webviews that receive contract events.
@@ -53,19 +53,35 @@ pub fn outside(f: impl FnOnce() + Send + 'static) {
 
 /// Carries out `fx` now. Call on the main thread.
 pub fn apply<R: Runtime>(app: &AppHandle<R>, fx: Vec<Effect>) {
-    let mut relayout = false;
+    let (mut relayout, mut focus) = (false, false);
     for effect in fx {
         relayout |= matches!(effect, Effect::Layout | Effect::Web(_));
         match effect {
             Effect::Emit(event) => emit(app, &event),
             Effect::Web(op) => web(app, op),
             Effect::FocusToolbar => focus_toolbar(app),
+            Effect::FocusContent => focus = true,
             Effect::HoverLater(generation) => show_later(app, generation),
             Effect::Layout => {}
         }
     }
     if relayout {
         view::sync(app);
+    }
+    if focus {
+        // After the layout: the view that shows now is the one that takes the keys.
+        focus_content(app);
+    }
+}
+
+/// Gives keyboard focus to the webview the content area shows.
+fn focus_content<R: Runtime>(app: &AppHandle<R>) {
+    let label = match lock(&shared(app).core).view() {
+        View::Web(tab) => tab_webview(app, tab).map(|w| w.label().to_owned()),
+        View::Internal(_) => Some("internal".to_owned()),
+    };
+    if let Some(webview) = label.and_then(|l| app.get_webview(&l)) {
+        let _ = webview.set_focus();
     }
 }
 

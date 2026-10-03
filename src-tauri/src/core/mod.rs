@@ -50,6 +50,8 @@ pub enum Effect {
     Web(WebOp),
     /// Give keyboard focus to the toolbar.
     FocusToolbar,
+    /// Give keyboard focus to the content area (the web tab or the internal page shown).
+    FocusContent,
     /// Lay the webviews out again and show the right one.
     Layout,
     /// Call [`Core::hover_expire`] with this generation after the show delay.
