@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>probe frame __MODE__</title>
+  </head>
+  <body>
+    <script>
+      const M = "__MODE__";
+      const rep = (k, v) =>
+        fetch(`/report?mode=${M}&k=${k}&v=${encodeURIComponent(v)}`).catch(() => {});
+
+      async function webrtc() {
+        rep("frame_rtc_type", typeof window.RTCPeerConnection);
+        if (typeof window.RTCPeerConnection !== "function") return;
+        const pc = new RTCPeerConnection({ iceServers: [{ urls: "stun:127.0.0.1:__UDP__" }] });
+        const found = [];
+        pc.onicecandidate = (e) => e.candidate && found.push(e.candidate.candidate);
+        pc.createDataChannel("probe");
+        await pc.setLocalDescription(await pc.createOffer());
+        setTimeout(() => rep("frame_rtc_candidates", JSON.stringify(found)), 4000);
+      }
+
+      webrtc().catch((e) => rep("frame_rtc_error", String(e)));
+    </script>
+  </body>
+</html>

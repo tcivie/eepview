@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>probe __MODE__</title>
+    <link rel="dns-prefetch" href="//dnspf-__MODE__.clear.example" />
+    <link rel="preconnect" href="http://preconnect-__MODE__.clear.example" />
+    <link rel="prefetch" href="http://prefetch-__MODE__.clear.example/p" />
+  </head>
+  <body>
+    <h1>eepview probe — __MODE__</h1>
+    <noscript><img src="/report?mode=__MODE__&k=js&v=off" alt="" /></noscript>
+    <img src="http://img-http-__MODE__.clear.example/i.png" alt="" />
+    <img src="https://img-https-__MODE__.clear.example/i.png" alt="" />
+    <iframe src="http://frame.probe.i2p/frame.html?mode=__MODE__" title="frame"></iframe>
+    <script>
+      const M = "__MODE__";
+      const rep = (k, v) =>
+        fetch(`/report?mode=${M}&k=${k}&v=${encodeURIComponent(v)}`).catch(() => {});
+      const probe = (name, url) =>
+        fetch(url, { mode: "no-cors" })
+          .then(() => rep(name, "resolved"))
+          .catch(() => rep(name, "rejected"));
+
+      async function webrtc(prefix) {
+        rep(`${prefix}rtc_type`, typeof window.RTCPeerConnection);
+        if (typeof window.RTCPeerConnection !== "function") return;
+        const pc = new RTCPeerConnection({ iceServers: [{ urls: "stun:127.0.0.1:__UDP__" }] });
+        const found = [];
+        pc.onicecandidate = (e) => e.candidate && found.push(e.candidate.candidate);
+        pc.createDataChannel("probe");
+        await pc.setLocalDescription(await pc.createOffer());
+        setTimeout(() => {
+          rep(`${prefix}rtc_candidates`, JSON.stringify(found));
+          pc.close();
+        }, 4000);
+      }
+
+      rep("js", "on");
+      probe("lb_ip", `http://127.0.0.1:__CANARY__/lb-ip-${M}`);
+      probe("lb_name", `http://localhost:__CANARY__/lb-name-${M}`);
+      probe("clear_ip", `http://203.0.113.7/ip-${M}`);
+      try {
+        const ws = new WebSocket(`ws://ws-${M}.clear.example/`);
+        ws.onerror = () => rep("ws", "error");
+      } catch (e) {
+        rep("ws", `throw ${e}`);
+      }
+      webrtc("").catch((e) => rep("rtc_error", String(e)));
+    </script>
+  </body>
+</html>

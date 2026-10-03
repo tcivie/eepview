@@ -1,0 +1,23 @@
+[package]
+name = "eepview-probe"
+version = "0.0.0"
+description = "Spike: does the system WebView send all traffic through the proxy?"
+license = "MIT"
+edition = "2024"
+rust-version = "1.96"
+publish = false
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["macos-proxy"] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+webkit2gtk = "2"
+
+[lints.rust]
+unsafe_code = "deny"
+
+[lints.clippy]
+pedantic = { level = "warn", priority = -1 }
