@@ -1,12 +1,16 @@
+//! eepview: a browser that opens I2P sites only.
+
+pub mod nav;
+pub mod net;
+pub mod session;
+pub mod tabs;
+pub mod types;
+
 /// Starts the eepview application and blocks until it exits.
 ///
-/// # Panics
+/// # Errors
 ///
-/// Panics if Tauri cannot start the application, for example when the
-/// system web view is missing.
-#[cfg_attr(mobile, tauri::mobile_entry_point)]
-pub fn run() {
-    tauri::Builder::default()
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+/// Fails when Tauri cannot start, for example when the system web view is missing.
+pub fn run() -> tauri::Result<()> {
+    tauri::Builder::default().run(tauri::generate_context!())
 }
