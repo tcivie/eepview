@@ -12,6 +12,7 @@ Working rules for any human or AI agent on this repo.
 - Keep the branch up to date with main.
 - Before you finish, fix and resolve every review thread. Zero unresolved.
 - Before you finish, make sure every required check is green.
+- Own your PR until it is merged. Do not stop while it is open: update the branch when it is behind, fix failing checks, and fix and resolve every review thread. Spike PRs are the exception: they close with a comment that says where the findings live.
 
 ## Quality
 
