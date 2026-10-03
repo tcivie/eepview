@@ -236,18 +236,36 @@ proptest! {
         }
     }
 
-    // Req: PO decision "CONNECT only to :443" and ADR L1 "everything else gets 403": a CONNECT
-    // is relayed only to an I2P host on port 443, and only where TLS tunnels are open.
+    // Req: ADR L1 "CONNECT goes only to *.i2p:80 (terminated and checked) or *.i2p:443 (relayed
+    // only where TLS tunnels are open); everything else gets 403" (PO ruling: 80 and 443,
+    // every other port refused).
     #[test]
-    fn connect_only_to_i2p_port_443(host in tricky(), port in 0u32..70000, allow_tls in any::<bool>()) {
+    fn connect_only_to_i2p_ports_80_and_443(host in tricky(), port in 0u32..70000, allow_tls in any::<bool>()) {
         let text = format!("CONNECT {host}:{port} HTTP/1.1\r\n\r\n");
         let Some(head) = head_of(&text) else { return Ok(()); };
         match plan(&head, allow_tls) {
+            Plan::Terminate { host: h } => prop_assert!(port == 80 && is_i2p_host(&h)),
             Plan::Relay { host: h } => prop_assert!(allow_tls && port == 443 && is_i2p_host(&h)),
-            Plan::Terminate { .. } => prop_assert!(false, "CONNECT to port {port} terminated"),
             Plan::Http { .. } => prop_assert!(false, "CONNECT planned as plain HTTP"),
             Plan::Refuse(_) => {}
         }
+    }
+
+    // Req: the same rule, from the accepting side: an I2P host on port 80 is always accepted,
+    // on port 443 when TLS tunnels are open, and any other port is refused.
+    #[test]
+    fn connect_to_i2p_ports_is_decided_by_port(host in plain_i2p_host(), port in 0u32..70000) {
+        prop_assume!(is_i2p_host(&host));
+        let head = head_of(&format!("CONNECT {host}:{port} HTTP/1.1\r\n\r\n"))
+            .ok_or_else(|| TestCaseError::fail("unparsable"))?;
+        let open = plan(&head, true);
+        let closed = plan(&head, false);
+        let right = match port {
+            80 => matches!((&open, &closed), (Plan::Terminate { .. }, Plan::Terminate { .. })),
+            443 => matches!((&open, &closed), (Plan::Relay { .. }, Plan::Refuse(_))),
+            _ => matches!((&open, &closed), (Plan::Refuse(_), Plan::Refuse(_))),
+        };
+        prop_assert!(right, "port {port}: {open:?} / {closed:?}");
     }
 
     // Req: the planner and the parser never panic on arbitrary bytes (a malformed request head
