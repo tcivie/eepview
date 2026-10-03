@@ -80,7 +80,7 @@ fn find_text<R: Runtime>(webview: &Webview<R>, tab: u32, find: &FindOp) -> tauri
     let app = webview.app_handle().clone();
     webview.with_webview(move |platform| {
         if !eepview_platform::find(&platform, &request, count_callback(&app, tab)) {
-            find_by_script(&live, tab, &find);
+            super::apply::outside(move || find_by_script(&live, tab, &find));
         }
     })
 }

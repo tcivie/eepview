@@ -274,3 +274,24 @@ fn host_scan_finds_clearnet_names() {
     assert!(foreign_hosts("http://proxy.i2p/ HTTP/1.1 127.0.0.1").is_empty());
     assert!(foreign_hosts("I2P HTTP proxy OK, text/html").is_empty());
 }
+
+#[test]
+fn nested_webview_calls_leave_the_with_webview_closure() {
+    // A Tauri webview call inside a `with_webview` closure deadlocks on Linux and Windows
+    // (the dispatcher holds its window lock). These call sites must hop to another thread.
+    for (file, call) in [
+        ("src/shell/content.rs", "webview.navigate(url)"),
+        ("src/shell/engine.rs", "find_by_script(&live"),
+        ("src/shell/view.rs", "store_buttons(&handle"),
+    ] {
+        let text = code(&root().join(file)).unwrap().join("\n");
+        let at = text
+            .find(call)
+            .unwrap_or_else(|| panic!("{file}: {call} not found"));
+        let before = &text[at.saturating_sub(120)..at];
+        assert!(
+            before.contains("outside(move ||"),
+            "{file}: {call} must run in apply::outside"
+        );
+    }
+}

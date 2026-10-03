@@ -5,13 +5,14 @@ SPDX-License-Identifier: MIT
 
 # IPC contract
 
-Version 1.2. The Rust shell (`src-tauri/`) and the UI (`src/ui/`) build against this page.
+Version 1.3. The Rust shell (`src-tauri/`) and the UI (`src/ui/`) build against this page.
 Change it in a PR that changes both sides, or keep the old form working as a shim.
 
 ## History
 
 - v1: first contract.
 - v1.1: argument names, `chrome_set_height`, `platform`, `router_stats`, `bookmarks_export_file`, history cursors, `link-hover`, `fullscreen-changed`, `toast`.
+- v1.3: `chrome_insets`, `chrome-insets-changed`.
 - v1.2: `connection_pause`, `connection_resume`, `router_control`, `RouterStatus.paused` and `.managed`, `RouterStats.history`. The `outproxy` state is gone: VERIFY no longer asks for a clearnet host.
 - Shipped in [#29](https://github.com/tcivie/eepview/pull/29).
 
@@ -96,6 +97,7 @@ At most 10 000 entries. Nothing is recorded while `history.enabled` is false.
 
 - `chrome_set_height(px)`: the toolbar grows over the content while a popup (suggestions, router panel) is open. The content does not move. `0` goes back to the default. Clamped to 84–480.
 - `platform() -> "macos" | "windows" | "linux"`
+- `chrome_insets() -> {left: number}`: the space the tab strip leaves on the left for the macOS window buttons. The shell centers the buttons on the tab row (y = 22), measures their frames, and answers their right edge plus their left margin, so the gap after the buttons equals the margin before them. 0 in full screen, and 0 on Windows and Linux (native title bar; the UI picks its own margin).
 
 ## Events
 
@@ -110,6 +112,7 @@ Rust sends them to `toolbar`, `internal` and `status`.
 - `toast: {kind: "info" | "warn", text}`: refused downloads, new windows and in-page navigations.
 - `link-hover: {text, blocked}`: the link under the mouse, already decoded and shortened to about 80 characters. `blocked: true` for a link that would be refused (`text` = `Blocked: <host>`). `text` is `Loading <host>…` while a page loads, and empty when there is nothing to show. It shows at once and hides after 150 ms.
 - `fullscreen-changed: boolean`
+- `chrome-insets-changed: {left: number}`: on full screen enter and exit, and when the scale factor or the button frames change.
 
 ## Types
 

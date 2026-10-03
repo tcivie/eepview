@@ -12,6 +12,19 @@ pub const TOOLBAR_FIND: f64 = 124.0;
 pub const TOOLBAR_MAX: f64 = 480.0;
 /// Status bubble height.
 pub const STATUS_HEIGHT: f64 = 24.0;
+/// The vertical center of the 44 px tab row, where the macOS window buttons sit.
+pub const TAB_ROW_CENTER: f64 = 22.0;
+
+/// The space the tab strip leaves for the window buttons: their right edge plus a gap equal
+/// to their left margin, so the gap after them matches the margin before them. 0 without
+/// buttons (a native title bar) and in full screen.
+#[must_use]
+pub fn chrome_inset(buttons: Option<(f64, f64)>, fullscreen: bool) -> f64 {
+    match buttons {
+        Some((left, right)) if !fullscreen => (right + left).max(0.0),
+        _ => 0.0,
+    }
+}
 const STATUS_CHAR: f64 = 7.0;
 const STATUS_PAD: f64 = 20.0;
 
@@ -80,6 +93,13 @@ pub fn status(content: Rect, chars: usize) -> Rect {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn inset_mirrors_the_left_margin() {
+        assert!((chrome_inset(Some((14.0, 66.0)), false) - 80.0).abs() < f64::EPSILON);
+        assert!(chrome_inset(Some((14.0, 66.0)), true).abs() < f64::EPSILON);
+        assert!(chrome_inset(None, false).abs() < f64::EPSILON);
+    }
 
     #[test]
     fn toolbar_heights() {

@@ -18,9 +18,12 @@ use objc2_web_kit::{
     WKUserScriptInjectionTime, WKWebView,
 };
 
+use objc2_app_kit::{NSButton, NSView, NSWindow, NSWindowButton};
+use objc2_foundation::NSRect;
+
 use crate::{
     CLEAR_SELECTION_SCRIPT, FindRequest, HOVER_CHANNEL, HOVER_SCRIPT, Nav, PlatformWebview, Rules,
-    count_script, hover_target,
+    WindowButtons, count_script, hover_target,
 };
 
 /// The identifier of the compiled rule list in the default store.
@@ -294,4 +297,77 @@ pub fn harden(webview: &PlatformWebview) -> Result<(), String> {
     // SAFETY: setter on live preferences.
     unsafe { preferences.setFraudulentWebsiteWarningEnabled(false) };
     Ok(())
+}
+
+/// The `NSWindow` of a Tauri webview.
+fn ns_window(webview: &PlatformWebview) -> Option<Retained<NSWindow>> {
+    MainThreadMarker::new()?;
+    let ptr = webview.ns_window().cast::<NSWindow>();
+    // SAFETY: `PlatformWebview::ns_window` is the live window of this webview (Tauri keeps it
+    // alive while `with_webview` runs), and we are on the main thread.
+    unsafe { Retained::retain(ptr) }
+}
+
+/// The superview of `view`.
+fn parent(view: &NSView) -> Option<Retained<NSView>> {
+    // SAFETY: a plain getter on a live view on the main thread.
+    unsafe { view.superview() }
+}
+
+/// Moves the traffic lights so their center is `center_y` points below the window top.
+pub fn place_window_buttons(webview: &PlatformWebview, center_y: f64) -> Option<WindowButtons> {
+    let window = ns_window(webview)?;
+    let kinds = [
+        NSWindowButton::CloseButton,
+        NSWindowButton::MiniaturizeButton,
+        NSWindowButton::ZoomButton,
+    ];
+    let buttons: Vec<Retained<NSButton>> = kinds
+        .iter()
+        .filter_map(|k| window.standardWindowButton(*k))
+        .collect();
+    let (first, last) = (buttons.first()?, buttons.last()?);
+    grow_title_bar(&window, first, center_y);
+    for button in &buttons {
+        center_button(&window, button, center_y);
+    }
+    Some(measure(&window, first, last))
+}
+
+/// Makes the title bar container tall enough to hold buttons centered at `center_y`.
+fn grow_title_bar(window: &NSWindow, button: &NSButton, center_y: f64) {
+    let Some(container) = parent(button).and_then(|bar| parent(&bar)) else {
+        return;
+    };
+    let mut frame = container.frame();
+    frame.size.height = (center_y * 2.0).max(frame.size.height);
+    frame.origin.y = window.frame().size.height - frame.size.height;
+    container.setFrame(frame);
+}
+
+/// Moves one button vertically; its left edge stays.
+fn center_button(window: &NSWindow, button: &NSButton, center_y: f64) {
+    let Some(bar) = parent(button) else {
+        return;
+    };
+    let size = button.frame().size;
+    let top = center_y - size.height / 2.0;
+    let mut target = button.convertRect_toView(button.bounds(), None);
+    target.origin.y = window.frame().size.height - top - size.height;
+    let local = bar.convertRect_fromView(target, None);
+    let mut origin = button.frame().origin;
+    origin.y = local.origin.y;
+    button.setFrameOrigin(origin);
+}
+
+/// The frames of the first and last button, in top-left window points.
+fn measure(window: &NSWindow, first: &NSButton, last: &NSButton) -> WindowButtons {
+    let height = window.frame().size.height;
+    let a: NSRect = first.convertRect_toView(first.bounds(), None);
+    let b: NSRect = last.convertRect_toView(last.bounds(), None);
+    WindowButtons {
+        left: a.origin.x,
+        right: b.origin.x + b.size.width,
+        center_y: height - (a.origin.y + a.size.height / 2.0),
+    }
 }

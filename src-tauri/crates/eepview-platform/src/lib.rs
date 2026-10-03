@@ -61,6 +61,17 @@ pub struct FindRequest {
     pub fresh: bool,
 }
 
+/// The window buttons (traffic lights) in window points, measured from the top-left corner.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct WindowButtons {
+    /// Left edge of the close button.
+    pub left: f64,
+    /// Right edge of the zoom button.
+    pub right: f64,
+    /// Vertical center of the buttons.
+    pub center_y: f64,
+}
+
 /// The rules of [`attach_rules`].
 #[derive(Debug, Clone, Copy)]
 pub struct Rules<'a> {
@@ -182,6 +193,14 @@ pub fn find(
 /// Ends a find: clears the highlight.
 pub fn find_clear(webview: &PlatformWebview) {
     imp::find_clear(webview);
+}
+
+/// Moves the window buttons so their center sits at `center_y` points from the top of the
+/// window (their left edge stays), then reads their frames back. `None` where the window
+/// has no such buttons (Windows and Linux keep a native title bar).
+#[must_use]
+pub fn place_window_buttons(webview: &PlatformWebview, center_y: f64) -> Option<WindowButtons> {
+    imp::place_window_buttons(webview, center_y)
 }
 
 /// Turns off engine features that call home or leak (see the table above).

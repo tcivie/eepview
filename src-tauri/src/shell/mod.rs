@@ -54,9 +54,16 @@ pub fn run() -> tauri::Result<()> {
 
 /// A window resize lays the webviews out again.
 fn on_window_event<R: Runtime>(handle: &AppHandle<R>, event: &WindowEvent) {
-    if matches!(event, WindowEvent::Resized(_)) {
-        view::sync(handle);
-        view::check_fullscreen(handle);
+    match event {
+        WindowEvent::Resized(_) => {
+            view::sync(handle);
+            view::check_fullscreen(handle);
+            view::place_buttons(handle);
+        }
+        WindowEvent::ScaleFactorChanged { .. } | WindowEvent::Focused(_) => {
+            view::place_buttons(handle);
+        }
+        _ => {}
     }
 }
 
@@ -102,6 +109,7 @@ macro_rules! contract_handler {
             commands::router_control,
             commands::chrome_set_height,
             commands::platform,
+            commands::chrome_insets,
         ]
     };
 }
@@ -160,6 +168,7 @@ fn new_core(paths: Option<Paths>, proxy: &str, js_off: bool) -> Core {
 fn start<R: Runtime>(app: &mut App<R>, inputs: Inputs) -> tauri::Result<()> {
     chrome::build(app)?;
     let handle = app.handle().clone();
+    view::place_buttons(&handle);
     open_start_urls(&handle, &inputs.urls);
     watch::start(&handle, inputs.proxy);
     if let Some(seconds) = inputs.exit_after {

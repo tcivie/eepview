@@ -20,8 +20,8 @@ use crate::store::bookmarks::export_file_name;
 use crate::store::settings::Settings;
 use crate::tabs::Place;
 use crate::types::{
-    Bookmark, ControlResult, HistoryEntry, HistoryQuery, NavResult, NewBookmark, RouterStatus,
-    Suggestion, TabInfo,
+    Bookmark, ChromeInsets, ControlResult, HistoryEntry, HistoryQuery, NavResult, NewBookmark,
+    RouterStatus, Suggestion, TabInfo,
 };
 
 type Res<T> = Result<T, String>;
@@ -360,6 +360,16 @@ pub fn router_control(action: &str) -> Res<ControlResult> {
 #[tauri::command]
 pub fn chrome_set_height<R: Runtime>(app: AppHandle<R>, px: f64) {
     act(app, move |c| c.set_toolbar_request(px));
+}
+
+/// `chrome_insets()`: the space the tab strip leaves for the macOS window buttons (0 in
+/// full screen and on Windows and Linux).
+#[tauri::command]
+#[must_use]
+pub fn chrome_insets<R: Runtime>(app: AppHandle<R>) -> ChromeInsets {
+    let insets = super::view::chrome_insets(&app);
+    drop(app);
+    insets
 }
 
 /// `platform()`: `macos`, `windows` or `linux`.

@@ -41,6 +41,7 @@ const COMMANDS: &[&str] = &[
     "router_control",
     "chrome_set_height",
     "platform",
+    "chrome_insets",
 ];
 
 fn main() {

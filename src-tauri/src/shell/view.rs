@@ -8,11 +8,14 @@ use tauri::{
     Window,
 };
 
+use std::sync::atomic::Ordering;
+
 use super::state::{lock, shared};
 use crate::core::View;
 use crate::hover::HoverText;
 use crate::layout::{self, Rect};
 use crate::nav::internal_file;
+use crate::types::ChromeInsets;
 
 /// The main window size in logical pixels.
 fn window_size<R: Runtime>(window: &Window<R>) -> (f64, f64) {
@@ -156,26 +159,66 @@ pub fn remember_base<R: Runtime>(app: &AppHandle<R>, toolbar: &Webview<R>) {
     }
 }
 
-/// Sends `fullscreen-changed` when the window enters or leaves full screen (the UI drops the
-/// traffic-light inset in full screen).
+/// Sends `fullscreen-changed` when the window enters or leaves full screen, and
+/// `chrome-insets-changed` when the button inset moves with it.
 pub fn check_fullscreen<R: Runtime>(app: &AppHandle<R>) {
     let Some(window) = app.get_window("main") else {
         return;
     };
+    let insets = chrome_insets(app);
     let now = window.is_fullscreen().unwrap_or(false);
-    let before = shared(app)
-        .fullscreen
-        .swap(now, std::sync::atomic::Ordering::SeqCst);
+    let before = shared(app).fullscreen.swap(now, Ordering::SeqCst);
     if now != before {
-        for label in ["toolbar", "internal"] {
-            let _ = tauri::Emitter::emit_to(app, label, "fullscreen-changed", now);
-        }
+        emit_chrome(app, "fullscreen-changed", now);
+    }
+    emit_insets_if_moved(app, insets);
+}
+
+/// The current `chrome_insets()` answer.
+pub fn chrome_insets<R: Runtime>(app: &AppHandle<R>) -> ChromeInsets {
+    let state = shared(app);
+    let buttons = *lock(&state.buttons);
+    ChromeInsets {
+        left: layout::chrome_inset(buttons, state.fullscreen.load(Ordering::SeqCst)),
+    }
+}
+
+/// Puts the macOS window buttons on the tab row center, then measures them. `AppKit` lays the
+/// title bar out again on resizes and focus changes, so this runs after each of them.
+pub fn place_buttons<R: Runtime>(app: &AppHandle<R>) {
+    let Some(toolbar) = app.get_webview("toolbar") else {
+        return;
+    };
+    let handle = app.clone();
+    let _ = toolbar.with_webview(move |platform| {
+        let buttons = eepview_platform::place_window_buttons(&platform, layout::TAB_ROW_CENTER);
+        let edges = buttons.map(|b| (b.left, b.right));
+        super::apply::outside(move || store_buttons(&handle, edges));
+    });
+}
+
+/// Records measured button edges and tells the UI when the inset moved.
+pub fn store_buttons<R: Runtime>(app: &AppHandle<R>, buttons: Option<(f64, f64)>) {
+    let insets = chrome_insets(app);
+    *lock(&shared(app).buttons) = buttons;
+    emit_insets_if_moved(app, insets);
+}
+
+fn emit_insets_if_moved<R: Runtime>(app: &AppHandle<R>, before: ChromeInsets) {
+    let now = chrome_insets(app);
+    if now != before {
+        emit_chrome(app, "chrome-insets-changed", now);
+    }
+}
+
+fn emit_chrome<R: Runtime, S: serde::Serialize + Clone>(app: &AppHandle<R>, name: &str, body: S) {
+    for label in ["toolbar", "internal"] {
+        let _ = tauri::Emitter::emit_to(app, label, name, body.clone());
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::sync::atomic::Ordering;
 
     use super::*;
     use crate::core::router::status_of;
@@ -202,6 +245,18 @@ mod tests {
             .url()
             .unwrap()
             .to_string()
+    }
+
+    #[test]
+    fn insets_follow_buttons_and_fullscreen() {
+        let app = bare();
+        let handle = app.handle();
+        assert!(chrome_insets(handle).left.abs() < f64::EPSILON);
+        store_buttons(handle, Some((14.0, 66.0)));
+        assert!((chrome_insets(handle).left - 80.0).abs() < f64::EPSILON);
+        shared(handle).fullscreen.store(true, Ordering::SeqCst);
+        assert!(chrome_insets(handle).left.abs() < f64::EPSILON);
+        place_buttons(handle);
     }
 
     #[test]

@@ -28,6 +28,8 @@ pub struct Shared<R: Runtime> {
     pub stop_item: Mutex<Option<MenuItem<R>>>,
     /// The last full-screen state sent to the UI.
     pub fullscreen: AtomicBool,
+    /// The window-button frames last measured (left edge, right edge), macOS only.
+    pub buttons: Mutex<Option<(f64, f64)>>,
     generation: AtomicU64,
 }
 
@@ -42,6 +44,7 @@ impl<R: Runtime> Shared<R> {
             base: Mutex::new(None),
             stop_item: Mutex::new(None),
             fullscreen: AtomicBool::new(false),
+            buttons: Mutex::new(None),
             generation: AtomicU64::new(0),
         }
     }

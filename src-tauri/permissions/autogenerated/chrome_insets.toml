@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-chrome-insets"
+description = "Enables the chrome_insets command without any pre-configured scope."
+commands.allow = ["chrome_insets"]
+
+[[permission]]
+identifier = "deny-chrome-insets"
+description = "Denies the chrome_insets command without any pre-configured scope."
+commands.deny = ["chrome_insets"]

@@ -135,11 +135,12 @@ fn load_after_rules<R: Runtime>(
     url: Url,
 ) -> Box<dyn FnOnce(Result<(), String>)> {
     Box::new(move |result| match result {
-        Ok(()) => {
+        // Linux, Windows and a cached macOS rule list call this inside `with_webview`.
+        Ok(()) => apply::outside(move || {
             if let Err(e) = webview.navigate(url) {
                 super::log::error("first load", &e.to_string());
             }
-        }
+        }),
         Err(e) => super::log::error("engine filter, page not loaded", &e),
     })
 }

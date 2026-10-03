@@ -225,6 +225,14 @@ pub struct FindResult {
     pub active: Option<u32>,
 }
 
+/// `chrome_insets()` and the `chrome-insets-changed` event: the space the tab strip leaves
+/// on the left for the window buttons.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+pub struct ChromeInsets {
+    /// Points from the left window edge.
+    pub left: f64,
+}
+
 /// The `toast` event.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct Toast {

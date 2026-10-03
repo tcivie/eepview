@@ -36,6 +36,16 @@ pub fn later<R: Runtime>(app: &AppHandle<R>, fx: Vec<Effect>) {
     }
 }
 
+/// Runs `f` on a new thread. Use it for any Tauri webview call that starts inside a
+/// `with_webview` closure: Tauri holds the webview's window lock while that closure runs on
+/// the main thread, so a nested call on the same webview (`navigate`, `eval`, `emit`) waits
+/// for that lock forever. From another thread the call goes through the event loop instead.
+pub fn outside(f: impl FnOnce() + Send + 'static) {
+    if let Err(e) = thread::Builder::new().name("webview-call".into()).spawn(f) {
+        log::error("thread", &e.to_string());
+    }
+}
+
 /// Carries out `fx` now. Call on the main thread.
 pub fn apply<R: Runtime>(app: &AppHandle<R>, fx: Vec<Effect>) {
     let mut relayout = false;

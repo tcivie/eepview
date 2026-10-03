@@ -9,7 +9,7 @@ use std::rc::Rc;
 use webkit2gtk::glib::ObjectExt;
 use webkit2gtk::{FindControllerExt, FindOptions, HitTestResultExt, SettingsExt, WebViewExt};
 
-use crate::{FindRequest, Nav, PlatformWebview, Rules};
+use crate::{FindRequest, Nav, PlatformWebview, Rules, WindowButtons};
 
 /// No request filter: webkit2gtk has no binding for one, and the engine makes no requests
 /// of its own (spike S1). The CSP of the gatekeeper is the L3 layer here.
@@ -99,4 +99,9 @@ pub fn harden(webview: &PlatformWebview) -> Result<(), String> {
     settings.set_enable_webrtc(false);
     settings.set_enable_media_stream(false);
     Ok(())
+}
+
+/// A native title bar: no buttons to place.
+pub fn place_window_buttons(_webview: &PlatformWebview, _center_y: f64) -> Option<WindowButtons> {
+    None
 }

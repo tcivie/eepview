@@ -14,7 +14,7 @@ use webview2_com::{
 };
 use windows_core::{Interface, PWSTR, w};
 
-use crate::{FindRequest, Nav, PlatformWebview, Rules};
+use crate::{FindRequest, Nav, PlatformWebview, Rules, WindowButtons};
 
 fn core(webview: &PlatformWebview) -> Result<ICoreWebView2, String> {
     let controller = webview.controller();
@@ -137,4 +137,9 @@ pub fn harden(webview: &PlatformWebview) -> Result<(), String> {
         .map_err(|e| e.to_string())?;
     // SAFETY: setter on live settings.
     unsafe { s8.SetIsReputationCheckingRequired(false) }.map_err(|e| e.to_string())
+}
+
+/// A native title bar: no buttons to place.
+pub fn place_window_buttons(_webview: &PlatformWebview, _center_y: f64) -> Option<WindowButtons> {
+    None
 }
