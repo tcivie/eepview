@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: 2026 The eepview contributors
+# SPDX-License-Identifier: MIT
 # Keep docs on track.
 # 1. A PR that changes code, dependencies, permissions, scripts or workflows must also change CHANGELOG.md or docs/wiki.
 # 2. Every docs/wiki page except README.md must be linked from docs/wiki/README.md.

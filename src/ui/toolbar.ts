@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The eepview contributors
+// SPDX-License-Identifier: MIT
+
 import "./boot.ts";
 import type { RouterState, TabInfo } from "./contract.ts";
 import { byId } from "./dom.ts";

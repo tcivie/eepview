@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: 2026 The eepview contributors
+# SPDX-License-Identifier: MIT
+
+version = 1
+
+# Files that cannot hold a comment header: JSON, images, lock files, text and dotfiles.
+[[annotations]]
+path = [
+  "**/*.json",
+  "**/*.png",
+  "**/*.ico",
+  "**/*.icns",
+  "**/*.lock",
+  "**/*.txt",
+  "**/.gitignore",
+  ".editorconfig",
+  ".github/CODEOWNERS",
+]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 The eepview contributors"
+SPDX-License-Identifier = "MIT"
+
+# Documentation: the wiki source and the root Markdown files.
+[[annotations]]
+path = ["**/*.md"]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 The eepview contributors"
+SPDX-License-Identifier = "MIT"

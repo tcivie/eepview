@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The eepview contributors
+// SPDX-License-Identifier: MIT
+
 export const CHROME_HEIGHT = 84;
 export const FIND_BAR_HEIGHT = 40;
 export const POPUP_MARGIN = 8;

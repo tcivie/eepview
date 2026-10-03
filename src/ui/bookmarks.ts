@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The eepview contributors
+// SPDX-License-Identifier: MIT
+
 import "./boot.ts";
 import type { Bookmark } from "./contract.ts";
 import { announce, byId, cloneTemplate, setText } from "./dom.ts";

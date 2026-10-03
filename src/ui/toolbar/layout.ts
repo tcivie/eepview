@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The eepview contributors
+// SPDX-License-Identifier: MIT
+
 import { all, byId } from "../dom.ts";
 import { call, on } from "../ipc.ts";
 import { chromeHeight } from "../lib/chrome-height.ts";

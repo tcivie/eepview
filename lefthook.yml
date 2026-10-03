@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 The eepview contributors
+# SPDX-License-Identifier: MIT
+
 # Fast checks before each commit. CI runs the full set and is the real gate.
 # Install once per clone: `lefthook install`.
 pre-commit:
@@ -23,3 +26,5 @@ pre-commit:
       run: ./scripts/complexity.sh
     - name: gitleaks
       run: gitleaks git --staged --no-banner --redact
+    - name: reuse
+      run: reuse lint

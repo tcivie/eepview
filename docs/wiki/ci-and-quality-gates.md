@@ -4,7 +4,8 @@ Every change to main passes lint, complexity limits, security scans and a rulese
 
 ## How it works
 
-- `.github/workflows/lint.yml` runs rustfmt and clippy (pedantic, `-D warnings`), biome and tsc, taplo, shellcheck, lizard complexity and actionlint.
+- `.github/workflows/lint.yml` runs rustfmt and clippy (pedantic, `-D warnings`), biome and tsc, taplo, shellcheck, lizard complexity, actionlint and `reuse lint` (SPDX headers, with `REUSE.toml` for files that cannot hold a comment). The `reuse` tool is pinned by hash in `scripts/requirements-lint.txt`.
+- `.github/workflows/dco.yml` runs the `dco` job on each PR. It checks that every commit has a `Signed-off-by` line that matches its author. Dependabot commits are skipped. It is not a required check yet.
 - `.github/workflows/ci.yml` builds and tests the app.
 - `.github/workflows/security.yml` runs cargo-deny, gitleaks and zizmor.
 - `.github/workflows/codeql.yml` runs CodeQL (`security-extended`) for actions, javascript-typescript and rust. Each matrix entry has a fixed job name, `codeql (<language>)`.
@@ -22,6 +23,8 @@ Every change to main passes lint, complexity limits, security scans and a rulese
 - Rust: `cargo fmt --manifest-path src-tauri/Cargo.toml --check` and `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --locked -- -D warnings`.
 - Web: `npx biome ci .` and `npm run typecheck`.
 - Complexity: `./scripts/complexity.sh`.
+- Licenses: `reuse lint`.
+- Sign-off: use `git commit -s`.
 
 ## Limits
 
@@ -38,3 +41,4 @@ Every change to main passes lint, complexity limits, security scans and a rulese
 - 2026-10-03 — Hash-pinned CI tools and typed vite config — [#15](https://github.com/tcivie/eepview/pull/15)
 - 2026-10-03 — Add the docs-check job: code changes need a docs or changelog update — [#16](https://github.com/tcivie/eepview/pull/16)
 - 2026-10-03 — Restore CodeQL and Scorecard, add dependency review and audit badges — [#26](https://github.com/tcivie/eepview/pull/26)
+- 2026-10-03 — Add `reuse lint` and the DCO check — see CHANGELOG

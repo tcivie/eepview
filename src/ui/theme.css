@@ -1,4 +1,9 @@
 /*
+ * SPDX-FileCopyrightText: 2026 The eepview contributors
+ * SPDX-License-Identifier: MIT
+ */
+
+/*
  * eepview design tokens.
  * Light values are the default. Dark values apply when the OS asks for dark
  * and the user did not force light, or when the user forces dark.
