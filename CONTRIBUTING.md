@@ -65,7 +65,7 @@ cargo-deny allows crates from crates.io only. It blocks wildcard versions. npm i
 
 - Add no telemetry.
 - Add no external fonts, CDNs, or remote assets to the bundled pages.
-- Add no new network path without an update to the network-path list and the consent model.
+- Add no new network path that breaks the "No-leak design" or "Consent first" principles. These documents arrive in docs/ with Phase 1.
 
 ## Report a security issue
 
