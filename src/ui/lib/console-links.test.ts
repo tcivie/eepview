@@ -3,7 +3,7 @@
 
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { join, sep } from "node:path";
 import { describe, it } from "node:test";
 import {
   CONSOLE_PAGE_LABELS,
@@ -146,7 +146,7 @@ describe("R18 router version, display only", () => {
     const used = (pick: (f: string) => boolean) =>
       sources().some((f) => pick(f.slice(UI.length)) && /routerVersion/.test(own(f)));
     assert.ok(
-      used((f) => /toolbar/.test(f)),
+      used((f) => /popup[\\/]router-panel/.test(f)),
       "the router panel uses routerVersion",
     );
     assert.ok(
@@ -229,14 +229,16 @@ const sources = (): string[] =>
 
 describe("R15 no loopback link in any page", () => {
   it("R15: no page holds an http://127.0.0.1 link", () => {
-    for (const file of sources()) {
+    // Pages only: the test helpers under testing/ are not pages.
+    const pages = sources().filter((f) => !f.includes(`${sep}testing${sep}`));
+    for (const file of pages) {
       const text = readFileSync(file, "utf8");
       assert.ok(!/https?:\/\/(127\.0\.0\.1|localhost|\[::1\])/.test(text), file);
     }
   });
 
   it("R15: the router panel and the home page know the console links", () => {
-    for (const name of ["home.ts", "toolbar/router-panel.ts"]) {
+    for (const name of ["home.ts", "popup/router-panel.ts"]) {
       assert.match(read(name), /console/i, name);
     }
   });
@@ -256,7 +258,7 @@ describe("R6 the UI asks for detection", () => {
   });
 
   it("R6: the router panel, the home page and Settings call console_detect", () => {
-    const text = ["toolbar/router-panel.ts", "home.ts", "settings.ts"].map(read);
+    const text = ["popup/router-panel.ts", "home.ts", "settings.ts"].map(read);
     for (const source of text) {
       assert.match(source, /console_detect|detectConsole/);
     }

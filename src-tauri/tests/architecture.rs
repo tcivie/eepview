@@ -221,7 +221,7 @@ fn status_bubble_gets_events_only() {
 }
 
 /// What the `popup` webview may do: events, and the commands of its four popups.
-const POPUP_PERMISSIONS: [&str; 15] = [
+const POPUP_PERMISSIONS: [&str; 18] = [
     "core:event:allow-listen",
     "core:event:allow-unlisten",
     "allow-popup-size",
@@ -237,6 +237,9 @@ const POPUP_PERMISSIONS: [&str; 15] = [
     "allow-connection-pause",
     "allow-connection-resume",
     "allow-router-control",
+    "allow-console-status",
+    "allow-console-detect",
+    "allow-console-open",
 ];
 
 #[test]

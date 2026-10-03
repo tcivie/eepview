@@ -34,6 +34,9 @@ const POPUP_COMMANDS = [
   "connection_pause",
   "connection_resume",
   "router_control",
+  "console_status",
+  "console_detect",
+  "console_open",
 ];
 
 describe("rule 14: the popup webview's permissions", () => {
