@@ -23,4 +23,5 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Polish the setup flow and add the router panel to the toolbar (#27)
 - Release gates job replaces the reusable-workflow calls; the macOS app is ad-hoc signed inside the dmg (#24)
 - Release gate accepts checks that run on pull requests only (#39)
+- Sign releases with Sigstore, build the Linux binary repeatably, harden the release profile (#37)
 - Add the eepview logo and app icons (#11)
