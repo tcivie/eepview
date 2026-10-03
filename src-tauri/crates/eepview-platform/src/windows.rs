@@ -4,17 +4,45 @@
 //! `WebView2` calls through webview2-com. Every `unsafe` block holds one COM call and names
 //! why it is sound.
 
+use std::rc::Rc;
+
 use webview2_com::Microsoft::Web::WebView2::Win32::{
-    COREWEBVIEW2_WEB_RESOURCE_CONTEXT_ALL, ICoreWebView2, ICoreWebView2_12, ICoreWebView2Settings4,
-    ICoreWebView2Settings8,
+    COREWEBVIEW2_CONTEXT_MENU_ITEM_KIND_COMMAND, COREWEBVIEW2_CONTEXT_MENU_ITEM_KIND_SEPARATOR,
+    COREWEBVIEW2_CONTEXT_MENU_TARGET_KIND, COREWEBVIEW2_CONTEXT_MENU_TARGET_KIND_IMAGE,
+    COREWEBVIEW2_KEY_EVENT_KIND, COREWEBVIEW2_KEY_EVENT_KIND_KEY_DOWN,
+    COREWEBVIEW2_KEY_EVENT_KIND_SYSTEM_KEY_DOWN, COREWEBVIEW2_WEB_RESOURCE_CONTEXT_ALL,
+    ICoreWebView2, ICoreWebView2_11, ICoreWebView2_12, ICoreWebView2AcceleratorKeyPressedEventArgs,
+    ICoreWebView2ContextMenuItem, ICoreWebView2ContextMenuItemCollection,
+    ICoreWebView2ContextMenuRequestedEventArgs, ICoreWebView2ContextMenuTarget,
+    ICoreWebView2Environment9, ICoreWebView2Settings4, ICoreWebView2Settings8,
 };
 use webview2_com::{
-    CallDevToolsProtocolMethodCompletedHandler, StatusBarTextChangedEventHandler,
-    WebResourceRequestedEventHandler, take_pwstr,
+    AcceleratorKeyPressedEventHandler, CallDevToolsProtocolMethodCompletedHandler,
+    ContextMenuRequestedEventHandler, CustomItemSelectedEventHandler,
+    StatusBarTextChangedEventHandler, WebResourceRequestedEventHandler, take_pwstr,
 };
-use windows_core::{Interface, PWSTR, w};
+use windows::Win32::Foundation::{GlobalFree, HANDLE, HGLOBAL};
+use windows::Win32::System::Com::IStream;
+use windows::Win32::System::DataExchange::{
+    CloseClipboard, EmptyClipboard, OpenClipboard, SetClipboardData,
+};
+use windows::Win32::System::Memory::{GMEM_MOVEABLE, GlobalAlloc, GlobalLock, GlobalUnlock};
+use windows::Win32::System::Ole::CF_UNICODETEXT;
+use windows::Win32::UI::Input::KeyboardAndMouse::{
+    GetKeyState, MAPVK_VK_TO_CHAR, MapVirtualKeyW, VIRTUAL_KEY, VK_CONTROL, VK_LWIN, VK_MENU,
+    VK_RWIN, VK_SHIFT,
+};
+use windows_core::{BOOL, HSTRING, Interface, PWSTR, w};
 
-use crate::{FindRequest, Nav, PlatformWebview, Rules, WindowButtons};
+use crate::{
+    FindRequest, Hit, Hooks, Input, Keys, MenuEntry, Native, Nav, PlatformWebview, Reply, Rules,
+    WindowButtons, code_of_char, code_of_virtual_key,
+};
+
+/// The input hook, shared by the engine handlers of one webview.
+type InputHook = Rc<dyn Fn(Input) -> Reply>;
+/// The chosen-item hook, shared by the custom items of every menu of one webview.
+type ChosenHook = Rc<dyn Fn(&str)>;
 
 fn core(webview: &PlatformWebview) -> Result<ICoreWebView2, String> {
     let controller = webview.controller();
@@ -157,3 +185,328 @@ pub fn harden(webview: &PlatformWebview) -> Result<(), String> {
 pub fn place_window_buttons(_webview: &PlatformWebview, _center_y: f64) -> Option<WindowButtons> {
     None
 }
+
+/// Reports key presses (`AcceleratorKeyPressed`) and context menu requests
+/// (`ContextMenuRequested`). `WebView2` hands the host every key with Ctrl or Alt, every
+/// function key and Esc; the menu bar never sees them while a webview has the focus.
+///
+/// # Errors
+///
+/// Fails when the engine handle is missing or the engine refuses the call.
+pub fn on_input(webview: &PlatformWebview, hooks: Hooks) -> Result<(), String> {
+    let Hooks { input, chosen, .. } = hooks;
+    let input: InputHook = Rc::from(input);
+    on_keys(webview, Rc::clone(&input)).map_err(|e| e.to_string())?;
+    on_menu(webview, input, Rc::from(chosen)).map_err(|e| e.to_string())
+}
+
+fn on_keys(webview: &PlatformWebview, input: InputHook) -> windows_core::Result<()> {
+    let handler = AcceleratorKeyPressedEventHandler::create(Box::new(move |_, args| {
+        args.map_or(Ok(()), |args| key_pressed(&args, &input))
+    }));
+    let mut token = 0_i64;
+    // SAFETY: COM call on the live controller; the token outlives the call.
+    unsafe {
+        webview
+            .controller()
+            .add_AcceleratorKeyPressed(&handler, &raw mut token)
+    }
+}
+
+/// One key event: a key down that the app takes is marked handled, so the page and the
+/// engine never see it.
+fn key_pressed(
+    args: &ICoreWebView2AcceleratorKeyPressedEventArgs,
+    input: &InputHook,
+) -> windows_core::Result<()> {
+    let mut kind = COREWEBVIEW2_KEY_EVENT_KIND::default();
+    // SAFETY: getter on the live event args.
+    unsafe { args.KeyEventKind(&raw mut kind) }?;
+    if kind != COREWEBVIEW2_KEY_EVENT_KIND_KEY_DOWN
+        && kind != COREWEBVIEW2_KEY_EVENT_KIND_SYSTEM_KEY_DOWN
+    {
+        return Ok(());
+    }
+    let mut vk = 0_u32;
+    // SAFETY: getter on the live event args.
+    unsafe { args.VirtualKey(&raw mut vk) }?;
+    let Some(code) = key_code(vk) else {
+        return Ok(());
+    };
+    if input(Input::Key {
+        code,
+        keys: held_keys(),
+    }) == Reply::Consume
+    {
+        // SAFETY: setter on the live event args.
+        unsafe { args.SetHandled(true) }?;
+    }
+    Ok(())
+}
+
+/// The `KeyboardEvent.code` name of a virtual key on the active layout.
+fn key_code(vk: u32) -> Option<String> {
+    code_of_virtual_key(vk).or_else(|| {
+        // SAFETY: a pure table lookup in the active keyboard layout.
+        let mapped = unsafe { MapVirtualKeyW(vk, MAPVK_VK_TO_CHAR) };
+        // The top bit marks a dead key; the low word is the character.
+        char::from_u32(mapped & 0xFFFF).and_then(code_of_char)
+    })
+}
+
+fn down(key: VIRTUAL_KEY) -> bool {
+    // SAFETY: reads the key state of this thread's input queue.
+    let state = unsafe { GetKeyState(i32::from(key.0)) };
+    state < 0
+}
+
+/// The modifier keys held now, from the input state of the UI thread.
+#[must_use]
+pub fn held_keys() -> Keys {
+    Keys::default()
+        .with_meta(down(VK_LWIN) || down(VK_RWIN))
+        .with_ctrl(down(VK_CONTROL))
+        .with_alt(down(VK_MENU))
+        .with_shift(down(VK_SHIFT))
+}
+
+fn on_menu(
+    webview: &PlatformWebview,
+    input: InputHook,
+    chosen: ChosenHook,
+) -> windows_core::Result<()> {
+    let core11 = core(webview)
+        .map_err(|e| windows_core::Error::new(windows_core::HRESULT(-1), e))?
+        .cast::<ICoreWebView2_11>()?;
+    let env = webview.environment().cast::<ICoreWebView2Environment9>()?;
+    let handler = ContextMenuRequestedEventHandler::create(Box::new(move |_, args| {
+        args.map_or(Ok(()), |args| menu_requested(&args, &env, &input, &chosen))
+    }));
+    let mut token = 0_i64;
+    // SAFETY: COM call on a live object; the token outlives the call.
+    unsafe { core11.add_ContextMenuRequested(&handler, &raw mut token) }
+}
+
+/// Replaces the engine menu with the app's entries. No entries: no menu at all.
+fn menu_requested(
+    args: &ICoreWebView2ContextMenuRequestedEventArgs,
+    env: &ICoreWebView2Environment9,
+    input: &InputHook,
+    chosen: &ChosenHook,
+) -> windows_core::Result<()> {
+    // SAFETY: getter on the live event args.
+    let target = unsafe { args.ContextMenuTarget() }?;
+    let Reply::Menu(entries) = input(Input::Menu(hit_of(&target)?)) else {
+        return Ok(());
+    };
+    if entries.is_empty() {
+        // SAFETY: setter on the live event args; a handled request shows no menu.
+        return unsafe { args.SetHandled(true) };
+    }
+    // SAFETY: getter on the live event args.
+    let items = unsafe { args.MenuItems() }?;
+    let natives = take_items(&items)?;
+    for (index, entry) in (0_u32..).zip(&entries) {
+        let item = menu_item(entry, &natives, env, chosen)?;
+        // SAFETY: COM call on the live collection with a live item.
+        unsafe { items.InsertValueAtIndex(index, &item) }?;
+    }
+    Ok(())
+}
+
+fn read_bool(
+    get: impl FnOnce(*mut BOOL) -> windows_core::Result<()>,
+) -> windows_core::Result<bool> {
+    let mut value = BOOL::default();
+    get(&raw mut value)?;
+    Ok(value.as_bool())
+}
+
+fn read_text(
+    get: impl FnOnce(*mut PWSTR) -> windows_core::Result<()>,
+) -> windows_core::Result<String> {
+    let mut value = PWSTR::null();
+    get(&raw mut value)?;
+    Ok(take_pwstr(value))
+}
+
+/// What is under the pointer, from the engine's menu target.
+fn hit_of(target: &ICoreWebView2ContextMenuTarget) -> windows_core::Result<Hit> {
+    // SAFETY: getter on the live target.
+    let has_link = read_bool(|v| unsafe { target.HasLinkUri(v) })?;
+    // SAFETY: getter on the live target; WebView2 allocates the string we take.
+    let link = read_text(|v| unsafe { target.LinkUri(v) })?;
+    let mut kind = COREWEBVIEW2_CONTEXT_MENU_TARGET_KIND::default();
+    // SAFETY: getter on the live target.
+    unsafe { target.Kind(&raw mut kind) }?;
+    // SAFETY: getter on the live target.
+    let has_source = read_bool(|v| unsafe { target.HasSourceUri(v) })?;
+    // SAFETY: getter on the live target; WebView2 allocates the string we take.
+    let source = read_text(|v| unsafe { target.SourceUri(v) })?;
+    let image = kind == COREWEBVIEW2_CONTEXT_MENU_TARGET_KIND_IMAGE && has_source;
+    Ok(Hit {
+        link: has_link.then_some(link).filter(|l| !l.is_empty()),
+        image: image.then_some(source).filter(|s| !s.is_empty()),
+        // SAFETY: getter on the live target.
+        selection: read_bool(|v| unsafe { target.HasSelection(v) })?,
+        // SAFETY: getter on the live target.
+        editable: read_bool(|v| unsafe { target.IsEditable(v) })?,
+    })
+}
+
+/// Empties the engine menu and returns its items by name, so the app's menu can reuse the
+/// engine's own editing items.
+fn take_items(
+    items: &ICoreWebView2ContextMenuItemCollection,
+) -> windows_core::Result<Vec<(String, ICoreWebView2ContextMenuItem)>> {
+    let mut count = 0_u32;
+    // SAFETY: getter on the live collection.
+    unsafe { items.Count(&raw mut count) }?;
+    let mut named = Vec::new();
+    for _ in 0..count {
+        // SAFETY: index 0 exists while the count is above zero.
+        let item = unsafe { items.GetValueAtIndex(0) }?;
+        // SAFETY: getter on the live item; WebView2 allocates the string we take.
+        let name = read_text(|v| unsafe { item.Name(v) })?;
+        // SAFETY: index 0 exists; the item stays alive in `named`.
+        unsafe { items.RemoveValueAtIndex(0) }?;
+        named.push((name, item));
+    }
+    Ok(named)
+}
+
+/// The engine's name of the item that does a native command.
+fn native_name(native: Native) -> &'static str {
+    match native {
+        Native::Undo => "undo",
+        Native::Redo => "redo",
+        Native::Cut => "cut",
+        Native::Copy => "copy",
+        Native::Paste => "paste",
+        Native::SelectAll => "selectAll",
+        Native::CopyImage => "copyImage",
+    }
+}
+
+fn menu_item(
+    entry: &MenuEntry,
+    natives: &[(String, ICoreWebView2ContextMenuItem)],
+    env: &ICoreWebView2Environment9,
+    chosen: &ChosenHook,
+) -> windows_core::Result<ICoreWebView2ContextMenuItem> {
+    let MenuEntry::Item {
+        id,
+        label,
+        enabled,
+        native,
+    } = entry
+    else {
+        // SAFETY: COM factory call on the live environment with a static string.
+        return unsafe {
+            env.CreateContextMenuItem(
+                w!(""),
+                None::<&IStream>,
+                COREWEBVIEW2_CONTEXT_MENU_ITEM_KIND_SEPARATOR,
+            )
+        };
+    };
+    let engine_item = native.and_then(|n| natives.iter().find(|(name, _)| name == native_name(n)));
+    if let Some((_, item)) = engine_item {
+        return Ok(item.clone());
+    }
+    // A native command the engine did not offer here cannot run: it shows, disabled.
+    let enabled = *enabled && native.is_none();
+    custom_item(id, label, enabled, env, chosen)
+}
+
+fn custom_item(
+    id: &str,
+    label: &str,
+    enabled: bool,
+    env: &ICoreWebView2Environment9,
+    chosen: &ChosenHook,
+) -> windows_core::Result<ICoreWebView2ContextMenuItem> {
+    let text = HSTRING::from(label);
+    // SAFETY: COM factory call on the live environment; the label outlives the call.
+    let item = unsafe {
+        env.CreateContextMenuItem(
+            &text,
+            None::<&IStream>,
+            COREWEBVIEW2_CONTEXT_MENU_ITEM_KIND_COMMAND,
+        )
+    }?;
+    // SAFETY: setter on the live item.
+    unsafe { item.SetIsEnabled(enabled) }?;
+    let (hook, id) = (Rc::clone(chosen), id.to_owned());
+    let handler = CustomItemSelectedEventHandler::create(Box::new(move |_, _| {
+        hook(&id);
+        Ok(())
+    }));
+    let mut token = 0_i64;
+    // SAFETY: COM call on the live item; the token outlives the call.
+    unsafe { item.add_CustomItemSelected(&handler, &raw mut token) }?;
+    Ok(item)
+}
+
+/// Puts `text` on the clipboard as Unicode text.
+///
+/// # Errors
+///
+/// Fails when the clipboard is busy or the copy cannot be made.
+pub fn copy_text(text: &str) -> Result<(), String> {
+    let wide: Vec<u16> = text.encode_utf16().chain(std::iter::once(0)).collect();
+    // SAFETY: opens the clipboard for this thread; it is closed below on every path.
+    unsafe { OpenClipboard(None) }.map_err(|e| e.to_string())?;
+    let result = fill_clipboard(&wide);
+    // SAFETY: the clipboard is open on this thread.
+    let closed = unsafe { CloseClipboard() };
+    result.and(closed.map_err(|e| e.to_string()))
+}
+
+/// Writes `wide` (with its final 0) to the open clipboard.
+fn fill_clipboard(wide: &[u16]) -> Result<(), String> {
+    // SAFETY: the caller opened the clipboard on this thread.
+    unsafe { EmptyClipboard() }.map_err(|e| e.to_string())?;
+    // SAFETY: allocates movable global memory of the given size.
+    let memory = unsafe { GlobalAlloc(GMEM_MOVEABLE, std::mem::size_of_val(wide)) }
+        .map_err(|e| e.to_string())?;
+    let written = write_global(memory, wide);
+    let handed = written.and_then(|()| {
+        // SAFETY: the clipboard is open and `memory` holds a 0-terminated UTF-16 string;
+        // on success the clipboard owns the memory.
+        unsafe { SetClipboardData(u32::from(CF_UNICODETEXT.0), Some(HANDLE(memory.0))) }
+            .map(drop)
+            .map_err(|e| e.to_string())
+    });
+    if handed.is_err() {
+        // SAFETY: the clipboard did not take `memory`, so it is still ours to free.
+        drop(unsafe { GlobalFree(Some(memory)) });
+    }
+    handed
+}
+
+fn write_global(memory: HGLOBAL, wide: &[u16]) -> Result<(), String> {
+    // SAFETY: `memory` is a live movable block; locking gives its address.
+    let target = unsafe { GlobalLock(memory) }.cast::<u16>();
+    if target.is_null() {
+        return Err("the clipboard memory could not be locked".into());
+    }
+    // SAFETY: the block holds `wide.len()` u16 values (its size was made from `wide`), and
+    // the two regions do not overlap.
+    unsafe { std::ptr::copy_nonoverlapping(wide.as_ptr(), target, wide.len()) };
+    // SAFETY: unlocks the block locked above. An error here only means it is unlocked.
+    drop(unsafe { GlobalUnlock(memory) });
+    Ok(())
+}
+
+/// The editing commands run from the engine's own menu items: nothing to do here.
+///
+/// # Errors
+///
+/// Always: `WebView2` runs these commands from its own menu items.
+pub fn edit(_webview: &PlatformWebview, _command: Native) -> Result<(), String> {
+    Err("WebView2 runs editing commands from its own menu items".into())
+}
+
+/// No system menu items to take out.
+pub fn quiet_menus() {}

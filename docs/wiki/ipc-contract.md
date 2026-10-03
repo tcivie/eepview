@@ -21,6 +21,7 @@ Change it in a PR that changes both sides, or keep the old form working as a shi
 - v1.5: `console_status`, `console_detect`, `console_open`, `console-changed`, `ConsoleInfo`, the `console` webview ([#54](https://github.com/tcivie/eepview/pull/54)).
 - v1.6: the console tab. `TabInfo.kind` adds `"console"`. `console_open()` takes no argument and opens the console home page in the console tab. `ConsoleInfo.pages`, `ConsolePage` and the `no-page` reason are gone ([#76](https://github.com/tcivie/eepview/pull/76)).
 - v1.7: `RouterStats.uptimeResolutionMs`, `.floodfills`, `.tunnels.client`, `.tunnels.exploratory`, `.tunnelBuildSuccessPercent.total`. `router_stats` reads the detected router console when there is no router helper. The UI reads this shape (`src/ui/contract.ts`). See [Router console](router-console.md#router-statistics-from-the-console).
+- v1.8: no new command or event. The keyboard shortcuts follow the K1 table of [Links, menus and shortcuts](links-and-shortcuts.md): new window N, and on Windows and Linux Ctrl+F4, Alt+D, F6, F5, Ctrl+F5, Ctrl+PageUp, Ctrl+PageDown and Alt+Home; Cmd+. and Cmd+Shift+[ ] on macOS. Alt+Left and Alt+Right are Back and Forward on Windows and Linux only. Esc stops a load only from a page (K4). The engines report link clicks, context menus and mouse buttons to the shell, never to a page ([#77](https://github.com/tcivie/eepview/pull/77)).
 
 ## Window layout
 
@@ -195,9 +196,7 @@ type ConsoleInfo = { found: boolean; kind: "java" | "i2pd" | null; origin: strin
 
 ## Keyboard shortcuts
 
-Cmd on macOS, Ctrl elsewhere. Rust handles them as menu accelerators.
-
-New tab T, close tab W, reopen closed tab Shift+T, next and previous tab Ctrl+Tab and Ctrl+Shift+Tab, tab 1–8 and last 9, address bar L, find F, find next G, find previous Shift+G, reload R, hard reload Shift+R, back [ and Alt+Left, forward ] and Alt+Right, home Shift+H, bookmark D, bookmarks Shift+B, history Y (macOS) or H (others), zoom + − 0, stop Esc while loading, settings comma.
+Rust handles them. They work wherever the keyboard focus is, also in a web page with JavaScript off. The table, with every key on each system, is in [Links, menus and shortcuts](links-and-shortcuts.md#keyboard) (K1). Esc stops a load only from a page: in the address bar, the find field and a popup it belongs to the field (K4).
 
 ## Security rules
 

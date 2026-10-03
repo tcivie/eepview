@@ -11,6 +11,7 @@
 //! - [`console`]: the only factory of the `console` webview (the router's own pages).
 //! - [`engine`]: back, forward, stop, find and zoom with page JavaScript off.
 //! - [`commands`]: the IPC commands.
+//! - [`input`]: link clicks, keys, mouse buttons and context menus from the engines.
 
 pub mod apply;
 pub mod chrome;
@@ -19,6 +20,7 @@ pub mod console;
 pub mod content;
 pub mod engine;
 pub mod env;
+pub mod input;
 pub mod menu;
 pub mod popup;
 pub mod report;

@@ -1,7 +1,10 @@
 // SPDX-FileCopyrightText: 2026 The eepview contributors
 // SPDX-License-Identifier: MIT
 
-//! Keyboard shortcuts of the contract, as menu items with accelerators. Pure table.
+//! Keyboard shortcuts of the contract (docs/wiki/links-and-shortcuts.md, K1), as menu items
+//! with accelerators and as a chord lookup for keys the menu bar cannot see. Pure table.
+
+use crate::input::{Modifiers, MouseButton};
 
 /// What a shortcut does.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -84,87 +87,174 @@ pub struct Shortcut {
     pub menu: Menu,
 }
 
-const BASE: [(&str, &str, &str, Menu); 25] = [
-    ("new-tab", "New Tab", "CmdOrCtrl+T", Menu::File),
-    ("close-tab", "Close Tab", "CmdOrCtrl+W", Menu::File),
+/// The rows of K1 that every system has.
+const COMMON: [(&str, &str, &str, Menu); 32] = [
+    ("new-tab", "New Tab", "CmdOrCtrl+KeyT", Menu::File),
+    ("new-window", "New Window", "CmdOrCtrl+KeyN", Menu::File),
+    ("close-tab", "Close Tab", "CmdOrCtrl+KeyW", Menu::File),
     (
         "reopen-tab",
         "Reopen Closed Tab",
-        "CmdOrCtrl+Shift+T",
+        "CmdOrCtrl+Shift+KeyT",
         Menu::File,
     ),
-    ("focus-address", "Open Location", "CmdOrCtrl+L", Menu::File),
+    (
+        "focus-address",
+        "Open Location",
+        "CmdOrCtrl+KeyL",
+        Menu::File,
+    ),
     ("settings", "Settings", "CmdOrCtrl+Comma", Menu::File),
-    ("open-find", "Find", "CmdOrCtrl+F", Menu::Edit),
-    ("find-next", "Find Next", "CmdOrCtrl+G", Menu::Edit),
+    ("open-find", "Find", "CmdOrCtrl+KeyF", Menu::Edit),
+    ("find-next", "Find Next", "CmdOrCtrl+KeyG", Menu::Edit),
     (
         "find-prev",
         "Find Previous",
-        "CmdOrCtrl+Shift+G",
+        "CmdOrCtrl+Shift+KeyG",
         Menu::Edit,
     ),
-    ("reload", "Reload", "CmdOrCtrl+R", Menu::View),
+    ("reload", "Reload", "CmdOrCtrl+KeyR", Menu::View),
     (
         "hard-reload",
         "Reload Without Cache",
-        "CmdOrCtrl+Shift+R",
+        "CmdOrCtrl+Shift+KeyR",
         Menu::View,
     ),
     ("stop", "Stop", "Escape", Menu::View),
     ("zoom-in", "Zoom In", "CmdOrCtrl+Equal", Menu::View),
+    (
+        "zoom-in-plus",
+        "Zoom In",
+        "CmdOrCtrl+Shift+Equal",
+        Menu::View,
+    ),
     ("zoom-out", "Zoom Out", "CmdOrCtrl+Minus", Menu::View),
     ("zoom-reset", "Actual Size", "CmdOrCtrl+Digit0", Menu::View),
     ("back", "Back", "CmdOrCtrl+BracketLeft", Menu::Go),
     ("forward", "Forward", "CmdOrCtrl+BracketRight", Menu::Go),
-    ("back-alt", "Back", "Alt+ArrowLeft", Menu::Go),
-    ("forward-alt", "Forward", "Alt+ArrowRight", Menu::Go),
-    ("home", "Home", "CmdOrCtrl+Shift+H", Menu::Go),
-    ("history", "Show History", "", Menu::Go),
+    ("home", "Home", "CmdOrCtrl+Shift+KeyH", Menu::Go),
     (
         "bookmark",
         "Bookmark This Page",
-        "CmdOrCtrl+D",
+        "CmdOrCtrl+KeyD",
         Menu::Bookmarks,
     ),
     (
         "bookmarks",
         "Show Bookmarks",
-        "CmdOrCtrl+Shift+B",
+        "CmdOrCtrl+Shift+KeyB",
         Menu::Bookmarks,
     ),
     ("next-tab", "Next Tab", "Ctrl+Tab", Menu::Window),
     ("prev-tab", "Previous Tab", "Ctrl+Shift+Tab", Menu::Window),
+    ("tab-1", "Tab 1", "CmdOrCtrl+Digit1", Menu::Window),
+    ("tab-2", "Tab 2", "CmdOrCtrl+Digit2", Menu::Window),
+    ("tab-3", "Tab 3", "CmdOrCtrl+Digit3", Menu::Window),
+    ("tab-4", "Tab 4", "CmdOrCtrl+Digit4", Menu::Window),
+    ("tab-5", "Tab 5", "CmdOrCtrl+Digit5", Menu::Window),
+    ("tab-6", "Tab 6", "CmdOrCtrl+Digit6", Menu::Window),
+    ("tab-7", "Tab 7", "CmdOrCtrl+Digit7", Menu::Window),
+    ("tab-8", "Tab 8", "CmdOrCtrl+Digit8", Menu::Window),
     ("tab-9", "Last Tab", "CmdOrCtrl+Digit9", Menu::Window),
 ];
 
-/// Every shortcut. History is Cmd+Y on macOS and Ctrl+H elsewhere.
+/// The rows of K1 on macOS only.
+const MAC_ONLY: [(&str, &str, &str, Menu); 4] = [
+    ("stop-period", "Stop", "CmdOrCtrl+Period", Menu::View),
+    ("history", "Show History", "CmdOrCtrl+KeyY", Menu::Go),
+    (
+        "next-tab-alt",
+        "Next Tab",
+        "CmdOrCtrl+Shift+BracketRight",
+        Menu::Window,
+    ),
+    (
+        "prev-tab-alt",
+        "Previous Tab",
+        "CmdOrCtrl+Shift+BracketLeft",
+        Menu::Window,
+    ),
+];
+
+/// The rows of K1 on Windows and Linux only.
+const OTHER_ONLY: [(&str, &str, &str, Menu); 11] = [
+    ("close-tab-f4", "Close Tab", "Ctrl+F4", Menu::File),
+    ("focus-address-alt", "Open Location", "Alt+KeyD", Menu::File),
+    ("focus-address-f6", "Open Location", "F6", Menu::File),
+    ("reload-f5", "Reload", "F5", Menu::View),
+    (
+        "hard-reload-f5",
+        "Reload Without Cache",
+        "Ctrl+F5",
+        Menu::View,
+    ),
+    ("back-alt", "Back", "Alt+ArrowLeft", Menu::Go),
+    ("forward-alt", "Forward", "Alt+ArrowRight", Menu::Go),
+    ("home-alt", "Home", "Alt+Home", Menu::Go),
+    ("history", "Show History", "Ctrl+KeyH", Menu::Go),
+    ("next-tab-alt", "Next Tab", "Ctrl+PageDown", Menu::Window),
+    ("prev-tab-alt", "Previous Tab", "Ctrl+PageUp", Menu::Window),
+];
+
+/// Every shortcut of K1 for one system (`mac` true for macOS). Quit is the macOS app menu
+/// item, not a row.
 #[must_use]
 pub fn table(mac: bool) -> Vec<Shortcut> {
-    let mut list: Vec<Shortcut> = BASE
+    let own: &[(&str, &str, &str, Menu)] = if mac { &MAC_ONLY } else { &OTHER_ONLY };
+    COMMON
         .iter()
-        .map(|(id, label, accel, menu)| item(id, label, accel, *menu))
-        .collect();
-    if let Some(history) = list.iter_mut().find(|s| s.id == "history") {
-        history.accel = if mac { "CmdOrCtrl+Y" } else { "Ctrl+H" }.into();
-    }
-    for n in 1..=8 {
-        let accel = format!("CmdOrCtrl+Digit{n}");
-        list.push(item(
-            &format!("tab-{n}"),
-            &format!("Tab {n}"),
-            &accel,
-            Menu::Window,
-        ));
-    }
-    list
+        .chain(own)
+        .map(|(id, label, accel, menu)| Shortcut {
+            id: (*id).into(),
+            label: (*label).into(),
+            accel: (*accel).into(),
+            menu: *menu,
+        })
+        .collect()
 }
 
-fn item(id: &str, label: &str, accel: &str, menu: Menu) -> Shortcut {
-    Shortcut {
-        id: id.into(),
-        label: label.into(),
-        accel: accel.into(),
-        menu,
+/// One key press: a `KeyboardEvent.code` name and the held modifiers.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Chord {
+    /// The key, as a `KeyboardEvent.code` name (`KeyT`, `Digit1`, `Escape`, `F5`).
+    pub code: String,
+    /// The held modifiers.
+    pub modifiers: Modifiers,
+}
+
+/// The chord of an accelerator such as `CmdOrCtrl+Shift+KeyT`; `CmdOrCtrl` is Cmd on macOS
+/// and Ctrl elsewhere.
+fn chord_of(mac: bool, accel: &str) -> Chord {
+    let mut parts: Vec<&str> = accel.split('+').collect();
+    let code = parts.pop().unwrap_or_default().to_owned();
+    let mut modifiers = Modifiers::default();
+    for part in parts {
+        modifiers = match part {
+            "CmdOrCtrl" if mac => modifiers.with_meta(true),
+            "Alt" => modifiers.with_alt(true),
+            "Shift" => modifiers.with_shift(true),
+            _ => modifiers.with_ctrl(true),
+        };
+    }
+    Chord { code, modifiers }
+}
+
+/// The action of the K1 row whose keys are exactly `chord` on this system (K1, K9).
+#[must_use]
+pub fn lookup(mac: bool, chord: &Chord) -> Option<Action> {
+    table(mac)
+        .into_iter()
+        .find(|s| chord_of(mac, &s.accel) == *chord)
+        .and_then(|s| action(&s.id))
+}
+
+/// The action of a mouse button: back and forward only (B3).
+#[must_use]
+pub fn mouse_action(button: MouseButton) -> Option<Action> {
+    match button {
+        MouseButton::Back => Some(Action::Back),
+        MouseButton::Forward => Some(Action::Forward),
+        _ => None,
     }
 }
 
@@ -183,18 +273,18 @@ pub fn action(id: &str) -> Option<Action> {
 
 fn simple_action(id: &str) -> Option<Action> {
     Some(match id {
-        "new-tab" => Action::NewTab,
-        "close-tab" => Action::CloseTab,
+        "new-tab" | "new-window" => Action::NewTab,
+        "close-tab" | "close-tab-f4" => Action::CloseTab,
         "reopen-tab" => Action::ReopenTab,
-        "next-tab" => Action::NextTab,
-        "prev-tab" => Action::PrevTab,
-        "focus-address" => Action::FocusAddress,
+        "next-tab" | "next-tab-alt" => Action::NextTab,
+        "prev-tab" | "prev-tab-alt" => Action::PrevTab,
+        "focus-address" | "focus-address-alt" | "focus-address-f6" => Action::FocusAddress,
         "open-find" => Action::Find,
         "find-next" => Action::FindNext,
         "find-prev" => Action::FindPrev,
-        "reload" => Action::Reload,
-        "hard-reload" => Action::HardReload,
-        "stop" => Action::Stop,
+        "reload" | "reload-f5" => Action::Reload,
+        "hard-reload" | "hard-reload-f5" => Action::HardReload,
+        "stop" | "stop-period" => Action::Stop,
         _ => return None,
     })
 }
@@ -203,11 +293,11 @@ fn page_action(id: &str) -> Option<Action> {
     Some(match id {
         "back" | "back-alt" => Action::Back,
         "forward" | "forward-alt" => Action::Forward,
-        "home" => Action::Home,
+        "home" | "home-alt" => Action::Home,
         "bookmark" => Action::Bookmark,
         "bookmarks" => Action::Bookmarks,
         "history" => Action::History,
-        "zoom-in" => Action::ZoomIn,
+        "zoom-in" | "zoom-in-plus" => Action::ZoomIn,
         "zoom-out" => Action::ZoomOut,
         "zoom-reset" => Action::ZoomReset,
         "settings" => Action::Settings,
@@ -241,8 +331,8 @@ mod tests {
                 .unwrap()
                 .accel
         };
-        assert_eq!(key(true), "CmdOrCtrl+Y");
-        assert_eq!(key(false), "Ctrl+H");
+        assert_eq!(key(true), "CmdOrCtrl+KeyY");
+        assert_eq!(key(false), "Ctrl+KeyH");
     }
 
     #[test]

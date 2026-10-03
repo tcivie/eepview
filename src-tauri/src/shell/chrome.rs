@@ -4,7 +4,7 @@
 //! The main window and the bundled webviews: `toolbar`, `internal`, `status` and `popup`.
 //! They load only bundled pages (`WebviewUrl::App`); remote pages live in `content.rs`.
 
-use tauri::webview::PageLoadEvent;
+use tauri::webview::{NewWindowResponse, PageLoadEvent};
 use tauri::window::Color;
 use tauri::window::WindowBuilder;
 use tauri::{
@@ -60,6 +60,7 @@ pub fn build<R: Runtime>(app: &mut App<R>) -> tauri::Result<Window<R>> {
     status.hide()?;
     listen_status_size(app.handle());
     add_popup(app.handle(), &window)?;
+    super::input::wire_chrome(app.handle());
     view::raise_chrome(app.handle(), &window);
     Ok(window)
 }
@@ -83,7 +84,7 @@ fn add_popup<R: Runtime>(app: &AppHandle<R>, window: &Window<R>) -> tauri::Resul
 }
 
 /// True for a bundled page.
-fn bundled<R: Runtime>(app: &AppHandle<R>, url: &Url) -> bool {
+pub fn bundled<R: Runtime>(app: &AppHandle<R>, url: &Url) -> bool {
     let base = lock(&shared(app).base).clone();
     base.is_some_and(|b| b.origin() == url.origin()) || url.scheme() == "tauri"
 }
@@ -126,9 +127,13 @@ fn window_builder<R: Runtime>(app: &App<R>) -> tauri::Result<WindowBuilder<'_, R
 /// The `internal` webview: bundled pages only. A link to an I2P site opens in the active tab;
 /// anything else is refused.
 fn internal_builder<R: Runtime>(app: &AppHandle<R>) -> WebviewBuilder<R> {
-    let nav_app = app.clone();
+    let (nav_app, win_app) = (app.clone(), app.clone());
     WebviewBuilder::new("internal", WebviewUrl::App(HOME_PAGE.into()))
         .on_navigation(move |url| internal_navigation(&nav_app, url))
+        .on_new_window(move |url, _features| {
+            super::input::new_window(&win_app, super::input::Source::Internal, &url);
+            NewWindowResponse::Deny
+        })
         .on_page_load(|webview, payload| {
             internal_page_load(webview.app_handle(), payload.event(), payload.url());
         })

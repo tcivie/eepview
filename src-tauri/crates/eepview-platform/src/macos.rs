@@ -10,21 +10,27 @@ use std::ptr::NonNull;
 
 use block2::RcBlock;
 use objc2::rc::Retained;
-use objc2::runtime::{AnyObject, NSObject, ProtocolObject};
-use objc2::{DefinedClass, MainThreadOnly, Message, define_class, msg_send};
-use objc2_foundation::{MainThreadMarker, NSError, NSNumber, NSObjectProtocol, NSString};
+use objc2::runtime::{AnyObject, NSObject, ProtocolObject, Sel};
+use objc2::{DefinedClass, MainThreadOnly, Message, define_class, msg_send, sel};
+use objc2_foundation::{
+    MainThreadMarker, NSError, NSNumber, NSObjectProtocol, NSString, NSUserDefaults,
+};
 use objc2_web_kit::{
     WKContentRuleList, WKContentRuleListStore, WKContentWorld, WKFindConfiguration, WKFindResult,
     WKScriptMessage, WKScriptMessageHandler, WKUserContentController, WKUserScript,
     WKUserScriptInjectionTime, WKWebView,
 };
 
-use objc2_app_kit::{NSButton, NSView, NSWindow, NSWindowButton};
+use objc2_app_kit::{
+    NSApplication, NSButton, NSEvent, NSEventModifierFlags, NSPasteboard, NSPasteboardTypeString,
+    NSView, NSWindow, NSWindowButton,
+};
 use objc2_foundation::NSRect;
 
 use crate::{
-    CLEAR_SELECTION_SCRIPT, FindRequest, HOVER_CHANNEL, HOVER_SCRIPT, Nav, PlatformWebview, Rules,
-    WindowButtons, count_script, hover_target,
+    CLEAR_SELECTION_SCRIPT, FindRequest, HOVER_CHANNEL, HOVER_SCRIPT, Hooks, INPUT_CHANNEL, Keys,
+    Native, Nav, PlatformWebview, Rules, WindowButtons, count_script, hover_target, input_script,
+    parse_message,
 };
 
 thread_local! {
@@ -184,19 +190,7 @@ pub fn on_hover(
     let (view, mtm) = view(webview)?;
     let controller = content_controller(&view);
     let world = world(mtm);
-    let source = NSString::from_str(HOVER_SCRIPT);
-    // SAFETY: designated initializer on a fresh allocation; all arguments are live.
-    let script = unsafe {
-        WKUserScript::initWithSource_injectionTime_forMainFrameOnly_inContentWorld(
-            mtm.alloc(),
-            &source,
-            WKUserScriptInjectionTime::AtDocumentStart,
-            false,
-            &world,
-        )
-    };
-    // SAFETY: both objects are live; the controller retains the script.
-    unsafe { controller.addUserScript(&script) };
+    add_script(&controller, &world, HOVER_SCRIPT, mtm);
     let handler = HoverHandler::new(callback, mtm);
     let name = NSString::from_str(HOVER_CHANNEL);
     // SAFETY: the controller retains the handler; the name is unique in this world.
@@ -208,6 +202,180 @@ pub fn on_hover(
         );
     }
     Ok(())
+}
+
+/// Adds a script that runs at document start in every frame of `world`.
+fn add_script(
+    controller: &WKUserContentController,
+    world: &WKContentWorld,
+    source: &str,
+    mtm: MainThreadMarker,
+) {
+    let source = NSString::from_str(source);
+    // SAFETY: designated initializer on a fresh allocation; all arguments are live.
+    let script = unsafe {
+        WKUserScript::initWithSource_injectionTime_forMainFrameOnly_inContentWorld(
+            mtm.alloc(),
+            &source,
+            WKUserScriptInjectionTime::AtDocumentStart,
+            false,
+            world,
+        )
+    };
+    // SAFETY: both objects are live; the controller retains the script.
+    unsafe { controller.addUserScript(&script) };
+}
+
+/// The ivars of [`InputHandler`].
+pub struct InputIvars {
+    hooks: Hooks,
+}
+
+define_class!(
+    // SAFETY: NSObject has no subclassing rules; the class adds no Drop impl and only
+    // reads its ivars on the main thread.
+    #[unsafe(super(NSObject))]
+    #[thread_kind = MainThreadOnly]
+    #[ivars = InputIvars]
+    struct InputHandler;
+
+    // SAFETY: NSObjectProtocol has no required methods.
+    unsafe impl NSObjectProtocol for InputHandler {}
+
+    // SAFETY: the method signature matches `userContentController:didReceiveScriptMessage:`.
+    unsafe impl WKScriptMessageHandler for InputHandler {
+        #[unsafe(method(userContentController:didReceiveScriptMessage:))]
+        fn did_receive(&self, _controller: &WKUserContentController, message: &WKScriptMessage) {
+            // SAFETY: `body` is a plain getter on a live message.
+            let body = unsafe { message.body() };
+            let text = body
+                .downcast::<NSString>()
+                .map(|s| s.to_string())
+                .unwrap_or_default();
+            if let Some(input) = parse_message(&text) {
+                // The app shows its own menu on macOS: the reply has nothing to change here.
+                drop((self.ivars().hooks.input)(input));
+            }
+        }
+    }
+);
+
+impl InputHandler {
+    fn new(hooks: Hooks, mtm: MainThreadMarker) -> Retained<Self> {
+        let this = mtm.alloc::<Self>().set_ivars(InputIvars { hooks });
+        // SAFETY: `init` of NSObject on a freshly allocated instance with ivars set.
+        unsafe { msg_send![super(this), init] }
+    }
+}
+
+/// Installs the input script in the private world and its message handler. The script also
+/// runs once now, for a page that loaded before this call (the bundled pages).
+///
+/// # Errors
+///
+/// Fails when the engine handle is missing or the engine refuses the call.
+pub fn on_input(webview: &PlatformWebview, hooks: Hooks) -> Result<(), String> {
+    let (view, mtm) = view(webview)?;
+    let controller = content_controller(&view);
+    let world = world(mtm);
+    let source = input_script(hooks.content);
+    add_script(&controller, &world, &source, mtm);
+    let handler = InputHandler::new(hooks, mtm);
+    let name = NSString::from_str(INPUT_CHANNEL);
+    // SAFETY: the controller retains the handler; the name is unique in this world.
+    unsafe {
+        controller.addScriptMessageHandler_contentWorld_name(
+            ProtocolObject::from_ref(&*handler),
+            &world,
+            &name,
+        );
+    }
+    run_in_world(&view, mtm, &source, Box::new(|_| {}));
+    Ok(())
+}
+
+/// Puts `text` on the general pasteboard.
+///
+/// # Errors
+///
+/// Fails off the main thread or when the pasteboard refuses the text.
+pub fn copy_text(text: &str) -> Result<(), String> {
+    MainThreadMarker::new().ok_or("not on the main thread")?;
+    let board = NSPasteboard::generalPasteboard();
+    board.clearContents();
+    // SAFETY: an AppKit constant, set before `main` runs and never changed.
+    let kind = unsafe { NSPasteboardTypeString };
+    board
+        .setString_forType(&NSString::from_str(text), kind)
+        .then_some(())
+        .ok_or_else(|| "the pasteboard refused the text".to_owned())
+}
+
+/// The script that selects the image of the last context menu (input script).
+const SELECT_IMAGE: &str =
+    "window.__eepviewSelectImage ? (window.__eepviewSelectImage() ? 1 : 0) : 0";
+
+/// An editing command, sent to the view as the Edit menu sends it. Copy Image first selects
+/// the image of the last context menu, then copies that selection.
+///
+/// # Errors
+///
+/// Fails when the engine handle is missing or no responder takes the command.
+pub fn edit(webview: &PlatformWebview, command: Native) -> Result<(), String> {
+    let (view, mtm) = view(webview)?;
+    let action = match command {
+        Native::Undo => sel!(undo:),
+        Native::Redo => sel!(redo:),
+        Native::Cut => sel!(cut:),
+        Native::Copy => sel!(copy:),
+        Native::Paste => sel!(paste:),
+        Native::SelectAll => sel!(selectAll:),
+        Native::CopyImage => {
+            let target = view.clone();
+            let copy = move |selected: Option<u32>| {
+                let _ = selected == Some(1) && send_action(&target, mtm, sel!(copy:));
+            };
+            run_in_world(&view, mtm, SELECT_IMAGE, Box::new(copy));
+            return Ok(());
+        }
+    };
+    send_action(&view, mtm, action)
+        .then_some(())
+        .ok_or_else(|| "no responder took the command".to_owned())
+}
+
+/// Makes `view` the first responder, then sends `action` down the responder chain.
+fn send_action(view: &WKWebView, mtm: MainThreadMarker, action: Sel) -> bool {
+    if let Some(window) = view.window() {
+        window.makeFirstResponder(Some(view));
+    }
+    let app = NSApplication::sharedApplication(mtm);
+    // SAFETY: `action` is one of the standard editing selectors, which take one sender
+    // argument; a nil target means the first responder and a nil sender is allowed.
+    unsafe { app.sendAction_to_from(action, None, None) }
+}
+
+/// The modifier keys held now.
+#[must_use]
+pub fn held_keys() -> Keys {
+    let flags = NSEvent::modifierFlags_class();
+    Keys::default()
+        .with_meta(flags.contains(NSEventModifierFlags::Command))
+        .with_ctrl(flags.contains(NSEventModifierFlags::Control))
+        .with_alt(flags.contains(NSEventModifierFlags::Option))
+        .with_shift(flags.contains(NSEventModifierFlags::Shift))
+}
+
+/// `AppKit` adds Start Dictation and Emoji & Symbols to the Edit menu unless these user
+/// defaults say no (P4).
+pub fn quiet_menus() {
+    let defaults = NSUserDefaults::standardUserDefaults();
+    for key in [
+        "NSDisabledDictationMenuItem",
+        "NSDisabledCharacterPaletteMenuItem",
+    ] {
+        defaults.setBool_forKey(true, &NSString::from_str(key));
+    }
 }
 
 /// One step on the engine's navigation list.

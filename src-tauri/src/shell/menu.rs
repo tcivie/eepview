@@ -1,12 +1,15 @@
 // SPDX-FileCopyrightText: 2026 The eepview contributors
 // SPDX-License-Identifier: MIT
 
-//! The menu bar: every shortcut of the contract as a menu accelerator.
+//! The menu bar: every shortcut of the contract as a menu accelerator, except the bare Esc
+//! of Stop (K4): Esc belongs to the focused field, and the page webviews report it
+//! themselves (`shell::input`).
 
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::{AppHandle, Runtime};
 
 use super::apply::with_core;
+use super::input;
 use super::state::{lock, now_ms, shared};
 use crate::shortcuts::{self, Menu as Group, Shortcut};
 
@@ -25,6 +28,7 @@ const GROUPS: [(Group, &str); 6] = [
 ///
 /// Fails when the OS menu cannot be built.
 pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
+    eepview_platform::quiet_menus();
     let table = shortcuts::table(MAC);
     let menu = Menu::new(app)?;
     app_menu(app, &menu)?;
@@ -53,10 +57,16 @@ fn group_menu<R: Runtime>(
 /// The macOS menu layout: an app menu first, and the macOS accelerators.
 const MAC: bool = cfg!(target_os = "macos");
 
-/// The accelerator of a shortcut, `None` when it has none.
+/// The accelerator of a shortcut, `None` when it has none. A bare Esc is never a menu
+/// accelerator: a menu key comes before the focused field, so it would take Esc from the
+/// address bar, the find field and the popups (K4).
 fn accel(s: &Shortcut) -> Option<&str> {
-    (!s.accel.is_empty()).then_some(s.accel.as_str())
+    let menu_key = !s.accel.is_empty() && s.accel != ESCAPE;
+    menu_key.then_some(s.accel.as_str())
 }
+
+/// The accelerator of Stop that only the page webviews handle.
+const ESCAPE: &str = "Escape";
 
 /// True for the Stop item, which starts disabled and follows the active tab's loading.
 fn is_stop(s: &Shortcut) -> bool {
@@ -130,9 +140,11 @@ fn append_all<R: Runtime, const N: usize>(
     Ok(())
 }
 
-/// A menu item was chosen.
+/// A menu item was chosen: a context menu item, or a menu bar item.
 pub fn on_event<R: Runtime>(app: &AppHandle<R>, id: &str) {
-    if let Some(action) = shortcuts::action(id) {
+    if id.starts_with(input::MENU_PREFIX) {
+        input::chosen(app, id);
+    } else if let Some(action) = shortcuts::action(id) {
         with_core(app, |core| core.shortcut(action, now_ms()));
     }
 }

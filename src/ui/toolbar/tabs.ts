@@ -4,7 +4,14 @@
 import type { TabInfo } from "../contract.ts";
 import { byId } from "../dom.ts";
 import { call } from "../ipc.ts";
-import { dropIndex, moveTarget, neighbour, tabMonogram, tabTitle } from "../lib/tab-strip.ts";
+import {
+  dropIndex,
+  moveTarget,
+  neighbour,
+  stripMouse,
+  tabMonogram,
+  tabTitle,
+} from "../lib/tab-strip.ts";
 import { renderSiteMark } from "../site-mark.ts";
 import { currentTabs } from "./state.ts";
 
@@ -13,6 +20,7 @@ const quiet = (): undefined => undefined;
 let draggedId: number | null = null;
 
 const strip = (): HTMLElement => byId("tabs");
+const stripRow = (): HTMLElement => byId("tabstrip");
 
 function tabElement(target: EventTarget | null): HTMLElement | null {
   return (target as Element | null)?.closest<HTMLElement>(".tab") ?? null;
@@ -80,7 +88,31 @@ function onClick(event: MouseEvent): void {
 
 function onAuxClick(event: MouseEvent): void {
   const id = idOf(tabElement(event.target));
-  if (event.button === MIDDLE_BUTTON && id !== null) closeTab(id);
+  if (id !== null && stripMouse("tab", event.button, event.detail) === "close-tab") closeTab(id);
+}
+
+/** True for the empty part of the strip: not a tab, not a button. */
+function onEmptyStrip(target: EventTarget | null): boolean {
+  const el = target as Element | null;
+  return el?.closest(".tab, button, .popover") === null;
+}
+
+function onDoubleClick(event: MouseEvent): void {
+  if (!onEmptyStrip(event.target)) return;
+  if (stripMouse("empty", event.button, event.detail) === "new-tab") {
+    call("tab_new", {}).catch(quiet);
+  }
+}
+
+/**
+ * The empty strip is a window drag region, which maximizes the window on a double-click.
+ * A double-click there opens a tab instead (B2), so the second press never reaches the
+ * drag handler on the document.
+ */
+function keepWindow(event: MouseEvent): void {
+  if (event.button === 0 && event.detail >= 2 && onEmptyStrip(event.target)) {
+    event.stopPropagation();
+  }
 }
 
 function focusTab(id: number | undefined): void {
@@ -140,5 +172,9 @@ export function wireTabs(): void {
   el.addEventListener("dragover", (e) => e.preventDefault());
   el.addEventListener("drop", onDrop);
   el.addEventListener("wheel", onWheel, { passive: false });
+  const row = stripRow();
+  row.addEventListener("dblclick", onDoubleClick);
+  row.addEventListener("mousedown", keepWindow);
+  row.addEventListener("mouseup", keepWindow);
   byId("new-tab").addEventListener("click", () => call("tab_new", {}).catch(quiet));
 }

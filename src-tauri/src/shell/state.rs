@@ -11,6 +11,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::menu::MenuItem;
 use tauri::{Manager, Runtime, Url};
 
+use crate::context_menu::Target;
 use crate::core::Core;
 use crate::net::console::VerifiedConsole;
 use crate::net::gatekeeper::Gatekeeper;
@@ -47,6 +48,9 @@ pub struct Shared<R: Runtime> {
     pub buttons: Mutex<Option<(f64, f64)>>,
     /// The toolbar popup that is open, if any.
     pub popups: Mutex<Popups>,
+    /// The label of the webview of the last context menu, and its target: the chosen item
+    /// acts on them.
+    pub menu_target: Mutex<Option<(String, Target)>>,
     generation: AtomicU64,
 }
 
@@ -69,6 +73,7 @@ impl<R: Runtime> Shared<R> {
             fullscreen: AtomicBool::new(false),
             buttons: Mutex::new(None),
             popups: Mutex::new(Popups::default()),
+            menu_target: Mutex::new(None),
             generation: AtomicU64::new(0),
         }
     }

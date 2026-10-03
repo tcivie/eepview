@@ -20,8 +20,11 @@ objc2 = "0.6.4"
 objc2-app-kit = { version = "0.3.2", default-features = false, features = [
   "std",
   "objc2-core-foundation",
+  "NSApplication",
   "NSButton",
   "NSControl",
+  "NSEvent",
+  "NSPasteboard",
   "NSResponder",
   "NSView",
   "NSWindow",
@@ -32,6 +35,7 @@ objc2-foundation = { version = "0.3.2", default-features = false, features = [
   "NSGeometry",
   "NSObject",
   "NSString",
+  "NSUserDefaults",
   "NSValue",
 ] }
 objc2-web-kit = { version = "0.3.2", default-features = false, features = [
@@ -56,11 +60,21 @@ objc2-web-kit = { version = "0.3.2", default-features = false, features = [
 
 [target.'cfg(windows)'.dependencies]
 webview2-com = "0.39.1"
-windows = "0.62.2"
+windows = { version = "0.62.2", features = [
+  "Win32_Foundation",
+  "Win32_System_Com",
+  "Win32_System_DataExchange",
+  "Win32_System_Memory",
+  "Win32_System_Ole",
+  "Win32_UI_Input_KeyboardAndMouse",
+] }
 windows-core = "0.62.2"
 
 [target.'cfg(target_os = "linux")'.dependencies]
-webkit2gtk = "2.0.2"
+# Context menu items from a `GAction` need WebKitGTK 2.18.
+webkit2gtk = { version = "2.0.2", features = ["v2_18"] }
+# Already in the tree through wry and tao: key and button events, and the clipboard.
+gtk = "0.18.2"
 
 # Unsafe is allowed in this crate only, under strict rules: every unsafe block names its
 # invariant, holds one unsafe operation, and unsafe fns stay unsafe inside.
