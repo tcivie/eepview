@@ -8,6 +8,7 @@ import { chromeHeight, insetPx } from "../lib/chrome-height.ts";
 
 const POPUPS = ".suggestions, .menu, .tooltip, .router-panel";
 const quiet = (): undefined => undefined;
+const insetSheet = new CSSStyleSheet();
 let lastHeight = 0;
 let pending = 0;
 
@@ -36,7 +37,7 @@ function applyPlatform(platform: string): void {
 }
 
 function applyInsets(insets: ChromeInsets): void {
-  document.documentElement.style.setProperty("--chrome-inset-left", insetPx(insets.left));
+  insetSheet.replaceSync(`:root { --chrome-inset-left: ${insetPx(insets.left)}; }`);
 }
 
 function applyFullscreen(fullscreen: boolean): void {
@@ -44,6 +45,7 @@ function applyFullscreen(fullscreen: boolean): void {
 }
 
 export function wireLayout(): void {
+  document.adoptedStyleSheets = [...document.adoptedStyleSheets, insetSheet];
   const observer = new MutationObserver(scheduleSync);
   observer.observe(byId("chrome-bar"), {
     subtree: true,

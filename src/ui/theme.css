@@ -9,6 +9,8 @@
  * and the user did not force light, or when the user forces dark.
  */
 
+@layer base, components, pages, state;
+
 :root {
   color-scheme: light;
 
@@ -42,6 +44,9 @@
     "Helvetica Neue", Arial, sans-serif;
   --font-mono:
     ui-monospace, "SF Mono", "Cascadia Mono", "Segoe UI Mono", "DejaVu Sans Mono", monospace;
+  --fs-root: 100%;
+  --fs-mono: 0.92em;
+  --fs-2xs: 0.6875rem;
   --fs-xs: 0.75rem;
   --fs-sm: 0.8125rem;
   --fs-md: 0.9375rem;
@@ -56,8 +61,11 @@
   --fw-strong: 600;
   --tracking-display: -0.018em;
 
-  /* Spacing scale (4 px base). */
+  /* Spacing scale (4 px base), with hairline steps for tight controls. */
+  --space-px: 1px;
+  --space-0-5: 0.125rem;
   --space-1: 0.25rem;
+  --space-1-5: 0.375rem;
   --space-2: 0.5rem;
   --space-3: 0.75rem;
   --space-4: 1rem;
@@ -67,10 +75,31 @@
   --space-8: 4rem;
 
   /* Radii follow hierarchy: controls are tight, panels are soft. */
+  --radius-xxs: 2px;
+  --radius-xs: 4px;
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 16px;
   --radius-pill: 999px;
+  --radius-round: 50%;
+  --radius-mark: 19%;
+
+  /* Component sizes. */
+  --size-dot: 10px;
+  --size-letter-sm: 16px;
+  --size-letter-lg: 40px;
+  --size-control: 36px;
+  --size-control-sm: 28px;
+  --size-icon-btn: 32px;
+  --size-icon-btn-sm: 24px;
+  --border-marker: 3px;
+
+  /* Browser chrome rows. lib/chrome-height.ts uses the same heights. */
+  --tabstrip-h: 44px;
+  --tab-h: 36px;
+  --navrow-h: 40px;
+  --findbar-h: 40px;
+  --chrome-inset-left: 0px;
 
   /* Borders and shadows. Shadows only on things that float. */
   --border-width: 1px;

@@ -60,6 +60,7 @@ jobs:
       - run: npx biome ci .
       - run: npm run typecheck
       - run: ./scripts/palette-check.sh
+      - run: ./scripts/style-check.sh
 
   config:
     name: taplo + shellcheck + complexity + actionlint

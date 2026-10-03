@@ -38,10 +38,10 @@ function optionFor(item: Suggestion, index: number): HTMLElement {
   option.dataset.index = String(index);
   option.dataset.source = item.source;
   const title = document.createElement("span");
-  title.className = "suggestion-title";
+  title.className = "truncate";
   title.textContent = item.title || displayUrl(item.url);
   const url = document.createElement("span");
-  url.className = "suggestion-url";
+  url.className = "caption truncate";
   url.textContent = displayUrl(item.url);
   option.append(title, url);
   return option;
