@@ -13,6 +13,7 @@ import {
   panelText,
   sparkSeries,
 } from "../lib/router-panel.ts";
+import { statsView } from "../lib/router-stats.ts";
 import { areaPath, CHART_HEIGHT, linePath, scaleMax } from "../lib/sparkline.ts";
 import { MISSING } from "../lib/stats-view.ts";
 import { delegateClick } from "../shared/events.ts";
@@ -62,7 +63,17 @@ export function renderPanelStatus(status: RouterStatus): void {
   renderControls(status);
   const ready = shouldRedetect(lastStatus, status);
   lastStatus = status;
-  if (ready && !panel().hidden) call("console_detect", {}).then(renderConsole).catch(quiet);
+  if (ready && !panel().hidden) detectConsole();
+}
+
+/** Probes for a console, then loads the figures again: a console found now fills them. */
+function detectConsole(): void {
+  call("console_detect", {})
+    .then((info) => {
+      renderConsole(info);
+      return refresh();
+    })
+    .catch(quiet);
 }
 
 function renderConsole(info: ConsoleInfo): void {
@@ -83,7 +94,7 @@ function showConsoleVersion(): void {
   if (version) byId("rp-version").textContent = `I2P ${version}`;
 }
 
-function renderSpark(history: RouterStats["history"]): void {
+function renderSpark(history: ReturnType<typeof statsView>["history"]): void {
   const series = sparkSeries(history);
   if (!series) {
     for (const id of SPARK_PATHS) byId(id).setAttribute("d", EMPTY_PATH);
@@ -96,10 +107,11 @@ function renderSpark(history: RouterStats["history"]): void {
 }
 
 function renderStats(stats: RouterStats): void {
-  const text = panelText(stats);
+  const view = statsView(stats);
+  const text = panelText(view);
   for (const [id, key] of Object.entries(STAT_FIELDS)) byId(id).textContent = text[key];
   if (text.version === MISSING) showConsoleVersion();
-  renderSpark(stats.history);
+  renderSpark(view.history);
 }
 
 /** Loads the figures, then reports the new size: the panel may have grown. */
@@ -114,7 +126,7 @@ async function refresh(): Promise<void> {
 /** The panel opened: refresh it now and every 5 s while it is open. */
 export function openPanel(): void {
   refresh().catch(quiet);
-  call("console_detect", {}).then(renderConsole).catch(quiet);
+  detectConsole();
   window.clearInterval(refreshTimer);
   refreshTimer = window.setInterval(() => refresh().catch(quiet), REFRESH_MS);
   byId("rp-title").focus();

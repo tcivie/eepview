@@ -79,23 +79,35 @@ export type PopupClosed = { id: number; kind: PopupKind; refocus: boolean };
 export type BandwidthHistory = { stepSeconds: number; inBps: number[]; outBps: number[] };
 export type RouterAction = "restart" | "stop";
 
+export type BandwidthSample = { t: number; in: number; out: number };
+
 export type RouterStats = {
+  version: string | null;
+  uptimeMs: number | null;
+  uptimeResolutionMs: number | null;
   networkStatus: string | null;
-  uptimeSeconds: number | null;
-  routerKind: string | null;
-  routerVersion: string | null;
-  javaVersion: string | null;
-  bandwidthInBps: number | null;
-  bandwidthOutBps: number | null;
-  history: BandwidthHistory | null;
-  clientTunnels: number | null;
-  inboundTunnels: number | null;
-  outboundTunnels: number | null;
-  activePeers: number | null;
-  participatingTunnels: number | null;
-  buildSuccessRate: number | null;
   knownRouters: number | null;
   floodfills: number | null;
+  activePeers: number | null;
+  tunnels: {
+    in: number | null;
+    out: number | null;
+    participating: number | null;
+    client: number | null;
+    exploratory: number | null;
+  };
+  bandwidthBytesPerSecond: {
+    in1s: number | null;
+    out1s: number | null;
+    in5m: number | null;
+    out5m: number | null;
+  };
+  tunnelBuildSuccessPercent: {
+    exploratory: number | null;
+    client: number | null;
+    total: number | null;
+  };
+  history: BandwidthSample[];
 };
 export type ConsolePage = "home" | "tunnels" | "addressbook" | "config" | "logs";
 export type ConsoleKind = "java" | "i2pd";

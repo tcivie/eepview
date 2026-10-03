@@ -280,6 +280,7 @@ pub fn set_console<R: Runtime>(app: &AppHandle<R>, console: Option<VerifiedConso
 /// re-checked every 10 s (misses count, R21); a miss here clears the stored console at once
 /// and is retried every 10 s for 2 minutes.
 pub fn detect_now<R: Runtime>(app: &AppHandle<R>) -> ConsoleInfo {
+    shared(app).console_stopped.store(false, Ordering::SeqCst);
     let found = detect_here();
     let info = info_of(found.as_ref());
     let hit = found.is_some();
@@ -292,10 +293,17 @@ pub fn detect_now<R: Runtime>(app: &AppHandle<R>) -> ConsoleInfo {
     info
 }
 
-/// R22: ends every re-check and retry loop at its next tick. After it, no loop opens a
-/// connection; a later [`detect_now`] starts the loops again.
+/// R22: ends every re-check and retry loop at its next tick. After it, no loop and no
+/// statistics request opens a connection; a later [`detect_now`] starts the loops again.
 pub fn stop<R: Runtime>(app: &AppHandle<R>) {
+    shared(app).console_stopped.store(true, Ordering::SeqCst);
     shared(app).console_epoch.fetch_add(1, Ordering::SeqCst);
+}
+
+/// True after [`stop`], until the next [`detect_now`].
+#[must_use]
+pub fn stopped<R: Runtime>(app: &AppHandle<R>) -> bool {
+    shared(app).console_stopped.load(Ordering::SeqCst)
 }
 
 /// True while the loop of epoch `epoch` may still run: no [`stop`] since it started.

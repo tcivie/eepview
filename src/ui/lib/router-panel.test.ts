@@ -167,6 +167,7 @@ describe("[R34] the router panel shows the uptime to its resolution", () => {
 
 const tunnelsLine = (patch: Partial<PanelStatsLike>): string => panelText(stats(patch)).tunnels;
 const NO_SPLIT = { inboundTunnels: null, outboundTunnels: null };
+const NO_PARTICIPATING = { clientTunnels: 2, exploratoryTunnels: 11, participatingTunnels: null };
 
 describe("[R35] the tunnels line without the in and out split", () => {
   it("[R35] shows client, exploratory and participating", () => {
@@ -192,7 +193,7 @@ describe("[R35] the tunnels line without the in and out split", () => {
   });
 
   it('[R35] shows "—" for a participating count that is null', () => {
-    const line = tunnelsLine({ ...NO_SPLIT, clientTunnels: 2, exploratoryTunnels: 11 });
+    const line = tunnelsLine({ ...NO_SPLIT, ...NO_PARTICIPATING });
     assert.equal(line, "2 client · 11 exploratory · — participating");
   });
 

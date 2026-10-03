@@ -6,6 +6,7 @@ export const MISSING = "—";
 export interface StatsLike {
   networkStatus: string | null;
   uptimeSeconds: number | null;
+  uptimeResolutionSeconds?: number | null;
   routerKind: string | null;
   routerVersion: string | null;
   javaVersion: string | null;
@@ -54,14 +55,36 @@ export function formatPercent(rate: number | null): string {
   return rate === null ? MISSING : `${(rate * 100).toFixed(1)}%`;
 }
 
-export function formatUptime(seconds: number | null): string {
+interface UptimeUnit {
+  label: string;
+  size: number;
+  wrap: number;
+}
+
+const UPTIME_UNITS: readonly UptimeUnit[] = [
+  { label: "d", size: DAY_S, wrap: Number.POSITIVE_INFINITY },
+  { label: "h", size: HOUR_S, wrap: DAY_S },
+  { label: "min", size: MINUTE_S, wrap: HOUR_S },
+];
+
+const unitCount = (unit: UptimeUnit, seconds: number): number =>
+  Math.floor((seconds % unit.wrap) / unit.size);
+
+/** The units the resolution allows: none is smaller than the resolution, days at least. */
+function keptUnits(resolutionSeconds: number | null | undefined): readonly UptimeUnit[] {
+  const kept = UPTIME_UNITS.filter((unit) => unit.size >= (resolutionSeconds ?? 0));
+  return kept.length > 0 ? kept : UPTIME_UNITS.slice(0, 1);
+}
+
+/** The largest unit with a value and the next smaller one, without a unit under the resolution. */
+export function formatUptime(seconds: number | null, resolutionSeconds?: number | null): string {
   if (seconds === null) return MISSING;
-  const days = Math.floor(seconds / DAY_S);
-  const hours = Math.floor((seconds % DAY_S) / HOUR_S);
-  const minutes = Math.floor((seconds % HOUR_S) / MINUTE_S);
-  if (days > 0) return `${days} d ${hours} h`;
-  if (hours > 0) return `${hours} h ${minutes} min`;
-  return `${minutes} min`;
+  const kept = keptUnits(resolutionSeconds);
+  const found = UPTIME_UNITS.findIndex((unit) => unitCount(unit, seconds) > 0);
+  const lead = found === -1 ? UPTIME_UNITS.length - 1 : found;
+  const parts = UPTIME_UNITS.slice(lead, lead + 2).filter((unit) => kept.includes(unit));
+  const shown = parts.length > 0 ? parts : kept.slice(-1);
+  return shown.map((unit) => `${unitCount(unit, seconds)} ${unit.label}`).join(" ");
 }
 
 export function formatRouter(kind: string | null, version: string | null): string {
@@ -81,7 +104,7 @@ export function statsText(stats: StatsLike): StatsText {
     buildRate: formatPercent(rate),
     buildRateBar: rate === null ? 0 : Math.round(Math.min(1, Math.max(0, rate)) * 100),
     networkStatus: text(stats.networkStatus),
-    uptime: formatUptime(stats.uptimeSeconds),
+    uptime: formatUptime(stats.uptimeSeconds, stats.uptimeResolutionSeconds),
     router: formatRouter(stats.routerKind, stats.routerVersion),
     java: text(stats.javaVersion),
     knownRouters: formatCount(stats.knownRouters),

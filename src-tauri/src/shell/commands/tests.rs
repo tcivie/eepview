@@ -242,11 +242,7 @@ mod stats_from_console {
         );
     }
 
-    #[test]
-    fn r23_current_stats_reads_the_stored_java_console() {
-        let app = app();
-        let _fake = java_console(&app);
-        let stats = current_stats(&handle(&app), None);
+    fn check_java_uptime_and_bandwidth(stats: &RouterStats) {
         assert_eq!(stats.uptime_ms, Some(28_800_000));
         assert_eq!(stats.uptime_resolution_ms, Some(3_600_000));
         assert_eq!(stats.network_status.as_deref(), Some("OK"));
@@ -254,6 +250,9 @@ mod stats_from_console {
         assert_eq!(stats.bandwidth_bytes_per_second.out1s, Some(37_370));
         assert_eq!(stats.bandwidth_bytes_per_second.in5m, Some(37_830));
         assert_eq!(stats.bandwidth_bytes_per_second.out5m, Some(33_060));
+    }
+
+    fn check_java_counts(stats: &RouterStats) {
         assert_eq!(stats.active_peers, Some(1678));
         assert_eq!(stats.known_routers, Some(4905));
         assert_eq!(stats.floodfills, Some(1570));
@@ -261,6 +260,15 @@ mod stats_from_console {
         assert_eq!(stats.tunnels.client, Some(2));
         assert_eq!(stats.tunnels.exploratory, Some(11));
         assert_eq!(stats.version, None);
+    }
+
+    #[test]
+    fn r23_current_stats_reads_the_stored_java_console() {
+        let app = app();
+        let _fake = java_console(&app);
+        let stats = current_stats(&handle(&app), None);
+        check_java_uptime_and_bandwidth(&stats);
+        check_java_counts(&stats);
     }
 
     #[test]
@@ -360,18 +368,16 @@ mod stats_from_console {
         assert!(second.history[1].t >= second.history[0].t + 4_000);
     }
 
-    #[test]
-    fn r33_the_router_stats_command_answers_the_contract_v1_6_shape() {
-        // R31, R33, IPC contract v1.6: camelCase keys, the new fields, history samples.
-        let app = app();
-        let _fake = java_console(&app);
-        let value = ok(&app, "router_stats", json!({}));
+    fn check_shape_figures(value: &Value) {
         assert_eq!(value["uptimeMs"], json!(28_800_000));
         assert_eq!(value["uptimeResolutionMs"], json!(3_600_000));
         assert_eq!(value["floodfills"], json!(1570));
         assert_eq!(value["activePeers"], json!(1678));
         assert_eq!(value["knownRouters"], json!(4905));
         assert_eq!(value["networkStatus"], json!("OK"));
+    }
+
+    fn check_shape_groups(value: &Value) {
         assert_eq!(value["tunnels"]["participating"], json!(398));
         assert_eq!(value["tunnels"]["client"], json!(2));
         assert_eq!(value["tunnels"]["exploratory"], json!(11));
@@ -381,11 +387,25 @@ mod stats_from_console {
         assert_eq!(value["bandwidthBytesPerSecond"]["out5m"], json!(33_060));
         assert_eq!(value["tunnelBuildSuccessPercent"]["total"], Value::Null);
         assert_eq!(value["version"], Value::Null);
+    }
+
+    fn check_shape_history(value: &Value) {
         let history = value["history"].as_array().unwrap();
         assert_eq!(history.len(), 1);
         assert_eq!(history[0]["in"], json!(53_910));
         assert_eq!(history[0]["out"], json!(37_370));
         assert!(history[0]["t"].is_u64());
+    }
+
+    #[test]
+    fn r33_the_router_stats_command_answers_the_contract_v1_6_shape() {
+        // R31, R33, IPC contract v1.6: camelCase keys, the new fields, history samples.
+        let app = app();
+        let _fake = java_console(&app);
+        let value = ok(&app, "router_stats", json!({}));
+        check_shape_figures(&value);
+        check_shape_groups(&value);
+        check_shape_history(&value);
     }
 
     #[test]

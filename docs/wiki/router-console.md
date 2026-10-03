@@ -5,7 +5,7 @@ SPDX-License-Identifier: MIT
 
 # Router console
 
-Status: detection, links and the console view shipped in [#54](https://github.com/tcivie/eepview/pull/54). Router statistics from the console (R23–R36): in progress.
+Status: detection, links and the console view shipped in [#54](https://github.com/tcivie/eepview/pull/54). Router statistics from the console (R23–R36) shipped in [#78](https://github.com/tcivie/eepview/pull/78).
 
 eepview shows router information. It does not change the router configuration. All router configuration goes through the router's own console pages. eepview finds the console of the router in use and gives quick links to it. When the router has no eepview helper, eepview also reads the router statistics from that console (R23–R36).
 
@@ -90,7 +90,7 @@ The console view is not a web tab. It is built in `src-tauri/src/shell/console.r
 - **R19 Console rule list.** Before its first load, the console view gets an engine rule list: block every URL, then allow only URLs on the console origin (R9) and `about:`, `data:`, `blob:`. The view starts on `about:blank` and loads the page only after the list is attached. If it cannot be attached, nothing loads (fail closed). On Windows the same rule answers each `WebResourceRequested` with 403. Linux has no engine filter yet (the same limit as L3b for tabs); there the console view relies on R10 and the router's own pages.
 - **R20 Retry after a miss.** When a `console_detect()` finds no console, eepview retries every 10 s for 2 minutes (12 retries), and stops at the first console found. A new trigger during the retries does not start a second retry loop. The UI also calls `console_detect()` when `router-status` turns `ok` (from any other state, not paused) while a page with the links shows: the home page or Settings as the active tab, or the open router panel.
 - **R21 Re-check misses.** While a console is known, a re-check runs every 10 s. A re-check that finds a different console (another port or type) replaces it at once. A re-check that finds none counts a miss; the known console stays, with no event, until 3 misses in a row. The third miss clears it: `console-changed` with `found: false`, and the console window closes. A re-check that finds the same console resets the count.
-- **R22 Stop.** `shell::console::stop(app)` ends every re-check and retry loop at its next tick (at most one tick, 10 s). After stop, no thread opens a connection to a console port. The shell calls it on `RunEvent::Exit`. A later `detect_now` starts the loops again.
+- **R22 Stop.** `shell::console::stop(app)` ends every re-check and retry loop at its next tick (at most one tick, 10 s). After stop, no thread opens a connection to a console port, and `router_stats()` asks no console (R26). The shell calls it on `RunEvent::Exit`. A later `detect_now` starts the loops again.
 
 ### Router statistics from the console
 
@@ -110,12 +110,12 @@ The router panel and the Network page (`eepview://stats`) show the router statis
   | i2pd | `/` |
 
   The path never carries a `lang`, `action` or `consoleNonce` parameter. (A Java I2P console saves `?lang=` in the router configuration.) The request code lives in `src-tauri/src/net/` (ADR 0001 rule 2). The Java path is the sidebar data that the console's own script loads every 15 s, with the section list of the sidebar page (`/summaryframe`). It has the least markup of the pages that carry the figures.
-- **R25 Bounds.** The request waits at most 3 s to connect and 3 s for each read. It reads at most 256 KiB. A closed port, a timeout before any answer, a status other than `200`, or an answer that is not HTTP counts as "the console does not answer": R23 moves on. A body cut by the size cap or by the timeout is still parsed; R27 makes every cut value `null`.
+- **R25 Bounds.** The whole request, connect and reads together, takes at most 3 s. It reads at most 256 KiB of the page. A peer that sends slowly cannot hold a call longer than 3 s. A closed port, a timeout before any answer, a status other than `200`, or an answer that is not HTTP counts as "the console does not answer": R23 moves on. A body cut by the size cap or by the timeout is still parsed; R27 makes every cut value `null`.
 - **R26 Cadence.** Rust starts no thread and no timer for the console statistics: each `router_stats()` call makes at most one console request. The UI calls `router_stats()` every 5 s, and only while the figures show:
   - the router panel: while it is open (unchanged);
   - the Network page: while `document.visibilityState` is `"visible"`. It stops while the page is hidden, and refreshes at once when it shows again.
 
-  The Network page calls `console_detect()` once when it loads (a new trigger for R6). The router panel and the Network page load the figures again when that `console_detect()` answers, so a console found at that moment fills the figures at once. After `RunEvent::Exit`, no page calls `router_stats()`, so no console request runs.
+  The Network page calls `console_detect()` once when it loads (a new trigger for R6). The router panel and the Network page load the figures again when that `console_detect()` answers, so a console found at that moment fills the figures at once. After `RunEvent::Exit`, no page calls `router_stats()`, so no console request runs. After `shell::console::stop` (R22), `router_stats()` asks no console either, until the next detection. A call that starts after the stop sends no request; a request already sent ends within 3 s (R25).
 - **R27 Fail closed, per field.** Each field is parsed alone. A field that does not match its rule exactly is `null`, and the UI shows "—". eepview never shows a guessed or a derived number.
   - An integer is one or more ASCII digits and fits in `u64`. A decimal is ASCII digits, then optionally `.` and one or more digits. No sign, no group separator, no `,` as the decimal mark, no other digit set. A value that does not match is `null`.
   - A value must end with the terminator its rule names. A value at the end of the body (cut by R25) is `null`.
@@ -164,7 +164,7 @@ The router panel and the Network page (`eepview://stats`) show the router statis
   | `tunnels.participating` | `Transit Tunnels` | `N`, then `<br>` | `N` |
 
   Always `null` from i2pd: `version` (R18), `activePeers` (the main page has no peer count), `tunnels.in`, `tunnels.out`, `tunnels.exploratory`, `bandwidthBytesPerSecond.in5m` and `.out5m`, `tunnelBuildSuccessPercent.exploratory` and `.client`. The label `Total tunnel creation success rate` is a different label and is not read.
-- **R31 New `RouterStats` fields (contract v1.6).** `uptimeResolutionMs`, `floodfills`, `tunnels.client`, `tunnels.exploratory` and `tunnelBuildSuccessPercent.total`. See [IPC contract](ipc-contract.md). `bandwidthBytesPerSecond.in1s` and `.out1s` hold the shortest window that the source gives, which the UI shows as "now": 1 s from the helper, 3 s from Java I2P, 15 s from i2pd. From the helper: `uptimeResolutionMs` is `1` when `uptimeMs` is set, else `null`. `tunnels.client` is `clientInbound + clientOutbound` and `tunnels.exploratory` is `exploratoryInbound + exploratoryOutbound`, each `null` when a part is missing. `floodfills` and `tunnelBuildSuccessPercent.total` are `null`.
+- **R31 New `RouterStats` fields (contract v1.6).** `uptimeResolutionMs`, `floodfills`, `tunnels.client`, `tunnels.exploratory` and `tunnelBuildSuccessPercent.total`. See [IPC contract](ipc-contract.md). `bandwidthBytesPerSecond.in1s` and `.out1s` hold the shortest window that the source gives, which the UI shows as "now": 1 s from the helper, and the current rate that the console gives from Java I2P and i2pd. (The Java I2P row is labeled "3 sec", but the console only shows the router's current rate there, so it is not a 3 s average.) From the helper: `uptimeResolutionMs` is `1` when `uptimeMs` is set, else `null`. `tunnels.client` is `clientInbound + clientOutbound` and `tunnels.exploratory` is `exploratoryInbound + exploratoryOutbound`, each `null` when a part is missing. `floodfills` and `tunnelBuildSuccessPercent.total` are `null`.
 - **R32 Bandwidth history from the console.** When `router_stats()` answers from the console, it adds that answer's bandwidth sample to the 10-minute history, as the watcher does for the helper. It adds no sample when the newest sample is less than 4 s old, so the panel and the Network page together still add one sample per 5 s. The `history` of the answer includes the new sample. With the console, the history grows only while a page shows the figures.
 - **R33 The UI reads the contract shape.** `router_stats()` answers the `RouterStats` of the [IPC contract](ipc-contract.md). `src/ui/contract.ts` uses that same shape. The router panel and the Network page turn it into their view with one pure function, `statsView` (below):
 
@@ -181,7 +181,7 @@ The router panel and the Network page (`eepview://stats`) show the router statis
   | `history` | `{ stepSeconds: 5, inBps: history[].in, outBps: history[].out }`, oldest first; `null` when `history` is empty |
   | `routerKind`, `javaVersion` | `null` |
 
-  A missing or `null` input gives a view with every field `null`.
+  `buildSuccessRate` never uses `tunnelBuildSuccessPercent.client`: the build success of client tunnels alone is not the build success of the router, and the panel would show it as the router's rate. A helper that gives only `client` shows "—". A missing or `null` input gives a view with every field `null`.
 - **R34 Uptime to its resolution.** The UI never shows a unit smaller than the uptime resolution. `formatUptime(seconds, resolutionSeconds)` keeps today's form (`<d> d <h> h`, `<h> h <m> min`, `<m> min`) and drops each unit smaller than `resolutionSeconds`: with a resolution of 3 600 s, 28 800 s is `8 h`, not `8 h 0 min`; with 86 400 s, 172 800 s is `2 d`. A `null` or missing resolution, or one below 60 s, gives today's output. The router panel and the Network page pass `uptimeResolutionSeconds`.
 - **R35 Tunnels line in the router panel.** When `inboundTunnels` and `outboundTunnels` are both `null` and `clientTunnels` or `exploratoryTunnels` is not, the line is `<client> client · <exploratory> exploratory · <participating> participating`, each count as `formatCount` gives it ("—" when `null`). Else it stays `<in> in · <out> out · <participating> participating`.
 - **R36 Where eepview connects.** The About list row of the console names the statistics too: "Router console check, router statistics and the console window".
@@ -302,7 +302,7 @@ In `eepview_lib::net::console` (`src-tauri/src/net/console.rs`):
 ```rust
 use crate::net::stats::RouterStats;
 
-pub const STATS_TIMEOUT: Duration = Duration::from_secs(3);   // R25
+pub const STATS_TIMEOUT: Duration = Duration::from_secs(3);   // R25, the whole request
 pub const STATS_MAX_ANSWER: u64 = 256 * 1024;                  // R25, bytes
 
 /// R24: "/xhr1.jsp?requestURI=/summaryframe" (Java I2P) or "/" (i2pd).
@@ -313,8 +313,9 @@ pub fn parse_java_summary(body: &str) -> RouterStats;
 pub fn parse_i2pd_main(body: &str) -> RouterStats;
 /// The parser of `kind`.
 pub fn parse_console_stats(kind: ConsoleKind, body: &str) -> RouterStats;
-/// R24, R25: one GET of `stats_path` on the console origin, parsed. `None` when the
-/// console does not answer `200` (R25). `history` is always empty here.
+/// R24, R25: one GET of `stats_path` on the console origin, parsed, with the request code of
+/// `probe` and its own bounds. `None` when the console does not answer `200` (R25).
+/// `history` is always empty here.
 pub fn fetch_stats(console: &VerifiedConsole) -> Option<RouterStats>;
 ```
 
@@ -452,8 +453,8 @@ export function formatUptime(seconds: number | null, resolutionSeconds?: number 
 - `src-tauri/src/shell/console/tests.rs` (R6, R8, R10–R13, R20–R22; the mock runtime fixtures in `crate::shell::testing`)
 - `src-tauri/tests/architecture.rs` (R4, R8, R11, R14)
 - `src/ui/lib/console-links.test.ts` (R15, R18, R20)
-- `src-tauri/src/net/console/tests.rs` (R24, R25, R27–R30, with the fixtures)
-- `src-tauri/src/net/console/stats_tests.rs` (new, declared from `console.rs` as `#[cfg(test)] mod stats_tests;`: R23 `pick`, R31, R32 `record_spaced`)
+- `src-tauri/src/net/console/stats_from_console.rs` (R24, R25, R27–R30, with the fixtures; declared from `console.rs` as `#[cfg(test)] mod stats_from_console;`)
+- `src-tauri/src/net/stats/requirement_tests.rs` (declared from `stats.rs` as `#[cfg(test)] mod requirement_tests;`: R23 `pick`, R31, R32 `record_spaced`)
 - `src-tauri/src/shell/commands/tests.rs` (R23, R26 one request per call, R32 through `current_stats`)
 - `src-tauri/tests/architecture.rs` (R24: the request code stays in `net/`)
 - `src/ui/lib/router-stats.test.ts` (R33), `src/ui/lib/stats-view.test.ts` (R34), `src/ui/lib/router-panel.test.ts` (R34, R35)
@@ -465,10 +466,11 @@ export function formatUptime(seconds: number | null, resolutionSeconds?: number 
 - A console behind a password (Java I2P console password, i2pd `http.auth`) is not detected.
 - i2pd with a `webroot` other than `/`, or with `http.address` other than `127.0.0.1`, is not detected.
 - Linux: the console view has no engine rule list yet (R19); see [No-leak architecture](no-leak-architecture.md).
-- Statistics from a Java I2P console: no build success rate, and no inbound and outbound split of the tunnels. The uptime has the coarse unit of the console ("8 hours"). The uptime needs an English console; the other figures work in every language. A future console that reorders the rows of a sidebar table without changing their count would give wrong figures; the fixture tests pin the 2.13.0 layout.
+- Statistics from a Java I2P console: no build success rate, and no inbound and outbound split of the tunnels. The uptime has the coarse unit of the console ("8 hours"). The uptime needs an English console. The other figures work in every console language, but they need a router JVM that writes numbers with `.` as the decimal mark and no group separator: Java I2P formats them with the JVM default locale, so on a `de_DE` or `fr_FR` system the bandwidth (`53,91`) and a long uptime (`1,095 days`) are "—". A future console that reorders the rows of a sidebar table without changing their count would give wrong figures; the fixture tests pin the 2.13.0 layout.
 - Statistics from i2pd: English console only (R30). Written from the i2pd source, not tested against a live i2pd.
 - A sidebar section that the user removed in the Java I2P console settings gives "—" for its figures.
 
 ## History
 
 - 2026-10-03 — Router console detection, quick links and the console view — [#54](https://github.com/tcivie/eepview/pull/54)
+- 2026-10-03 — Router statistics from the console, UI contract shape — [#78](https://github.com/tcivie/eepview/pull/78)

@@ -22,6 +22,9 @@ const MAX_ANSWER: u64 = 64 * 1024;
 /// How far back [`History`] reaches: 10 minutes.
 pub const HISTORY_SPAN_MS: u64 = 10 * 60 * 1000;
 
+/// [`History::record_spaced`] adds no sample when the newest one is younger than this.
+pub const MIN_SAMPLE_GAP_MS: u64 = 4_000;
+
 /// One bandwidth sample, bytes per second over the last second.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 pub struct Sample {
@@ -58,6 +61,18 @@ impl History {
         }
     }
 
+    /// Like [`History::record`], but adds no sample when the newest one is less than
+    /// [`MIN_SAMPLE_GAP_MS`] older than `now`.
+    pub fn record_spaced(&mut self, now: u64, stats: &RouterStats) {
+        let fresh = self
+            .samples
+            .back()
+            .is_some_and(|s| now.saturating_sub(s.t) < MIN_SAMPLE_GAP_MS);
+        if !fresh {
+            self.record(now, stats);
+        }
+    }
+
     /// The samples, oldest first.
     #[must_use]
     pub fn samples(&self) -> Vec<Sample> {
@@ -75,6 +90,10 @@ pub struct Tunnels {
     pub out: Option<u64>,
     /// Tunnels this router takes part in for others.
     pub participating: Option<u64>,
+    /// Client tunnels (inbound + outbound).
+    pub client: Option<u64>,
+    /// Exploratory tunnels (inbound + outbound).
+    pub exploratory: Option<u64>,
 }
 
 /// Bandwidth in bytes per second.
@@ -98,6 +117,8 @@ pub struct BuildSuccess {
     pub exploratory: Option<u64>,
     /// Client tunnels.
     pub client: Option<u64>,
+    /// All tunnels together.
+    pub total: Option<u64>,
 }
 
 /// The contract `RouterStats` type. Every field is nullable.
@@ -108,10 +129,14 @@ pub struct RouterStats {
     pub version: Option<String>,
     /// Uptime in ms.
     pub uptime_ms: Option<u64>,
+    /// The smallest step of the uptime in ms: 1 for the helper, the console unit otherwise.
+    pub uptime_resolution_ms: Option<u64>,
     /// Network status name, such as `OK` or `FIREWALLED`.
     pub network_status: Option<String>,
     /// Routers in the network database.
     pub known_routers: Option<u64>,
+    /// Floodfill routers in the network database.
+    pub floodfills: Option<u64>,
     /// Peers with an open connection.
     pub active_peers: Option<u64>,
     /// Tunnel counts.
@@ -137,13 +162,17 @@ pub fn from_helper(v: &Value) -> RouterStats {
     RouterStats {
         version: text("version"),
         uptime_ms: num(&["uptimeMs"]),
+        uptime_resolution_ms: num(&["uptimeMs"]).map(|_| 1),
         network_status: text("networkStatus"),
         known_routers: num(&["knownRouters"]),
+        floodfills: None,
         active_peers: num(&["activePeers"]),
         tunnels: Tunnels {
             inbound: sum("clientInbound", "exploratoryInbound"),
             out: sum("clientOutbound", "exploratoryOutbound"),
             participating: num(&["tunnels", "participating"]),
+            client: sum("clientInbound", "clientOutbound"),
+            exploratory: sum("exploratoryInbound", "exploratoryOutbound"),
         },
         bandwidth_bytes_per_second: Bandwidth {
             in1s: num(&["bandwidthBytesPerSecond", "in1s"]),
@@ -154,6 +183,7 @@ pub fn from_helper(v: &Value) -> RouterStats {
         tunnel_build_success_percent: BuildSuccess {
             exploratory: num(&["tunnelBuildSuccessPercent", "exploratory"]),
             client: num(&["tunnelBuildSuccessPercent", "client"]),
+            total: None,
         },
         history: Vec::new(),
     }
@@ -162,10 +192,41 @@ pub fn from_helper(v: &Value) -> RouterStats {
 /// Fetches the helper status. All-null stats when the helper does not answer.
 #[must_use]
 pub fn fetch(addr: LoopbackAddr, token: &str) -> RouterStats {
+    try_fetch(addr, token).unwrap_or_default()
+}
+
+/// The helper answer, or `None` when the helper does not answer `200` with JSON.
+#[must_use]
+pub fn try_fetch(addr: LoopbackAddr, token: &str) -> Option<RouterStats> {
     request(addr, token)
         .and_then(|body| serde_json::from_str::<Value>(&body).ok())
         .map(|v| from_helper(&v))
-        .unwrap_or_default()
+}
+
+/// Which source gave the figures. Never shown in the UI.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StatsSource {
+    /// The router helper.
+    Helper,
+    /// The router console.
+    Console,
+    /// No source answered.
+    None,
+}
+
+/// The helper stats when `Some`; else the stats of `console`, asked once; else all-null
+/// stats. `console` does not run when `helper` is `Some`.
+pub fn pick(
+    helper: Option<RouterStats>,
+    console: impl FnOnce() -> Option<RouterStats>,
+) -> (RouterStats, StatsSource) {
+    if let Some(stats) = helper {
+        return (stats, StatsSource::Helper);
+    }
+    console().map_or_else(
+        || (RouterStats::default(), StatsSource::None),
+        |stats| (stats, StatsSource::Console),
+    )
 }
 
 fn request(addr: LoopbackAddr, token: &str) -> Option<String> {
@@ -180,6 +241,9 @@ fn request(addr: LoopbackAddr, token: &str) -> Option<String> {
     let (code, body) = parse_answer(&raw)?;
     (code == 200).then_some(body)
 }
+
+#[cfg(test)]
+mod requirement_tests;
 
 #[cfg(test)]
 mod tests {

@@ -4,6 +4,8 @@
 import { type RouterLike, type RouterTone, routerView } from "./router-view.ts";
 import { formatCount, formatPercent, formatRate, formatUptime, MISSING } from "./stats-view.ts";
 
+export { formatUptime };
+
 export const SPARK_WINDOW_SECONDS = 600;
 export const UNMANAGED_TITLE = "Only for a router that eepview manages";
 const MIN_POINTS = 2;
@@ -11,9 +13,12 @@ const MIN_POINTS = 2;
 export interface PanelStatsLike {
   routerVersion: string | null;
   uptimeSeconds: number | null;
+  uptimeResolutionSeconds?: number | null;
   activePeers: number | null;
   inboundTunnels: number | null;
   outboundTunnels: number | null;
+  clientTunnels?: number | null;
+  exploratoryTunnels?: number | null;
   participatingTunnels: number | null;
   buildSuccessRate: number | null;
   bandwidthInBps: number | null;
@@ -55,6 +60,25 @@ export function tunnelsText(
   return `${formatCount(inbound)} in · ${formatCount(outbound)} out · ${formatCount(part)} participating`;
 }
 
+/** The tunnels line of a router that gives client and exploratory counts, not in and out. */
+export function kindTunnelsText(
+  client: number | null,
+  exploratory: number | null,
+  part: number | null,
+): string {
+  return `${formatCount(client)} client · ${formatCount(exploratory)} exploratory · ${formatCount(part)} participating`;
+}
+
+function panelTunnels(stats: PanelStatsLike): string {
+  const client = stats.clientTunnels ?? null;
+  const exploratory = stats.exploratoryTunnels ?? null;
+  const noSplit = stats.inboundTunnels === null && stats.outboundTunnels === null;
+  if (noSplit && (client !== null || exploratory !== null)) {
+    return kindTunnelsText(client, exploratory, stats.participatingTunnels);
+  }
+  return tunnelsText(stats.inboundTunnels, stats.outboundTunnels, stats.participatingTunnels);
+}
+
 export function bandwidthText(inBps: number | null, outBps: number | null): string {
   return `${formatRate(inBps)} in · ${formatRate(outBps)} out`;
 }
@@ -62,9 +86,9 @@ export function bandwidthText(inBps: number | null, outBps: number | null): stri
 export function panelText(stats: PanelStatsLike): PanelText {
   return {
     version: stats.routerVersion ? `I2P ${stats.routerVersion}` : MISSING,
-    uptime: formatUptime(stats.uptimeSeconds),
+    uptime: formatUptime(stats.uptimeSeconds, stats.uptimeResolutionSeconds),
     peers: formatCount(stats.activePeers),
-    tunnels: tunnelsText(stats.inboundTunnels, stats.outboundTunnels, stats.participatingTunnels),
+    tunnels: panelTunnels(stats),
     build: formatPercent(stats.buildSuccessRate),
     bandwidth: bandwidthText(stats.bandwidthInBps, stats.bandwidthOutBps),
   };

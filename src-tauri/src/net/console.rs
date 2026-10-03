@@ -12,9 +12,9 @@
 
 use std::fs;
 use std::io::{Read, Write};
-use std::net::{Ipv4Addr, SocketAddr};
+use std::net::{Ipv4Addr, SocketAddr, TcpStream};
 use std::path::{Path, PathBuf};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use serde::Serialize;
 use serde_json::{Value, json};
@@ -22,8 +22,13 @@ use tauri::Url;
 
 use super::loopback::LoopbackAddr;
 use super::rules::LOCAL_URL_PATTERNS;
+use super::stats::RouterStats;
 use super::verify::{Answer, parse_answer};
 use crate::nav;
+
+mod figures;
+
+pub use figures::{parse_i2pd_main, parse_java_summary};
 
 /// The Java I2P console port when the configuration names none.
 pub const JAVA_DEFAULT_PORT: u16 = 7657;
@@ -42,6 +47,12 @@ const TIMEOUT: Duration = Duration::from_secs(5);
 pub const RECHECK_MISSES: u32 = 3;
 /// Most bytes read from one probe answer.
 const MAX_ANSWER: u64 = 512 * 1024;
+/// The statistics request takes at most this long, connect and reads together (R25).
+pub const STATS_TIMEOUT: Duration = Duration::from_secs(3);
+/// Most bytes of the statistics page that are read (R25).
+pub const STATS_MAX_ANSWER: u64 = 256 * 1024;
+/// Room for the head of the statistics answer on top of the page.
+const STATS_HEAD_ROOM: u64 = 16 * 1024;
 
 /// The page paths of each router type, in the quick-link order.
 const JAVA_PAGES: [(ConsolePage, &str); 5] = [
@@ -377,10 +388,59 @@ pub fn detect_here() -> Option<VerifiedConsole> {
     detect(&candidates(&|var| std::env::var(var).ok()))
 }
 
+/// The path of the page that carries the statistics: Java I2P the sidebar data, i2pd the
+/// main page. It never has a `lang`, `action` or `consoleNonce` parameter (R24).
+#[must_use]
+pub fn stats_path(kind: ConsoleKind) -> &'static str {
+    match kind {
+        ConsoleKind::Java => "/xhr1.jsp?requestURI=/summaryframe",
+        ConsoleKind::I2pd => "/",
+    }
+}
+
+/// The statistics in a page body of the console of `kind`.
+#[must_use]
+pub fn parse_console_stats(kind: ConsoleKind, body: &str) -> RouterStats {
+    match kind {
+        ConsoleKind::Java => parse_java_summary(body),
+        ConsoleKind::I2pd => parse_i2pd_main(body),
+    }
+}
+
+/// One read-only `GET` of [`stats_path`] on the console, parsed (R24, R25). `None` when the
+/// console does not answer `200`. A body cut by the size cap or the timeout is still parsed.
+#[must_use]
+pub fn fetch_stats(console: &VerifiedConsole) -> Option<RouterStats> {
+    let addr = LoopbackAddr::new(SocketAddr::from((Ipv4Addr::LOCALHOST, console.port))).ok()?;
+    let max = STATS_MAX_ANSWER + STATS_HEAD_ROOM;
+    let answer = get_bounded(addr, stats_path(console.kind), STATS_TIMEOUT, max);
+    let Ok((200, body)) = answer else {
+        return None;
+    };
+    let page = body.get(..page_end(&body))?;
+    Some(parse_console_stats(console.kind, page))
+}
+
+/// Where the first [`STATS_MAX_ANSWER`] bytes of `body` end, on a character boundary.
+fn page_end(body: &str) -> usize {
+    let cap = usize::try_from(STATS_MAX_ANSWER).unwrap_or(usize::MAX);
+    (0..=cap.min(body.len()))
+        .rev()
+        .find(|end| body.is_char_boundary(*end))
+        .unwrap_or(0)
+}
+
 /// `GET <path> HTTP/1.0` in origin form on `addr`: an HTTP/1.0 answer is never chunked, so
 /// the markers arrive whole. No redirect is followed.
 fn get(addr: LoopbackAddr, path: &str) -> Answer {
-    let mut stream = addr.connect(TIMEOUT).map_err(|e| format!("{addr}: {e}"))?;
+    get_bounded(addr, path, TIMEOUT, MAX_ANSWER)
+}
+
+/// [`get`] with its own bounds: the whole request, connect and reads together, takes at most
+/// `timeout`, and at most `max` bytes are read.
+fn get_bounded(addr: LoopbackAddr, path: &str, timeout: Duration, max: u64) -> Answer {
+    let deadline = Instant::now() + timeout;
+    let mut stream = addr.connect(timeout).map_err(|e| format!("{addr}: {e}"))?;
     let head = format!(
         "GET {path} HTTP/1.0\r\nHost: {addr}\r\nUser-Agent: eepview\r\n\
          Accept: text/html\r\nConnection: close\r\n\r\n"
@@ -388,10 +448,28 @@ fn get(addr: LoopbackAddr, path: &str) -> Answer {
     stream
         .write_all(head.as_bytes())
         .map_err(|e| format!("{addr}: {e}"))?;
-    let mut raw = Vec::new();
-    // A timeout after some bytes still leaves a usable answer.
-    let _ = (&mut stream).take(MAX_ANSWER).read_to_end(&mut raw);
+    let raw = read_until(&mut stream, deadline, max);
     parse_answer(&raw).ok_or_else(|| format!("{addr}: not an HTTP answer"))
+}
+
+/// Reads until the peer closes, `max` bytes are in, or `deadline` passes. A timeout after
+/// some bytes still leaves a usable answer.
+fn read_until(stream: &mut TcpStream, deadline: Instant, max: u64) -> Vec<u8> {
+    let max = usize::try_from(max).unwrap_or(usize::MAX);
+    let mut raw = Vec::new();
+    let mut chunk = [0_u8; 8192];
+    while raw.len() < max {
+        let left = deadline.saturating_duration_since(Instant::now());
+        if left.is_zero() || stream.set_read_timeout(Some(left)).is_err() {
+            break;
+        }
+        match stream.read(&mut chunk) {
+            Ok(n) if n > 0 => raw.extend_from_slice(chunk.get(..n).unwrap_or_default()),
+            _ => break,
+        }
+    }
+    raw.truncate(max);
+    raw
 }
 
 /// What the console view does with a navigation.
@@ -561,3 +639,6 @@ impl ConsoleInfo {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod stats_from_console;

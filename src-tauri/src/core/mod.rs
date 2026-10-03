@@ -349,6 +349,11 @@ impl Core {
         self.stats.record(now, stats);
     }
 
+    /// Records a console stats sample, unless the newest one is less than 4 s old.
+    pub fn record_stats_spaced(&mut self, now: u64, stats: &RouterStats) {
+        self.stats.record_spaced(now, stats);
+    }
+
     /// The router bandwidth of the last 10 minutes.
     #[must_use]
     pub fn stats_history(&self) -> Vec<Sample> {

@@ -367,12 +367,23 @@ function sampleStats(): RouterStats {
   statsTick += 1;
   const inBps = bandwidthSeries(data.stats.inBps, data.stats.inSwing);
   const outBps = bandwidthSeries(data.stats.outBps, data.stats.outSwing);
+  const step = data.stats.stepSeconds * 1000;
+  const end = Date.now();
+  const first = end - (inBps.length - 1) * step;
   return {
     ...data.stats.fixed,
-    uptimeSeconds: data.stats.fixed.uptimeSeconds + statsTick * 5,
-    bandwidthInBps: inBps[inBps.length - 1] ?? null,
-    bandwidthOutBps: outBps[outBps.length - 1] ?? null,
-    history: { stepSeconds: data.stats.stepSeconds, inBps, outBps },
+    uptimeMs: data.stats.fixed.uptimeMs + statsTick * 5000,
+    bandwidthBytesPerSecond: {
+      in1s: inBps[inBps.length - 1] ?? null,
+      out1s: outBps[outBps.length - 1] ?? null,
+      in5m: null,
+      out5m: null,
+    },
+    history: inBps.map((bps, i) => ({
+      t: first + i * step,
+      in: bps,
+      out: outBps[i] ?? 0,
+    })),
   };
 }
 

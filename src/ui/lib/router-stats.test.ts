@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 The eepview contributors
 // SPDX-License-Identifier: MIT
 
-// Requirement tests for R33 of docs/wiki/router-console.md ("The UI reads the contract
+// Requirement tests for R33 of the router console wiki page ("The UI reads the contract
 // shape"): `statsView` turns the `RouterStats` of the IPC contract v1.6 into the view that
 // the router panel and the Network page show.
 
