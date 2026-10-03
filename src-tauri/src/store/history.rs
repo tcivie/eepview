@@ -273,6 +273,7 @@ mod tests {
             title: String::new(),
             visited: i as u64,
             visits: 1,
+            icon: None,
         };
         let mut entries: Vec<HistoryEntry> = (0..12_000)
             .map(|i| entry(i, format!("http://p{i}.i2p/")))

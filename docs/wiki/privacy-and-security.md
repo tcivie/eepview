@@ -13,6 +13,7 @@ Status: the design is written. The protections are coming in v0.1. eepview is pr
   5. WebRTC is off, so a page cannot send direct UDP traffic.
 - **Router checked first.** No page loads until eepview has verified the router. It also checks that the router has no outproxy.
 - **Private by default.** Cookies and cache vanish when you quit. JavaScript is off until you turn it on for a site. You can turn history off.
+- **Site icons stay with the site.** Once a day at most, eepview asks the site you visit for its icon (`/favicon.ico`). The request goes to that same `.i2p` site, through the same I2P proxy as the page, with no cookies and no referrer. Nothing goes anywhere else. eepview draws the icon again as a new image and keeps it only while the site is in your bookmarks or history. Clearing history clears the icons too. See [Site icons](site-icons.md).
 - **Consent first.** eepview downloads and installs nothing without your click.
 
 See [No-leak architecture](no-leak-architecture.md) for the full design.
@@ -48,3 +49,4 @@ Report it in private. Never use a public issue. Follow the steps in [SECURITY.md
 ## History
 
 - 2026-10-03 — Write the page — [#28](https://github.com/tcivie/eepview/pull/28)
+- 2026-10-03 — Site icons — [#53](https://github.com/tcivie/eepview/pull/53)
