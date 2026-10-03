@@ -65,3 +65,7 @@ OpenSSF Best Practices: add the badge that bestpractices.dev gives after step 5.
 ## 7. Check SECURITY.md
 
 Open the advisory link in `SECURITY.md`. Make sure it works.
+
+## 5. Check release provenance
+
+The `publish` job in `release.yml` attests build provenance only when the repo is public. After the switch, run a release and check that the attest step ran. Then run `gh attestation verify <file> --repo tcivie/eepview` on one bundle.
