@@ -1,5 +1,8 @@
 import "./boot.ts";
+import type { RouterStatus } from "./contract.ts";
 import { byId } from "./dom.ts";
+import { call, devMode, on } from "./ipc.ts";
+import { routerView } from "./lib/router-view.ts";
 
 const CHART_WIDTH = 600;
 const CHART_HEIGHT = 140;
@@ -75,11 +78,32 @@ function advance(series: Series, tick: number): Series {
   };
 }
 
-let series = sampleSeries();
-let tick = 0;
-renderChart(series);
-window.setInterval(() => {
-  tick += 1;
-  series = advance(series, tick);
+function renderRouter(status: RouterStatus): void {
+  const view = routerView(status);
+  const chip = byId("net-chip");
+  chip.dataset.tone = view.tone;
+  chip.textContent = view.label;
+  byId("router-state").textContent = view.title;
+  byId("router-version").textContent = status.version ? `I2P ${status.version}` : "Unknown";
+  byId("router-proxy").textContent = status.proxy || "None yet";
+  byId("router-detail").textContent = view.text;
+}
+
+function startSampleFigures(): void {
+  byId("sample-figures").hidden = false;
+  byId("figures-missing").hidden = true;
+  let series = sampleSeries();
+  let tick = 0;
   renderChart(series);
-}, REFRESH_MS);
+  window.setInterval(() => {
+    tick += 1;
+    series = advance(series, tick);
+    renderChart(series);
+  }, REFRESH_MS);
+}
+
+call("router_status", {})
+  .then(renderRouter)
+  .catch(() => undefined);
+on("router-status", renderRouter).catch(() => undefined);
+if (devMode) startSampleFigures();

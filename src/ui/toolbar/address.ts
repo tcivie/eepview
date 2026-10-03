@@ -4,12 +4,13 @@ import { call } from "../ipc.ts";
 import { displayUrl, isInternal } from "../lib/address.ts";
 import {
   emptySuggest,
-  isSuggestKey,
   type KeyOutcome,
   onKey,
+  type SuggestKey,
   type SuggestState,
   withItems,
 } from "../lib/suggest-state.ts";
+import { keyActions } from "../shared/events.ts";
 import { activeTab } from "./state.ts";
 
 let state: SuggestState<Suggestion> = emptySuggest();
@@ -79,11 +80,14 @@ function applyOutcome(outcome: KeyOutcome<Suggestion>): void {
   if (outcome.go) go(outcome.go === "typed" ? input().value : outcome.go.url);
 }
 
-function onKeyDown(event: KeyboardEvent): void {
-  if (!isSuggestKey(event.key)) return;
-  event.preventDefault();
-  applyOutcome(onKey(state, event.key));
-}
+const handleKey = (key: SuggestKey) => () => applyOutcome(onKey(state, key));
+
+const onKeyDown = keyActions<KeyboardEvent>({
+  ArrowDown: handleKey("ArrowDown"),
+  ArrowUp: handleKey("ArrowUp"),
+  Escape: handleKey("Escape"),
+  Enter: handleKey("Enter"),
+});
 
 function onInput(): void {
   editing = true;

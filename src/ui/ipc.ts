@@ -2,6 +2,8 @@ import { isTauri, invoke as tauriInvoke } from "@tauri-apps/api/core";
 import { listen as tauriListen } from "@tauri-apps/api/event";
 import type { CommandName, Commands, EventName, Events } from "./contract.ts";
 
+export { errorMessage as errorText } from "./shared/events.ts";
+
 export interface Backend {
   invoke(cmd: CommandName, args: object): Promise<unknown>;
   listen(event: EventName, handler: (payload: unknown) => void): Promise<() => void>;
@@ -44,8 +46,4 @@ export async function on<K extends EventName>(
 ): Promise<() => void> {
   const b = await backend;
   return b.listen(event, (payload) => handler(payload as Events[K]));
-}
-
-export function errorText(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }

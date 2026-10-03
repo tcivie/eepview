@@ -2,6 +2,7 @@ import type { FindResult } from "../contract.ts";
 import { byId } from "../dom.ts";
 import { call } from "../ipc.ts";
 import { findCountText, findTone } from "../lib/find-text.ts";
+import { bindClicks, keyActions } from "../shared/events.ts";
 
 const quiet = (): undefined => undefined;
 const bar = (): HTMLFormElement => byId("findbar");
@@ -41,12 +42,10 @@ export function closeFind(): void {
   call("find_close", {}).catch(quiet);
 }
 
-function onKeyDown(event: KeyboardEvent): void {
-  if (event.key === "Escape") closeFind();
-  if (event.key !== "Enter") return;
-  event.preventDefault();
-  runFind(!event.shiftKey);
-}
+const onKeyDown = keyActions<KeyboardEvent>({
+  Enter: (event) => runFind(!event.shiftKey),
+  Escape: () => closeFind(),
+});
 
 function toggleCase(): void {
   caseButton().setAttribute("aria-pressed", String(!matchCase()));
@@ -56,9 +55,14 @@ function toggleCase(): void {
 export function wireFind(): void {
   input().addEventListener("input", () => runFind(true));
   input().addEventListener("keydown", onKeyDown);
-  byId("find-next").addEventListener("click", () => runFind(true));
-  byId("find-prev").addEventListener("click", () => runFind(false));
-  caseButton().addEventListener("click", toggleCase);
-  byId("find-close").addEventListener("click", closeFind);
+  bindClicks(
+    {
+      "find-next": () => runFind(true),
+      "find-prev": () => runFind(false),
+      "find-case": toggleCase,
+      "find-close": closeFind,
+    },
+    byId,
+  );
   bar().addEventListener("submit", (e) => e.preventDefault());
 }

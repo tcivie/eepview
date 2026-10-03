@@ -101,6 +101,20 @@
                 <label><input type="radio" name="theme" value="dark" />Dark</label>
               </div>
             </fieldset>
+            <div class="setting">
+              <label class="setting-label" for="zoom-default">Default zoom</label>
+              <p class="setting-hint">eepview remembers a different zoom for each site you change.</p>
+              <select class="select setting-control zoom-select" id="zoom-default">
+                <option value="0.8">80%</option>
+                <option value="0.9">90%</option>
+                <option value="1">100%</option>
+                <option value="1.1">110%</option>
+                <option value="1.25">125%</option>
+                <option value="1.5">150%</option>
+                <option value="1.75">175%</option>
+                <option value="2">200%</option>
+              </select>
+            </div>
           </div>
         </section>
 
@@ -125,10 +139,12 @@
                 <input
                   class="input mono"
                   id="homepage-url"
-                  value="notbob.i2p"
                   spellcheck="false"
+                  placeholder="notbob.i2p"
+                  aria-describedby="homepage-hint"
                   disabled
                 />
+                <span class="field-hint" id="homepage-hint">Saved when you leave the field.</span>
               </div>
             </fieldset>
           </div>
@@ -162,11 +178,29 @@
                 aria-describedby="keep-cookies-hint"
               />
             </div>
+            <div class="setting">
+              <label class="setting-label" for="history-on">Keep history</label>
+              <p class="setting-hint" id="history-on-hint">
+                Off: eepview records no pages and suggests only bookmarks.
+              </p>
+              <input
+                class="switch setting-control"
+                type="checkbox"
+                id="history-on"
+                aria-describedby="history-on-hint"
+              />
+            </div>
+            <div class="setting">
+              <p class="setting-label">Clear history</p>
+              <p class="setting-hint">Choose a time range and confirm on the History page.</p>
+              <a class="btn setting-control" href="./history.html?clear=1">Clear history</a>
+            </div>
           </div>
         </section>
 
         <section class="section settings-group" id="router" aria-labelledby="router-title">
           <h2 id="router-title">Router</h2>
+          <p class="notice-inline" id="router-preview">Preview. These router controls are not connected to the router yet.</p>
           <div class="panel settings-panel">
             <fieldset class="setting">
               <legend class="setting-label">Router updates</legend>

@@ -4,6 +4,7 @@ import { announce, byId } from "./dom.ts";
 import { call, errorText, on } from "./ipc.ts";
 import { displayUrl, hostOf } from "./lib/address.ts";
 import { groupByDay, oldestVisit, timeOfDay } from "./lib/history-groups.ts";
+import { delegateClick, runAndAnnounce } from "./shared/events.ts";
 
 const PAGE_SIZE = 50;
 const SEARCH_DELAY_MS = 200;
@@ -95,18 +96,14 @@ function onSearch(): void {
   searchTimer = window.setTimeout(reload, SEARCH_DELAY_MS);
 }
 
-async function removeEntry(id: string): Promise<void> {
+function removeEntry(button: HTMLElement): void {
+  const id = button.dataset.remove ?? "";
   const removed = entries.find((e) => e.id === id);
-  await call("history_remove", { id });
-  entries = entries.filter((e) => e.id !== id);
-  render();
-  announce(status(), `Removed ${removed?.title || "the page"} from history.`);
-}
-
-function onListClick(event: MouseEvent): void {
-  const button = (event.target as Element).closest<HTMLElement>("[data-remove]");
-  const id = button?.dataset.remove;
-  if (id) removeEntry(id).catch((e) => announce(status(), errorText(e)));
+  const message = `Removed ${removed?.title || "the page"} from history.`;
+  runAndAnnounce(() => call("history_remove", { id }), status(), message).then((ok) => {
+    if (ok) entries = entries.filter((e) => e.id !== id);
+    render();
+  });
 }
 
 function chosenRange(): ClearRange {
@@ -162,7 +159,7 @@ function showHistoryState(): void {
 byId<HTMLInputElement>("history-q").value =
   new URLSearchParams(window.location.search).get("q") ?? "";
 byId("history-q").addEventListener("input", onSearch);
-byId("history").addEventListener("click", onListClick);
+delegateClick(byId("history"), "[data-remove]", removeEntry);
 wireClear();
 watchScroll();
 showHistoryState();

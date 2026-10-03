@@ -77,9 +77,35 @@
             <h1>Network</h1>
             <p>What your I2P router is doing right now. Figures refresh every few seconds.</p>
           </div>
-          <p role="status"><span class="chip" data-tone="ready">Connected</span></p>
+          <p role="status"><span class="chip" id="net-chip" data-tone="building">Checking</span></p>
         </header>
 
+        <section class="section" aria-labelledby="router-title">
+          <div class="section-head">
+            <h2 id="router-title">Router</h2>
+          </div>
+          <dl class="facts panel router-facts">
+            <div>
+              <dt>Status</dt>
+              <dd id="router-state">Checking</dd>
+            </div>
+            <div>
+              <dt>Router</dt>
+              <dd id="router-version">Unknown</dd>
+            </div>
+            <div>
+              <dt>Proxy</dt>
+              <dd class="mono" id="router-proxy">None yet</dd>
+            </div>
+          </dl>
+          <p class="muted router-detail" id="router-detail"></p>
+        </section>
+
+        <p class="notice-inline figures-missing" id="figures-missing">
+          The router does not share bandwidth and tunnel figures with eepview yet.
+        </p>
+
+        <div id="sample-figures" hidden>
         <section class="section panel bandwidth" aria-labelledby="bw-title">
           <div class="bandwidth-head">
             <h2 id="bw-title">Bandwidth</h2>
@@ -198,37 +224,7 @@
           </div>
         </section>
 
-        <section class="section" aria-labelledby="router-title">
-          <div class="section-head">
-            <h2 id="router-title">Router</h2>
-          </div>
-          <dl class="facts panel router-facts">
-            <div>
-              <dt>Network status</dt>
-              <dd>OK, reachable</dd>
-            </div>
-            <div>
-              <dt>Running for</dt>
-              <dd>3 h 12 min</dd>
-            </div>
-            <div>
-              <dt>Router</dt>
-              <dd>I2P 2.10.0, bundled</dd>
-            </div>
-            <div>
-              <dt>Java</dt>
-              <dd>Temurin 21.0.8</dd>
-            </div>
-            <div>
-              <dt>Known routers</dt>
-              <dd>4,812</dd>
-            </div>
-            <div>
-              <dt>Floodfills</dt>
-              <dd>1,136</dd>
-            </div>
-          </dl>
-        </section>
+        </div>
       </main>
     </div>
   </body>

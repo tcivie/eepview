@@ -4,6 +4,8 @@ import { announce, byId, cloneTemplate, setText } from "./dom.ts";
 import { call, errorText, on } from "./ipc.ts";
 import { displayUrl, eepsiteUrl, isI2pAddress } from "./lib/address.ts";
 import { folderGroups, folderNames } from "./lib/bookmark-groups.ts";
+import { bindClicks, delegateClick, runAndAnnounce } from "./shared/events.ts";
+import { setFieldError } from "./shared/form.ts";
 
 const ADDRESS_HINT = "A .i2p name or a .b32.i2p address.";
 
@@ -63,10 +65,7 @@ function load(): void {
 }
 
 function setAddressError(message: string | null): void {
-  const hint = byId("bm-address-hint");
-  byId("bm-address").setAttribute("aria-invalid", message ? "true" : "false");
-  hint.textContent = message ?? ADDRESS_HINT;
-  hint.classList.toggle("field-error", message !== null);
+  setFieldError(byId("bm-address"), byId("bm-address-hint"), message, ADDRESS_HINT);
 }
 
 function openEditor(bookmark: Bookmark | null): void {
@@ -106,18 +105,15 @@ function onSave(event: SubmitEvent): void {
   byId("bm-address").focus();
 }
 
-async function deleteBookmark(id: string): Promise<void> {
+function deleteBookmark(id: string): void {
   const doomed = bookmarks.find((b) => b.id === id);
-  await call("bookmark_remove", { id });
-  announce(status(), `Deleted ${doomed ? labelOf(doomed) : "the bookmark"}.`);
-  load();
+  const message = `Deleted ${doomed ? labelOf(doomed) : "the bookmark"}.`;
+  runAndAnnounce(() => call("bookmark_remove", { id }), status(), message).then(load);
 }
 
-function onListClick(event: MouseEvent): void {
-  const button = (event.target as Element).closest<HTMLButtonElement>("button[data-action]");
-  const id = button?.dataset.id;
-  if (!id) return;
-  if (button.dataset.action === "delete") deleteBookmark(id).catch(reportError);
+function onRowAction(button: HTMLButtonElement): void {
+  const id = button.dataset.id ?? "";
+  if (button.dataset.action === "delete") deleteBookmark(id);
   else openEditor(bookmarks.find((b) => b.id === id) ?? null);
 }
 
@@ -144,17 +140,22 @@ function onImportChosen(event: Event): void {
   if (file) importFile(file).catch(reportError);
 }
 
-function wire(): void {
-  byId("folders").addEventListener("click", onListClick);
-  byId("add-btn").addEventListener("click", () => openEditor(null));
-  byId("export-btn").addEventListener("click", () => exportBookmarks().catch(reportError));
-  byId("import-btn").addEventListener("click", () => byId("import-file").click());
+function wireBookmarks(): void {
+  delegateClick(byId("folders"), "button[data-action]", onRowAction);
+  bindClicks(
+    {
+      "add-btn": () => openEditor(null),
+      "export-btn": () => exportBookmarks().catch(reportError),
+      "import-btn": () => byId("import-file").click(),
+      "editor-cancel": () => byId<HTMLDialogElement>("editor").close(),
+    },
+    byId,
+  );
   byId("import-file").addEventListener("change", onImportChosen);
   byId<HTMLFormElement>("editor-form").addEventListener("submit", onSave);
-  byId("editor-cancel").addEventListener("click", () => byId<HTMLDialogElement>("editor").close());
   on("bookmarks-changed", load).catch(reportError);
 }
 
-wire();
+wireBookmarks();
 load();
 if (window.location.hash === "#add") openEditor(null);

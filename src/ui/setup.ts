@@ -1,5 +1,6 @@
 import "./boot.ts";
 import { all, announce, byId } from "./dom.ts";
+import { delegateClick } from "./shared/events.ts";
 
 type Step = "install" | "download" | "tunnels" | "ready" | "found" | "later";
 
@@ -176,9 +177,8 @@ function onJavaChoice(): void {
   byId("download-total").textContent = system ? "About 31 MB" : "About 75 MB";
 }
 
-function onGoto(event: MouseEvent): void {
-  const target = (event.target as Element).closest<HTMLElement>("[data-goto]");
-  const step = target?.dataset.goto;
+function onGoto(target: HTMLElement): void {
+  const step = target.dataset.goto;
   if (isStep(step)) showStep(step, true);
 }
 
@@ -198,7 +198,7 @@ function keepThemeInReviewLinks(): void {
 }
 
 function wire(): void {
-  byId("main").addEventListener("click", onGoto);
+  delegateClick(byId("main"), "[data-goto]", onGoto);
   for (const radio of all<HTMLInputElement>('input[name="java"]')) {
     radio.addEventListener("change", onJavaChoice);
   }

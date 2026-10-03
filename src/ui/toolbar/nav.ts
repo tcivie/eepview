@@ -4,6 +4,7 @@ import { call } from "../ipc.ts";
 import { hostOf } from "../lib/address.ts";
 import { routerView } from "../lib/router-view.ts";
 import { zoomText } from "../lib/tab-strip.ts";
+import { bindClicks } from "../shared/events.ts";
 import { activeTab } from "./state.ts";
 
 const TOAST_MS = 4000;
@@ -141,12 +142,17 @@ function wireMenu(): void {
 }
 
 export function wireNav(): void {
-  byId("back").addEventListener("click", () => call("go_back", {}).catch(quiet));
-  byId("forward").addEventListener("click", () => call("go_forward", {}).catch(quiet));
-  byId("reload").addEventListener("click", reloadOrStop);
-  byId("home").addEventListener("click", () => call("home", {}).catch(quiet));
-  byId("star").addEventListener("click", () => toggleBookmark().catch(quiet));
-  byId("js").addEventListener("click", toggleJs);
+  bindClicks(
+    {
+      back: () => call("go_back", {}).catch(quiet),
+      forward: () => call("go_forward", {}).catch(quiet),
+      reload: reloadOrStop,
+      home: () => call("home", {}).catch(quiet),
+      star: () => toggleBookmark().catch(quiet),
+      js: toggleJs,
+    },
+    byId,
+  );
   wireMenu();
   wireStatus();
 }
