@@ -171,9 +171,14 @@ fn dead_router_gives_bad_gateway() {
         .write_all(b"GET http://site.i2p/ HTTP/1.1\r\n\r\n")
         .unwrap();
     let mut out = Vec::new();
-    let _ = client.read_to_end(&mut out);
-    assert!(out.starts_with(b"HTTP/1.1 502"));
-    worker.join().unwrap().unwrap();
+    let read = client.read_to_end(&mut out);
+    let handled = worker.join().unwrap();
+    assert!(
+        out.starts_with(b"HTTP/1.1 502"),
+        "read {read:?}, handler {handled:?}, got {:?}",
+        String::from_utf8_lossy(&out)
+    );
+    handled.unwrap();
     drop(gate);
 }
 
