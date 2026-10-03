@@ -20,6 +20,7 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Add the Rust and TypeScript coverage gate (#13)
 - Add the release pipeline: SBOM, checksums, provenance, draft release (#14)
 - Move all docs into docs/wiki and enforce it in docs-check (#22)
+- Restore CodeQL and Scorecard, add dependency review and audit badges ([#26](https://github.com/tcivie/eepview/pull/26))
 - Add the design system, theme switching, browser chrome and internal pages (#19)
 - Keep the macOS traffic lights off the first tab (#23)
 - Release gates job replaces the reusable-workflow calls; the macOS app is ad-hoc signed inside the dmg (#24)
