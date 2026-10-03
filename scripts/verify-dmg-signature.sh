@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: 2026 The eepview contributors
+# SPDX-License-Identifier: MIT
 # Mount each dmg in a folder and check that the .app inside is ad-hoc signed.
 # Usage: verify-dmg-signature.sh <dmg-dir>
 set -euo pipefail

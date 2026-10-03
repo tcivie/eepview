@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: 2026 The eepview contributors
+# SPDX-License-Identifier: MIT
 # Node's coverage report lists only the files that a test loads, so an untested
 # module would not count against the gate. Every logic module in src/ui/lib and
 # src/ui/shared must therefore have a sibling .test.ts file.

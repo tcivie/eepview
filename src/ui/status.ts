@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The eepview contributors
+// SPDX-License-Identifier: MIT
+
 import "./boot.ts";
 import { byId } from "./dom.ts";
 import { devMode, on } from "./ipc.ts";

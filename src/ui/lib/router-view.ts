@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The eepview contributors
+// SPDX-License-Identifier: MIT
+
 export type RouterTone = "ready" | "building" | "stopped";
 
 export interface RouterLike {

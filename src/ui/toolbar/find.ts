@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The eepview contributors
+// SPDX-License-Identifier: MIT
+
 import type { FindResult } from "../contract.ts";
 import { byId } from "../dom.ts";
 import { call } from "../ipc.ts";

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The eepview contributors
+// SPDX-License-Identifier: MIT
+
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { NO_PROXY, renderRouterSummary } from "./router-summary.ts";
