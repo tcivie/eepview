@@ -29,4 +29,4 @@ Status: shipped. Review 1 of a yearly cycle.
 
 ## History
 
-- 2026-10-03 — First security review recorded — see CHANGELOG.
+- 2026-10-03 — First security review recorded — [#30](https://github.com/tcivie/eepview/pull/30).

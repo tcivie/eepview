@@ -26,4 +26,4 @@ How eepview does this: see [Assurance case](assurance-case.md) and [No-leak arch
 
 ## History
 
-- 2026-10-03 — Add the governance pages — see CHANGELOG.
+- 2026-10-03 — Add the governance pages — [#30](https://github.com/tcivie/eepview/pull/30).

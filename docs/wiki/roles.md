@@ -25,4 +25,4 @@ eepview has three roles. Today one person holds the first and the third.
 
 ## History
 
-- 2026-10-03 — Add the governance pages — see CHANGELOG.
+- 2026-10-03 — Add the governance pages — [#30](https://github.com/tcivie/eepview/pull/30).

@@ -29,4 +29,4 @@ eepview is run by one maintainer. This page says how decisions are made and how 
 
 ## History
 
-- 2026-10-03 — Add the governance pages — see CHANGELOG.
+- 2026-10-03 — Add the governance pages — [#30](https://github.com/tcivie/eepview/pull/30).

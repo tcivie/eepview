@@ -105,4 +105,4 @@ Out of scope: a compromised computer, a flaw inside I2P, and a flaw in the OS we
 
 ## History
 
-- 2026-10-03 — Add the assurance case — see CHANGELOG.
+- 2026-10-03 — Add the assurance case — [#30](https://github.com/tcivie/eepview/pull/30).

@@ -25,4 +25,4 @@ The project wants a co-maintainer. See the [roadmap](roadmap.md) and [Governance
 
 ## History
 
-- 2026-10-03 — Add the governance pages — see CHANGELOG.
+- 2026-10-03 — Add the governance pages — [#30](https://github.com/tcivie/eepview/pull/30).

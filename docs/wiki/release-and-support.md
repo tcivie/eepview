@@ -35,4 +35,4 @@ Status: shipped. eepview has no release yet.
 
 ## History
 
-- 2026-10-03 — Add the release and support policy — see CHANGELOG.
+- 2026-10-03 — Add the release and support policy — [#30](https://github.com/tcivie/eepview/pull/30).
