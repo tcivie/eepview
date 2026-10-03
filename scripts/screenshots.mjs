@@ -9,7 +9,8 @@ import { setTimeout as sleep } from "node:timers/promises";
 
 const config = JSON.parse(readFileSync(new URL("./screenshots.json", import.meta.url), "utf8"));
 const baseUrl = process.env.SCREENSHOT_BASE ?? "";
-const debugUrl = `http://127.0.0.1:${config.debugPort}`;
+const DEBUG_PORT = 9339;
+const debugUrl = `http://127.0.0.1:${DEBUG_PORT}`;
 
 const CHROME_PATHS = {
   darwin: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
@@ -23,7 +24,7 @@ function launchChrome(profile) {
     "--headless=new",
     "--hide-scrollbars",
     "--no-first-run",
-    `--remote-debugging-port=${config.debugPort}`,
+    `--remote-debugging-port=${DEBUG_PORT}`,
     `--user-data-dir=${profile}`,
     "about:blank",
   ];
@@ -50,8 +51,10 @@ function connect(url) {
   let nextId = 0;
   socket.addEventListener("message", ({ data }) => {
     const message = JSON.parse(data);
-    if (message.id !== undefined) pending.get(message.id)?.(message);
-    else listeners.get(message.method)?.(message.params);
+    const handler =
+      message.id === undefined ? listeners.get(message.method) : pending.get(message.id);
+    if (typeof handler !== "function") return;
+    handler(message.id === undefined ? message.params : message);
   });
   const send = (method, params = {}) =>
     new Promise((resolve, reject) => {
