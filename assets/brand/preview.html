@@ -109,9 +109,8 @@
         color: var(--muted);
       }
       .mono {
+        display: block;
         color: var(--ink);
-        background: currentColor;
-        mask: url("eepview-mark-mono.svg") center / contain no-repeat;
       }
       .dock {
         display: flex;
@@ -169,6 +168,18 @@
   </head>
   <body>
     <span id="light"></span><span id="dark"></span>
+    <!-- Inline copy of eepview-mark-mono.svg: CSS mask images do not load under file://. -->
+    <svg width="0" height="0" style="position: absolute" aria-hidden="true">
+      <symbol id="ev-mono" viewBox="0 0 1024 1024" fill="currentColor">
+        <path
+          fill-rule="evenodd"
+          d="M192 192H832A64 64 0 0 1 896 256V768A64 64 0 0 1 832 832H192A64 64 0 0 1 128 768V256A64 64 0 0 1 192 192ZM256 320H768A64 64 0 0 1 832 384V704A64 64 0 0 1 768 768H256A64 64 0 0 1 192 704V384A64 64 0 0 1 256 320Z"
+        />
+        <path
+          d="M640 448C704 512 768 576 768 640C768 704 704 704 704 704H640ZM384 448C320 512 256 576 256 640C256 704 320 704 320 704H384ZM512 384C576 448 576 512 576 576V704H448V576C448 512 448 448 512 384Z"
+        />
+      </symbol>
+    </svg>
     <h1>eepview brand preview</h1>
     <div class="grid">
       <div>
@@ -198,12 +209,12 @@
         <div class="card">
           <h2>Single color (currentColor)</h2>
           <div class="row">
-            <div class="size"><div class="mono" style="width: 64px; height: 64px"></div>64</div>
-            <div class="size"><div class="mono" style="width: 32px; height: 32px"></div>32</div>
-            <div class="size"><div class="mono" style="width: 24px; height: 24px"></div>24</div>
-            <div class="size"><div class="mono" style="width: 16px; height: 16px"></div>16</div>
+            <div class="size"><svg class="mono" width="64" height="64" aria-hidden="true"><use href="#ev-mono" /></svg>64</div>
+            <div class="size"><svg class="mono" width="32" height="32" aria-hidden="true"><use href="#ev-mono" /></svg>32</div>
+            <div class="size"><svg class="mono" width="24" height="24" aria-hidden="true"><use href="#ev-mono" /></svg>24</div>
+            <div class="size"><svg class="mono" width="16" height="16" aria-hidden="true"><use href="#ev-mono" /></svg>16</div>
             <div class="toolbar">
-              <div class="mono" style="width: 20px; height: 20px"></div>
+              <svg class="mono" width="20" height="20" aria-hidden="true"><use href="#ev-mono" /></svg>
               <span>Toolbar text, 14 px</span>
             </div>
           </div>
