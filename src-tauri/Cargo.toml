@@ -57,9 +57,18 @@ unwrap_used = "warn"
 expect_used = "warn"
 panic = "warn"
 
+# Repeatable and hardened. See docs/wiki/reproducible-builds.md.
 [profile.release]
+# One codegen unit gives one fixed order of functions in the binary.
 codegen-units = 1
-lto = true
+lto = "thin"
 opt-level = 3
+# Tauri supports abort; the app sets no panic hook that needs unwinding.
 panic = "abort"
-strip = true
+overflow-checks = true
+# Keep function names and line tables, then move them out of the binary:
+# macOS writes eepview.dSYM, Windows writes eepview.pdb, and on Linux CI runs objcopy
+# (scripts/split-debug.sh). The release uploads these files.
+debug = "limited"
+split-debuginfo = "packed"
+strip = "symbols"
