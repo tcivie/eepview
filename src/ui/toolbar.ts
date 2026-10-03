@@ -1,152 +1,82 @@
 import "./boot.ts";
-import { all, announce, byId } from "./dom.ts";
+import type { RouterState, TabInfo } from "./contract.ts";
+import { byId } from "./dom.ts";
+import { call, devMode, on } from "./ipc.ts";
+import { focusAddress, previewSuggestions, showUrl, wireAddress } from "./toolbar/address.ts";
+import { closeFind, openFind, showFindResult, wireFind } from "./toolbar/find.ts";
+import { openMenuForReview, renderNav, renderStatus, showToast, wireNav } from "./toolbar/nav.ts";
+import { activeTab, onTabs, setTabs, updateTab } from "./toolbar/state.ts";
+import { renderTabs, wireTabs } from "./toolbar/tabs.ts";
 
-type RouterState = "building" | "ready" | "reconnecting" | "stopped";
+const quiet = (): undefined => undefined;
 
-interface StateCopy {
-  label: string;
-  title: string;
-  text: string;
-}
-
-const STATE_COPY: Record<RouterState, StateCopy> = {
-  building: {
-    label: "Building",
-    title: "Building tunnels",
-    text: "The first start takes 2 to 10 minutes. Sites open when tunnels are up.",
-  },
-  ready: {
-    label: "Ready",
-    title: "Router ready",
-    text: "6 tunnels up. Sites open through 3 hops.",
-  },
-  reconnecting: {
-    label: "Reconnecting",
-    title: "Reconnecting",
-    text: "The network changed. The router is rebuilding tunnels. Pages may load slowly.",
-  },
-  stopped: {
-    label: "Stopped",
-    title: "Router stopped",
-    text: "Eepsites cannot load. eepview restarts the router in a few seconds.",
-  },
+const SHORTCUTS: Record<string, () => void> = {
+  "focus-address": focusAddress,
+  "open-find": openFind,
+  "close-find": closeFind,
 };
 
-const I2P_HOST = /^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+i2p$/;
-const status = (): HTMLElement => byId("toolbar-status");
-
-function isRouterState(value: string): value is RouterState {
-  return value in STATE_COPY;
+function render(tabs: TabInfo[]): void {
+  renderTabs(tabs);
+  const tab = activeTab();
+  renderNav(tab);
+  showUrl(tab);
+  byId("dev-frame-title").textContent = tab?.url ?? "";
 }
 
-function setRouterState(state: RouterState): void {
-  const copy = STATE_COPY[state];
-  const button = byId("router-status");
-  button.dataset.state = state;
-  button.setAttribute("aria-label", `Router: ${copy.label}`);
-  byId("router-status-label").textContent = copy.label;
-  byId("status-pop-title").textContent = copy.title;
-  byId("status-pop-text").textContent = copy.text;
-  announce(status(), `Router: ${copy.title}.`);
+function listenToCore(): void {
+  on("tabs-changed", setTabs).catch(quiet);
+  on("tab-updated", updateTab).catch(quiet);
+  on("find-result", showFindResult).catch(quiet);
+  on("router-status", renderStatus).catch(quiet);
+  on("toast", showToast).catch(quiet);
+  on("shortcut", ({ action }) => SHORTCUTS[action]?.()).catch(quiet);
 }
 
-function togglePressed(button: HTMLElement): boolean {
-  const pressed = button.getAttribute("aria-pressed") !== "true";
-  button.setAttribute("aria-pressed", String(pressed));
-  return pressed;
+function loadInitialState(): void {
+  call("tab_list", {}).then(setTabs).catch(quiet);
+  call("router_status", {}).then(renderStatus).catch(quiet);
 }
 
-function onJsToggle(): void {
-  const on = togglePressed(byId("js-toggle"));
-  announce(status(), on ? "JavaScript on for notbob.i2p." : "JavaScript off for notbob.i2p.");
+function previewRouter(state: string): void {
+  call("router_status", {})
+    .then((status) => renderStatus({ ...status, state: state as RouterState }))
+    .catch(quiet);
 }
 
-function onStar(): void {
-  const star = byId("star");
-  const saved = togglePressed(star);
-  star.setAttribute("aria-label", saved ? "Bookmarked" : "Bookmark this site");
-  announce(status(), saved ? "Bookmarked." : "Bookmark removed.");
+function previewFind(query: string): void {
+  openFind();
+  byId<HTMLInputElement>("find-input").value = query;
+  byId("find-input").dispatchEvent(new Event("input"));
 }
 
-function setOpen(trigger: HTMLElement, open: boolean): void {
-  const panel = byId(trigger.getAttribute("aria-controls") ?? "");
-  trigger.setAttribute("aria-expanded", String(open));
-  panel.hidden = !open;
+function applyReviewParams(params: URLSearchParams): void {
+  if (params.has("find")) previewFind(params.get("find") ?? "");
+  if (params.has("suggest")) previewSuggestions(params.get("suggest") ?? "");
+  if (params.has("menu")) openMenuForReview();
+  if (params.has("tip")) byId("status-tip").hidden = false;
 }
 
-function closeAll(): void {
-  for (const trigger of all<HTMLElement>("[aria-controls][aria-expanded]")) setOpen(trigger, false);
+function showDevToast(): void {
+  showToast({ kind: "info", text: "Downloads are not supported yet." });
 }
 
-function onTrigger(event: MouseEvent): void {
-  const trigger = event.currentTarget as HTMLElement;
-  const willOpen = trigger.getAttribute("aria-expanded") !== "true";
-  closeAll();
-  setOpen(trigger, willOpen);
-  event.stopPropagation();
-  if (willOpen)
-    byId(trigger.getAttribute("aria-controls") ?? "")
-      .querySelector("a")
-      ?.focus();
+function wireDevStage(): void {
+  const params = new URLSearchParams(window.location.search);
+  byId("dev-stage").hidden = false;
+  const router = byId<HTMLSelectElement>("dev-router");
+  router.value = params.get("router") ?? "ok";
+  router.addEventListener("change", () => previewRouter(router.value));
+  byId("dev-find").addEventListener("click", openFind);
+  byId("dev-toast").addEventListener("click", showDevToast);
+  window.setTimeout(() => applyReviewParams(params), 0);
 }
 
-function hostOf(address: string): string {
-  const trimmed = address
-    .trim()
-    .toLowerCase()
-    .replace(/^[a-z]+:/, "");
-  return trimmed.replace(/^\/+/, "").split(/[/?#]/)[0] ?? "";
-}
-
-function onAddress(event: SubmitEvent): void {
-  event.preventDefault();
-  const address = byId<HTMLInputElement>("address-input").value.trim();
-  if (!I2P_HOST.test(hostOf(address))) {
-    window.location.href = `./blocked.html?url=${encodeURIComponent(address)}`;
-    return;
-  }
-  byId("viewport-title").textContent = address;
-  announce(status(), `Opening ${hostOf(address)}.`);
-}
-
-function onStatePicked(event: Event): void {
-  const value = (event.target as HTMLInputElement).value;
-  if (isRouterState(value)) setRouterState(value);
-}
-
-function wire(): void {
-  byId("js-toggle").addEventListener("click", onJsToggle);
-  byId("star").addEventListener("click", onStar);
-  byId("reload").addEventListener("click", () => announce(status(), "Reloading."));
-  byId("router-status").addEventListener("click", onTrigger);
-  byId("menu-btn").addEventListener("click", onTrigger);
-  byId<HTMLFormElement>("address-form").addEventListener("submit", onAddress);
-  document.addEventListener("click", closeAll);
-  document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape") closeAll();
-  });
-  for (const radio of all<HTMLInputElement>('input[name="router-state"]')) {
-    radio.addEventListener("change", onStatePicked);
-  }
-}
-
-const REVIEW_TRIGGERS: Record<string, string> = { status: "router-status", menu: "menu-btn" };
-
-function showRequestedState(params: URLSearchParams): void {
-  const requested = params.get("router") ?? "";
-  if (!isRouterState(requested)) return;
-  setRouterState(requested);
-  for (const radio of all<HTMLInputElement>('input[name="router-state"]')) {
-    radio.checked = radio.value === requested;
-  }
-}
-
-function openRequestedPanel(params: URLSearchParams): void {
-  const triggerId = REVIEW_TRIGGERS[params.get("open") ?? ""];
-  if (triggerId) setOpen(byId(triggerId), true);
-}
-
-wire();
-const reviewParams = new URLSearchParams(window.location.search);
-showRequestedState(reviewParams);
-openRequestedPanel(reviewParams);
+onTabs(render);
+wireTabs();
+wireAddress();
+wireFind();
+wireNav();
+listenToCore();
+loadInitialState();
+if (devMode) wireDevStage();
