@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>eepview brand preview</title>
+    <!--
+      Open preview.html#light or preview.html#dark to force a theme.
+      Without a fragment the page follows the system setting.
+    -->
+    <style>
+      :root {
+        --bg: #f4f2ee;
+        --surface: #ffffff;
+        --ink: #1b1e45;
+        --muted: #6b6a7d;
+        --rule: #dedbe6;
+        --dock: rgb(255 255 255 / 0.55);
+        --taskbar: #eceaf2;
+        --ph: #c9c6d4;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root:not(:has(#light:target)) {
+          --bg: #111327;
+          --surface: #1a1d38;
+          --ink: #eeebfa;
+          --muted: #9d9ab4;
+          --rule: #2c2f52;
+          --dock: rgb(40 43 78 / 0.7);
+          --taskbar: #1f2140;
+          --ph: #3d4070;
+        }
+      }
+      :root:has(#dark:target) {
+        --bg: #111327;
+        --surface: #1a1d38;
+        --ink: #eeebfa;
+        --muted: #9d9ab4;
+        --rule: #2c2f52;
+        --dock: rgb(40 43 78 / 0.7);
+        --taskbar: #1f2140;
+        --ph: #3d4070;
+      }
+      .logo-dark {
+        display: none;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root:not(:has(#light:target)) .logo-light {
+          display: none;
+        }
+        :root:not(:has(#light:target)) .logo-dark {
+          display: block;
+        }
+      }
+      :root:has(#dark:target) .logo-light {
+        display: none;
+      }
+      :root:has(#dark:target) .logo-dark {
+        display: block;
+      }
+      body {
+        margin: 0;
+        padding: 40px;
+        background: var(--bg);
+        color: var(--ink);
+        font:
+          14px/1.4 system-ui,
+          -apple-system,
+          "Segoe UI",
+          sans-serif;
+      }
+      h1 {
+        margin: 0 0 24px;
+        font-size: 20px;
+        font-weight: 600;
+      }
+      h2 {
+        margin: 0 0 12px;
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: 1024px 1fr;
+        gap: 32px;
+      }
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--rule);
+        border-radius: 16px;
+        padding: 20px;
+        margin-bottom: 20px;
+      }
+      .row {
+        display: flex;
+        gap: 24px;
+        align-items: flex-end;
+        flex-wrap: wrap;
+      }
+      .size {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+        font-size: 11px;
+        color: var(--muted);
+      }
+      .mono {
+        color: var(--ink);
+        background: currentColor;
+        mask: url("eepview-mark-mono.svg") center / contain no-repeat;
+      }
+      .dock {
+        display: flex;
+        gap: 10px;
+        align-items: flex-end;
+        padding: 6px 12px;
+        border-radius: 22px;
+        background: var(--dock);
+        border: 1px solid var(--rule);
+        width: max-content;
+      }
+      .dock .ph {
+        width: 56px;
+        height: 56px;
+        margin: 8px 0;
+        border-radius: 13px;
+        background: var(--ph);
+      }
+      .dock img {
+        display: block;
+      }
+      .taskbar {
+        display: flex;
+        gap: 6px;
+        align-items: center;
+        justify-content: center;
+        height: 48px;
+        padding: 0 12px;
+        background: var(--taskbar);
+        border-radius: 8px;
+      }
+      .taskbar span {
+        display: grid;
+        place-items: center;
+        width: 40px;
+        height: 40px;
+        border-radius: 4px;
+      }
+      .taskbar .on {
+        background: var(--rule);
+      }
+      .taskbar .ph {
+        width: 24px;
+        height: 24px;
+        border-radius: 5px;
+        background: var(--ph);
+      }
+      .toolbar {
+        display: flex;
+        gap: 16px;
+        align-items: center;
+        color: var(--ink);
+      }
+    </style>
+  </head>
+  <body>
+    <span id="light"></span><span id="dark"></span>
+    <h1>eepview brand preview</h1>
+    <div class="grid">
+      <div>
+        <h2>Master mark, 1024 px</h2>
+        <img src="eepview-mark.svg" width="1024" height="1024" alt="eepview mark at 1024 pixels" />
+      </div>
+      <div>
+        <div class="card">
+          <h2>Master mark</h2>
+          <div class="row">
+            <div class="size"><img src="eepview-mark.svg" width="256" height="256" alt="" />256</div>
+            <div class="size"><img src="eepview-mark.svg" width="64" height="64" alt="" />64</div>
+            <div class="size"><img src="eepview-mark.svg" width="32" height="32" alt="" />32</div>
+            <div class="size"><img src="eepview-mark.svg" width="16" height="16" alt="" />16</div>
+          </div>
+        </div>
+        <div class="card">
+          <h2>Small-size mark</h2>
+          <div class="row">
+            <div class="size"><img src="eepview-mark-small.svg" width="64" height="64" alt="" />64</div>
+            <div class="size"><img src="eepview-mark-small.svg" width="48" height="48" alt="" />48</div>
+            <div class="size"><img src="eepview-mark-small.svg" width="32" height="32" alt="" />32</div>
+            <div class="size"><img src="eepview-mark-small.svg" width="24" height="24" alt="" />24</div>
+            <div class="size"><img src="eepview-mark-small.svg" width="16" height="16" alt="" />16</div>
+          </div>
+        </div>
+        <div class="card">
+          <h2>Single color (currentColor)</h2>
+          <div class="row">
+            <div class="size"><div class="mono" style="width: 64px; height: 64px"></div>64</div>
+            <div class="size"><div class="mono" style="width: 32px; height: 32px"></div>32</div>
+            <div class="size"><div class="mono" style="width: 24px; height: 24px"></div>24</div>
+            <div class="size"><div class="mono" style="width: 16px; height: 16px"></div>16</div>
+            <div class="toolbar">
+              <div class="mono" style="width: 20px; height: 20px"></div>
+              <span>Toolbar text, 14 px</span>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <h2>Horizontal logo</h2>
+          <img class="logo-light" src="eepview-logo-horizontal-light.svg" width="406" height="90" alt="eepview" />
+          <img class="logo-dark" src="eepview-logo-horizontal-dark.svg" width="406" height="90" alt="eepview" />
+          <div style="height: 16px"></div>
+          <img class="logo-light" src="eepview-logo-horizontal-light.svg" width="145" height="32" alt="eepview" />
+          <img class="logo-dark" src="eepview-logo-horizontal-dark.svg" width="145" height="32" alt="eepview" />
+        </div>
+        <div class="card">
+          <h2>macOS Dock (64 pt)</h2>
+          <div class="dock">
+            <div class="ph"></div>
+            <div class="ph"></div>
+            <img src="app-icon-1024.png" width="72" height="72" alt="" />
+            <div class="ph"></div>
+            <div class="ph"></div>
+          </div>
+        </div>
+        <div class="card">
+          <h2>Windows taskbar (24 px)</h2>
+          <div class="taskbar">
+            <span><i class="ph"></i></span>
+            <span><i class="ph"></i></span>
+            <span class="on"><img src="eepview-mark-small.svg" width="24" height="24" alt="" /></span>
+            <span><i class="ph"></i></span>
+            <span><i class="ph"></i></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
