@@ -2,6 +2,7 @@
 # Fail unless the tagged commit is on main and every required check passed on it.
 # Required checks come from the active ruleset that targets the default branch.
 # Env: REPO (owner/name), SHA (the tagged commit). Needs a full checkout and origin/main.
+# The caller must check out with fetch-depth 0, so origin/main exists.
 set -euo pipefail
 
 : "${REPO:?set REPO to owner/name}"
@@ -26,7 +27,6 @@ passed_checks() {
 }
 
 main() {
-  git fetch --no-tags origin main
   if ! git merge-base --is-ancestor "$SHA" origin/main; then
     echo "::error::$SHA is not on main"
     exit 1

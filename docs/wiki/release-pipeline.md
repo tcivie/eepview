@@ -36,7 +36,7 @@ A `v*` tag builds installers for four targets, adds SBOMs and checksums, and mak
 - The macOS release ships only the `.dmg`. `bundle.macOS.signingIdentity` is `-` in `src-tauri/tauri.conf.json`, so the Tauri bundler ad-hoc signs the `.app` before it builds the `.dmg`. A build step mounts the `.dmg` and runs `codesign --verify --deep --strict` and `codesign -dv` on the app. It fails unless the report says `Signature=adhoc`. There is no Developer ID signature and no notarization.
 - Windows installers are not signed.
 - Provenance is skipped while the repo is private. See [going-public.md](going-public.md).
-- The `gates` job needs a green `main` at the tagged commit. A dry run on `main` fails while the checks of `main` HEAD are red or still running.
+- The `gates` job skips its check on a branch dry run, so a pipeline change can be tested before merge. It needs a green `main` at the tagged commit. A dry run on `main` fails while the checks of `main` HEAD are red or still running.
 - The pipeline has no lint exclusion. actionlint and `zizmor --offline` report nothing.
 
 ## History

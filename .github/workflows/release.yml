@@ -29,6 +29,8 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - name: Verify the tagged commit is on main and passed every required check
+        # A branch dry run tests a pipeline change before merge, so the gate skips it.
+        if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
