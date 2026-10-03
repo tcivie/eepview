@@ -529,7 +529,9 @@ proptest! {
         size in (1.0..150.0_f64, 1.0..100.0_f64),
     ) {
         // Rule 5: a popup that fits keeps its size. Rule 3: it keeps its alignment when no
-        // window edge pushes it.
+        // window edge pushes it. It fits when it is no taller than the space under the
+        // anchor (4 px gap) down to the window bottom minus 8 px; the width always fits here.
+        prop_assume!(size.1 <= window.1 - (anchor.y + anchor.h + GAP) - MARGIN);
         let start = place(anchor, size, window, Align::Start);
         prop_assert!((start.w - size.0).abs() < EPS && (start.h - size.1).abs() < EPS, "{start:?}");
         if anchor.x >= MARGIN && anchor.x + size.0 <= window.0 - MARGIN {
@@ -540,6 +542,22 @@ proptest! {
         if right - size.0 >= MARGIN && right <= window.0 - MARGIN {
             prop_assert!((end.x + end.w - right).abs() < EPS, "{end:?} under {anchor:?}");
         }
+    }
+
+    #[test]
+    fn rule_5_popup_taller_than_the_space_is_cut_to_the_window_bottom_minus_8(
+        (window, anchor) in scene(),
+        extra in 0.1..5000.0_f64,
+        end in any::<bool>(),
+    ) {
+        // Rule 5: when the content is taller than the space, the popup gets the whole space,
+        // from 4 px under the anchor to the window bottom minus 8 px, and scrolls inside.
+        let top = anchor.y + anchor.h + GAP;
+        let space = window.1 - top - MARGIN;
+        let align = if end { Align::End } else { Align::Start };
+        let r = place(anchor, (100.0, space + extra), window, align);
+        prop_assert!((r.h - space).abs() < EPS, "height {} for space {space}", r.h);
+        prop_assert!((r.y + r.h - (window.1 - MARGIN)).abs() < EPS, "{r:?}");
     }
 
     #[test]
