@@ -4,11 +4,11 @@
 
 Status: settings only. No CI job checks it.
 
-The release build uses deterministic settings. They cost nothing. CI does not verify that two builds of one commit match. The per-PR double-build check was removed on 2026-10-03, because it doubled build time for little value. Reproducibility is no longer verified in CI.
+The release build uses deterministic settings.
 
 ## How the build is made repeatable
 
-`scripts/repro-env.sh` prints the environment. `release.yml` adds it to `GITHUB_ENV` before the Linux build:
+`scripts/repro-env.sh` prints the environment. `release.yml` adds it to `GITHUB_ENV` before every platform build:
 
 - `SOURCE_DATE_EPOCH` is the commit time.
 - `CARGO_INCREMENTAL=0`.
@@ -22,7 +22,7 @@ Do not treat any release file as reproducible. Nobody checks it on any PR or rel
 
 ## Hardening
 
-`scripts/check-hardening.sh` checks the Linux binary in the release build:
+`scripts/check-hardening.sh` checks the Linux binary. The Linux leg of `leak-test` runs it on every PR, and the release build runs it again:
 
 ```
 ok   PIE (ELF type):  Type: DYN (Position-Independent Executable file)
@@ -43,4 +43,4 @@ To check one binary on your machine:
 ## History
 
 - [#37](https://github.com/tcivie/eepview/pull/37): repeatable Linux builds, `reproducible` CI job, hardening check.
-- 2026-10-03, [#73](https://github.com/tcivie/eepview/pull/73): removed the `reproducible` CI job and `scripts/repro-check.sh`. The deterministic settings stay.
+- 2026-10-03, [#73](https://github.com/tcivie/eepview/pull/73): removed the per-PR `reproducible` CI job and `scripts/repro-check.sh`. The double build doubled build time for little value. The deterministic settings stay.
