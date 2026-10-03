@@ -5,7 +5,7 @@ SPDX-License-Identifier: MIT
 
 # Site icons
 
-Status: in progress, branch `feat/site-icons`.
+Status: in progress in [#53](https://github.com/tcivie/eepview/pull/53).
 
 Tabs, bookmark tiles, the bookmarks page and history rows show the icon of each site. When a site has no icon, they show the first letter of its host, as before.
 
@@ -216,4 +216,4 @@ export function siteMark(icon: string | null | undefined, letter: string): SiteM
 
 ## History
 
-- 2026-10-03 — Requirements and interface — branch `feat/site-icons`
+- 2026-10-03 — Requirements, fetch, sanitizer, store, IPC v1.4 and the UI — [#53](https://github.com/tcivie/eepview/pull/53)
