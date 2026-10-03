@@ -807,6 +807,7 @@ dependencies = [
  "eepview-platform",
  "libc",
  "proptest",
+ "regex",
  "serde",
  "serde_json",
  "tauri",

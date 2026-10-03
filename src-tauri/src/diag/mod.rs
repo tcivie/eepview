@@ -121,6 +121,7 @@ pub fn init(log_dir: &Path) {
     started();
     CRASHED.store(take_crash_marker(log_dir), Ordering::SeqCst);
     *MARKER_DIR.lock().unwrap_or_else(PoisonError::into_inner) = Some(log_dir.to_path_buf());
+    let _ = files::private_dir(log_dir);
     let mut files = LogFiles::new(log_dir.to_path_buf());
     let backlog: Vec<String> = state()
         .ring

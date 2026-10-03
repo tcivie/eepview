@@ -1,0 +1,7 @@
+# SPDX-FileCopyrightText: 2026 The eepview contributors
+# SPDX-License-Identifier: MIT
+
+# ruff for the leak harness. CI lints on ubuntu-24.04 (x86_64), so only that wheel is pinned.
+# Install with: pip install --no-deps --require-hashes -r tests/leak/requirements-lint.txt
+ruff==0.16.10 \
+    --hash=sha256:f33f43a864a8483eebd160e713336c8bab02c934feaff0a33cf5ccb41546d09a

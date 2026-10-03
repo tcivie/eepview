@@ -75,11 +75,10 @@ pub struct Report {
 }
 
 fn description(report: &Report) -> String {
-    let text = report.description.trim();
-    if text.is_empty() {
+    if report.description.trim().is_empty() {
         "(not given)".to_owned()
     } else {
-        text.to_owned()
+        report.description.clone()
     }
 }
 
