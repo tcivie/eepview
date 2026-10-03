@@ -29,6 +29,38 @@ pub const LOCAL_URL_PATTERNS: [&str; 3] = ["^about:", "^data:", "^blob:"];
 /// filter normalized URLs, so the path always starts with `/` after the host.
 pub const I2P_URL_PATTERN: &str = r"^https?://([a-z0-9-]+\.)*[a-z0-9-]+\.i2p(:[0-9]+)?/";
 
+/// The refusals that follow the allow pattern, in order. `WebKit` rule regexes have no look-ahead
+/// and no `|`, so one pattern cannot say "an I2P host, but not ...". Each entry is a rule that
+/// blocks again (`false`) or allows again (`true`) what [`I2P_URL_PATTERN`] let through, and
+/// together they accept exactly the hosts of [`crate::net::host::is_i2p_host`] on a port other
+/// than 0.
+pub const I2P_URL_EXCEPTIONS: [(&str, bool); 4] = [
+    // An IDN label (`xn--`).
+    (
+        r"^https?://([a-z0-9-]+\.)*xn--[a-z0-9-]*(\.[a-z0-9-]+)*\.i2p(:[0-9]+)?/",
+        false,
+    ),
+    // Every `b32.i2p` host: the bare name and every `*.b32.i2p` name ...
+    (r"^https?://([a-z0-9-]+\.)*b32\.i2p(:[0-9]+)?/", false),
+    // ... then the one form that is valid: a single base32 label of 52 characters or more.
+    (
+        concat!(
+            "^https?://",
+            "[a-z2-7][a-z2-7][a-z2-7][a-z2-7][a-z2-7][a-z2-7][a-z2-7][a-z2-7]",
+            "[a-z2-7][a-z2-7][a-z2-7][a-z2-7][a-z2-7][a-z2-7][a-z2-7][a-z2-7]",
+            "[a-z2-7][a-z2-7][a-z2-7][a-z2-7][a-z2-7][a-z2-7][a-z2-7][a-z2-7]",
+            "[a-z2-7][a-z2-7][a-z2-7][a-z2-7][a-z2-7][a-z2-7][a-z2-7][a-z2-7]",
+            "[a-z2-7][a-z2-7][a-z2-7][a-z2-7][a-z2-7][a-z2-7][a-z2-7][a-z2-7]",
+            "[a-z2-7][a-z2-7][a-z2-7][a-z2-7][a-z2-7][a-z2-7][a-z2-7][a-z2-7]",
+            "[a-z2-7][a-z2-7][a-z2-7][a-z2-7]",
+            "[a-z2-7]*\\.b32\\.i2p(:[0-9]+)?/"
+        ),
+        true,
+    ),
+    // Port 0.
+    (r"^https?://[a-z0-9.-]+:0/", false),
+];
+
 /// Sources a page may use: I2P sites over http(s), any port.
 const I2P_SOURCES: &str = "http://*.i2p:* https://*.i2p:*";
 
@@ -49,8 +81,9 @@ pub fn csp_header() -> &'static str {
 }
 
 /// The rule set as `WKContentRuleList` JSON: block every URL, then ignore that rule for
-/// I2P and local URLs. The `WebKit` regex subset has no look-ahead and no `|`, so each
-/// allowed form is a rule of its own.
+/// I2P and local URLs, then block again what [`is_i2p_host`](crate::net::host::is_i2p_host) and
+/// the guard refuse ([`I2P_URL_EXCEPTIONS`]). The `WebKit` regex subset has no look-ahead and no
+/// `|`, so each form is a rule of its own, and the order of the rules matters.
 #[must_use]
 pub fn content_rule_list() -> Value {
     let mut rules = vec![
@@ -60,6 +93,17 @@ pub fn content_rule_list() -> Value {
             "action": { "type": "ignore-previous-rules" }
         }),
     ];
+    rules.extend(I2P_URL_EXCEPTIONS.iter().map(|(pattern, allow)| {
+        let action = if *allow {
+            "ignore-previous-rules"
+        } else {
+            "block"
+        };
+        json!({
+            "trigger": { "url-filter": pattern, "url-filter-is-case-sensitive": true },
+            "action": { "type": action }
+        })
+    }));
     rules.extend(LOCAL_URL_PATTERNS.iter().map(|pattern| {
         json!({
             "trigger": { "url-filter": pattern },
@@ -119,22 +163,32 @@ mod tests {
         assert!(!frame.contains("data:") && !frame.contains("blob:"));
     }
 
+    fn assert_rule(rule: &Value, pattern: &str, allow: bool) {
+        let action = if allow {
+            "ignore-previous-rules"
+        } else {
+            "block"
+        };
+        assert_eq!(rule["action"]["type"], action, "{pattern}");
+        assert_eq!(rule["trigger"]["url-filter"], pattern);
+    }
+
     #[test]
     fn rule_list_blocks_then_allows_i2p() {
         let rules = content_rule_list();
         let list = rules.as_array().unwrap();
-        assert_eq!(list.len(), 5);
-        assert_eq!(list[0]["action"]["type"], "block");
-        assert_eq!(list[0]["trigger"]["url-filter"], ".*");
-        assert_eq!(list[1]["action"]["type"], "ignore-previous-rules");
-        assert_eq!(list[1]["trigger"]["url-filter"], I2P_URL_PATTERN);
-        for (rule, pattern) in list[2..].iter().zip(LOCAL_URL_PATTERNS) {
-            assert_eq!(rule["action"]["type"], "ignore-previous-rules");
-            assert_eq!(rule["trigger"]["url-filter"], pattern);
+        assert_eq!(list.len(), 5 + I2P_URL_EXCEPTIONS.len());
+        assert_rule(&list[0], ".*", false);
+        assert_rule(&list[1], I2P_URL_PATTERN, true);
+        let (exceptions, local) = list[2..].split_at(I2P_URL_EXCEPTIONS.len());
+        for (rule, (pattern, allow)) in exceptions.iter().zip(I2P_URL_EXCEPTIONS) {
+            assert_rule(rule, pattern, allow);
         }
-        let text = rules.to_string();
+        for (rule, pattern) in local.iter().zip(LOCAL_URL_PATTERNS) {
+            assert_rule(rule, pattern, true);
+        }
         assert!(
-            !text.contains('|'),
+            !rules.to_string().contains('|'),
             "WebKit rule regexes have no disjunction"
         );
     }
