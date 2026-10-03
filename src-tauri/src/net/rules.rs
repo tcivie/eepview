@@ -34,7 +34,14 @@ pub const I2P_URL_PATTERN: &str = r"^https?://([a-z0-9-]+\.)*[a-z0-9-]+\.i2p(:[0
 /// blocks again (`false`) or allows again (`true`) what [`I2P_URL_PATTERN`] let through, and
 /// together they accept exactly the hosts of [`crate::net::host::is_i2p_host`] on a port other
 /// than 0.
-pub const I2P_URL_EXCEPTIONS: [(&str, bool); 4] = [
+pub const I2P_URL_EXCEPTIONS: [(&str, bool); 6] = [
+    // A label that starts with `-`.
+    (
+        r"^https?://([a-z0-9-]*\.)*-[a-z0-9.-]*\.i2p(:[0-9]+)?/",
+        false,
+    ),
+    // A label that ends with `-`.
+    (r"^https?://[a-z0-9.-]*-\.[a-z0-9.-]*i2p(:[0-9]+)?/", false),
     // An IDN label (`xn--`).
     (
         r"^https?://([a-z0-9-]+\.)*xn--[a-z0-9-]*(\.[a-z0-9-]+)*\.i2p(:[0-9]+)?/",

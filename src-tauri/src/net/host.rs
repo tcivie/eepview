@@ -26,8 +26,11 @@ pub fn is_i2p_host(host: &str) -> bool {
     }
 }
 
+/// A DNS label (RFC 1123): letters, digits and `-`, never `-` at either end, and no IDN `xn--`.
 fn is_plain_label(label: &str) -> bool {
     !label.is_empty()
+        && !label.starts_with('-')
+        && !label.ends_with('-')
         && !label.starts_with("xn--")
         && label
             .bytes()
@@ -62,6 +65,11 @@ mod tests {
             ("foo.i2p:80", false),
             ("a@foo.i2p", false),
             ("xn--bcher-kva.i2p", false),
+            ("a.-xn--.i2p", false),
+            ("-foo.i2p", false),
+            ("foo-.i2p", false),
+            ("a.-b.i2p", false),
+            ("a-.b.i2p", false),
             ("bücher.i2p", false),
             ("foo.\u{456}2p", false),
             ("foo_bar.i2p", false),
