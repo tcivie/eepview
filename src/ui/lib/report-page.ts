@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The eepview contributors
+// SPDX-License-Identifier: MIT
+
 export type ReportKind = "general" | "crash" | "blocked" | "router-down" | "load-failed";
 
 const KINDS: readonly ReportKind[] = ["general", "crash", "blocked", "router-down", "load-failed"];
