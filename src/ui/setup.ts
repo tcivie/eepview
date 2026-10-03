@@ -1,39 +1,58 @@
 import "./boot.ts";
 import { all, announce, byId } from "./dom.ts";
+import {
+  countText,
+  formatElapsed,
+  isStep,
+  type Progress,
+  percentOf,
+  progressText,
+  type Step,
+  stepPosition,
+  stepperHopState,
+  totalProgress,
+} from "./lib/setup-flow.ts";
 import { delegateClick } from "./shared/events.ts";
 
-type Step = "install" | "download" | "tunnels" | "ready" | "found" | "later";
-
-const STEPS: readonly Step[] = ["install", "download", "tunnels", "ready", "found", "later"];
-const SEQUENCE: readonly Step[] = ["install", "download", "tunnels", "ready"];
 const DOWNLOAD_TICK_MS = 200;
-const DOWNLOAD_STEP_PERCENT = 2;
+const DOWNLOAD_TICK_MB = 0.8;
+const ROUTER_MB = 31;
+const JAVA_MB = 44;
+const ROUTER_START_MB = 19.4;
 const BUILD_TICK_MS = 1000;
 const HAND_OFF_MS = 1200;
 const START_ELAPSED_S = 100;
 const START_PEERS = 312;
+const PEERS_PER_TICK = 7;
+const TUNNELS = 2;
+const MILESTONE_PERCENT = 25;
+
+interface Transfer extends Progress {
+  bar: HTMLProgressElement;
+  size: HTMLElement;
+  label: string;
+}
+
+interface BuildRun {
+  queue: HTMLElement[];
+  totalHops: number;
+  elapsed: number;
+  peers: number;
+}
 
 type Stop = () => void;
 let stopRunning: Stop | null = null;
 let handOffTimer = 0;
 
-function isStep(value: unknown): value is Step {
-  return typeof value === "string" && (STEPS as readonly string[]).includes(value);
-}
-
-function hopState(index: number, current: number, step: Step): string | null {
-  if (index < current || step === "ready") return "built";
-  return index === current ? "building" : null;
-}
-
 function updateStepper(step: Step): void {
-  const current = SEQUENCE.indexOf(step);
-  const stepper = byId("stepper");
-  stepper.hidden = current < 0;
-  all<HTMLElement>(".hop", stepper).forEach((hop, index) => {
-    const state = hopState(index, current, step);
-    hop.toggleAttribute("aria-current", index === current);
-    if (index === current) hop.setAttribute("aria-current", "step");
+  const position = stepPosition(step);
+  byId("setup-progress").hidden = position === null;
+  if (!position) return;
+  byId("step-count").textContent = position.text;
+  all<HTMLElement>(".hop", byId("stepper")).forEach((hop, index) => {
+    const state = stepperHopState(index, position);
+    if (index === position.index) hop.setAttribute("aria-current", "step");
+    else hop.removeAttribute("aria-current");
     if (state) hop.dataset.state = state;
     else delete hop.dataset.state;
   });
@@ -55,69 +74,56 @@ function showStep(step: Step, moveFocus: boolean): void {
   if (moveFocus) document.querySelector<HTMLElement>(`[data-step="${step}"] h1`)?.focus();
 }
 
-interface Transfer {
-  bar: HTMLProgressElement;
-  size: HTMLElement;
-  totalMb: number;
-  label: string;
-}
-
-interface DownloadRun {
-  queue: Transfer[];
-  percent: number;
+function transfer(id: string, totalMb: number, label: string): Transfer {
+  return { bar: byId(`${id}-progress`), size: byId(`${id}-size`), totalMb, doneMb: 0, label };
 }
 
 function transfers(): Transfer[] {
-  const router: Transfer = {
-    bar: byId("router-progress"),
-    size: byId("router-size"),
-    totalMb: 31,
-    label: "the I2P router",
-  };
-  const java: Transfer = {
-    bar: byId("java-progress"),
-    size: byId("java-size"),
-    totalMb: 44,
-    label: "Java",
-  };
+  const router = { ...transfer("router", ROUTER_MB, "the I2P router"), doneMb: ROUTER_START_MB };
+  const java = transfer("java", JAVA_MB, "Java");
   return usesSystemJava() ? [router] : [router, java];
 }
 
-function showProgress(transfer: Transfer, percent: number): void {
-  const doneMb = ((transfer.totalMb * percent) / 100).toFixed(1);
-  transfer.bar.value = percent;
-  transfer.bar.textContent = `${percent}%`;
-  transfer.size.textContent = `${doneMb} of ${transfer.totalMb} MB`;
+function showProgress(items: Transfer[]): void {
+  for (const item of items) {
+    const percent = percentOf(item);
+    item.bar.value = percent;
+    item.bar.textContent = `${percent}%`;
+    item.size.textContent = progressText(item);
+  }
+  byId("total-size").textContent = progressText(totalProgress(items));
+}
+
+function announceMilestone(item: Transfer, before: number): void {
+  const percent = percentOf(item);
+  if (Math.floor(percent / MILESTONE_PERCENT) === Math.floor(before / MILESTONE_PERCENT)) return;
+  announce(byId("download-status"), `Downloading ${item.label}, ${percent} percent.`);
+}
+
+function advanceDownload(items: Transfer[]): boolean {
+  const item = items.find((candidate) => candidate.doneMb < candidate.totalMb);
+  if (!item) return true;
+  const before = percentOf(item);
+  item.doneMb = Math.min(item.totalMb, item.doneMb + DOWNLOAD_TICK_MB);
+  showProgress(items);
+  announceMilestone(item, before);
+  return false;
 }
 
 function finishDownload(): void {
-  byId("verify-state").textContent = "Signatures match";
-  announce(byId("download-status"), "Download complete. Signatures match. Starting the router.");
+  byId("verify-state").textContent = "All signatures match";
+  byId<HTMLButtonElement>("download-next").disabled = false;
+  announce(byId("download-status"), "Download complete. All signatures match.");
   handOff("tunnels");
 }
 
-function announceMilestone(transfer: Transfer, percent: number): void {
-  if (percent % 25 !== 0) return;
-  announce(byId("download-status"), `Downloading ${transfer.label}, ${percent} percent.`);
-}
-
-function advanceDownload(run: DownloadRun): boolean {
-  const transfer = run.queue[0];
-  if (!transfer) return true;
-  run.percent = Math.min(100, run.percent + DOWNLOAD_STEP_PERCENT);
-  showProgress(transfer, run.percent);
-  announceMilestone(transfer, run.percent);
-  if (run.percent < 100) return false;
-  run.queue.shift();
-  run.percent = 0;
-  return run.queue.length === 0;
-}
-
 function runDownload(): Stop {
-  const queue = transfers();
-  const run: DownloadRun = { queue, percent: queue[0]?.bar.value ?? 0 };
+  const items = transfers();
+  byId("java-transfer").hidden = usesSystemJava();
+  byId<HTMLButtonElement>("download-next").disabled = true;
+  showProgress(items);
   const timer = window.setInterval(() => {
-    if (!advanceDownload(run)) return;
+    if (!advanceDownload(items)) return;
     window.clearInterval(timer);
     finishDownload();
   }, DOWNLOAD_TICK_MS);
@@ -130,40 +136,53 @@ function pendingHops(): HTMLElement[] {
   return [...outbound, ...inbound];
 }
 
-function formatElapsed(seconds: number): string {
-  return `${Math.floor(seconds / 60)} min ${seconds % 60} s`;
-}
-
 function tunnelsReady(): number {
   const done = (id: string) => all(`#${id} .hop:not([data-state='built'])`).length === 0;
   return Number(done("build-out")) + Number(done("build-in"));
 }
 
-function buildNextHop(queue: HTMLElement[]): void {
+function advanceHop(queue: HTMLElement[]): void {
   const hop = queue.shift();
   if (hop) hop.dataset.state = "built";
   const next = queue[0];
   if (next) next.dataset.state = "building";
-  const ready = tunnelsReady();
-  byId("build-ready").textContent = `${ready} of 2`;
-  const message = ready === 2 ? "Both tunnels are built." : "Building the next hop.";
+}
+
+function showBuildCounts(ready: number, hopsLeft: number, totalHops: number): void {
+  byId("build-ready").textContent = countText(ready, TUNNELS);
+  byId("build-hops").textContent = countText(totalHops - hopsLeft, totalHops);
+  const message = ready === TUNNELS ? "Both tunnels are built." : "Building the next hop.";
   announce(byId("tunnel-status"), message);
+}
+
+function buildNextHop(queue: HTMLElement[], totalHops: number): void {
+  advanceHop(queue);
+  showBuildCounts(tunnelsReady(), queue.length, totalHops);
+}
+
+function tickBuild(run: BuildRun): boolean {
+  run.elapsed += 1;
+  run.peers += PEERS_PER_TICK;
+  byId("build-elapsed").textContent = formatElapsed(run.elapsed);
+  byId("build-peers").textContent = run.peers.toLocaleString("en");
+  if (run.elapsed % 2 === 0) buildNextHop(run.queue, run.totalHops);
+  return run.queue.length === 0;
 }
 
 function runTunnels(): Stop {
   const queue = pendingHops();
-  const first = queue[0];
-  if (first) first.dataset.state = "building";
-  let elapsed = START_ELAPSED_S;
-  let peers = START_PEERS;
+  const run: BuildRun = {
+    queue,
+    totalHops: queue.length,
+    elapsed: START_ELAPSED_S,
+    peers: START_PEERS,
+  };
+  byId<HTMLButtonElement>("tunnels-next").disabled = true;
+  if (queue[0]) queue[0].dataset.state = "building";
   const timer = window.setInterval(() => {
-    elapsed += 1;
-    peers += 7;
-    byId("build-elapsed").textContent = formatElapsed(elapsed);
-    byId("build-peers").textContent = peers.toLocaleString("en");
-    if (elapsed % 2 === 0) buildNextHop(queue);
-    if (queue.length > 0) return;
+    if (!tickBuild(run)) return;
     window.clearInterval(timer);
+    byId<HTMLButtonElement>("tunnels-next").disabled = false;
     handOff("ready");
   }, BUILD_TICK_MS);
   return () => window.clearInterval(timer);
@@ -181,7 +200,7 @@ function usesSystemJava(): boolean {
 function onJavaChoice(): void {
   const system = usesSystemJava();
   byId("java-row").classList.toggle("row-skipped", system);
-  byId("download-total").textContent = system ? "About 31 MB" : "About 75 MB";
+  byId("download-total").textContent = `${system ? ROUTER_MB : ROUTER_MB + JAVA_MB} MB`;
 }
 
 function onGoto(target: HTMLElement): void {
