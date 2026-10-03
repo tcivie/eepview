@@ -538,19 +538,15 @@ pub async fn popup_size<R: Runtime>(
     blocking(move || super::popup::sized(&app, id, (width, height))).await
 }
 
-/// `popup_close({id?, refocus?})`: closes popup `id`, or any popup without one.
+/// `popup_close({id, refocus?})`: closes popup `id`; a stale id does nothing.
 ///
 /// # Errors
 ///
 /// Fails only when the worker thread that runs the command panics.
 #[tauri::command]
-pub async fn popup_close<R: Runtime>(
-    app: AppHandle<R>,
-    id: Option<u64>,
-    refocus: Option<bool>,
-) -> Res<()> {
+pub async fn popup_close<R: Runtime>(app: AppHandle<R>, id: u64, refocus: Option<bool>) -> Res<()> {
     let refocus = refocus.unwrap_or(false);
-    blocking(move || super::popup::close(&app, id, refocus)).await
+    blocking(move || super::popup::close(&app, Some(id), refocus)).await
 }
 
 /// `chrome_insets()`: the space the tab strip leaves for the macOS window buttons (0 in

@@ -37,15 +37,17 @@ The toolbar has four popups: the address suggestions, the main menu, the router 
 3. A popup opens 4 px below its anchor (its button, or the address field). The suggestions line up with the left edge of the address field and take its width. The menu, the router panel and the hint line up with the right edge of their button.
 4. A popup never leaves the window. It stays at least 8 px from the left and right window edges, and it is at most the window width minus 16 px wide.
 5. A popup is never cut. It gets the height it needs, up to the window bottom minus 8 px. When its content is taller, the popup scrolls inside itself, so its last row (for example the router panel's action buttons) can always be reached.
-6. One popup shows at a time. Opening a popup of another kind closes the open one first. Opening the same kind again (the suggestions while you type) updates it in place.
-7. The router hint shows while the mouse is over the router dot and hides when the mouse leaves. It is small: a title and one short line, at most 280 px wide. It never resizes anything and never takes focus. It does not show while the router panel is open.
-8. A click on the router dot opens the router panel. A second click on the dot closes it. Esc closes it, and focus goes back to the dot. A click anywhere outside the panel (on the toolbar or on the page) closes it.
+6. One popup shows at a time. Opening a popup of another kind closes the open one first. Opening the same kind again (the suggestions while you type) updates it in place. The toolbar never asks for the hint while the menu or the router panel is open, so the hint never replaces them.
+7. The router hint shows while the mouse is over the router dot and hides when the mouse leaves. It is small: a title and one short line, at most 280 px wide. It never resizes anything and never takes focus. It does not show while the menu or the router panel is open.
+8. A click on the router dot opens the router panel. A second click on the dot closes it. Esc closes it, and focus goes back to the dot. A click anywhere outside the panel (on the toolbar or on the page) closes it. The toolbar reads the state at `pointerdown` on the dot: when the panel was open at that moment, the click closes it, however long the press lasts.
 9. The menu button and the menu act the same as rule 8. A menu item that opens a page or a tab closes the menu; the zoom buttons keep it open and show the new zoom.
-10. The suggestions show while the address field has focus and there are suggestions. The arrow keys move the selection, Enter opens it, and a click on a suggestion opens it. Esc, or leaving the address field, closes the list.
+10. The suggestions show while the address field has focus and there are suggestions. The arrow keys move the selection, Enter opens it, and a click on a suggestion opens it. Esc, or leaving the address field, closes the list. A pick in the popup acts on `mousedown`, and the toolbar closes the list 150 ms after the address field loses focus, so the pick always lands first. An arrow key only moves the highlight (`popup-select`): it does not re-measure or re-place the popup.
 11. A window resize closes the open popup.
-12. A close or a size report for a popup that is no longer open does nothing.
+12. A close or a size report for a popup that is no longer open does nothing. The toolbar and the popup page always close a popup by its id.
 13. Popups use the palette tokens only and follow the light and dark themes. The webview is transparent, so nothing shows around the popup's card.
 14. Security: `popup` is a bundled eepview page. It never loads a remote page, and it gets only the commands its popups need (listed below). `tab-*` webviews still get no IPC.
+15. The popup page reports the natural size of its card: the size of its content with no width or height limit, not the size of the webview it sits in. So a list that grows while it is open gets its new height.
+16. The `popup` webview stays above every other webview, also after a new tab webview is added.
 
 ### Public interface
 
@@ -66,9 +68,9 @@ Rust, in the `eepview_lib` crate (pure, no Tauri):
 TypeScript (pure):
 
 - `src/ui/lib/chrome-height.ts`: `chromeHeight({ findOpen }) -> number`: 84, or 124 with the find bar.
-- `src/ui/lib/popup-toggle.ts`: `PopupKind`, `TOGGLE_MS` (300), and `clickOpens(open: PopupKind | null, closedAt: number | undefined, kind: PopupKind, now: number) -> boolean`: a click on the button of `kind` opens it, unless that popup is open or closed less than 300 ms ago (the same click closed it, rule 8).
+- `src/ui/lib/popup-toggle.ts`: `PopupKind`, `TOGGLE_MS` (300), and `clickOpens(open: PopupKind | null, closedAt: number | undefined, kind: PopupKind, now: number) -> boolean`: a click on the button of `kind` opens it, unless that popup is open or closed less than 300 ms ago (the same click closed it, rule 8). The toolbar passes the state and the time of the `pointerdown` on the button.
 
-IPC: see the [IPC contract](ipc-contract.md) (v1.4): `popup_open`, `popup_size`, `popup_close`, `popup-show` and `popup-closed`.
+IPC: see the [IPC contract](ipc-contract.md) (v1.4): `popup_open`, `popup_size`, `popup_close`, `popup-show`, `popup-closed` and `popup-select`.
 
 The `popup` webview may call: `popup_size`, `popup_close`, `navigate`, `tab_new`, `tab_list`, `zoom_in`, `zoom_out`, `zoom_reset`, `router_status`, `router_stats`, `connection_pause`, `connection_resume`, `router_control`, and listen to events.
 

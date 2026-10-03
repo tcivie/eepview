@@ -15,8 +15,8 @@ Change it in a PR that changes both sides, or keep the old form working as a shi
 - v1.3: `chrome_insets`, `chrome-insets-changed`, `window_fullscreen`, `status-size`, `status-side`; the bubble shows after 100 ms and hides at once.
 - v1.4: `TabInfo.icon`, `Bookmark.icon`, `HistoryEntry.icon`, `icons-changed`. See [Site icons](site-icons.md). [#53](https://github.com/tcivie/eepview/pull/53)
 - v1.2: `connection_pause`, `connection_resume`, `router_control`, `RouterStatus.paused` and `.managed`, `RouterStats.history`. The `outproxy` state is gone: VERIFY no longer asks for a clearnet host.
-- v1.4: the `popup` webview, `popup_open`, `popup_size`, `popup_close`, `popup-show`, `popup-closed`. `chrome_set_height` reports the find bar only; the toolbar never grows for a popup.
 - Shipped in [#29](https://github.com/tcivie/eepview/pull/29).
+- v1.4: the `popup` webview, `popup_open`, `popup_size`, `popup_close`, `popup-show`, `popup-closed`, `popup-select`. `chrome_set_height` reports the find bar only; the toolbar never grows for a popup — [#55](https://github.com/tcivie/eepview/pull/55).
 
 ## Window layout
 
@@ -99,10 +99,10 @@ At most 10 000 entries. Nothing is recorded while `history.enabled` is false.
 
 ### Window
 
-- `chrome_set_height(px)`: the toolbar reports its find bar. 124 or more means the find bar is open (toolbar 124 px); any other value means it is closed (84 px). The toolbar never takes another height.
+- `chrome_set_height(px)`: the toolbar reports its find bar: 124 or more while it shows, 84 when it is hidden. The toolbar is 124 px when the core has the find bar open (`find`, the Find shortcut) or the last report is 124 or more, else 84 px. It never takes another height.
 - `popup_open({kind, anchor: {x, y, width, height}, data?}) -> number` (`toolbar` only): opens a popup under `anchor` (window points) and returns its id. `kind` is `"suggestions" | "menu" | "router" | "hint"`. `data` goes to the page unchanged: `{items: Suggestion[], index: number}` for the suggestions, `{title, text}` for the hint. The shell sends `popup-show` to `popup`; the popup shows once the page reports its size. Opening another kind closes the open one; the same kind updates in place.
-- `popup_size({id, width, height})` (`popup` only): the natural size of the popup's card. The shell clamps it to the window (8 px margin), places the `popup` webview 4 px under the anchor and shows it. The menu and the router panel take the focus.
-- `popup_close({id?, refocus?})` (`toolbar` and `popup`): closes the popup `id`, or any popup without `id`. A stale id does nothing. `refocus: true` gives the focus back to the toolbar. The shell hides `popup` and sends `popup-closed`.
+- `popup_size({id, width, height})` (`popup` only): the natural size of the popup's card. The shell clamps it to the window (8 px margin), places the `popup` webview 4 px under the anchor and shows it, above every other webview (`popup` is raised last when a tab webview is added). The menu and the router panel take the focus. The size is the content size of the card with no width or height limit (`scrollWidth`/`scrollHeight` of an unconstrained card), never the size of the webview.
+- `popup_close({id, refocus?})` (`toolbar` and `popup`): closes the popup `id`. A stale id does nothing. Only the shell closes any popup (on a window resize). `refocus: true` gives the focus back to the toolbar. The shell hides `popup` and sends `popup-closed`.
 - `platform() -> "macos" | "windows" | "linux"`
 - `window_fullscreen() -> boolean`
 - `chrome_insets() -> {left: number}`: the space the tab strip leaves on the left for the macOS window buttons. The shell centers the buttons on the tab row (y = 22), measures their frames, and answers their right edge plus their left margin, so the gap after the buttons equals the margin before them. 0 in full screen, and 0 on Windows and Linux (native title bar; the UI picks its own margin).
@@ -129,6 +129,7 @@ Rust sends them to `toolbar`, `internal`, `status` and `popup`.
 
 ### Events a page sends
 
+- `popup-select: {index}` (from `toolbar`, to `popup`): the arrow keys moved the highlight of the open suggestions. The page moves it; no new id, no new size.
 - `status-size: {width, height}` (from `status` only): the natural size of the pill. The shell fits the transparent `status` webview to it, at most half the content width; longer text ends in an ellipsis. The webview never sits under the mouse.
 
 ## Types
