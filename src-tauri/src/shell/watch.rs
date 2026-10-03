@@ -47,6 +47,7 @@ fn sample<R: Runtime>(app: &AppHandle<R>, helper: Option<(LoopbackAddr, String)>
     if let Some((addr, token)) = helper {
         let stats = crate::net::stats::fetch(addr, &token);
         lock(&shared(app).core).record_stats(now_ms(), &stats);
+        with_core(app, |core| core.router_version(stats.version.as_deref()));
     }
 }
 

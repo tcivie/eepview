@@ -7,6 +7,7 @@ import type { ConsoleInfo, RouterStatus, Settings } from "./contract.ts";
 import { all, announce, byId } from "./dom.ts";
 import { call, devMode, on } from "./ipc.ts";
 import { shouldRedetect } from "./lib/console-links.ts";
+import { versionText } from "./lib/router-view.ts";
 import {
   type HomepageMode,
   homepageAddress,
@@ -16,6 +17,7 @@ import {
 } from "./lib/settings-form.ts";
 import { runAndAnnounce } from "./shared/events.ts";
 import { checkMatching, setFieldError } from "./shared/form.ts";
+import { proxyText } from "./shared/router-summary.ts";
 import { getThemePref, isThemePref, onThemeChange, setThemePref, type ThemePref } from "./theme.ts";
 
 const HOMEPAGE_HINT = "Saved when you leave the field.";
@@ -40,6 +42,8 @@ function onThemePicked(event: Event): void {
   const value = (event.target as HTMLInputElement).value;
   if (!isThemePref(value)) return;
   setThemePref(value);
+  // The shell paints the window and new tabs from the saved theme, so tell it.
+  call("settings_set", { patch: { theme: value } }).catch(() => undefined);
   announce(status(), `Theme set to ${value}.`);
 }
 
@@ -121,6 +125,18 @@ function wireSettings(): void {
   on("settings-changed", showSettings).catch(() => undefined);
 }
 
+function showRouter(router: RouterStatus): void {
+  byId("connect-proxy").textContent = proxyText(router);
+  byId("about-router").textContent = versionText(router);
+}
+
+function wireRouter(): void {
+  call("router_status", {})
+    .then(showRouter)
+    .catch(() => undefined);
+  on("router-status", showRouter).catch(() => undefined);
+}
+
 function renderConsole(info: ConsoleInfo): void {
   renderConsoleLinks({ list: byId("console-links"), note: byId("console-note") }, info, ["config"]);
 }
@@ -161,5 +177,6 @@ function wireRouterPreview(): void {
 
 wireTheme();
 wireSettings();
+wireRouter();
 wireRouterPreview();
 wireConsole();

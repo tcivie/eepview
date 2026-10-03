@@ -18,6 +18,14 @@ impl Core {
         let id = self.tabs.open(&landing, place, true);
         fx.extend(self.open_target(id, &target, &raw));
         fx.extend([Effect::Emit(Event::TabsChanged), Effect::Layout]);
+        if input.is_none() {
+            // A blank new tab (Cmd/Ctrl+T, the + button): type an address at once.
+            self.focus_on_commit = None;
+            fx.extend([
+                Effect::Emit(Event::Shortcut("focus-address")),
+                Effect::FocusToolbar,
+            ]);
+        }
         (self.tab_info(id), fx)
     }
 

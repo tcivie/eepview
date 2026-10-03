@@ -13,7 +13,7 @@ use tauri::{AppHandle, Emitter, Manager, Runtime, Url, Webview};
 use super::content::ContentWebview;
 use super::state::{lock, now_ms, shared};
 use super::{engine, log, view};
-use crate::core::{Core, Effect, Event, Load, WebOp};
+use crate::core::{Core, Effect, Event, Load, View, WebOp};
 use crate::hover::SHOW_DELAY_MS;
 use crate::{icons, net};
 
@@ -54,13 +54,14 @@ pub fn outside(f: impl FnOnce() + Send + 'static) {
 
 /// Carries out `fx` now. Call on the main thread.
 pub fn apply<R: Runtime>(app: &AppHandle<R>, fx: Vec<Effect>) {
-    let mut relayout = false;
+    let (mut relayout, mut focus) = (false, false);
     for effect in fx {
         relayout |= matches!(effect, Effect::Layout | Effect::Web(_));
         match effect {
             Effect::Emit(event) => emit(app, &event),
             Effect::Web(op) => web(app, op),
             Effect::FocusToolbar => focus_toolbar(app),
+            Effect::FocusContent => focus = true,
             Effect::HoverLater(generation) => show_later(app, generation),
             Effect::FetchIcon(host) => fetch_icon(app, host),
             Effect::Layout => {}
@@ -68,6 +69,21 @@ pub fn apply<R: Runtime>(app: &AppHandle<R>, fx: Vec<Effect>) {
     }
     if relayout {
         view::sync(app);
+    }
+    if focus {
+        // After the layout: the view that shows now is the one that takes the keys.
+        focus_content(app);
+    }
+}
+
+/// Gives keyboard focus to the webview the content area shows.
+fn focus_content<R: Runtime>(app: &AppHandle<R>) {
+    let label = match lock(&shared(app).core).view() {
+        View::Web(tab) => tab_webview(app, tab).map(|w| w.label().to_owned()),
+        View::Internal(_) => Some("internal".to_owned()),
+    };
+    if let Some(webview) = label.and_then(|l| app.get_webview(&l)) {
+        let _ = webview.set_focus();
     }
 }
 
@@ -143,6 +159,9 @@ fn hover_payload(text: Option<&crate::hover::HoverText>) -> Value {
 fn emit<R: Runtime>(app: &AppHandle<R>, event: &Event) {
     if matches!(event, Event::TabUpdated(_) | Event::TabsChanged) {
         view::sync_stop_item(app);
+    }
+    if matches!(event, Event::Settings) {
+        super::surface::paint_window(app);
     }
     if let Event::Hover(text) = event {
         view::status(app, text.as_ref());

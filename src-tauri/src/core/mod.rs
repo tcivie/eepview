@@ -54,6 +54,8 @@ pub enum Effect {
     Web(WebOp),
     /// Give keyboard focus to the toolbar.
     FocusToolbar,
+    /// Give keyboard focus to the content area (the web tab or the internal page shown).
+    FocusContent,
     /// Lay the webviews out again and show the right one.
     Layout,
     /// Call [`Core::hover_expire`] with this generation after the show delay.
@@ -190,6 +192,8 @@ pub struct Core {
     stats: StatsHistory,
     /// The link under the mouse in the active tab: a refused navigation to it is a click.
     pointed: Option<Url>,
+    /// The tab whose next commit takes keyboard focus: its navigation came from the address bar.
+    focus_on_commit: Option<u32>,
 }
 
 impl Core {
@@ -225,6 +229,7 @@ impl Core {
             js_forced_off: false,
             stats: StatsHistory::default(),
             pointed: None,
+            focus_on_commit: None,
         };
         // Effects are dropped: no UI listens yet, and a save error shows on the next save.
         let _ = core.sweep_icons();

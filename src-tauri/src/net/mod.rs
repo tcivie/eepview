@@ -7,6 +7,7 @@
 //! - [`console`]: find and verify the router console (quick links only).
 //! - [`loopback`]: socket addresses that can only point at this machine.
 //! - [`verify`]: VERIFY of the router proxy, the only source of a [`verify::VerifiedUpstream`].
+//! - [`failures`]: the pages whose load failed, for history.
 //! - [`gatekeeper`]: eepview's own proxy in front of the router (layer L1).
 //! - [`http`]: message heads for the gatekeeper.
 //! - [`icons`]: one site icon request through the gatekeeper.
@@ -15,6 +16,7 @@
 //! - `testing` (tests only): a fake router proxy, so tests outside `net/` open no socket.
 
 pub mod console;
+pub mod failures;
 pub mod gatekeeper;
 pub mod host;
 pub mod http;

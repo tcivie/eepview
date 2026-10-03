@@ -31,7 +31,11 @@ impl Core {
 
     fn ui_shortcut(&mut self, action: Action, now: u64) -> Vec<Effect> {
         match action {
-            Action::FocusAddress => ui("focus-address"),
+            Action::FocusAddress => {
+                // The user is back in the address bar: the page must not take the keys.
+                self.focus_on_commit = None;
+                ui("focus-address")
+            }
             Action::Find => {
                 self.find_open = true;
                 let mut fx = ui("open-find");

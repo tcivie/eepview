@@ -8,7 +8,7 @@ import { all, byId, cloneTemplate, setText } from "./dom.ts";
 import { call, errorText, on } from "./ipc.ts";
 import { displayUrl, hostOf } from "./lib/address.ts";
 import { routerVersion, shouldRedetect } from "./lib/console-links.ts";
-import { hopStates } from "./lib/router-view.ts";
+import { hopStates, versionText } from "./lib/router-view.ts";
 import { renderRouterSummary } from "./shared/router-summary.ts";
 import { renderSiteMark } from "./site-mark.ts";
 
@@ -67,7 +67,7 @@ function renderRouter(status: RouterStatus): void {
 
 function showVersion(): void {
   const version = routerVersion(lastStatus?.version ?? null, lastConsole);
-  byId("router-version").textContent = version ? `I2P ${version}` : "Unknown";
+  byId("router-version").textContent = versionText({ version });
 }
 
 function renderConsole(info: ConsoleInfo): void {
