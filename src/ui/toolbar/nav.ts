@@ -2,6 +2,7 @@ import type { RouterStatus, TabInfo, Toast } from "../contract.ts";
 import { byId } from "../dom.ts";
 import { call } from "../ipc.ts";
 import { hostOf } from "../lib/address.ts";
+import { jsToggleLabel } from "../lib/js-toggle.ts";
 import { routerView } from "../lib/router-view.ts";
 import { zoomText } from "../lib/tab-strip.ts";
 import { bindClicks } from "../shared/events.ts";
@@ -34,8 +35,9 @@ function renderJs(tab: TabInfo | undefined): void {
   const js = byId<HTMLButtonElement>("js");
   js.setAttribute("aria-pressed", String(tab?.jsOn ?? false));
   js.disabled = !tab || tab.kind === "internal";
-  const host = tab ? hostOf(tab.url) : "";
-  js.title = tab?.jsOn ? `JavaScript is on for ${host}` : `JavaScript is off for ${host}`;
+  const label = jsToggleLabel(tab?.jsOn ?? false, tab ? hostOf(tab.url) : "");
+  js.title = label;
+  js.setAttribute("aria-label", label);
 }
 
 export function renderNav(tab: TabInfo | undefined): void {

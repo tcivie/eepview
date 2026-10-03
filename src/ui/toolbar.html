@@ -75,9 +75,25 @@
         </form>
 
         <div class="nav-group">
-          <button class="icon-btn js-toggle" type="button" id="js" aria-pressed="false" title="JavaScript for this site">
-            <span class="js-label" aria-hidden="true">JS</span>
-            <span class="visually-hidden">JavaScript for this site</span>
+          <button
+            class="icon-btn js-toggle"
+            type="button"
+            id="js"
+            aria-pressed="false"
+            aria-label="JavaScript for this site"
+            title="JavaScript for this site"
+          >
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+              <mask id="js-slash-cut" maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24">
+                <rect width="24" height="24" fill="#fff" />
+                <path class="js-cut" d="M4 4l16 16" stroke="#000" stroke-width="5.6" />
+              </mask>
+              <g class="js-braces" mask="url(#js-slash-cut)">
+                <path d="M8.5 4C7 4 6 4.75 6 6.25v3.5C6 10.75 5.5 12 4 12c1.5 0 2 1.25 2 2.25v3.5C6 19.25 7 20 8.5 20" />
+                <path d="M15.5 4c1.5 0 2.5.75 2.5 2.25v3.5c0 1 .5 2.25 2 2.25-1.5 0-2 1.25-2 2.25v3.5c0 1.5-1 2.25-2.5 2.25" />
+              </g>
+              <path class="js-slash" d="M4 4l16 16" />
+            </svg>
           </button>
           <button
             class="status-btn"
