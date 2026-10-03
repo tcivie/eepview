@@ -10,6 +10,7 @@ Every change to main passes lint, complexity limits, security scans and a rulese
 - Complexity limits: cognitive and cyclomatic complexity 10 or less, 40 lines per function, 5 parameters, nesting 3.
 - No lint exclusions exist. The code is fixed instead.
 - Socket reviews every dependency change.
+- The `docs-check` job (`scripts/docs-check.sh`) fails a PR that changes code or workflows without a CHANGELOG or docs/wiki update. It also checks that every wiki page is indexed.
 - A repository ruleset blocks direct pushes to main. A pull request needs green required checks.
 
 ## How to use / run locally
@@ -32,3 +33,4 @@ Every change to main passes lint, complexity limits, security scans and a rulese
 - 2026-10-03 — Remove CodeQL and Scorecard until the repo is public — [#9](https://github.com/tcivie/eepview/pull/9)
 - 2026-10-03 — Cut dependencies flagged by Socket — [#10](https://github.com/tcivie/eepview/pull/10)
 - 2026-10-03 — Hash-pinned CI tools and typed vite config — [#15](https://github.com/tcivie/eepview/pull/15)
+- 2026-10-03 — Add the docs-check job: code changes need a docs or changelog update — [#16](https://github.com/tcivie/eepview/pull/16)
