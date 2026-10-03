@@ -85,9 +85,15 @@ fail_on_drops() {
   return 1
 }
 
-# Print the floors file with every floor raised to the current score.
+# Print the floors file with the floors of one mode raised to the current scores.
 print_raised_floors() {
-  jq --argjson n "$1" '
+  local mode="$1" now="$2"
+  if [ "$mode" = pr ]; then
+    jq --argjson n "$now" '
+      .scorecard_pr.checks |= with_entries(.value = ([.value, $n["scorecard/" + .key]] | max))' "$FLOORS"
+    return
+  fi
+  jq --argjson n "$now" '
     .scorecard.score = ([.scorecard.score, $n["scorecard/Overall"]] | max)
     | .scorecard.checks |= with_entries(.value = ([.value, $n["scorecard/" + .key]] | max))
     | .bestpractices |= with_entries(.value = ([.value, $n["bestpractices/" + .key]] | max))' "$FLOORS"
@@ -99,18 +105,18 @@ print_raise_lines() {
 }
 
 report_raises() {
-  local raises="$1" now="$2"
+  local mode="$1" raises="$2" now="$3"
   [ -n "$raises" ] || return 0
   print_raise_lines "$raises"
   echo "Paste this into $FLOORS:"
-  print_raised_floors "$now"
+  print_raised_floors "$mode" "$now"
 }
 
 run_published() {
   local floors now drops
   floors="$(published_floors)"
   now="$(published_now)"
-  report_raises "$(find_raises "$floors" "$now")" "$now"
+  report_raises published "$(find_raises "$floors" "$now")" "$now"
   drops="$(find_drops "$floors" "$now")"
   fail_on_drops "$drops"
   echo "ok: no published score is below its floor."
@@ -123,7 +129,7 @@ run_pr() {
   drops="$(find_drops "$floors" "$now")"
   fail_on_drops "$drops"
   echo "ok: no file-based Scorecard check is below its floor."
-  print_raise_lines "$(find_raises "$floors" "$now")"
+  report_raises pr "$(find_raises "$floors" "$now")" "$now"
 }
 
 case "${1:-}" in

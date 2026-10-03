@@ -12,7 +12,7 @@ The floors live in `.github/score-floors.json`.
 
 ## The two jobs
 
-`scripts/score-ratchet.sh` runs both. It needs `curl` and `jq`. The `pr` mode also needs Docker.
+`scripts/score-ratchet.sh` runs both. `scripts/score-ratchet-test.sh` tests it with a fake `docker`; the `pr` job runs that test first. It needs `curl` and `jq`. The `pr` mode also needs Docker.
 
 | Check | When it runs | What it does |
 | --- | --- | --- |
@@ -23,10 +23,10 @@ The CLI runs from the official image `ghcr.io/ossf/scorecard`, pinned by digest.
 
 ## Raise a floor
 
-When a score goes up, the script prints "raise the floor" lines and the full JSON to paste. Do this:
+When a score goes up, the script prints "raise the floor" lines and the full floors JSON to paste. The `published` mode raises `scorecard` and `bestpractices`. The `pr` mode raises `scorecard_pr`. Do this:
 
 1. Run `scripts/score-ratchet.sh published` or `scripts/score-ratchet.sh pr`.
-2. Copy the printed JSON into `.github/score-floors.json`.
+2. Copy the printed JSON (it follows the line "Paste this into") into `.github/score-floors.json`.
 3. Commit it in a PR. Only raise floors. Never lower one.
 
 ## When a score drops
