@@ -120,17 +120,12 @@ a:hover {
 /* Mark: three nested layers, the innermost one is the message. */
 
 .mark {
+  display: block;
   width: 28px;
   height: 28px;
   flex: none;
-  fill: none;
-  stroke: var(--color-accent);
-  stroke-width: 1.5;
-}
-
-.mark .core {
-  fill: var(--color-accent);
-  stroke: none;
+  border-radius: 19%;
+  box-shadow: 0 0 0 1px var(--color-mark-ring);
 }
 
 .brand {

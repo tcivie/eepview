@@ -21,6 +21,19 @@ All files are in `assets/brand/`.
 
 Open a preview page with `#light` or `#dark` to force a theme.
 
+## In the app
+
+- The brand slot is the one place the logo appears on a screen. It holds `eepview-mark-small.svg` at 28 px next to the word "eepview", in the sidebar of every internal page and in the setup header. No page adds a second logo.
+- Every internal page uses `eepview-mark-small.svg` as its favicon.
+- The app copy of the mark lives in `src/ui/assets/`. It is the same file as `assets/brand/eepview-mark-small.svg`, so change both together.
+- In dark mode a 1 px ring (`--color-mark-ring`, white at 12%) separates the green body from the dark surface. In light mode the ring is transparent.
+
+Added in [#BRANDPR](https://github.com/tcivie/eepview/pull/BRANDPR).
+
+## Screenshots
+
+`scripts/screenshots.sh` builds the bundled UI, serves it with `vite preview`, and takes every README and wiki screenshot with headless Chrome. It uses one window size (1280×800), the dev mock data, and both themes. The list of shots is `scripts/screenshots.json`. Set `CHROME` to use a Chrome binary that is not in the default place. The script never starts the eepview app.
+
 ## Palette
 
 | Token | Hex | Use |
@@ -115,6 +128,7 @@ Defined in `src/ui/theme.css`. "Brand" marks a value that comes straight from th
 | `--color-danger` | `#A1252B` brick-700 | `#F2918B` brick-300 | Stopped, refused, errors |
 | `--color-danger-soft` | `#F6D9D8` brick-100 | `#3D1C1C` brick-900 | Error boxes |
 | `--color-focus` | `#2A6A56` pine-700 (brand) | `#6CCFA5` accent dark (brand) | Focus ring |
+| `--color-mark-ring` | `#FFFFFF00` white at 0% | `#FFFFFF1F` white at 12% | The ring around the mark in the brand slot |
 | `--color-scrim` | `#1C1C1C6B` gray-900 at 42% | `#00000099` black at 60% | Behind dialogs |
 | `--shadow-float` | `#1C1C1C14`, `#1C1C1C24` | `#00000066`, `#00000080` | Popovers and menus |
 | `--shadow-inset` | `#FFFFFF99` | `#FFFFFF0A` | The top highlight on panels |
@@ -149,3 +163,4 @@ All variants are the same artwork. None is redrawn.
 - 2026-10-03 — Add the logo, the app icons and the brand assets — [#11](https://github.com/tcivie/eepview/pull/11)
 - 2026-10-03 — One color source, the palette check — [#38](https://github.com/tcivie/eepview/pull/38)
 - 2026-10-03 — Neutral surfaces, green only as the accent — [#51](https://github.com/tcivie/eepview/pull/51)
+- 2026-10-03 — The bulb mark in the brand slot and the favicon; scripts/screenshots.sh — [#BRANDPR](https://github.com/tcivie/eepview/pull/BRANDPR)

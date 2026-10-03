@@ -1,0 +1,75 @@
+{
+  "outDir": "docs/images/ui",
+  "themes": ["light", "dark"],
+  "viewport": { "width": 1280, "height": 800 },
+  "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)",
+  "debugPort": 9339,
+  "settleMs": 1500,
+  "clickSettleMs": 400,
+  "startupTries": 50,
+  "startupDelayMs": 200,
+  "cleanupRetries": 5,
+  "shots": [
+    { "name": "index", "page": "index.html", "query": "dev=1" },
+    { "name": "home", "page": "home.html", "query": "dev=1" },
+    { "name": "bookmarks", "page": "bookmarks.html", "query": "dev=1" },
+    { "name": "history", "page": "history.html", "query": "dev=1" },
+    { "name": "history-clear", "page": "history.html", "query": "dev=1&clear=1" },
+    { "name": "stats", "page": "stats.html", "query": "dev=1" },
+    { "name": "settings", "page": "settings.html", "query": "dev=1" },
+    { "name": "blocked", "page": "blocked.html", "query": "dev=1" },
+    { "name": "router-down", "page": "router-down.html", "query": "dev=1" },
+    { "name": "status", "page": "status.html", "query": "dev=1" },
+    { "name": "status-blocked", "page": "status.html", "query": "dev=1&blocked=1" },
+    { "name": "setup-install", "page": "setup.html", "query": "step=install" },
+    { "name": "setup-found", "page": "setup.html", "query": "step=found" },
+    { "name": "setup-download", "page": "setup.html", "query": "step=download" },
+    { "name": "setup-tunnels", "page": "setup.html", "query": "step=tunnels" },
+    { "name": "setup-ready", "page": "setup.html", "query": "step=ready" },
+    { "name": "toolbar", "page": "toolbar.html", "query": "dev=1" },
+    { "name": "toolbar-windows", "page": "toolbar.html", "query": "dev=1&platform=windows" },
+    { "name": "toolbar-find", "page": "toolbar.html", "query": "dev=1&find=i2p" },
+    { "name": "toolbar-suggest", "page": "toolbar.html", "query": "dev=1&suggest=i2p" },
+    { "name": "toolbar-menu", "page": "toolbar.html", "query": "dev=1&menu=1" },
+    { "name": "router-panel", "page": "toolbar.html", "query": "dev=1&panel=1" },
+    { "name": "router-panel-paused", "page": "toolbar.html", "query": "dev=1&panel=1&paused=1" },
+    {
+      "name": "router-panel-unmanaged",
+      "page": "toolbar.html",
+      "query": "dev=1&panel=1&managed=0"
+    },
+    {
+      "name": "toolbar-macos-corner",
+      "suffix": "@2x",
+      "page": "toolbar.html",
+      "query": "dev=1",
+      "scale": 2,
+      "rect": { "x": 0, "y": 0, "width": 320, "height": 84 }
+    },
+    {
+      "name": "toolbar-windows-corner",
+      "suffix": "@2x",
+      "page": "toolbar.html",
+      "query": "dev=1&platform=windows",
+      "scale": 2,
+      "rect": { "x": 0, "y": 0, "width": 320, "height": 84 }
+    },
+    {
+      "name": "js-toggle-off",
+      "suffix": "@4x",
+      "page": "toolbar.html",
+      "query": "dev=1",
+      "scale": 4,
+      "element": { "selector": "#js", "pad": 6 }
+    },
+    {
+      "name": "js-toggle-on",
+      "suffix": "@4x",
+      "page": "toolbar.html",
+      "query": "dev=1",
+      "scale": 4,
+      "click": "#js",
+      "element": { "selector": "#js", "pad": 6 }
+    }
+  ]
+}
