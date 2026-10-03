@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 The eepview contributors
+# SPDX-License-Identifier: MIT
+
 name: lint
 
 on:
@@ -87,6 +90,14 @@ jobs:
           python3 -m venv "$RUNNER_TEMP/lint-venv"
           "$RUNNER_TEMP/lint-venv/bin/pip" install --quiet --no-deps --require-hashes -r scripts/requirements-lint.txt
           PATH="$RUNNER_TEMP/lint-venv/bin:$PATH" ./scripts/complexity.sh
+      - name: reuse (SPDX headers)
+        env:
+          PIP_DISABLE_PIP_VERSION_CHECK: "1"
+        run: |
+          python3 -m venv "$RUNNER_TEMP/reuse-venv"
+          "$RUNNER_TEMP/reuse-venv/bin/pip" install --quiet --require-hashes -r scripts/requirements-reuse-build.txt
+          "$RUNNER_TEMP/reuse-venv/bin/pip" install --quiet --no-build-isolation --no-deps --require-hashes -r scripts/requirements-reuse.txt
+          "$RUNNER_TEMP/reuse-venv/bin/reuse" lint
       - name: actionlint
         env:
           ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8

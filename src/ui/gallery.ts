@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The eepview contributors
+// SPDX-License-Identifier: MIT
+
 import "./boot.ts";
 import { all } from "./dom.ts";
 import { checkMatching } from "./shared/form.ts";

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The eepview contributors
+// SPDX-License-Identifier: MIT
+
 export const CHART_WIDTH = 600;
 export const CHART_HEIGHT = 140;
 const CHART_TOP = 10;

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The eepview contributors
+// SPDX-License-Identifier: MIT
+
 import { displayUrl, eepsiteUrl, isI2pAddress, isInternal } from "./address.ts";
 
 export const HOME_PAGE = "eepview://home";

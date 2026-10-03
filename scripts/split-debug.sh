@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: 2026 The eepview contributors
+# SPDX-License-Identifier: MIT
 # Move the debug symbols of the release binary into a separate file, for upload as a release asset.
 # - Linux: objcopy copies the DWARF into eepview-<target>.debug, then strips the binary and adds a debug link.
 # - macOS: cargo writes eepview.dSYM (split-debuginfo = "packed"); this zips it.

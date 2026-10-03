@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: 2026 The eepview contributors
+# SPDX-License-Identifier: MIT
 # Check that a Linux ELF binary is PIE, has full RELRO and a non-executable stack.
 # Prints the readelf lines it checks. Fails if one is missing.
 # Usage: scripts/check-hardening.sh <elf-file>

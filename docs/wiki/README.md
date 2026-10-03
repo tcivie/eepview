@@ -46,7 +46,21 @@ This wiki is generated from docs/wiki in the repository. Edit it there, in a PR.
 - [Decisions](decisions.md)
 - [Going public](going-public.md)
 
+## Project governance
+
+- [Governance](governance.md)
+- [Roles](roles.md)
+- [Access continuity](access-continuity.md)
+- [Security requirements](security-requirements.md)
+- [Assurance case](assurance-case.md)
+- [Vulnerability response](vulnerability-response.md)
+- [Coding standards](coding-standards.md)
+- [Testing policy](testing-policy.md)
+- [Release and support](release-and-support.md)
+- [Security review](security-review.md)
+
 ## Policies
+
 
 - [README](https://github.com/tcivie/eepview/blob/main/README.md)
 - [Security policy](https://github.com/tcivie/eepview/blob/main/SECURITY.md)
