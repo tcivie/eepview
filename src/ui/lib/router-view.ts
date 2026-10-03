@@ -79,3 +79,8 @@ export function hopStates(tone: RouterTone, count: number): HopState[] {
     return i === 1 ? "building" : null;
   });
 }
+
+/** The router version for a page: `I2P <version>`, or why there is none. */
+export function versionText(_status: { version: string | null }): string {
+  return "";
+}

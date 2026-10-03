@@ -27,3 +27,8 @@ export function renderRouterSummary(targets: RouterSummaryTargets, status: Route
   targets.proxy.textContent = status.proxy || NO_PROXY;
   return view;
 }
+
+/** The proxy text for a page: the proxy, or a dash while it is not known. */
+export function proxyText(_status: { proxy: string }): string {
+  return "";
+}
