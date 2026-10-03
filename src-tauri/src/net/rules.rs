@@ -18,6 +18,9 @@ use tauri::Url;
 
 use crate::nav;
 
+/// The identifier of the compiled content rule list (macOS).
+pub const CONTENT_RULES_ID: &str = "eepview-i2p-only";
+
 /// URLs that never touch the network: the blank page and inline data. One rule each: the
 /// `WebKit` regex subset has no `|`.
 pub const LOCAL_URL_PATTERNS: [&str; 3] = ["^about:", "^data:", "^blob:"];

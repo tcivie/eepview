@@ -14,6 +14,12 @@ Five independent layers keep the web engine away from the clearnet and from loca
 | L4 navigation guard | Only `http(s)://*.i2p` may load in a tab or open a new one. |
 | L5 WebRTC off | WebRTC sends UDP outside the proxy, so it is removed in every frame. |
 
+The router console view is not a leak path for eepsites:
+
+| View | Why it is not a leak path |
+|---|---|
+| `console` (router console) | It loads only the detected console origin, `http://127.0.0.1:<port>`, after an engine rule list that allows only that origin (macOS, Windows). An eepsite can never load in it: an `.i2p` link opens in a normal tab through L4, and anything else is cancelled. No `tab-*` webview can reach it, because the tabs keep L1–L5 and loopback stays blocked for them. It has no IPC, WebRTC is off, and no probe runs at start. See [Router console](router-console.md) and [ADR 0001](adr-0001-no-leak-architecture.md#router-console-exception). |
+
 JavaScript is on. The layers sit below JavaScript, so they hold with it on. You can turn it off per site.
 
 ## How to use / run locally
@@ -24,8 +30,9 @@ JavaScript is on. The layers sit below JavaScript, so they hold with it on. You 
 ## Limits
 
 - No OS-level layer yet (L6, see the [roadmap](roadmap.md)).
-- Linux has no engine rule list yet (L3b); the page policy covers it.
+- Linux has no engine rule list yet (L3b); the page policy covers it. The console view has no page policy, so on Linux it relies on its navigation guard and the router's own pages.
 
 ## History
 
 - 2026-10-03 — Five layers, the platform bridge and the architecture test — [#29](https://github.com/tcivie/eepview/pull/29)
+- 2026-10-03 — Router console view: not a leak path for eepsites — [#54](https://github.com/tcivie/eepview/pull/54)

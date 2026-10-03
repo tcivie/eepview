@@ -12,7 +12,7 @@
 //!   filter on Windows), attached through `eepview-platform` before the first load. The
 //!   webview starts on `about:blank` and loads the page only once the filter is on.
 //! - L4: [`nav::guard`] on every navigation and new-window request.
-//! - L5: WebRTC removed in every frame ([`webrtc_off`]); `WebKitGTK` also turns it off in the
+//! - L5: WebRTC removed in every frame (`webrtc::webrtc_off`); `WebKitGTK` also turns it off in the
 //!   engine settings.
 //!
 //! No IPC: the capabilities name only the `toolbar` and `internal` webviews.
@@ -26,6 +26,7 @@ use tauri::{
 
 use super::apply::{self, with_core};
 use super::state::{lock, now_ms, shared};
+use super::webrtc::webrtc_off;
 use crate::core::{Core, Load};
 use crate::layout::Rect;
 use crate::nav;
@@ -34,21 +35,6 @@ use crate::net::rules;
 
 /// The first document of every content webview, until the engine filter is on.
 const BLANK: &str = "about:blank";
-
-/// Removes the WebRTC constructors in every frame, before any page script runs.
-pub const WEBRTC_OFF_SCRIPT: &str = r"
-for (const name of ['RTCPeerConnection', 'webkitRTCPeerConnection', 'RTCDataChannel',
-                    'RTCSessionDescription', 'RTCIceCandidate', 'RTCRtpSender',
-                    'RTCRtpReceiver', 'RTCRtpTransceiver']) {
-  try { Object.defineProperty(window, name, { value: undefined, writable: false, configurable: false }); }
-  catch (e) {}
-}
-try {
-  if (navigator.mediaDevices) {
-    Object.defineProperty(navigator, 'mediaDevices', { value: undefined, writable: false, configurable: false });
-  }
-} catch (e) {}
-";
 
 /// `WebView2` features off: the out-of-process UI and `SmartScreen` calls home.
 const WINDOWS_FEATURES_OFF: &str = "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection";
@@ -62,12 +48,6 @@ pub fn windows_proxy_args(gatekeeper_url: &str) -> String {
         "{WINDOWS_FEATURES_OFF} --proxy-server={proxy} --proxy-bypass-list=<-loopback> \
          --force-webrtc-ip-handling-policy=disable_non_proxied_udp"
     )
-}
-
-/// The init script that removes WebRTC in every frame.
-#[must_use]
-pub fn webrtc_off() -> &'static str {
-    WEBRTC_OFF_SCRIPT
 }
 
 /// A remote webview for one tab.
@@ -123,8 +103,9 @@ fn arm<R: Runtime>(webview: &Webview<R>, tab: u32, url: Url) -> tauri::Result<()
         super::engine::native_hooks(&platform, &app, tab);
         let json = rules::content_rule_list().to_string();
         let rules = Rules {
+            id: rules::CONTENT_RULES_ID,
             json: &json,
-            allow: rules::engine_allows,
+            allow: Box::new(rules::engine_allows),
         };
         eepview_platform::attach_rules(&platform, rules, load_after_rules(live, url));
     })

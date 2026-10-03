@@ -57,8 +57,24 @@ These make the wrong code hard to write.
    - a socket type appears outside `net/`;
    - `unsafe` appears in the app crate (it lives only in `crates/eepview-platform`, whose lints are checked too);
    - `content.rs` stops calling a layer: `gatekeeper.url()`, `proxy_url`, `windows_proxy_args`, `rules::content_rule_list`, `rules::engine_allows`, `attach_rules`, `nav::guard`, `webrtc_off`, the `about:blank` first load;
-   - a capability names a webview other than `toolbar`, `internal` or `status`, grants by window or remote URL, or gives `status` more than events.
+   - a capability names a webview other than `toolbar`, `internal` or `status`, grants by window or remote URL, or gives `status` more than events;
+   - the router console view breaks its own rules (see [Router console exception](#router-console-exception)).
+
+   The router console view is the one other remote webview. The test allows it only in `src/shell/console.rs`: `WebviewBuilder::new`, `on_navigation` and `add_child` (with `content.rs` and `chrome.rs`), `WebviewUrl::External` (with `content.rs`, and only for `about:blank`), and `WebviewWindowBuilder` (only there). `proxy_url` stays in `content.rs` only.
 5. **Fail closed at runtime.** The gatekeeper runs only while VERIFY passes. VERIFY asks the router proxy for `http://proxy.i2p/` every 5 s and needs 200 with "I2P HTTP proxy OK". It never asks for a non-`.i2p` host: on a router with an outproxy, that request would itself reach the clearnet. The architecture test fails if `verify.rs` or `gatekeeper.rs` names a non-`.i2p` host. When the router goes down, or you pause, the gatekeeper closes and every `tab-*` webview is destroyed.
+
+## Router console exception
+
+Amended in [#54](https://github.com/tcivie/eepview/pull/54). eepview shows router information but never changes the router configuration. It opens the router's own console pages instead, in one `console` webview. That view loads a loopback page, so it is an exception to the goal above. It is confined like this:
+
+- **Sealed input.** `ConsoleWebview::open(&VerifiedConsole, …)` in `src/shell/console.rs` is the only constructor. Only the detector in `src/net/console.rs` makes a `VerifiedConsole`, after one loopback `GET` shows that console's marker.
+- **One origin.** The view loads only `http://127.0.0.1:<detected port>`. It starts on `about:blank` and loads the page only after an engine rule list is attached that allows only that origin and `about:`, `data:`, `blob:` (macOS and Windows; fail closed). Linux has no engine filter yet, the same limit as L3b for tabs.
+- **Navigation guard.** The console origin stays. An `http(s)://*.i2p` link opens in a normal tab through the tab guard (L4). Anything else is cancelled. New windows are never engine windows.
+- **No IPC, no proxy, WebRTC off.** No capability names `console`. It has no `proxy_url` and never sees the gatekeeper. WebRTC is removed in every frame, downloads are refused, and it runs incognito.
+- **Tabs unchanged.** The `tab-*` webviews keep all five layers. A `tab-*` webview never gets a loopback URL.
+- **No probe at start.** Detection runs only when a page that shows the console links opens, so the leak test sees no extra socket.
+
+See [Router console](router-console.md) for the requirements (R1–R21).
 
 ## The platform bridge
 

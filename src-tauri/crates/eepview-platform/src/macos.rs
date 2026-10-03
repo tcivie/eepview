@@ -5,6 +5,7 @@
 //! names why it is sound.
 
 use std::cell::{Cell, RefCell};
+use std::collections::HashMap;
 use std::ptr::NonNull;
 
 use block2::RcBlock;
@@ -26,12 +27,11 @@ use crate::{
     WindowButtons, count_script, hover_target,
 };
 
-/// The identifier of the compiled rule list in the default store.
-const RULES_ID: &str = "eepview-i2p-only";
-
 thread_local! {
-    /// The compiled rule list, shared by every content webview (main thread only).
-    static RULES: RefCell<Option<Retained<WKContentRuleList>>> = const { RefCell::new(None) };
+    /// The compiled rule lists by identifier, shared by every webview that uses one rule
+    /// set (main thread only).
+    static RULES: RefCell<HashMap<String, Retained<WKContentRuleList>>> =
+        RefCell::new(HashMap::new());
 }
 
 /// The `WKWebView` behind a Tauri webview, and the main-thread marker.
@@ -68,12 +68,15 @@ pub fn attach_rules(
         Ok(v) => v,
         Err(e) => return done(Err(e)),
     };
-    let cached = RULES.with(|r| r.borrow().clone());
+    let Rules { id, json, allow } = rules;
+    // The allow function is the Windows filter; WebKit uses the compiled list.
+    drop(allow);
+    let cached = RULES.with(|r| r.borrow().get(id).cloned());
     if let Some(list) = cached {
         add_rules(&view, &list);
         return done(Ok(()));
     }
-    compile(&view, rules.json, mtm, done);
+    compile(&view, id, json, mtm, done);
 }
 
 fn add_rules(view: &WKWebView, list: &WKContentRuleList) {
@@ -84,6 +87,7 @@ fn add_rules(view: &WKWebView, list: &WKContentRuleList) {
 
 fn compile(
     view: &WKWebView,
+    id: &str,
     json: &str,
     mtm: MainThreadMarker,
     done: Box<dyn FnOnce(Result<(), String>)>,
@@ -93,6 +97,7 @@ fn compile(
         return done(Err("no content rule list store".into()));
     };
     let view = view.retain();
+    let key = id.to_owned();
     let done = Cell::new(Some(done));
     let block = RcBlock::new(move |list: *mut WKContentRuleList, error: *mut NSError| {
         let Some(done) = done.take() else { return };
@@ -100,20 +105,20 @@ fn compile(
         match unsafe { Retained::retain(list) } {
             Some(list) => {
                 add_rules(&view, &list);
-                RULES.with(|r| *r.borrow_mut() = Some(list));
+                RULES.with(|r| r.borrow_mut().insert(key.clone(), list));
                 done(Ok(()));
             }
             None => done(Err(error_text(error))),
         }
     });
-    let id = NSString::from_str(RULES_ID);
-    let rules = NSString::from_str(json);
+    let id = NSString::from_str(id);
+    let json = NSString::from_str(json);
     // SAFETY: all arguments are live for the call; WebKit copies the block and calls it once
     // on the main thread.
     unsafe {
         store.compileContentRuleListForIdentifier_encodedContentRuleList_completionHandler(
             Some(&id),
-            Some(&rules),
+            Some(&json),
             Some(&block),
         );
     }

@@ -18,6 +18,9 @@
     "allow-router-stats",
     "allow-connection-pause",
     "allow-connection-resume",
-    "allow-router-control"
+    "allow-router-control",
+    "allow-console-status",
+    "allow-console-detect",
+    "allow-console-open"
   ]
 }
