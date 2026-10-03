@@ -226,7 +226,7 @@ mod tests {
     use std::path::PathBuf;
 
     use super::*;
-    use crate::shell::testing::{app, bare, core};
+    use crate::shell::testing::{app, bare, core, wait_for};
 
     fn url(text: &str) -> Url {
         Url::parse(text).unwrap()
@@ -290,7 +290,9 @@ mod tests {
         load_after_rules(webview.clone(), url("http://a.i2p/"))(Err("no filter".into()));
         assert_ne!(webview.url().unwrap().as_str(), "http://a.i2p/");
         load_after_rules(webview.clone(), url("http://a.i2p/"))(Ok(()));
-        assert_eq!(webview.url().unwrap().as_str(), "http://a.i2p/");
+        assert!(wait_for(
+            || webview.url().unwrap().as_str() == "http://a.i2p/"
+        ));
     }
 
     #[test]
