@@ -3,7 +3,13 @@
 
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { CHROME_HEIGHT, chromeHeight, FIND_BAR_HEIGHT, POPUP_MARGIN } from "./chrome-height.ts";
+import {
+  CHROME_HEIGHT,
+  chromeHeight,
+  FIND_BAR_HEIGHT,
+  insetPx,
+  POPUP_MARGIN,
+} from "./chrome-height.ts";
 
 describe("chromeHeight", () => {
   it("is the tab strip plus nav row when nothing is open", () => {
@@ -23,5 +29,16 @@ describe("chromeHeight", () => {
       chromeHeight({ findOpen: true, popupBottoms: [90] }),
       CHROME_HEIGHT + FIND_BAR_HEIGHT,
     );
+  });
+});
+
+describe("insetPx", () => {
+  it("rounds the shell's inset to whole pixels", () => {
+    assert.equal(insetPx(86), "86px");
+    assert.equal(insetPx(85.6), "86px");
+  });
+  it("never goes below zero or accepts a broken value", () => {
+    assert.equal(insetPx(-4), "0px");
+    assert.equal(insetPx(Number.NaN), "0px");
   });
 });
