@@ -64,3 +64,4 @@ jobs:
         with:
           # Code scanning upload needs a public repo on the free plan. Print and fail instead.
           advanced-security: false
+          persona: pedantic

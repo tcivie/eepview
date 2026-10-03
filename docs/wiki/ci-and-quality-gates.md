@@ -6,7 +6,7 @@ Every change to main passes lint, complexity limits, security scans and a rulese
 
 - `.github/workflows/lint.yml` runs rustfmt and clippy (pedantic, `-D warnings`), biome and tsc, taplo, shellcheck, lizard complexity and actionlint.
 - `.github/workflows/ci.yml` builds and tests the app.
-- `.github/workflows/security.yml` runs cargo-deny, gitleaks and zizmor.
+- `.github/workflows/security.yml` runs cargo-deny, gitleaks and zizmor. zizmor runs with `--persona=pedantic` in CI and in lefthook, and every permission has a comment that says why.
 - `.github/workflows/codeql.yml` runs CodeQL (`security-extended`) for actions, javascript-typescript and rust. Each matrix entry has a fixed job name, `codeql (<language>)`.
 - `.github/workflows/scorecard.yml` runs OpenSSF Scorecard, publishes the result and uploads the SARIF to code scanning.
 - `.github/workflows/dependency-review.yml` fails a PR that adds a dependency with a high severity advisory.
