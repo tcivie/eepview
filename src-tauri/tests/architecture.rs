@@ -314,3 +314,428 @@ fn commands_that_take_the_app_are_async() {
     }
     assert!(checked > 30, "found only {checked} commands");
 }
+
+// ---------------------------------------------------------------------------------------
+// Diagnostics and bug reports (`docs/wiki/diagnostics-and-bug-reports.md`, R7 to R10).
+// ---------------------------------------------------------------------------------------
+
+/// The five report permissions of R8.1.
+const REPORT_PERMISSIONS: [&str; 5] = [
+    "allow-report-preview",
+    "allow-report-open",
+    "allow-diag-crash-status",
+    "allow-diag-crash-dismiss",
+    "allow-diag-logs-delete",
+];
+
+/// Every `.rs` file of the app crate and of the crates in `crates/*/src`.
+fn all_rust_sources() -> io::Result<Vec<PathBuf>> {
+    let mut out = rust_files(&root().join("src"))?;
+    for entry in fs::read_dir(root().join("crates"))? {
+        let src = entry?.path().join("src");
+        if src.is_dir() {
+            out.extend(rust_files(&src)?);
+        }
+    }
+    Ok(out)
+}
+
+/// Every `.ts` file under `dir`, recursively.
+fn ts_files(dir: &Path) -> io::Result<Vec<PathBuf>> {
+    let mut out = Vec::new();
+    for entry in fs::read_dir(dir)? {
+        let path = entry?.path();
+        if path.is_dir() {
+            out.extend(ts_files(&path)?);
+        } else if path.extension().is_some_and(|e| e == "ts") {
+            out.push(path);
+        }
+    }
+    Ok(out)
+}
+
+/// True when `line` holds `token` and the character before it is not part of a name.
+fn has_token(line: &str, token: &str) -> bool {
+    line.match_indices(token).any(|(at, _)| {
+        line[..at]
+            .chars()
+            .next_back()
+            .is_none_or(|c| !(c.is_ascii_alphanumeric() || c == '_'))
+    })
+}
+
+// R9.1: only the diag module prints or logs.
+#[test]
+fn r9_1_only_the_diag_module_logs() {
+    let tokens = [
+        "println!",
+        "eprintln!",
+        "print!",
+        "eprint!",
+        "dbg!",
+        "log::",
+        "tracing::",
+        "io::stdout",
+        "io::stderr",
+    ];
+    for file in all_rust_sources().unwrap() {
+        let name = rel(&file);
+        if name.starts_with("src/diag/") {
+            continue;
+        }
+        for line in code(&file).unwrap() {
+            let hit = tokens.iter().find(|t| has_token(&line, t));
+            assert!(
+                hit.is_none(),
+                "{hit:?} in {name}: {line} (only src/diag/ may log)"
+            );
+        }
+    }
+}
+
+// R9.1: the scanner sees the tokens, and not look-alikes.
+#[test]
+fn r9_1_token_scan_finds_logging_calls() {
+    assert!(has_token("    println!(\"x\");", "println!"));
+    assert!(has_token("let _ = std::io::stderr();", "io::stderr"));
+    assert!(has_token("log::info!(\"x\")", "log::"));
+    assert!(!has_token("eprint!(\"x\")", "print!"));
+    assert!(!has_token("changelog::x()", "log::"));
+}
+
+// R9.2: no `console.` in any `.ts` file under `src/ui/`, tests included.
+#[test]
+fn r9_2_no_console_in_ui_typescript() {
+    let ui = root().join("../src/ui");
+    for file in ts_files(&ui).unwrap() {
+        let text = fs::read_to_string(&file).unwrap();
+        let name = file
+            .strip_prefix(&ui)
+            .unwrap_or(&file)
+            .display()
+            .to_string();
+        assert!(!has_token(&text, "console."), "console. in src/ui/{name}");
+    }
+}
+
+/// The argument text of every call `diag::event(…)` in `text`. A call is `diag::event(`, or
+/// a bare `event(Code::…` after `use … diag::event`.
+fn event_calls(text: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    for (at, _) in text.match_indices("event(") {
+        let before = &text[..at];
+        let qualified = before.ends_with("diag::");
+        let bare = !qualified
+            && before
+                .chars()
+                .next_back()
+                .is_some_and(|c| c.is_whitespace() || c == '(' || c == '{')
+            && !before.trim_end().ends_with("fn")
+            && text[at + 6..].trim_start().starts_with("Code::");
+        if qualified || bare {
+            out.push(call_args(&text[at + 6..]));
+        }
+    }
+    out
+}
+
+/// The text up to the parenthesis that closes the call.
+fn call_args(rest: &str) -> String {
+    let mut depth = 1_usize;
+    let mut end = rest.len();
+    for (i, c) in rest.char_indices() {
+        depth = match c {
+            '(' => depth + 1,
+            ')' => depth - 1,
+            _ => depth,
+        };
+        if depth == 0 {
+            end = i;
+            break;
+        }
+    }
+    rest[..end].to_owned()
+}
+
+/// The reason an argument text holds text, or `None` when it holds typed values only.
+fn text_argument(args: &str) -> Option<&'static str> {
+    [
+        ("\"", "a string literal"),
+        ("format!", "format!"),
+        ("to_string", "to_string"),
+        ("to_owned", "to_owned"),
+        ("String", "String"),
+    ]
+    .into_iter()
+    .find(|(token, _)| args.contains(token))
+    .map(|(_, why)| why)
+}
+
+// R9.3: no call `diag::event(…)` has a string literal, `format!`, `to_string`, `to_owned` or
+// `String` in its arguments.
+#[test]
+fn r9_3_no_text_argument_to_diag_event() {
+    for file in all_rust_sources().unwrap() {
+        let source = code(&file).unwrap().join("\n");
+        for args in event_calls(&source) {
+            let why = text_argument(&args);
+            assert!(
+                why.is_none(),
+                "{} passes {why:?} to diag::event({args})",
+                rel(&file)
+            );
+        }
+    }
+}
+
+// R9.3: the scanner finds text arguments, also over several lines, and lets typed ones pass.
+#[test]
+fn r9_3_scan_finds_text_arguments() {
+    let good = "diag::event(Code::Startup, &[Field::Line(1)]);";
+    let bad = "diag::event(\n  Code::PageLoadFailed,\n  &[Field::Count(url.to_string())],\n);";
+    let literal = "diag::event(Code::Startup, &[\"x\"]);";
+    let bare = "use a::diag::event;\nevent(Code::Startup, &[format!(\"x\")]);";
+    assert!(event_calls(good).iter().all(|a| text_argument(a).is_none()));
+    assert!(event_calls(bad).iter().any(|a| text_argument(a).is_some()));
+    assert!(
+        event_calls(literal)
+            .iter()
+            .any(|a| text_argument(a).is_some())
+    );
+    assert!(event_calls(bare).iter().any(|a| text_argument(a).is_some()));
+}
+
+/// The capability file `capabilities/report.json`.
+fn report_capability() -> Res<serde_json::Value> {
+    let text = fs::read_to_string(root().join("capabilities/report.json"))?;
+    Ok(serde_json::from_str(&text)?)
+}
+
+// R8.1: `capabilities/report.json` names only `internal`, and grants only the five permissions.
+#[test]
+fn r8_1_report_capability_is_internal_only_with_five_permissions() {
+    let cap = report_capability().unwrap();
+    assert_eq!(labels(&cap), ["internal"]);
+    let mut granted = permissions(&cap);
+    granted.sort_unstable();
+    let mut expected = REPORT_PERMISSIONS.to_vec();
+    expected.sort_unstable();
+    assert_eq!(granted, expected);
+}
+
+// R8.2 and R9.4: no other capability names these permissions, so a `tab-*` webview and the
+// toolbar and status webviews get none of them.
+#[test]
+fn r8_2_no_other_capability_names_the_report_permissions() {
+    for (file, cap) in capabilities().unwrap() {
+        if file == "capabilities/report.json" {
+            continue;
+        }
+        for permission in permissions(&cap) {
+            assert!(
+                !REPORT_PERMISSIONS.contains(&permission),
+                "{file} grants {permission}"
+            );
+        }
+    }
+}
+
+// R8.2: the only capability with a report permission names only the internal webview, never a tab.
+#[test]
+fn r8_2_report_permissions_never_reach_tabs() {
+    for (file, cap) in capabilities().unwrap() {
+        let has = permissions(&cap)
+            .iter()
+            .any(|p| REPORT_PERMISSIONS.contains(p));
+        if has {
+            assert_eq!(labels(&cap), ["internal"], "{file}");
+        }
+        for label in labels(&cap) {
+            assert!(!label.starts_with("tab"), "{file} names {label}");
+        }
+    }
+}
+
+// R8.3: no capability grants an `opener:` permission. JavaScript gets no opener command.
+#[test]
+fn r8_3_no_capability_grants_an_opener_permission() {
+    for entry in fs::read_dir(root().join("capabilities")).unwrap() {
+        let path = entry.unwrap().path();
+        let text = fs::read_to_string(&path).unwrap();
+        assert!(!text.contains("opener"), "{} mentions opener", rel(&path));
+    }
+}
+
+// R8.3: JavaScript has no opener API: no UI file imports or names the opener plugin.
+#[test]
+fn r8_3_ui_never_uses_the_opener_plugin() {
+    let ui = root().join("../src/ui");
+    for file in ts_files(&ui).unwrap() {
+        let text = fs::read_to_string(&file).unwrap();
+        for token in ["plugin-opener", "opener:", "plugin:opener"] {
+            assert!(!text.contains(token), "{} names {token}", rel(&file));
+        }
+    }
+}
+
+// R8.3: the opener plugin starts with `open_js_links_on_click(false)`.
+#[test]
+fn r8_3_opener_plugin_does_not_open_js_links() {
+    let mut uses_plugin = false;
+    let mut disabled = false;
+    for file in rust_files(&root().join("src")).unwrap() {
+        let source = code(&file).unwrap().join("\n");
+        uses_plugin |= source.contains("tauri_plugin_opener");
+        disabled |= source.contains("open_js_links_on_click(false)");
+    }
+    assert!(
+        uses_plugin,
+        "the shell must use tauri-plugin-opener for the issue URL"
+    );
+    assert!(
+        disabled,
+        "the plugin must start with open_js_links_on_click(false)"
+    );
+}
+
+// R8.4: only `src/shell/report.rs` calls `open_url` and `reveal_item_in_dir`.
+#[test]
+fn r8_4_only_report_rs_opens_urls_and_reveals_files() {
+    only_in("open_url", &["src/shell/report.rs"]).unwrap();
+    only_in("reveal_item_in_dir", &["src/shell/report.rs"]).unwrap();
+}
+
+// R7 + R8.4: `report.rs` is the caller, it checks the URL with `is_issue_url`, and it writes
+// into the Downloads folder.
+#[test]
+fn r7_report_command_checks_the_url_and_the_folder() {
+    let report = code(&root().join("src/shell/report.rs"))
+        .unwrap()
+        .join("\n");
+    for token in ["open_url", "reveal_item_in_dir", "is_issue_url"] {
+        assert!(
+            report.contains(token),
+            "src/shell/report.rs must use {token}"
+        );
+    }
+    assert!(
+        report.to_lowercase().contains("download"),
+        "the report file goes to Downloads"
+    );
+}
+
+// R7: every report command is registered, so the build makes its permission.
+#[test]
+fn r7_ipc_commands_are_registered() {
+    let build = fs::read_to_string(root().join("build.rs")).unwrap();
+    for command in [
+        "report_preview",
+        "report_open",
+        "diag_crash_status",
+        "diag_crash_dismiss",
+        "diag_logs_delete",
+    ] {
+        assert!(
+            build.contains(&format!("\"{command}\"")),
+            "build.rs lacks {command}"
+        );
+    }
+}
+
+// R8.5 and R2.5: no HTTP client crate, and no socket in the diag module.
+#[test]
+fn r8_5_no_http_client_and_no_socket_in_diag() {
+    let manifest = fs::read_to_string(root().join("Cargo.toml")).unwrap();
+    for krate in [
+        "reqwest",
+        "hyper",
+        "ureq",
+        "isahc",
+        "curl",
+        "attohttpc",
+        "surf",
+        "minreq",
+    ] {
+        assert!(
+            !manifest.contains(&format!("{krate} =")),
+            "Cargo.toml names {krate}"
+        );
+    }
+    for file in rust_files(&root().join("src")).unwrap() {
+        if !rel(&file).starts_with("src/diag/") {
+            continue;
+        }
+        let source = code(&file).unwrap().join("\n");
+        for token in [
+            "TcpStream",
+            "TcpListener",
+            "UdpSocket",
+            "ToSocketAddrs",
+            "reqwest",
+        ] {
+            assert!(!source.contains(token), "{} uses {token}", rel(&file));
+        }
+    }
+}
+
+// R10: every code of the table is recorded somewhere outside the diag module.
+#[test]
+fn r10_every_event_code_is_recorded_by_the_app() {
+    let codes = [
+        "Startup",
+        "Shutdown",
+        "StartFailed",
+        "VerifyPassed",
+        "VerifyFailed",
+        "RouterUp",
+        "RouterDown",
+        "GatekeeperRefused",
+        "GatekeeperStartFailed",
+        "PageLoadFailed",
+        "WebviewCreateFailed",
+        "EngineCallFailed",
+        "FindFailed",
+        "ZoomFailed",
+        "StoreCorrupt",
+        "ThreadFailed",
+        "ReportOpened",
+        "ReportFailed",
+    ];
+    let mut sources = String::new();
+    for file in rust_files(&root().join("src")).unwrap() {
+        if !rel(&file).starts_with("src/diag/") {
+            sources.push_str(&code(&file).unwrap().join("\n"));
+        }
+    }
+    for code_name in codes {
+        assert!(
+            sources.contains(&format!("Code::{code_name}")),
+            "Code::{code_name} is never recorded outside src/diag/"
+        );
+    }
+}
+
+// R10: the report codes are recorded by the report command, the refusal by the gatekeeper.
+#[test]
+fn r10_events_sit_where_the_table_puts_them() {
+    let report = code(&root().join("src/shell/report.rs"))
+        .unwrap()
+        .join("\n");
+    for name in ["Code::ReportOpened", "Code::ReportFailed"] {
+        assert!(
+            report.contains(name),
+            "src/shell/report.rs must record {name}"
+        );
+    }
+    let mut refused_in_net = false;
+    for file in rust_files(&root().join("src/net")).unwrap() {
+        refused_in_net |= code(&file)
+            .unwrap()
+            .join("\n")
+            .contains("Code::GatekeeperRefused");
+    }
+    assert!(
+        refused_in_net,
+        "the gatekeeper must record Code::GatekeeperRefused"
+    );
+}
