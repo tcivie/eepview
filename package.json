@@ -18,7 +18,7 @@
   "devDependencies": {
     "@biomejs/biome": "2.5.15",
     "@tauri-apps/cli": "^2",
-    "typescript": "~6.0.3",
+    "typescript": "~7.0.2",
     "vite": "^8.0.16"
   },
   "license": "MIT"
