@@ -28,8 +28,8 @@ Enable secret scanning and push protection:
 
 ```sh
 gh api -X PATCH repos/tcivie/eepview \
-  -F security_and_analysis[secret_scanning][status]=enabled \
-  -F security_and_analysis[secret_scanning_push_protection][status]=enabled
+  -F 'security_and_analysis[secret_scanning][status]=enabled' \
+  -F 'security_and_analysis[secret_scanning_push_protection][status]=enabled'
 ```
 
 Enable private vulnerability reporting:
