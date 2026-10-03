@@ -7,9 +7,16 @@
 //!   On macOS this is what stops the `WKWebView` loopback bypass of the proxy (spike S1): an
 //!   `<img>`, `<iframe>`, `fetch` or `WebSocket` to `127.0.0.1` never leaves the engine.
 //! - [`content_rule_list`]: the same rule set as `WKContentRuleList` JSON, for an engine-level
-//!   filter once a platform bridge may attach it (see ADR 0001, "Implementation notes").
+//!   filter (L3b). The `eepview-platform` bridge attaches it to every content webview before
+//!   its first load. [`engine_allows`] is the same rule for the `WebView2` request filter.
 
 use serde_json::{Value, json};
+use tauri::Url;
+
+use crate::nav;
+
+/// URLs that never touch the network: the blank page and inline data.
+pub const LOCAL_URL_PATTERN: &str = "^(about|data|blob):";
 
 /// The allow pattern of ADR 0001: an `http(s)` URL on a `.i2p` host.
 pub const I2P_URL_PATTERN: &str = r"^https?://([a-z0-9-]+\.)*[a-z0-9-]+\.i2p(:[0-9]+)?(/|$)";
@@ -42,8 +49,19 @@ pub fn content_rule_list() -> Value {
         {
             "trigger": { "url-filter": I2P_URL_PATTERN, "url-filter-is-case-sensitive": true },
             "action": { "type": "ignore-previous-rules" }
+        },
+        {
+            "trigger": { "url-filter": LOCAL_URL_PATTERN },
+            "action": { "type": "ignore-previous-rules" }
         }
     ])
+}
+
+/// True for a request URL the engine may load: an I2P URL or a local one (`about:`,
+/// `data:`, `blob:`). The `WebView2` request filter asks this for every request.
+#[must_use]
+pub fn engine_allows(url: &str) -> bool {
+    Url::parse(url).is_ok_and(|u| nav::guard(&u) || matches!(u.scheme(), "about" | "data" | "blob"))
 }
 
 /// The I2P sources of the policy, for tests and docs.
@@ -93,10 +111,34 @@ mod tests {
     fn rule_list_blocks_then_allows_i2p() {
         let rules = content_rule_list();
         let list = rules.as_array().unwrap();
-        assert_eq!(list.len(), 2);
+        assert_eq!(list.len(), 3);
         assert_eq!(list[0]["action"]["type"], "block");
         assert_eq!(list[0]["trigger"]["url-filter"], ".*");
         assert_eq!(list[1]["action"]["type"], "ignore-previous-rules");
         assert_eq!(list[1]["trigger"]["url-filter"], I2P_URL_PATTERN);
+        assert_eq!(list[2]["trigger"]["url-filter"], LOCAL_URL_PATTERN);
+    }
+
+    #[test]
+    fn engine_allows_i2p_and_local_urls_only() {
+        for url in [
+            "http://stats.i2p/",
+            "https://a.b.i2p:8443/x",
+            "about:blank",
+            "data:image/png;base64,AA",
+            "blob:http://stats.i2p/1",
+        ] {
+            assert!(engine_allows(url), "{url}");
+        }
+        for url in [
+            "http://127.0.0.1:7657/",
+            "http://example.com/",
+            "https://stats.i2p.example.com/",
+            "file:///etc/passwd",
+            "ws://stats.i2p/",
+            "not a url",
+        ] {
+            assert!(!engine_allows(url), "{url}");
+        }
     }
 }

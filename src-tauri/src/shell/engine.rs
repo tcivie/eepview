@@ -1,13 +1,10 @@
-//! Engine calls on a `tab-*` webview that work with page JavaScript off.
-//!
-//! - `WebKitGTK`: the native API through `with_webview` (back, forward, stop, reload without
-//!   cache, `WebKitFindController` with counted matches, link hover).
-//! - `WKWebView` and `WebView2`: Tauri gives no safe native handle (only raw pointers), and the
-//!   crate denies `unsafe`. So these engines get app-injected scripts (`evaluateJavaScript`,
-//!   `ExecuteScript`), which run even when page JavaScript is off. Reload and zoom use the
-//!   native Tauri calls on every engine.
+//! Engine calls on a `tab-*` webview. They work with page JavaScript off: back, forward,
+//! stop, hard reload and find go through the native engine API in `eepview-platform`;
+//! reload and zoom use Tauri. Only `WebView2` lacks a native find with counts, so it gets an
+//! app-injected script (`ExecuteScript` runs with page JavaScript off).
 
-use tauri::{Manager, Runtime, Webview};
+use eepview_platform::{FindRequest, Nav, PlatformWebview};
+use tauri::{AppHandle, Manager, Runtime, Webview};
 
 use super::apply::with_core;
 use crate::core::{EngineOp, FindOp};
@@ -17,22 +14,70 @@ pub fn run<R: Runtime>(webview: &Webview<R>, tab: u32, op: &EngineOp) {
     let result = match op {
         EngineOp::Reload => webview.reload(),
         EngineOp::Zoom(level) => webview.set_zoom(*level),
-        EngineOp::Find(find) => {
-            find_text(webview, tab, find);
-            Ok(())
-        }
-        other => platform(webview, other),
+        EngineOp::Find(find) => find_text(webview, tab, find),
+        EngineOp::FindClear => webview.with_webview(|p| eepview_platform::find_clear(&p)),
+        EngineOp::Back => go(webview, Nav::Back),
+        EngineOp::Forward => go(webview, Nav::Forward),
+        EngineOp::HardReload => go(webview, Nav::HardReload),
+        EngineOp::Stop => go(webview, Nav::Stop),
     };
     if let Err(e) = result {
         super::log::error("engine call", &e.to_string());
     }
 }
 
+fn go<R: Runtime>(webview: &Webview<R>, nav: Nav) -> tauri::Result<()> {
+    webview.with_webview(move |platform| {
+        if let Err(e) = eepview_platform::go(&platform, nav) {
+            super::log::error("engine call", &e);
+        }
+    })
+}
+
+/// Hardens the engine and hooks the link under the mouse to the status bubble.
+pub fn native_hooks<R: Runtime>(platform: &PlatformWebview, app: &AppHandle<R>, tab: u32) {
+    if let Err(e) = eepview_platform::harden(platform) {
+        super::log::error("harden", &e);
+    }
+    let app = app.clone();
+    let hover = Box::new(move |link: Option<String>| {
+        with_core(&app, |core| core.hover_link(tab, link.as_deref()));
+    });
+    if let Err(e) = eepview_platform::on_hover(platform, hover) {
+        super::log::error("hover", &e);
+    }
+}
+
+/// The bridge request of a find.
+#[must_use]
+pub fn find_request(find: &FindOp) -> FindRequest {
+    FindRequest {
+        query: find.query.clone(),
+        backwards: !find.forward,
+        case_sensitive: find.match_case,
+        fresh: find.fresh,
+    }
+}
+
+fn find_text<R: Runtime>(webview: &Webview<R>, tab: u32, find: &FindOp) -> tauri::Result<()> {
+    let request = find_request(find);
+    let (live, find) = (webview.clone(), find.clone());
+    let app = webview.app_handle().clone();
+    webview.with_webview(move |platform| {
+        let counted = Box::new(move |count: Option<u32>| {
+            with_core(&app, |core| core.find_counted(tab, count));
+        });
+        if !eepview_platform::find(&platform, &request, counted) {
+            find_by_script(&live, tab, &find);
+        }
+    })
+}
+
 /// The find script for engines without a native find API with counts. Returns the match
 /// count of a fresh search, or -1.
 #[must_use]
 pub fn find_script(find: &FindOp) -> String {
-    let query = serde_json::to_string(&find.query).unwrap_or_else(|_| "\"\"".into());
+    let query = eepview_platform::js_string(&find.query);
     format!(
         "(function(q, fwd, cs, fresh) {{\
            if (fresh) {{ var s = window.getSelection(); if (s) s.removeAllRanges(); }}\
@@ -48,10 +93,6 @@ pub fn find_script(find: &FindOp) -> String {
     )
 }
 
-/// The script that clears a find selection.
-pub const FIND_CLEAR_SCRIPT: &str =
-    "window.getSelection() && window.getSelection().removeAllRanges()";
-
 /// Parses the result of [`find_script`]: `Some(count)` for a fresh search.
 #[must_use]
 pub fn parse_count(result: &str) -> Option<Option<u32>> {
@@ -62,20 +103,7 @@ pub fn parse_count(result: &str) -> Option<Option<u32>> {
     Some(u32::try_from(n).ok())
 }
 
-#[cfg(not(target_os = "linux"))]
-fn platform<R: Runtime>(webview: &Webview<R>, op: &EngineOp) -> tauri::Result<()> {
-    let script = match op {
-        EngineOp::Back => "history.back()",
-        EngineOp::Forward => "history.forward()",
-        EngineOp::HardReload => "location.reload()",
-        EngineOp::Stop => "window.stop()",
-        _ => FIND_CLEAR_SCRIPT,
-    };
-    webview.eval(script)
-}
-
-#[cfg(not(target_os = "linux"))]
-fn find_text<R: Runtime>(webview: &Webview<R>, tab: u32, find: &FindOp) {
+fn find_by_script<R: Runtime>(webview: &Webview<R>, tab: u32, find: &FindOp) {
     let app = webview.app_handle().clone();
     let result = webview.eval_with_callback(find_script(find), move |out| {
         if let Some(count) = parse_count(&out) {
@@ -84,85 +112,6 @@ fn find_text<R: Runtime>(webview: &Webview<R>, tab: u32, find: &FindOp) {
     });
     if let Err(e) = result {
         super::log::error("find", &e.to_string());
-    }
-}
-
-/// Engine settings after the webview exists. Only `WebKitGTK` has switches for WebRTC and
-/// media capture, and a link-hover signal.
-#[cfg(not(target_os = "linux"))]
-pub fn harden<R: Runtime>(_webview: &Webview<R>, _tab: u32) {}
-
-#[cfg(target_os = "linux")]
-fn platform<R: Runtime>(webview: &Webview<R>, op: &EngineOp) -> tauri::Result<()> {
-    use webkit2gtk::{FindControllerExt, WebViewExt};
-    let op = op.clone();
-    webview.with_webview(move |platform| {
-        let view = platform.inner();
-        match op {
-            EngineOp::Back => view.go_back(),
-            EngineOp::Forward => view.go_forward(),
-            EngineOp::HardReload => view.reload_bypass_cache(),
-            EngineOp::Stop => view.stop_loading(),
-            _ => view
-                .find_controller()
-                .iter()
-                .for_each(FindControllerExt::search_finish),
-        }
-    })
-}
-
-#[cfg(target_os = "linux")]
-fn find_text<R: Runtime>(webview: &Webview<R>, _tab: u32, find: &FindOp) {
-    use webkit2gtk::{FindControllerExt, FindOptions, WebViewExt};
-    let find = find.clone();
-    let result = webview.with_webview(move |platform| {
-        let Some(controller) = platform.inner().find_controller() else {
-            return;
-        };
-        let mut options = FindOptions::WRAP_AROUND;
-        if !find.match_case {
-            options |= FindOptions::CASE_INSENSITIVE;
-        }
-        if find.fresh {
-            controller.count_matches(&find.query, options.bits(), u32::MAX);
-            controller.search(&find.query, options.bits(), u32::MAX);
-        } else if find.forward {
-            controller.search_next();
-        } else {
-            controller.search_previous();
-        }
-    });
-    if let Err(e) = result {
-        super::log::error("find", &e.to_string());
-    }
-}
-
-/// WebKitGTK: WebRTC and media capture off in the engine (L5), counted find results, and the
-/// link under the mouse for the status bubble.
-#[cfg(target_os = "linux")]
-pub fn harden<R: Runtime>(webview: &Webview<R>, tab: u32) {
-    use webkit2gtk::{FindControllerExt, HitTestResultExt, SettingsExt, WebViewExt};
-    let app = webview.app_handle().clone();
-    let result = webview.with_webview(move |platform| {
-        let view = platform.inner();
-        if let Some(settings) = WebViewExt::settings(&view) {
-            settings.set_enable_webrtc(false);
-            settings.set_enable_media_stream(false);
-        }
-        let count_app = app.clone();
-        if let Some(controller) = view.find_controller() {
-            controller.connect_counted_matches(move |_, n| {
-                with_core(&count_app, |core| core.find_counted(tab, Some(n)));
-            });
-        }
-        view.connect_mouse_target_changed(move |_, hit, _| {
-            let link = hit.context_is_link().then(|| hit.link_uri()).flatten();
-            let link = link.as_ref().map(|s| s.as_str().to_owned());
-            with_core(&app, |core| core.hover_link(tab, link.as_deref()));
-        });
-    });
-    if let Err(e) = result {
-        super::log::error("harden", &e.to_string());
     }
 }
 
@@ -179,7 +128,20 @@ mod tests {
             fresh: true,
         };
         let script = find_script(&op);
-        assert!(script.contains(r#"("a\"b</script>", true, false, true)"#));
+        assert!(script.contains(r#"("a\"b\u003c/script>", true, false, true)"#));
+    }
+
+    #[test]
+    fn find_request_maps_direction_and_case() {
+        let op = FindOp {
+            query: "x".into(),
+            forward: false,
+            match_case: true,
+            fresh: false,
+        };
+        let request = find_request(&op);
+        assert!(request.backwards && request.case_sensitive && !request.fresh);
+        assert_eq!(request.query, "x");
     }
 
     #[test]

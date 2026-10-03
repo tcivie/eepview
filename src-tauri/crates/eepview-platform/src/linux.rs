@@ -6,7 +6,17 @@ use std::rc::Rc;
 use webkit2gtk::glib::ObjectExt;
 use webkit2gtk::{FindControllerExt, FindOptions, HitTestResultExt, SettingsExt, WebViewExt};
 
-use crate::{FindRequest, Nav, PlatformWebview};
+use crate::{FindRequest, Nav, PlatformWebview, Rules};
+
+/// No request filter: webkit2gtk has no binding for one, and the engine makes no requests
+/// of its own (spike S1). The CSP of the gatekeeper is the L3 layer here.
+pub fn attach_rules(
+    _webview: &PlatformWebview,
+    _rules: Rules<'_>,
+    done: Box<dyn FnOnce(Result<(), String>)>,
+) {
+    done(Ok(()));
+}
 
 /// The link under the mouse, from `mouse-target-changed`.
 pub fn on_hover(

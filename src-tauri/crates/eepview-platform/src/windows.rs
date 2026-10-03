@@ -10,7 +10,7 @@ use webview2_com::{
 };
 use windows_core::{Interface, PWSTR, w};
 
-use crate::{Nav, PlatformWebview};
+use crate::{FindRequest, Nav, PlatformWebview, Rules};
 
 fn core(webview: &PlatformWebview) -> Result<ICoreWebView2, String> {
     let controller = webview.controller();
@@ -18,8 +18,17 @@ fn core(webview: &PlatformWebview) -> Result<ICoreWebView2, String> {
     unsafe { controller.CoreWebView2() }.map_err(|e| e.to_string())
 }
 
-/// Answers 403 to every request whose URL `allow` refuses (the second L3 belt).
-pub fn attach_rules(webview: &PlatformWebview, allow: fn(&str) -> bool) -> Result<(), String> {
+/// Attaches the request filter, then calls `done`.
+pub fn attach_rules(
+    webview: &PlatformWebview,
+    rules: Rules<'_>,
+    done: Box<dyn FnOnce(Result<(), String>)>,
+) {
+    done(filter(webview, rules.allow));
+}
+
+/// Answers 403 to every request whose URL `allow` refuses (L3b).
+fn filter(webview: &PlatformWebview, allow: fn(&str) -> bool) -> Result<(), String> {
     let core = core(webview)?;
     let env = webview.environment();
     // SAFETY: COM call on a live object with a static wide string.
@@ -31,7 +40,7 @@ pub fn attach_rules(webview: &PlatformWebview, allow: fn(&str) -> bool) -> Resul
         let request = unsafe { args.Request() }?;
         let mut uri = PWSTR::null();
         // SAFETY: getter on the live request; WebView2 allocates the string we take.
-        unsafe { request.Uri(&mut uri) }?;
+        unsafe { request.Uri(&raw mut uri) }?;
         if allow(&take_pwstr(uri)) {
             return Ok(());
         }
@@ -58,7 +67,7 @@ pub fn on_hover(
     let handler = StatusBarTextChangedEventHandler::create(Box::new(move |_, _| {
         let mut text = PWSTR::null();
         // SAFETY: getter on the live webview; WebView2 allocates the string we take.
-        unsafe { source.StatusBarText(&mut text) }?;
+        unsafe { source.StatusBarText(&raw mut text) }?;
         callback(crate::hover_target(&take_pwstr(text)));
         Ok(())
     }));
@@ -82,6 +91,18 @@ pub fn go(webview: &PlatformWebview, nav: Nav) -> Result<(), String> {
     };
     result.map_err(|e| e.to_string())
 }
+
+/// No native find with counts: the caller falls back to a script.
+pub fn find(
+    _webview: &PlatformWebview,
+    _request: &FindRequest,
+    _on_count: Box<dyn Fn(Option<u32>)>,
+) -> bool {
+    false
+}
+
+/// Nothing to clear: the script find selects text, and the next page load drops it.
+pub fn find_clear(_webview: &PlatformWebview) {}
 
 /// Autofill, password saving and `SmartScreen` reputation checks off.
 pub fn harden(webview: &PlatformWebview) -> Result<(), String> {

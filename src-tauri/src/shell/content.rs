@@ -4,13 +4,17 @@
 //! Every one gets all engine-side layers:
 //! - L2: `proxy_url` = the gatekeeper ([`Gatekeeper::url`]), and on Windows the same proxy in
 //!   the browser arguments ([`windows_proxy_args`]).
-//! - L3: the page policy, added by the gatekeeper to every response (`net::rules`).
+//! - L3a: the page policy, added by the gatekeeper to every response (`net::rules`).
+//! - L3b: the engine request filter (`WKContentRuleList` on macOS, a `WebResourceRequested`
+//!   filter on Windows), attached through `eepview-platform` before the first load. The
+//!   webview starts on `about:blank` and loads the page only once the filter is on.
 //! - L4: [`nav::guard`] on every navigation and new-window request.
 //! - L5: WebRTC removed in every frame ([`webrtc_off`]); `WebKitGTK` also turns it off in the
 //!   engine settings.
 //!
 //! No IPC: the capabilities name only the `toolbar` and `internal` webviews.
 
+use eepview_platform::Rules;
 use tauri::webview::{DownloadEvent, NewWindowResponse, PageLoadEvent, PageLoadPayload};
 use tauri::{
     AppHandle, LogicalPosition, LogicalSize, Manager, Runtime, Url, Webview, WebviewBuilder,
@@ -23,6 +27,10 @@ use crate::core::{Core, Load};
 use crate::layout::Rect;
 use crate::nav;
 use crate::net::gatekeeper::Gatekeeper;
+use crate::net::rules;
+
+/// The first document of every content webview, until the engine filter is on.
+const BLANK: &str = "about:blank";
 
 /// Removes the WebRTC constructors in every frame, before any page script runs.
 pub const WEBRTC_OFF_SCRIPT: &str = r"
@@ -81,7 +89,8 @@ impl ContentWebview {
             .ok_or(tauri::Error::InvalidWebviewUrl("not an I2P URL"))?;
         let proxy = Url::parse(&gatekeeper.url())
             .map_err(|_| tauri::Error::InvalidWebviewUrl("bad gatekeeper URL"))?;
-        let mut builder = WebviewBuilder::new(label, WebviewUrl::External(url))
+        let blank = Url::parse(BLANK).map_err(|_| tauri::Error::InvalidWebviewUrl(BLANK))?;
+        let mut builder = WebviewBuilder::new(label, WebviewUrl::External(blank))
             .proxy_url(proxy)
             .incognito(load.private)
             .initialization_script_for_all_frames(webrtc_off());
@@ -95,10 +104,41 @@ impl ContentWebview {
             LogicalPosition::new(rect.x, rect.y),
             LogicalSize::new(rect.w, rect.h),
         )?;
-        super::engine::harden(&webview, load.tab);
         webview.set_zoom(load.zoom)?;
+        arm(&webview, load.tab, url)?;
         Ok(webview)
     }
+}
+
+/// Turns on the engine filter (L3b) and the native hooks, then loads `url`. When the filter
+/// cannot be attached, the webview stays on `about:blank` (fail closed).
+fn arm<R: Runtime>(webview: &Webview<R>, tab: u32, url: Url) -> tauri::Result<()> {
+    let live = webview.clone();
+    let app = webview.app_handle().clone();
+    webview.with_webview(move |platform| {
+        super::engine::native_hooks(&platform, &app, tab);
+        let json = rules::content_rule_list().to_string();
+        let rules = Rules {
+            json: &json,
+            allow: rules::engine_allows,
+        };
+        eepview_platform::attach_rules(&platform, rules, load_after_rules(live, url));
+    })
+}
+
+/// The load that waits for the engine filter.
+fn load_after_rules<R: Runtime>(
+    webview: Webview<R>,
+    url: Url,
+) -> Box<dyn FnOnce(Result<(), String>)> {
+    Box::new(move |result| match result {
+        Ok(()) => {
+            if let Err(e) = webview.navigate(url) {
+                super::log::error("first load", &e.to_string());
+            }
+        }
+        Err(e) => super::log::error("engine filter, page not loaded", &e),
+    })
 }
 
 /// Windows: the proxy in the browser arguments, and a data folder of its own, so the

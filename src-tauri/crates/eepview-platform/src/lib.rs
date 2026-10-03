@@ -15,10 +15,16 @@
 
 #[cfg(target_os = "linux")]
 mod linux;
+#[cfg(target_os = "linux")]
+use linux as imp;
 #[cfg(target_os = "macos")]
 mod macos;
+#[cfg(target_os = "macos")]
+use macos as imp;
 #[cfg(windows)]
 mod windows;
+#[cfg(windows)]
+use windows as imp;
 
 use std::fmt::Write as _;
 
@@ -135,15 +141,7 @@ pub fn attach_rules(
     rules: Rules<'_>,
     done: Box<dyn FnOnce(Result<(), String>)>,
 ) {
-    #[cfg(target_os = "macos")]
-    macos::attach_rules(webview, rules.json, done);
-    #[cfg(windows)]
-    done(windows::attach_rules(webview, rules.allow));
-    #[cfg(target_os = "linux")]
-    {
-        let _ = (webview, rules);
-        done(Ok(()));
-    }
+    imp::attach_rules(webview, rules, done);
 }
 
 /// Calls `callback` with the link under the mouse, or `None` when it leaves the link.
@@ -155,12 +153,7 @@ pub fn on_hover(
     webview: &PlatformWebview,
     callback: Box<dyn Fn(Option<String>)>,
 ) -> Result<(), String> {
-    #[cfg(target_os = "macos")]
-    return macos::on_hover(webview, callback);
-    #[cfg(windows)]
-    return windows::on_hover(webview, callback);
-    #[cfg(target_os = "linux")]
-    return linux::on_hover(webview, callback);
+    imp::on_hover(webview, callback)
 }
 
 /// A step on the engine's own navigation list.
@@ -169,12 +162,7 @@ pub fn on_hover(
 ///
 /// Fails when the engine handle is missing or the engine refuses the call.
 pub fn go(webview: &PlatformWebview, nav: Nav) -> Result<(), String> {
-    #[cfg(target_os = "macos")]
-    return macos::go(webview, nav);
-    #[cfg(windows)]
-    return windows::go(webview, nav);
-    #[cfg(target_os = "linux")]
-    return linux::go(webview, nav);
+    imp::go(webview, nav)
 }
 
 /// Finds text. For a fresh search `on_count` gets the match count. Returns false when the
@@ -185,25 +173,12 @@ pub fn find(
     request: &FindRequest,
     on_count: Box<dyn Fn(Option<u32>)>,
 ) -> bool {
-    #[cfg(target_os = "macos")]
-    return macos::find(webview, request, on_count);
-    #[cfg(windows)]
-    {
-        let _ = (webview, request, on_count);
-        return false;
-    }
-    #[cfg(target_os = "linux")]
-    return linux::find(webview, request, on_count);
+    imp::find(webview, request, on_count)
 }
 
 /// Ends a find: clears the highlight.
 pub fn find_clear(webview: &PlatformWebview) {
-    #[cfg(target_os = "macos")]
-    macos::find_clear(webview);
-    #[cfg(windows)]
-    let _ = webview;
-    #[cfg(target_os = "linux")]
-    linux::find_clear(webview);
+    imp::find_clear(webview);
 }
 
 /// Turns off engine features that call home or leak (see the table above).
@@ -212,12 +187,7 @@ pub fn find_clear(webview: &PlatformWebview) {
 ///
 /// Fails when the engine handle is missing or the engine refuses the call.
 pub fn harden(webview: &PlatformWebview) -> Result<(), String> {
-    #[cfg(target_os = "macos")]
-    return macos::harden(webview);
-    #[cfg(windows)]
-    return windows::harden(webview);
-    #[cfg(target_os = "linux")]
-    return linux::harden(webview);
+    imp::harden(webview)
 }
 
 #[cfg(test)]

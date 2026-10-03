@@ -16,7 +16,7 @@ use objc2_web_kit::{
 };
 
 use crate::{
-    CLEAR_SELECTION_SCRIPT, FindRequest, HOVER_CHANNEL, HOVER_SCRIPT, Nav, PlatformWebview,
+    CLEAR_SELECTION_SCRIPT, FindRequest, HOVER_CHANNEL, HOVER_SCRIPT, Nav, PlatformWebview, Rules,
     count_script, hover_target,
 };
 
@@ -55,7 +55,7 @@ fn world(mtm: MainThreadMarker) -> Retained<WKContentWorld> {
 /// Adds the compiled rule list to the view, compiling it on first use.
 pub fn attach_rules(
     webview: &PlatformWebview,
-    json: &str,
+    rules: Rules<'_>,
     done: Box<dyn FnOnce(Result<(), String>)>,
 ) {
     let (view, mtm) = match view(webview) {
@@ -67,7 +67,7 @@ pub fn attach_rules(
         add_rules(&view, &list);
         return done(Ok(()));
     }
-    compile(&view, json, mtm, done);
+    compile(&view, rules.json, mtm, done);
 }
 
 fn add_rules(view: &WKWebView, list: &WKContentRuleList) {
