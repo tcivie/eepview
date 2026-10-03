@@ -50,10 +50,10 @@ pub fn run() -> tauri::Result<()> {
         .on_menu_event(|app, event| menu::on_event(app, event.id().as_ref()))
         .setup(|app| setup(app).map_err(Into::into))
         .build(tauri::generate_context!())?;
-    app.run(|handle, event| {
-        if let RunEvent::WindowEvent { event, .. } = event {
-            on_window_event(handle, &event);
-        }
+    app.run(|handle, event| match event {
+        RunEvent::WindowEvent { event, .. } => on_window_event(handle, &event),
+        RunEvent::Exit => console::stop(handle),
+        _ => {}
     });
     Ok(())
 }

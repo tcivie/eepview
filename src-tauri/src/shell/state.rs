@@ -24,10 +24,13 @@ pub struct Shared<R: Runtime> {
     pub gate: Mutex<Option<Arc<Gatekeeper>>>,
     /// The detected router console; `None` until a detection finds one.
     pub console: Mutex<Option<VerifiedConsole>>,
-    /// True while the console re-check thread runs.
-    pub console_watch: AtomicBool,
-    /// True while the console retry thread runs.
-    pub console_retry: AtomicBool,
+    /// The console loop epoch: `console::stop` moves it on, and a loop of an older epoch
+    /// ends at its next tick.
+    pub console_epoch: AtomicU64,
+    /// The epoch of the running console re-check loop, or 0.
+    pub console_watch: AtomicU64,
+    /// The epoch of the running console retry loop, or 0.
+    pub console_retry: AtomicU64,
     /// True once the console rule list is attached to the console view.
     pub console_armed: AtomicBool,
     /// The label of the live webview of each tab.
@@ -53,8 +56,9 @@ impl<R: Runtime> Shared<R> {
             core: Mutex::new(core),
             gate: Mutex::new(None),
             console: Mutex::new(None),
-            console_watch: AtomicBool::new(false),
-            console_retry: AtomicBool::new(false),
+            console_epoch: AtomicU64::new(1),
+            console_watch: AtomicU64::new(0),
+            console_retry: AtomicU64::new(0),
             console_armed: AtomicBool::new(false),
             labels: Mutex::new(HashMap::new()),
             base: Mutex::new(None),

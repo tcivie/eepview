@@ -16,7 +16,7 @@
 //!
 //! The `tab-*` webviews keep every layer of ADR 0001 and still cannot reach loopback.
 
-use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::thread;
 use std::time::Duration;
 
@@ -281,23 +281,36 @@ pub fn detect_now<R: Runtime>(app: &AppHandle<R>) -> ConsoleInfo {
     info
 }
 
-/// Starts a named thread unless `flag` says one runs; the thread clears it when it ends.
+/// R22: ends every re-check and retry loop at its next tick. After it, no loop opens a
+/// connection; a later [`detect_now`] starts the loops again.
+pub fn stop<R: Runtime>(app: &AppHandle<R>) {
+    shared(app).console_epoch.fetch_add(1, Ordering::SeqCst);
+}
+
+/// True while the loop of epoch `epoch` may still run: no [`stop`] since it started.
+fn live<R: Runtime>(app: &AppHandle<R>, epoch: u64) -> bool {
+    shared(app).console_epoch.load(Ordering::SeqCst) == epoch
+}
+
+/// Starts a named loop thread unless one of the current epoch runs. `slot` holds the epoch
+/// of the running loop (0: none); the thread clears it when it ends.
 fn spawn_once<R: Runtime>(
     app: &AppHandle<R>,
     name: &str,
-    flag: fn(&AppHandle<R>) -> &std::sync::atomic::AtomicBool,
-    body: fn(&AppHandle<R>),
+    slot: fn(&AppHandle<R>) -> &AtomicU64,
+    body: fn(&AppHandle<R>, u64),
 ) {
-    if flag(app).swap(true, Ordering::SeqCst) {
+    let epoch = shared(app).console_epoch.load(Ordering::SeqCst);
+    if slot(app).swap(epoch, Ordering::SeqCst) == epoch {
         return;
     }
     let handle = app.clone();
     let spawned = thread::Builder::new().name(name.into()).spawn(move || {
-        body(&handle);
-        flag(&handle).store(false, Ordering::SeqCst);
+        body(&handle, epoch);
+        let _ = slot(&handle).compare_exchange(epoch, 0, Ordering::SeqCst, Ordering::SeqCst);
     });
     if let Err(e) = spawned {
-        flag(app).store(false, Ordering::SeqCst);
+        slot(app).store(0, Ordering::SeqCst);
         log::error(name, &e.to_string());
     }
 }
@@ -312,11 +325,11 @@ fn retry<R: Runtime>(app: &AppHandle<R>) {
     );
 }
 
-fn retry_loop<R: Runtime>(app: &AppHandle<R>) {
+fn retry_loop<R: Runtime>(app: &AppHandle<R>, epoch: u64) {
     let rounds = RETRY_FOR.as_secs() / RETRY_EVERY.as_secs();
     for _ in 0..rounds {
         thread::sleep(RETRY_EVERY);
-        if current(app).is_some() {
+        if !live(app, epoch) || current(app).is_some() {
             return;
         }
         if let Some(found) = detect_here() {
@@ -337,11 +350,15 @@ fn recheck<R: Runtime>(app: &AppHandle<R>) {
     );
 }
 
-/// Checks the known console every 10 s until it is cleared ([`after_recheck`]).
-fn watch_loop<R: Runtime>(app: &AppHandle<R>) {
+/// Checks the known console every 10 s until it is cleared ([`after_recheck`]) or the
+/// loops stop.
+fn watch_loop<R: Runtime>(app: &AppHandle<R>, epoch: u64) {
     let mut misses = 0;
-    while let Some(known) = current(app) {
+    loop {
         thread::sleep(RETRY_EVERY);
+        let Some(known) = current(app).filter(|_| live(app, epoch)) else {
+            return;
+        };
         let (next, count) = after_recheck(Some(&known), misses, detect_here());
         misses = count;
         set_console(app, next);
