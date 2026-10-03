@@ -3,7 +3,7 @@
 # Needs an elevated shell. The fw_harness.py script calls one action at a time.
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('Install', 'Add', 'Remove', 'Procs', 'DnsClear', 'DnsDump', 'Audit', 'CaptureStart', 'CaptureStop')]
+    [ValidateSet('Install', 'AuditOn', 'Add', 'Remove', 'Procs', 'DnsClear', 'DnsDump', 'Audit', 'CaptureStart', 'CaptureStop')]
     [string]$Action,
     [string]$Path = '',
     [string]$Out = '',
@@ -53,7 +53,6 @@ function Install-Runtime {
 # Path = the runtime folder. One outbound and one inbound block rule per executable.
 function Add-Rules {
     Set-NetFirewallProfile -All -Enabled True -DefaultOutboundAction Allow
-    & auditpol.exe /set /subcategory:"Filtering Platform Connection" /success:enable /failure:enable | Out-Null
     foreach ($exe in Get-ChildItem -Path $Path -Recurse -Filter '*.exe') {
         foreach ($direction in 'Outbound', 'Inbound') {
             New-NetFirewallRule -DisplayName "$Group $direction $($exe.Name)" -Group $Group `
@@ -64,6 +63,11 @@ function Add-Rules {
     Get-NetFirewallRule -Group $Group | Get-NetFirewallApplicationFilter |
         Select-Object -ExpandProperty Program | Sort-Object -Unique |
         ForEach-Object { Write-Output "blocked: $_" }
+}
+
+# WFP events 5156 (allowed) and 5157 (blocked), on for every phase so the control phase is real.
+function Set-Audit([string]$State) {
+    & auditpol.exe /set /subcategory:"Filtering Platform Connection" "/success:$State" "/failure:$State" | Out-Null
 }
 
 function Get-EngineProcesses {
@@ -94,7 +98,11 @@ function Get-AuditSummary {
 switch ($Action) {
     'Install' { Install-Runtime }
     'Add' { Add-Rules }
-    'Remove' { Remove-NetFirewallRule -Group $Group -ErrorAction SilentlyContinue }
+    'AuditOn' { Set-Audit 'enable' }
+    'Remove' {
+        Remove-NetFirewallRule -Group $Group -ErrorAction SilentlyContinue
+        Set-Audit 'disable'
+    }
     'Procs' { Get-EngineProcesses }
     'DnsClear' { Clear-DnsClientCache }
     'DnsDump' {

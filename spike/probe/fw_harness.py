@@ -127,14 +127,20 @@ def engine_flows(info: dict, lan_ip: str) -> tuple[list, list]:
     return allowed, [f for f in flows if f not in allowed]
 
 
-def engine_rows(info: dict, lan_ip: str) -> list:
+def allowed_verdict(allowed: list, ruled: bool) -> str:
+    if not ruled:
+        return "info" if allowed else "warn"
+    return "LEAK" if allowed else "pass"
+
+
+def engine_rows(info: dict, lan_ip: str, ruled: bool) -> list:
     paths = sorted({p.get("path") or "?" for p in info["procs"]})
     allowed, other = engine_flows(info, lan_ip)
     online = info["python_internet"]
     return [
         ("engine runs from the fixed runtime", "pass" if runs_from_fixed_runtime(paths) else "FAIL", f"{paths}"),
         ("engine process types", "info", ", ".join(sorted({process_kind(p) for p in info["procs"]}))),
-        ("engine flows allowed off-box (WFP 5156)", "LEAK" if allowed else "pass", json.dumps(allowed[:6])),
+        ("engine flows allowed off-box (WFP 5156)", allowed_verdict(allowed, ruled), json.dumps(allowed[:6])),
         ("engine flows blocked or same-host (WFP 5157/5156)", "info", json.dumps(other[:8])),
         ("python.exe still reaches 1.1.1.1:80", "pass" if online else "FAIL", "network is up"),
     ]
@@ -169,7 +175,7 @@ def evaluate(phase: str, log: h.EventLog, info: dict, ctx: dict) -> list:
         rows = page_rows(log, phase, ruled)
     else:
         rows = [("page loaded via the loopback proxy", *h.page_result(log, phase))]
-    return rows + engine_rows(info, ctx["lan_ip"]) + dns_rows(phase, info, ctx["pcap"], ctx["nonce"])
+    return rows + engine_rows(info, ctx["lan_ip"], ruled) + dns_rows(phase, info, ctx["pcap"], ctx["nonce"])
 
 
 def start_servers(log: h.EventLog, nonce: str) -> dict:
@@ -185,11 +191,14 @@ def start_servers(log: h.EventLog, nonce: str) -> dict:
 def run_all(args, log: h.EventLog, ports: dict) -> dict:
     infos = {}
     runtime = os.environ["WEBVIEW2_BROWSER_EXECUTABLE_FOLDER"]
-    for phase, (_mode, ruled) in PHASES.items():
-        if ruled and not any(PHASES[p][1] for p in infos):
-            print(ps("Add", Path=runtime))
-        infos[phase] = run_phase(phase, ports, log, args)
-    ps("Remove")
+    ps("AuditOn")
+    try:
+        for phase, (_mode, ruled) in PHASES.items():
+            if ruled and not any(PHASES[p][1] for p in infos):
+                print(ps("Add", Path=runtime))
+            infos[phase] = run_phase(phase, ports, log, args)
+    finally:
+        ps("Remove")
     return infos
 
 
@@ -210,8 +219,10 @@ def main() -> int:
     ports = start_servers(log, nonce)
     work = Path(os.environ.get("RUNNER_TEMP", HERE))
     ps("CaptureStart", Out=str(work / "dns.etl"))
-    infos = run_all(args, log, ports)
-    ps("CaptureStop", Path=str(work / "dns.etl"), Out=str(HERE / "s10-dns.pcapng"))
+    try:
+        infos = run_all(args, log, ports)
+    finally:
+        ps("CaptureStop", Path=str(work / "dns.etl"), Out=str(HERE / "s10-dns.pcapng"))
     ctx = {"lan_ip": ports["lan_ip"], "nonce": nonce, "pcap": (HERE / "s10-dns.pcapng").read_bytes()}
     results = {p: evaluate(p, log, infos[p], ctx) for p in PHASES}
     h.print_table(results)
