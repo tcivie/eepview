@@ -1416,11 +1416,13 @@ fn r21_a_known_console_survives_two_misses_and_is_cleared_by_the_third() {
 
 #[test]
 fn r21_a_re_check_that_finds_the_console_again_resets_the_count() {
-    // R21: miss, then found, then misses again: the count restarted.
+    // R21: miss, then found, then misses again: the count restarted. Only the Java
+    // console exists here, so no re-check finds another console.
     let _guard = detect_lock();
-    let Some((java, _i2pd)) = default_spies() else {
+    let Some((java, i2pd)) = default_spies() else {
         return;
     };
+    i2pd.set_up(false);
     let app = mock_app();
     let _stop = stop_on_drop(app.handle());
     assert!(detect_now(app.handle()).found);
@@ -1520,6 +1522,41 @@ fn r22_stop_ends_the_re_check_loop_and_a_later_detect_now_starts_it_again() {
     assert!(
         wait_until(30, || java.hits() > restarted),
         "a later detect_now starts the re-check loop again"
+    );
+}
+
+#[test]
+fn r22_stop_ends_the_retry_loop_and_a_later_detect_now_starts_it_again() {
+    // R22: the retry loop (nothing found) ends too: after stop and one tick no connection
+    // to a console port opens. A later detect_now starts the retries again.
+    let _guard = detect_lock();
+    let Some((java, i2pd)) = default_spies() else {
+        return;
+    };
+    java.set_up(false);
+    i2pd.set_up(false);
+    let app = mock_app();
+    let _stop = stop_on_drop(app.handle());
+    assert!(!detect_now(app.handle()).found);
+    let looping = java.hits();
+    assert!(
+        wait_until(30, || java.hits() > looping),
+        "the retry loop probes again"
+    );
+    stop(app.handle());
+    thread::sleep(Duration::from_secs(11));
+    let settled = (java.hits(), i2pd.hits());
+    thread::sleep(Duration::from_secs(11));
+    assert_eq!(
+        (java.hits(), i2pd.hits()),
+        settled,
+        "no connection to a console port after stop and one tick"
+    );
+    assert!(!detect_now(app.handle()).found);
+    let restarted = java.hits();
+    assert!(
+        wait_until(30, || java.hits() > restarted),
+        "a later detect_now starts the retry loop again"
     );
 }
 
