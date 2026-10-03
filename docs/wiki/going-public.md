@@ -1,5 +1,20 @@
 # Going public checklist
 
+Status on 2026-10-03:
+
+| Step | Status |
+|---|---|
+| Secret scanning | Done 2026-10-03 (PO) |
+| Push protection | Done 2026-10-03 (PO) |
+| Private vulnerability reporting | Done 2026-10-03 (PO) |
+| CodeQL | Done 2026-10-03 ([#26](https://github.com/tcivie/eepview/pull/26)) |
+| Scorecard | Done 2026-10-03 ([#26](https://github.com/tcivie/eepview/pull/26)) |
+| Dependency review | Done 2026-10-03 ([#26](https://github.com/tcivie/eepview/pull/26)) |
+| README badges | Done 2026-10-03 ([#26](https://github.com/tcivie/eepview/pull/26)). Best Practices badge is not added. |
+| `protect-main` required checks | Not done |
+| Best Practices registration | Not done. Owner action at bestpractices.dev. |
+| Release provenance check | Not done. Needs a release. |
+
 Do these steps on the day the repo goes public.
 
 ## 1. Restore the workflows
@@ -19,8 +34,12 @@ Then remove the `if: ${{ !github.event.repository.private }}` lines. They are no
 
 Add these checks to the required checks:
 
-- The CodeQL analyze checks.
-- Scorecard.
+- `codeql (actions)`
+- `codeql (javascript-typescript)`
+- `codeql (rust)`
+- `dependency-review`
+
+Do not add Scorecard. `scorecard.yml` has no `pull_request` trigger, so no PR reports it. A required Scorecard check would block every PR.
 
 ## 3. Turn on GitHub security features
 
