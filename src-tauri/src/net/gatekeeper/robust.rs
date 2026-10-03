@@ -511,3 +511,105 @@ fn nothing_is_forwarded_after_close() {
     }
     assert_eq!(fx.router.connections(), before);
 }
+
+/// The image of request `n`: 50 KB that differ per request, so a mix-up shows.
+fn image_bytes(n: usize) -> Vec<u8> {
+    let seed = u8::try_from(n % 251).unwrap_or(0);
+    (0..50_000usize)
+        .map(|i| u8::try_from(i % 251).unwrap_or(0).wrapping_add(seed))
+        .collect()
+}
+
+/// A router proxy that answers VERIFY at once and delays the first byte of every image
+/// (`/img<n>.png`) by `2 + n` seconds, then sends a 50 KB `image/png` with `Content-Length`.
+fn slow_image_router() -> LoopbackAddr {
+    let (listener, addr) = LoopbackAddr::listen_any().unwrap();
+    thread::spawn(move || {
+        for stream in listener.incoming().flatten() {
+            thread::spawn(move || serve_image(stream));
+        }
+    });
+    addr
+}
+
+fn serve_image(mut stream: TcpStream) {
+    let mut buf = Vec::new();
+    let mut chunk = [0u8; 4096];
+    while http::head_end(&buf).is_none() {
+        match stream.read(&mut chunk) {
+            Ok(n) if n > 0 => buf.extend_from_slice(&chunk[..n]),
+            _ => return,
+        }
+    }
+    let text = String::from_utf8_lossy(&buf).into_owned();
+    let target = text.split(' ').nth(1).unwrap_or("").to_owned();
+    let number = target
+        .rsplit_once("/img")
+        .and_then(|(_, rest)| rest.strip_suffix(".png"))
+        .and_then(|n| n.parse::<usize>().ok());
+    let Some(n) = number else {
+        let _ = stream.write_all(b"HTTP/1.1 200 OK\r\n\r\nI2P HTTP proxy OK");
+        return;
+    };
+    thread::sleep(Duration::from_secs(2 + n as u64));
+    let body = image_bytes(n);
+    let head = format!(
+        "HTTP/1.1 200 OK\r\nContent-Type: image/png\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+        body.len()
+    );
+    let _ = stream.write_all(head.as_bytes());
+    let _ = stream.write_all(&body);
+}
+
+/// The body of a tunnelled answer: after `200 Connection established`, one HTTP response.
+fn tunnel_response(raw: &[u8]) -> (String, Vec<u8>) {
+    let established = b"HTTP/1.1 200 Connection established\r\n\r\n";
+    let rest = raw.strip_prefix(established.as_slice()).unwrap_or(raw);
+    let end = http::head_end(rest).unwrap_or(rest.len());
+    let head = String::from_utf8_lossy(&rest[..end]).into_owned();
+    (head, rest[end..].to_vec())
+}
+
+// Req: "a page's same-site .i2p images load completely, also when the engine fetches many of
+// them at once": 8 concurrent `CONNECT a.i2p:80` tunnels, each with a GET for an image, to a
+// router that delays the first byte by 2 to 9 s and answers 50 KB `image/png` with
+// `Content-Length`. Every answer is 200 and the body is byte-identical to what the router sent.
+#[test]
+fn eight_concurrent_slow_images_arrive_complete() {
+    let router = slow_image_router();
+    let upstream = crate::net::verify::verify(router);
+    let crate::net::verify::Verdict::Ok(upstream) = upstream else {
+        panic!("the image router failed VERIFY: {upstream:?}");
+    };
+    let gate = Gatekeeper::start_with(&upstream, cfg!(windows)).unwrap();
+    let addr = LoopbackAddr::parse(&gate.url()).unwrap();
+    let workers: Vec<_> = (0..8usize)
+        .map(|n| {
+            thread::spawn(move || {
+                let mut stream = addr.connect(Duration::from_secs(5)).unwrap();
+                stream.set_read_timeout(Some(Duration::from_mins(1))).unwrap();
+                let raw = format!(
+                    "CONNECT a.i2p:80 HTTP/1.1\r\n\r\nGET /img{n}.png HTTP/1.1\r\nHost: a.i2p\r\nAccept: image/png\r\n\r\n"
+                );
+                stream.write_all(raw.as_bytes()).unwrap();
+                let _ = stream.shutdown(Shutdown::Write);
+                let answer = read_answer_bytes(&mut stream);
+                (n, answer)
+            })
+        })
+        .collect();
+    for worker in workers {
+        let (n, raw) = worker.join().unwrap();
+        let (head, body) = tunnel_response(&raw);
+        assert!(head.starts_with("HTTP/1.1 200"), "image {n}: {head}");
+        assert!(head.contains("image/png"), "image {n}: {head}");
+        assert_eq!(body.len(), 50_000, "image {n}: short or long body");
+        assert!(body == image_bytes(n), "image {n}: the bytes differ");
+    }
+}
+
+fn read_answer_bytes(stream: &mut TcpStream) -> Vec<u8> {
+    let mut out = Vec::new();
+    let _ = stream.read_to_end(&mut out);
+    out
+}

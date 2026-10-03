@@ -505,3 +505,68 @@ proptest! {
         }
     }
 }
+
+fn loads(fx: &[Effect]) -> Vec<(u32, String, bool, bool)> {
+    fx.iter()
+        .filter_map(|e| match e {
+            Effect::Web(WebOp::Load(l)) => Some((l.tab, l.url.clone(), l.js, l.rebuild)),
+            _ => None,
+        })
+        .collect()
+}
+
+// Req: "opening a second content tab, toggling site JS and reopening a closed tab do not block
+// the main loop". Without a GUI the part that can be tested is the state machine: each of
+// these commands returns its effects at once (the shell runs them), the effects name the right
+// webview work, and the sequence repeats without growth. The shell side (the lock is not held
+// across a webview call) is a manual smoke check on each OS.
+#[test]
+fn second_tab_js_toggle_and_reopen_return_at_once_with_the_right_effects() {
+    let mut core = Core::new(None, "127.0.0.1:4444", 0);
+    core.router_changed(status("ok"));
+    core.navigate("a.i2p");
+    let first = core.tabs().active_id();
+    core.page_started(first, "http://a.i2p/");
+    core.page_finished(first, "http://a.i2p/", 1);
+    // The per-site choice is remembered: a new tab starts with the last choice.
+    let mut site_js = true;
+    for round in 0..50u32 {
+        let started = Instant::now();
+        let (info, fx) = core.tab_new(Some("http://b.i2p/"), Place::End);
+        let second = info.map_or(0, |t| t.id);
+        assert_eq!(
+            loads(&fx),
+            vec![(second, "http://b.i2p/".to_owned(), site_js, false)]
+        );
+        site_js = !site_js;
+        let toggled = core.site_js_set("b.i2p", site_js);
+        let want_js = site_js;
+        assert!(
+            loads(&toggled).contains(&(second, "http://b.i2p/".to_owned(), want_js, true)),
+            "round {round}: no rebuild at the same URL: {toggled:?}"
+        );
+        core.tab_close(second);
+        let reopened = core.tab_reopen();
+        let got = loads(&reopened);
+        assert!(
+            got.iter().any(|(_, url, ..)| url == "http://b.i2p/"),
+            "round {round}: the reopened tab does not load: {reopened:?}"
+        );
+        assert!(
+            started.elapsed() < Duration::from_secs(1),
+            "round {round}: {:?}",
+            started.elapsed()
+        );
+        reset_to(&mut core, first);
+    }
+}
+
+/// Closes every tab but `keep` and selects it.
+fn reset_to(core: &mut Core, keep: u32) {
+    let ids: Vec<u32> = core.tab_infos().iter().map(|t| t.id).collect();
+    for id in ids.into_iter().filter(|id| *id != keep) {
+        core.tab_close(id);
+    }
+    core.tab_select(keep);
+    assert_eq!(core.tabs().len(), 1);
+}
