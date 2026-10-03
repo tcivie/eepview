@@ -7,6 +7,9 @@ Every change to main passes lint, complexity limits, security scans and a rulese
 - `.github/workflows/lint.yml` runs rustfmt and clippy (pedantic, `-D warnings`), biome and tsc, taplo, shellcheck, lizard complexity and actionlint.
 - `.github/workflows/ci.yml` builds and tests the app.
 - `.github/workflows/security.yml` runs cargo-deny, gitleaks and zizmor.
+- `.github/workflows/codeql.yml` runs CodeQL (`security-extended`) for actions, javascript-typescript and rust. Each matrix entry has a fixed job name, `codeql (<language>)`.
+- `.github/workflows/scorecard.yml` runs OpenSSF Scorecard, publishes the result and uploads the SARIF to code scanning.
+- `.github/workflows/dependency-review.yml` fails a PR that adds a dependency with a high severity advisory.
 - Complexity limits: cognitive and cyclomatic complexity 10 or less, 40 lines per function, 5 parameters, nesting 3.
 - No lint exclusions exist. The code is fixed instead.
 - Socket reviews every dependency change.
@@ -22,7 +25,7 @@ Every change to main passes lint, complexity limits, security scans and a rulese
 
 ## Limits
 
-- CodeQL and Scorecard are off until the repo is public. See [going-public](going-public.md).
+- The Scorecard badge shows "invalid repo path" until the first Scorecard run is published.
 - The Rust job needs the WebKitGTK packages on Linux.
 
 ## History
@@ -34,3 +37,4 @@ Every change to main passes lint, complexity limits, security scans and a rulese
 - 2026-10-03 — Cut dependencies flagged by Socket — [#10](https://github.com/tcivie/eepview/pull/10)
 - 2026-10-03 — Hash-pinned CI tools and typed vite config — [#15](https://github.com/tcivie/eepview/pull/15)
 - 2026-10-03 — Add the docs-check job: code changes need a docs or changelog update — [#16](https://github.com/tcivie/eepview/pull/16)
+- 2026-10-03 — Restore CodeQL and Scorecard, add dependency review and audit badges — PR_LINK
