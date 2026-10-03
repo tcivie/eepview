@@ -89,3 +89,4 @@ The `popup` webview may call: `popup_size`, `popup_close`, `navigate`, `tab_new`
 
 - 2026-10-03 — Browser shell: tabs, navigation, bookmarks, history, find, gatekeeper, pause and resume — [#29](https://github.com/tcivie/eepview/pull/29)
 - 2026-10-03 — Site icons in tabs, bookmarks and history — [#53](https://github.com/tcivie/eepview/pull/53)
+- 2026-10-03 — Toolbar popups in their own `popup` webview; the toolbar stays 84 px — [#55](https://github.com/tcivie/eepview/pull/55)
