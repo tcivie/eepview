@@ -15,6 +15,7 @@ Change it in a PR that changes both sides, or keep the old form working as a shi
 - v1.3: `chrome_insets`, `chrome-insets-changed`, `window_fullscreen`, `status-size`, `status-side`; the bubble shows after 100 ms and hides at once.
 - v1.4: `TabInfo.icon`, `Bookmark.icon`, `HistoryEntry.icon`, `icons-changed`. See [Site icons](site-icons.md). [#53](https://github.com/tcivie/eepview/pull/53)
 - v1.2: `connection_pause`, `connection_resume`, `router_control`, `RouterStatus.paused` and `.managed`, `RouterStats.history`. The `outproxy` state is gone: VERIFY no longer asks for a clearnet host.
+- v1.4: the `popup` webview, `popup_open`, `popup_size`, `popup_close`, `popup-show`, `popup-closed`. `chrome_set_height` reports the find bar only; the toolbar never grows for a popup.
 - Shipped in [#29](https://github.com/tcivie/eepview/pull/29).
 
 ## Window layout
@@ -26,6 +27,7 @@ One OS window with several webviews (Tauri `unstable` multi-webview).
 | `toolbar` | `src/ui/toolbar.html` (bundled) | yes | Top strip, 84 px: tab row (44 px) and nav row. 124 px with the find bar open. It sits above the content in z-order. |
 | `internal` | `src/ui/<page>.html` (bundled) | yes | Shown when the active tab is an internal page. |
 | `status` | `src/ui/status.html` (bundled) | events only | The link-hover bubble, bottom left, over the content. |
+| `popup` | `src/ui/popup.html` (bundled) | popup commands | The toolbar popups (suggestions, menu, router panel, router hint). Transparent, hidden until a popup opens, then sized and placed to the popup's own rectangle, on top of every other webview. |
 | `tab-<id>-<n>` | remote `http(s)://*.i2p/` | NO | One per web tab. Only the active one is visible. |
 
 On macOS the window has an overlay title bar with a hidden title. The traffic lights sit in the tab row. Windows and Linux keep the native decorations.
@@ -97,14 +99,17 @@ At most 10 000 entries. Nothing is recorded while `history.enabled` is false.
 
 ### Window
 
-- `chrome_set_height(px)`: the toolbar grows over the content while a popup (suggestions, router panel) is open. The content does not move. `0` goes back to the default. Clamped to 84–480.
+- `chrome_set_height(px)`: the toolbar reports its find bar. 124 or more means the find bar is open (toolbar 124 px); any other value means it is closed (84 px). The toolbar never takes another height.
+- `popup_open({kind, anchor: {x, y, width, height}, data?}) -> number` (`toolbar` only): opens a popup under `anchor` (window points) and returns its id. `kind` is `"suggestions" | "menu" | "router" | "hint"`. `data` goes to the page unchanged: `{items: Suggestion[], index: number}` for the suggestions, `{title, text}` for the hint. The shell sends `popup-show` to `popup`; the popup shows once the page reports its size. Opening another kind closes the open one; the same kind updates in place.
+- `popup_size({id, width, height})` (`popup` only): the natural size of the popup's card. The shell clamps it to the window (8 px margin), places the `popup` webview 4 px under the anchor and shows it. The menu and the router panel take the focus.
+- `popup_close({id?, refocus?})` (`toolbar` and `popup`): closes the popup `id`, or any popup without `id`. A stale id does nothing. `refocus: true` gives the focus back to the toolbar. The shell hides `popup` and sends `popup-closed`.
 - `platform() -> "macos" | "windows" | "linux"`
 - `window_fullscreen() -> boolean`
 - `chrome_insets() -> {left: number}`: the space the tab strip leaves on the left for the macOS window buttons. The shell centers the buttons on the tab row (y = 22), measures their frames, and answers their right edge plus their left margin, so the gap after the buttons equals the margin before them. 0 in full screen, and 0 on Windows and Linux (native title bar; the UI picks its own margin).
 
 ## Events
 
-Rust sends them to `toolbar`, `internal` and `status`.
+Rust sends them to `toolbar`, `internal`, `status` and `popup`.
 
 - `tabs-changed: TabInfo[]`: open, close, move, select.
 - `tab-updated: TabInfo`: URL, title, loading, history, zoom.
@@ -118,6 +123,9 @@ Rust sends them to `toolbar`, `internal` and `status`.
 - `status-side: "left" | "right"` (to `status` only): the corner the bubble sits in. It moves to the bottom right while the mouse is over the bottom-left spot.
 - `chrome-insets-changed: {left: number}`: on full screen enter and exit, and when the scale factor or the button frames change.
 - `icons-changed: null`: a site icon was stored or deleted. `tabs-changed` follows. Read the lists again for the new `icon` values.
+
+- `popup-show: {id, kind, anchorWidth, data}` (to `popup` only): render this popup, measure it, call `popup_size`.
+- `popup-closed: {id, kind, refocus}` (to `toolbar` and `popup`): the popup closed (Esc, a click outside, a resize, or another popup).
 
 ### Events a page sends
 
