@@ -45,5 +45,6 @@ export function wireLayout(): void {
   });
   call("platform", {}).then(applyPlatform).catch(quiet);
   on("fullscreen-changed", applyFullscreen).catch(quiet);
+  call("window_fullscreen", {}).then(applyFullscreen).catch(quiet);
   scheduleSync();
 }

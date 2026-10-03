@@ -114,6 +114,7 @@ export interface Commands {
   router_stats: { args: Record<string, never>; result: RouterStats };
   chrome_set_height: { args: { px: number }; result: undefined };
   platform: { args: Record<string, never>; result: Platform };
+  window_fullscreen: { args: Record<string, never>; result: boolean };
 }
 
 export interface Events {
