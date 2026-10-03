@@ -8,12 +8,7 @@ projectIgnorePaths:
   - "node_modules"
   - "src-tauri/target"
   - "dist"
-
-triggerPaths:
-  - "package.json"
-  - "package-lock.json"
-  - "src-tauri/Cargo.toml"
-  - "src-tauri/Cargo.lock"
+  - "spike/probe/target"
 
 githubApp:
   enabled: true
