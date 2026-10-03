@@ -20,9 +20,9 @@ Each requirement is a test target. The tests check these rules, not the code. "C
 - **L1.** A click on a link with the primary button and no modifier opens the link in the same tab, as today.
 - **L2.** A click on a link with the new-tab key (Cmd+click on macOS, Ctrl+click on Windows and Linux) opens the link in a new background tab. The new tab shows in the tab strip. The active tab, the address bar text and the keyboard focus do not change. The page in the current tab does not navigate.
 - **L3.** A middle-click on a link does the same as L2, on every system.
-- **L4.** The new-tab key with Shift, and a middle-click with Shift, open the link in a new foreground tab: the new tab becomes the active tab. The current tab does not navigate.
-- **L5.** Shift+click with no new-tab key opens the link in a new foreground tab. (Other browsers open a new window. eepview has one window.)
-- **L6.** Alt (Option) has no effect on a link click: Alt+click acts as a plain click. It never starts a download. On macOS, Ctrl+click is a secondary click: it opens the context menu and never follows the link. On Windows and Linux, the Windows (Super) key has no effect on a link click.
+- **L4.** The new-tab key with Shift, and a middle-click with Shift, open the link in a new foreground tab: the new tab becomes the active tab. The current tab does not navigate. On macOS, Ctrl+click and Ctrl+Shift+click are not in this rule: they open the context menu (L6).
+- **L5.** Shift+click with no new-tab key opens the link in a new foreground tab. (Other browsers open a new window. eepview has one window.) On macOS this needs Ctrl up: Ctrl+Shift+click opens the context menu (L6).
+- **L6.** Alt (Option) has no effect on a link click: Alt+click acts as a plain click. It never starts a download. On macOS, Ctrl+click and Ctrl+Shift+click are a secondary click: they open the context menu and never follow the link or open a tab, whatever other key is down. On Windows and Linux, the Windows (Super) key has no effect on a link click.
 - **L7.** A link that has keyboard focus follows the same rules when you press Enter: Enter alone opens it in the same tab, the new-tab key+Enter opens a background tab, and the new-tab key+Shift+Enter opens a foreground tab.
 - **L8.** A new tab from a link opens right after the tab that opened it. When the same tab opens several links in a row, each new tab opens after the previous one, so the tabs keep the order of the clicks. The run ends when you select another tab or open a tab in another way (Cmd/Ctrl+T, the + button, a typed address).
 - **L9.** Every new tab from L2 to L5 and from the context menu passes `nav::guard` before any tab state changes. A target that is not an `http(s)` URL on a `.i2p` host opens nothing: no tab, no load, no request. The current tab does not navigate either. The same warning toast shows as for a refused new window today.
@@ -38,11 +38,11 @@ Each requirement is a test target. The tests check these rules, not the code. "C
 - **C3.** In a text field (`editable`): Undo, Redo, separator, Cut, Copy, Paste, separator, Select All. Cut and Copy are enabled only when text is selected. The other items are always enabled. A link or an image under the pointer adds nothing in a text field.
 - **C4.** On a link: Open Link in New Tab, Open Link in New Background Tab, Copy Link Address.
 - **C5.** On an image: Open Image in New Tab, Copy Image Address, Copy Image.
-- **C6.** On selected text (not in a text field): Copy.
-- **C7.** When there is no link, no image, no selection and no text field: Back, Forward, Reload, separator, Bookmark This Page, Copy Page Address, separator, Find. Back is enabled only when the tab can go back. Forward is enabled only when the tab can go forward. Bookmark This Page is enabled only when the page is an I2P page that has no bookmark yet. The other items are always enabled.
+- **C6.** On selected text (not in a text field): Copy. It is always enabled.
+- **C7.** When there is no link, no image, no selection and no text field: Back, Forward, Reload, separator, Bookmark This Page, Copy Page Address, separator, Find. Back is enabled only when the tab can go back. Forward is enabled only when the tab can go forward. Bookmark This Page is enabled only when the page is an I2P page that has no bookmark yet. Reload, Copy Page Address and Find are always enabled.
 - **C8.** Several targets at once (for example an image inside a link, with selected text) show their groups in the order link, image, selection, with one separator between two groups. The page group of C7 shows only when no other group shows. A menu never starts or ends with a separator and never has two separators in a row.
 - **C9.** "Open Link in New Tab" and "Open Image in New Tab" open a new foreground tab (L4). "Open Link in New Background Tab" opens a new background tab (L2). Each one goes through L9. Each one is enabled only when its target is an `http(s)` URL on a `.i2p` host. For any other target the item shows, disabled.
-- **C10.** Copy Link Address, Copy Image Address and Copy Page Address put the absolute URL on the clipboard as plain text. Copy Image puts the image that the page already shows on the clipboard. Copy Image is enabled only when the image URL is an `http(s)` URL on a `.i2p` host.
+- **C10.** Copy Link Address, Copy Image Address and Copy Page Address put the absolute URL on the clipboard as plain text. Copy Image puts the image that the page already shows on the clipboard. Copy Link Address, Copy Image Address, Copy Page Address and Copy (selected text, C6) are always enabled, whatever the URL. Copy Image is enabled only when the image URL is an `http(s)` URL on a `.i2p` host.
 - **C11.** Back, Forward, Reload, Bookmark This Page and Find do the same as their shortcuts (K1).
 - **C12.** In the toolbar, the status bubble and the popups, a right-click outside a text field opens no menu.
 - **C13.** Esc, or a click outside the menu, closes the menu and does nothing else.
@@ -116,10 +116,11 @@ The tests call these. All of them are pure: no Tauri runtime, no engine.
 - `Disposition`: `CurrentTab`, `NewBackgroundTab`, `NewForegroundTab`.
 - `link_disposition(mac: bool, modifiers: Modifiers, button: MouseButton) -> Disposition`. The new-tab key is `meta` when `mac` is true, and `ctrl` when it is false. The rules (L1 to L7):
   - `Middle`: `NewForegroundTab` with `shift`, else `NewBackgroundTab`. Other modifiers do not matter.
+  - On macOS, `Primary` or `None` with `ctrl`: `CurrentTab`, whatever the other modifiers (L6). The shell shows the context menu and follows no link.
   - `Primary` or `None` with the new-tab key: `NewForegroundTab` with `shift`, else `NewBackgroundTab`.
   - `Primary` or `None` without the new-tab key: `NewForegroundTab` with `shift`, else `CurrentTab`.
   - `Secondary`, `Back`, `Forward`: `CurrentTab`. (These buttons never follow a link. The shell opens no tab for them.)
-  - `alt` never changes the result. Neither does the key that is not the new-tab key (`ctrl` on macOS, `meta` elsewhere).
+  - `alt` never changes the result. On Windows and Linux, `meta` never changes the result either.
 
 `shortcuts` (existing module, extended):
 
