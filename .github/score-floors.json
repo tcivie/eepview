@@ -1,0 +1,44 @@
+{
+  "scorecard": {
+    "score": 6.6,
+    "checks": {
+      "Packaging": -1,
+      "Dangerous-Workflow": 10,
+      "Maintained": 0,
+      "Code-Review": 0,
+      "Dependency-Update-Tool": 10,
+      "Security-Policy": 10,
+      "Binary-Artifacts": 10,
+      "Token-Permissions": 10,
+      "Pinned-Dependencies": 10,
+      "CII-Best-Practices": 2,
+      "Signed-Releases": -1,
+      "License": 10,
+      "Vulnerabilities": 8,
+      "SAST": 7,
+      "Fuzzing": 0,
+      "Branch-Protection": 4,
+      "Contributors": 3,
+      "CI-Tests": 10
+    }
+  },
+  "scorecard_pr": {
+    "checks": {
+      "Binary-Artifacts": 10,
+      "Dangerous-Workflow": 10,
+      "Dependency-Update-Tool": 10,
+      "Fuzzing": 0,
+      "License": 9,
+      "Packaging": -1,
+      "Pinned-Dependencies": 10,
+      "SAST": 10,
+      "Security-Policy": 10,
+      "Token-Permissions": 10
+    }
+  },
+  "bestpractices": {
+    "badge_percentage_0": 64,
+    "badge_percentage_1": 9,
+    "badge_percentage_2": 9
+  }
+}
