@@ -42,4 +42,4 @@ A `v*` tag builds installers for four targets, adds SBOMs and checksums, and mak
 ## History
 
 - [#14](https://github.com/tcivie/eepview/pull/14): release pipeline with SBOM, checksums and provenance.
-- [#23](https://github.com/tcivie/eepview/pull/23): release gates job without lint exclusions; the macOS app is signed inside the dmg.
+- [#24](https://github.com/tcivie/eepview/pull/24): release gates job without lint exclusions; the macOS app is signed inside the dmg.
