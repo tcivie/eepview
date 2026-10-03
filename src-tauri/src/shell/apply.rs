@@ -11,10 +11,11 @@ use serde_json::{Value, json};
 use tauri::{AppHandle, Emitter, Manager, Runtime, Url, Webview};
 
 use super::content::ContentWebview;
-use super::state::{lock, shared};
+use super::state::{lock, now_ms, shared};
 use super::{engine, log, view};
 use crate::core::{Core, Effect, Event, Load, WebOp};
 use crate::hover::SHOW_DELAY_MS;
+use crate::{icons, net};
 
 /// The webviews that receive contract events.
 const LISTENERS: [&str; 3] = ["toolbar", "internal", "status"];
@@ -61,6 +62,7 @@ pub fn apply<R: Runtime>(app: &AppHandle<R>, fx: Vec<Effect>) {
             Effect::Web(op) => web(app, op),
             Effect::FocusToolbar => focus_toolbar(app),
             Effect::HoverLater(generation) => show_later(app, generation),
+            Effect::FetchIcon(host) => fetch_icon(app, host),
             Effect::Layout => {}
         }
     }
@@ -83,6 +85,25 @@ fn show_later<R: Runtime>(app: &AppHandle<R>, generation: u64) {
     });
 }
 
+/// Asks `host` for its icon on a worker thread, through the gatekeeper only. Without a
+/// gatekeeper nothing is sent, and the attempt ends as a failure.
+fn fetch_icon<R: Runtime>(app: &AppHandle<R>, host: String) {
+    let gate = lock(&shared(app).gate).clone();
+    let (worker, name) = (app.clone(), host.clone());
+    let spawned = thread::Builder::new()
+        .name("site-icon".into())
+        .spawn(move || {
+            let icon = gate
+                .and_then(|g| net::icons::fetch(&g, &host).ok())
+                .and_then(|body| icons::sanitize(&body).ok());
+            with_core(&worker, |core| core.icon_fetched(&host, icon, now_ms()));
+        });
+    if let Err(e) = spawned {
+        log::error("site icon", &e.to_string());
+        with_core(app, |core| core.icon_fetched(&name, None, now_ms()));
+    }
+}
+
 /// The event name and payload of a core event.
 fn payload(core: &Core, event: &Event) -> (&'static str, Value) {
     match event {
@@ -96,6 +117,7 @@ fn payload(core: &Core, event: &Event) -> (&'static str, Value) {
         Event::Shortcut(action) => ("shortcut", json!({ "action": action })),
         Event::Toast(toast) => ("toast", json!(toast)),
         Event::Hover(text) => ("link-hover", hover_payload(text.as_ref())),
+        Event::Icons => ("icons-changed", Value::Null),
     }
 }
 

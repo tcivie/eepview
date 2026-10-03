@@ -80,6 +80,47 @@
   font-size: var(--fs-sm);
 }
 
+.tile-mark.has-icon {
+  border-color: var(--color-border);
+  outline: none;
+}
+
+.tile-mark img {
+  width: 24px;
+  height: 24px;
+}
+
+/* The site icon in bookmark and history rows; the letter chip when there is none. */
+.site-mark {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border: var(--border-width) solid var(--color-border);
+  border-radius: 4px;
+  background: var(--color-surface-sunken);
+  color: var(--color-text-muted);
+  font-size: 10px;
+  font-weight: var(--fw-strong);
+  line-height: 1;
+}
+
+.site-mark.has-icon {
+  border: none;
+  background: transparent;
+}
+
+.site-mark img {
+  display: block;
+  width: 16px;
+  height: 16px;
+}
+
+.history-link .site-mark {
+  align-self: center;
+}
+
 .tile-name {
   overflow: hidden;
   font-size: var(--fs-sm);

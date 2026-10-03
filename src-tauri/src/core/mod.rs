@@ -10,6 +10,7 @@ mod library;
 mod navigation;
 mod page;
 pub mod router;
+mod site_icons;
 mod tab_ops;
 
 #[cfg(test)]
@@ -20,6 +21,7 @@ use std::path::PathBuf;
 use tauri::Url;
 
 use crate::hover::{Debounce, HoverText};
+use crate::icons::IconStore;
 use crate::nav::{host_of, internal_with, is_web};
 use crate::store::bookmarks::Bookmarks;
 use crate::store::history::History;
@@ -39,6 +41,8 @@ pub struct Paths {
     pub settings: PathBuf,
     /// `sites.json`: per-site zoom and JS (config dir).
     pub sites: PathBuf,
+    /// `icons/`: the site icons (data dir).
+    pub icons: PathBuf,
 }
 
 /// Something the shell must do.
@@ -54,6 +58,8 @@ pub enum Effect {
     Layout,
     /// Call [`Core::hover_expire`] with this generation after the show delay.
     HoverLater(u64),
+    /// Ask this host for its icon through the gatekeeper, then call [`Core::icon_fetched`].
+    FetchIcon(String),
 }
 
 /// An event of the contract.
@@ -79,6 +85,8 @@ pub enum Event {
     Toast(Toast),
     /// `link-hover`: the status bubble text, or `None` to hide it.
     Hover(Option<HoverText>),
+    /// `icons-changed`.
+    Icons,
 }
 
 /// An operation on a `tab-*` webview.
@@ -170,6 +178,8 @@ pub struct Core {
     history: History,
     settings: Settings,
     prefs: SitePrefs,
+    icons: IconStore,
+    icon_jobs: site_icons::IconJobs,
     paths: Option<Paths>,
     router: RouterStatus,
     find: Option<FindState>,
@@ -202,15 +212,12 @@ impl Core {
             prefs: paths
                 .as_ref()
                 .map_or_else(SitePrefs::default, |p| SitePrefs::load(&p.sites)),
+            icons: paths
+                .as_ref()
+                .map_or_else(IconStore::default, |p| IconStore::load(&p.icons)),
+            icon_jobs: site_icons::IconJobs::default(),
             paths,
-            router: RouterStatus {
-                state: "verifying",
-                proxy: proxy.to_owned(),
-                version: None,
-                detail: None,
-                paused: false,
-                managed: false,
-            },
+            router: verifying(proxy),
             find: None,
             find_open: false,
             toolbar_request: 0.0,
@@ -219,6 +226,8 @@ impl Core {
             stats: StatsHistory::default(),
             pointed: None,
         };
+        // Effects are dropped: no UI listens yet, and a save error shows on the next save.
+        let _ = core.sweep_icons();
         let home = core.home_url();
         core.tabs.open(&home, crate::tabs::Place::End, true);
         core
@@ -318,6 +327,7 @@ impl Core {
                     .map_or(self.settings.js_default, |h| self.js_of(h)),
                 bookmarked: self.bookmarks.find(&tab.url).is_some(),
             },
+            icon: if web { self.small_icon(&tab.url) } else { None },
         }
     }
 
@@ -350,6 +360,18 @@ impl Core {
             kind,
             text: text.into(),
         }))
+    }
+}
+
+/// The router status before the first VERIFY.
+fn verifying(proxy: &str) -> RouterStatus {
+    RouterStatus {
+        state: "verifying",
+        proxy: proxy.to_owned(),
+        version: None,
+        detail: None,
+        paused: false,
+        managed: false,
     }
 }
 

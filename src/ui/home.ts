@@ -8,6 +8,7 @@ import { call, errorText, on } from "./ipc.ts";
 import { displayUrl, hostOf } from "./lib/address.ts";
 import { hopStates } from "./lib/router-view.ts";
 import { renderRouterSummary } from "./shared/router-summary.ts";
+import { renderSiteMark } from "./site-mark.ts";
 
 const MAX_TILES = 11;
 const quiet = (): undefined => undefined;
@@ -15,7 +16,8 @@ const quiet = (): undefined => undefined;
 function tile(bookmark: Bookmark): HTMLElement {
   const item = cloneTemplate("tile-template");
   item.querySelector("a")?.setAttribute("href", bookmark.url);
-  setText(item, ".tile-mark", (hostOf(bookmark.url)[0] ?? "?").toUpperCase());
+  const mark = item.querySelector(".tile-mark");
+  if (mark) renderSiteMark(mark, bookmark.icon, (hostOf(bookmark.url)[0] ?? "?").toUpperCase());
   setText(item, ".tile-name", bookmark.title || hostOf(bookmark.url));
   setText(item, ".tile-addr", displayUrl(bookmark.url));
   return item;
@@ -54,3 +56,4 @@ loadTiles();
 call("router_status", {}).then(renderRouter).catch(quiet);
 on("router-status", renderRouter).catch(quiet);
 on("bookmarks-changed", loadTiles).catch(quiet);
+on("icons-changed", loadTiles).catch(quiet);

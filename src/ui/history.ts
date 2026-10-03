@@ -8,6 +8,7 @@ import { call, errorText, on } from "./ipc.ts";
 import { displayUrl, hostOf } from "./lib/address.ts";
 import { groupByDay, pageCursor, timeOfDay } from "./lib/history-groups.ts";
 import { delegateClick, runAndAnnounce } from "./shared/events.ts";
+import { renderSiteMark } from "./site-mark.ts";
 
 const PAGE_SIZE = 50;
 const SEARCH_DELAY_MS = 200;
@@ -45,6 +46,8 @@ function entryRow(entry: HistoryEntry): HTMLElement {
   setText(row, ".history-time", timeOfDay(entry.visited));
   setText(row, ".history-title", entry.title || displayUrl(entry.url));
   setText(row, ".history-host", hostOf(entry.url));
+  const mark = row.querySelector(".site-mark");
+  if (mark) renderSiteMark(mark, entry.icon, (hostOf(entry.url)[0] ?? "?").toUpperCase());
   row.querySelector("a")?.setAttribute("href", entry.url);
   const remove = row.querySelector<HTMLElement>("[data-remove]");
   remove?.setAttribute("data-remove", entry.id);
@@ -92,6 +95,20 @@ function reload(): void {
   done = false;
   loading = false;
   loadMore().catch(showError);
+}
+
+/** Reads the loaded entries again for their new icons, without losing the scroll position. */
+function refreshIcons(): void {
+  if (loading) return;
+  const mine = generation;
+  const limit = Math.max(entries.length, PAGE_SIZE);
+  call("history_query", { query: { q: query(), limit } })
+    .then((page) => {
+      if (mine !== generation) return;
+      entries = page;
+      render();
+    })
+    .catch(showError);
 }
 
 function onSearch(): void {
@@ -167,6 +184,7 @@ wireClear();
 watchScroll();
 showHistoryState();
 on("history-changed", reload).catch(() => undefined);
+on("icons-changed", refreshIcons).catch(() => undefined);
 on("settings-changed", (s) => {
   byId("history-off").hidden = s.history.enabled;
 }).catch(() => undefined);

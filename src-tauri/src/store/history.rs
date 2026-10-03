@@ -105,6 +105,7 @@ impl History {
             title: title.to_owned(),
             visited: now,
             visits: 1,
+            icon: None,
         }
     }
 

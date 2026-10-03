@@ -87,6 +87,7 @@ impl Core {
             self.history.visit(url, &title, now);
             fx.extend(self.save_history());
         }
+        fx.extend(self.want_icon(url, now));
         fx.extend(self.hover_out());
         fx
     }
