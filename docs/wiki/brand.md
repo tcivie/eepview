@@ -59,7 +59,7 @@ All variants are the same artwork. None is redrawn.
 
 ## Limits
 
-- The palette is a proposal for the UI. `src/ui/theme.css` can adopt it.
+- `src/ui/theme.css` uses the same greens for its accent tokens (`--color-accent` `#2a6a56` / `#6ccfa5`, `--color-accent-line` `#23896a`). Change both together.
 - The wordmark is drawn as stroked paths, not as a font.
 
 ## History
