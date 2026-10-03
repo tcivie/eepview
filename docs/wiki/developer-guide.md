@@ -92,9 +92,10 @@ The full list is in [AGENTS.md](https://github.com/tcivie/eepview/blob/main/AGEN
 4. UI: call the command from `src/ui/`. Add the page or control. Check light and dark.
 5. Tests: unit tests for every pure module. Coverage only goes up. Run the architecture and leak tests if you touched networking.
 6. Wiki: add or update the feature page in `docs/wiki/`, link it from `docs/wiki/README.md`, and add a History line with the PR link.
-7. Open the PR with a clear Conventional Commit title, and run `gh pr merge --auto --squash`. Do not edit `CHANGELOG.md`. The release job generates it from the PR titles.
+7. Open the PR with a clear Conventional Commit title, and turn on auto-merge with `gh pr merge <n> --squash --auto`. Own the PR until it is merged: fix a red check at once, and resolve review threads while CI runs. Merge main in only when the PR has a conflict (DIRTY). If a check is red on main too, report it and do not change the gate in your PR. See the Workflow section of AGENTS.md. Do not edit `CHANGELOG.md`. The release job generates it from the PR titles.
 
 ## History
 
 - 2026-10-03 — Write the page — [#28](https://github.com/tcivie/eepview/pull/28)
 - 2026-10-03 — Do not edit CHANGELOG.md in a PR; the release job generates it — [#50](https://github.com/tcivie/eepview/pull/50)
+- 2026-10-03 — PR ownership rules: auto-merge, first red check, threads during CI, merge main on DIRTY — [#67](https://github.com/tcivie/eepview/pull/67)
