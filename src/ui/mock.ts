@@ -60,7 +60,7 @@ function historyEntry(i: number): HistoryEntry {
   const site = data.history[i % data.history.length] ?? { site: "stats.i2p/", title: "" };
   const url = eepsite(site.site);
   const title = site.title;
-  const ageMinutes = i * 47 + (i % 5) * 13;
+  const ageMinutes = i * 53 + (i % 3) * 7;
   return { id: `h${i}`, url, title, visited: now - ageMinutes * MINUTE, visits: 1 + (i % 4) };
 }
 
