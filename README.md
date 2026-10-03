@@ -69,7 +69,11 @@ CI enforces these checks on every pull request:
 
 ## Going public
 
-CodeQL and Scorecard start when the repo becomes public. See [docs/going-public.md](docs/going-public.md).
+CodeQL and Scorecard start when the repo becomes public. See [Going public](https://github.com/tcivie/eepview/wiki/going-public).
+
+## Documentation
+
+All docs live in the [wiki](https://github.com/tcivie/eepview/wiki).
 
 ## Credits
 

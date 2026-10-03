@@ -22,7 +22,7 @@ Every change to main passes lint, complexity limits, security scans and a rulese
 
 ## Limits
 
-- CodeQL and Scorecard are off until the repo is public. See [going-public](../going-public.md).
+- CodeQL and Scorecard are off until the repo is public. See [going-public](going-public.md).
 - The Rust job needs the WebKitGTK packages on Linux.
 
 ## History
