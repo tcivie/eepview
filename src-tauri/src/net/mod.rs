@@ -26,4 +26,5 @@ pub mod rules;
 pub mod stats;
 #[cfg(test)]
 pub(crate) mod testing;
+mod trace;
 pub mod verify;

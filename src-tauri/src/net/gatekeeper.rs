@@ -19,6 +19,7 @@ use std::time::{Duration, Instant};
 use super::failures::{Failures, is_server_error};
 use super::http::{self, Head, Plan, Refusal};
 use super::loopback::LoopbackAddr;
+use super::trace;
 use super::verify::VerifiedUpstream;
 
 /// Most connections handled at once.
@@ -216,6 +217,7 @@ fn handle(mut client: TcpStream, shared: &Shared) -> io::Result<()> {
     let Some((head, rest)) = read_head(&mut client)? else {
         return refuse(&mut client, Refusal::BadRequest);
     };
+    trace::line(&format!("head {}", head.start));
     if !shared.open.load(Ordering::SeqCst) {
         return refuse(&mut client, Refusal::Upstream);
     }
@@ -237,6 +239,7 @@ fn handle(mut client: TcpStream, shared: &Shared) -> io::Result<()> {
 
 /// Sends a refusal and ends the connection so that the answer reaches the client.
 fn refuse(client: &mut TcpStream, reason: Refusal) -> io::Result<()> {
+    trace::line(&format!("refused {reason:?}"));
     client.write_all(&reason.response())?;
     client.flush()?;
     close_gently(client);
@@ -292,8 +295,10 @@ fn terminate(client: &mut TcpStream, early: &[u8], host: &str, shared: &Shared) 
     let head = read_head(&mut source)?;
     let (unread, _) = source.into_inner();
     let Some((head, mut rest)) = head else {
+        trace::line(&format!("tunnel to {host} closed with no request"));
         return Ok(());
     };
+    trace::line(&format!("tunnel head {}", head.start));
     rest.extend_from_slice(unread);
     match http::plan_inner(&head, host) {
         Plan::Http { method, host, path } => {
@@ -354,6 +359,7 @@ fn forward(client: &mut TcpStream, rest: &[u8], req: &Request, shared: &Shared) 
     let Some((head, body)) = read_head(&mut upstream)? else {
         return refuse_page(client, req, shared, Refusal::Upstream);
     };
+    trace::line(&format!("answer {} for {}", head.start, req.url()));
     shared
         .failures
         .note(&req.url(), is_server_error(&head.start));
