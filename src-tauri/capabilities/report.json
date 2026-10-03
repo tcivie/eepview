@@ -1,0 +1,13 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "report",
+  "description": "The report page and the crash banner: build and open a bug report, and delete the diagnostics logs. Only the bundled internal pages get it; toolbar, status and remote tab-* webviews never do.",
+  "webviews": ["internal"],
+  "permissions": [
+    "allow-report-preview",
+    "allow-report-open",
+    "allow-diag-crash-status",
+    "allow-diag-crash-dismiss",
+    "allow-diag-logs-delete"
+  ]
+}

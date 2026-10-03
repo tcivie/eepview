@@ -459,6 +459,12 @@ const handlers: Record<CommandName, Handler> = {
   popup_open: nextPopupId,
   popup_size: nothing,
   popup_close: nothing,
+  report_preview: (a) =>
+    `What happened:\n${String(arg(a, "description")) || "(not given)"}\n\nSystem:\neepview: 0.1.0 (dev)\n`,
+  report_open: () => ({ file: "eepview-report.txt", trimmed: false }),
+  diag_crash_status: () => params.has("crashed"),
+  diag_crash_dismiss: () => undefined,
+  diag_logs_delete: () => undefined,
 };
 
 export const mockBackend: Backend = {

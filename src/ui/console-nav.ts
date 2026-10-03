@@ -49,7 +49,7 @@ export function wireConsoleClicks(root: HTMLElement, after?: () => void): void {
 }
 
 // True when the active tab shows this internal page: only then does a page probe for the
-// console (docs/wiki/router-console.md, R6).
+// console (R6 of the router console page in docs/wiki).
 export async function shownInActiveTab(page: string): Promise<boolean> {
   const tabs = await call("tab_list", {});
   const active = tabs.find((tab) => tab.active);

@@ -5,6 +5,7 @@ import type { ChromeInsets } from "../contract.ts";
 import { byId } from "../dom.ts";
 import { call, on } from "../ipc.ts";
 import { chromeHeight, insetPx } from "../lib/chrome-height.ts";
+import { setRootVar } from "../shared/runtime-vars.ts";
 
 const quiet = (): undefined => undefined;
 let lastHeight = 0;
@@ -32,7 +33,7 @@ function applyPlatform(platform: string): void {
 }
 
 function applyInsets(insets: ChromeInsets): void {
-  document.documentElement.style.setProperty("--chrome-inset-left", insetPx(insets.left));
+  setRootVar("--chrome-inset-left", insetPx(insets.left));
 }
 
 function applyFullscreen(fullscreen: boolean): void {

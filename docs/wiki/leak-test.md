@@ -24,6 +24,8 @@ a form auto-submit, a 302 to clearnet and `location = "http://example.com/"`.
 
 Two runs: `default` (JavaScript on, the one that counts) and `js-off` (a sanity check).
 
+On Linux, the job also runs `scripts/check-hardening.sh` on the release binary it built. It fails the PR when PIE, full RELRO or NX is missing.
+
 ## Pass criteria
 
 The exit code is 0 only when all of these hold:

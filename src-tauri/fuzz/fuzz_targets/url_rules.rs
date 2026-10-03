@@ -6,8 +6,8 @@
 //! Properties from docs/wiki/no-leak-architecture.md: for any URL, the navigation guard
 //! ([`eepview_lib::nav::guard`]) and the engine rule ([`eepview_lib::net::rules::engine_allows`])
 //! allow an `http(s)` URL only when its host passes [`eepview_lib::net::host::is_i2p_host`], and
-//! the `WebKit` rule list pattern ([`eepview_lib::net::rules::I2P_URL_PATTERN`], layer L3b) allows
-//! the same URLs as the guard.
+//! the `WebKit` rule list ([`eepview_lib::net::rules::content_rule_list`], layer L3b) allows the
+//! same URLs as the guard.
 
 #![no_main]
 
@@ -15,14 +15,41 @@ use std::sync::OnceLock;
 
 use eepview_lib::nav::{guard, host_of, is_allowed};
 use eepview_lib::net::host::is_i2p_host;
-use eepview_lib::net::rules::{I2P_URL_PATTERN, engine_allows};
+use eepview_lib::net::rules::{content_rule_list, engine_allows};
 use libfuzzer_sys::fuzz_target;
 use regex::Regex;
 use url::Url;
 
-fn pattern() -> &'static Regex {
-    static PATTERN: OnceLock<Regex> = OnceLock::new();
-    PATTERN.get_or_init(|| Regex::new(I2P_URL_PATTERN).unwrap_or_else(|e| panic!("{e}")))
+/// One rule of the `WKContentRuleList`: its regex and whether it blocks.
+struct Rule {
+    filter: Regex,
+    blocks: bool,
+}
+
+fn rules() -> &'static [Rule] {
+    static RULES: OnceLock<Vec<Rule>> = OnceLock::new();
+    RULES.get_or_init(|| {
+        let list = content_rule_list();
+        let items = list.as_array().map(Vec::as_slice).unwrap_or_default();
+        items
+            .iter()
+            .filter_map(|json| {
+                let pattern = json["trigger"]["url-filter"].as_str()?;
+                Some(Rule {
+                    filter: Regex::new(pattern).ok()?,
+                    blocks: json["action"]["type"] == "block",
+                })
+            })
+            .collect()
+    })
+}
+
+/// The rule list as `WebKit` runs it: a rule that blocks marks the URL blocked, and
+/// `ignore-previous-rules` clears the mark.
+fn list_allows(url: &str) -> bool {
+    let step =
+        |blocked: bool, rule: &Rule| [blocked, rule.blocks][usize::from(rule.filter.is_match(url))];
+    !rules().iter().fold(false, step)
 }
 
 fn is_web(url: &Url) -> bool {
@@ -45,9 +72,9 @@ fn assert_i2p_only(text: &str, url: &Url) {
 /// The `WebKit` rule list gets normalised URLs and must allow what the guard allows.
 fn assert_pattern_agrees(text: &str, url: &Url) {
     assert_eq!(
-        pattern().is_match(url.as_str()),
+        list_allows(url.as_str()),
         guard(url),
-        "L3b pattern and L4 guard disagree: {text:?} as {url}"
+        "L3b rule list and L4 guard disagree: {text:?} as {url}"
     );
 }
 
