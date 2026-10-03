@@ -332,3 +332,87 @@ fn r28_retain_with_no_live_host_leaves_no_icon_file() -> Res<()> {
     );
     Ok(())
 }
+
+/// R26: no trace of alpha in the store or on disk; beta is whole.
+fn assert_alpha_forgotten(store: &IconStore, dir: &Path) -> Res<()> {
+    assert_eq!(store.small(ALPHA), None);
+    assert_eq!(store.large(ALPHA), None);
+    assert_eq!(store.last_attempt(ALPHA), None);
+    assert!(store.small(BETA).is_some());
+    assert_eq!(store.last_attempt(BETA), Some(50));
+    let listing = names(dir)?;
+    assert!(
+        !listing.iter().any(|n| n.contains(ALPHA_STEM)),
+        "{listing:?}"
+    );
+    assert!(listing.contains(&format!("{BETA_STEM}.png")));
+    Ok(())
+}
+
+#[test]
+fn r26_forget_deletes_the_files_and_the_attempt_of_one_host() -> Res<()> {
+    // R26: alpha goes, beta stays; true because something existed.
+    let dir = fresh("forget")?;
+    let mut store = IconStore::load(&dir);
+    for host in [ALPHA, BETA] {
+        store.put(host, &icon(1))?;
+        store.record_attempt(host, 50)?;
+    }
+    assert!(store.forget(ALPHA)?);
+    assert_alpha_forgotten(&store, &dir)?;
+    assert_eq!(IconStore::load(&dir).last_attempt(ALPHA), None);
+    assert_eq!(IconStore::load(&dir).last_attempt(BETA), Some(50));
+    Ok(())
+}
+
+#[test]
+fn r26_forget_returns_false_for_an_unknown_host_and_true_for_an_attempt_only_host() -> Res<()> {
+    // R26: "True when one existed".
+    let dir = fresh("forget-unknown")?;
+    let mut store = IconStore::load(&dir);
+    assert!(!store.forget(ALPHA)?);
+    store.record_attempt(ALPHA, 9)?;
+    assert!(store.forget(ALPHA)?);
+    assert_eq!(store.last_attempt(ALPHA), None);
+    assert!(!store.forget(ALPHA)?, "a second forget finds nothing");
+    Ok(())
+}
+
+#[test]
+fn r11_restore_attempt_puts_back_the_time_from_before() -> Res<()> {
+    // R11: a new attempt was recorded; the old time comes back, also on disk.
+    let dir = fresh("restore")?;
+    let mut store = IconStore::load(&dir);
+    store.record_attempt(ALPHA, 100)?;
+    store.record_attempt(ALPHA, 900)?;
+    store.restore_attempt(ALPHA, Some(100))?;
+    assert_eq!(store.last_attempt(ALPHA), Some(100));
+    assert_eq!(IconStore::load(&dir).last_attempt(ALPHA), Some(100));
+    Ok(())
+}
+
+#[test]
+fn r11_restore_attempt_with_no_earlier_time_leaves_no_attempt() -> Res<()> {
+    // R11: there was no attempt before, so there is none after.
+    let dir = fresh("restore-none")?;
+    let mut store = IconStore::load(&dir);
+    store.record_attempt(ALPHA, 900)?;
+    store.restore_attempt(ALPHA, None)?;
+    assert_eq!(store.last_attempt(ALPHA), None);
+    assert_eq!(IconStore::load(&dir).last_attempt(ALPHA), None);
+    let text = fs::read_to_string(dir.join("attempts.json")).unwrap_or_default();
+    assert!(!text.contains(ALPHA_STEM), "{text}");
+    Ok(())
+}
+
+#[test]
+fn r11_restore_attempt_keeps_the_stored_icon() -> Res<()> {
+    // R11, R25: only the time moves.
+    let dir = fresh("restore-icon")?;
+    let mut store = IconStore::load(&dir);
+    store.put(ALPHA, &icon(2))?;
+    store.record_attempt(ALPHA, 900)?;
+    store.restore_attempt(ALPHA, None)?;
+    assert_eq!(store.small(ALPHA), Some(data_url(&icon(2).small)));
+    Ok(())
+}

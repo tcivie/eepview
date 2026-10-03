@@ -821,3 +821,180 @@ fn r31_internal_tabs_always_have_a_null_icon() -> Res<()> {
     }
     Ok(())
 }
+
+#[test]
+fn r11_an_attempt_that_never_reached_the_site_does_not_count() -> Res<()> {
+    // R11: after `icon_unreached` the next page load inside 24 h asks again.
+    let mut core = open(&fresh_paths("r11-again")?);
+    assert_eq!(fetches(&visit(&mut core, ALPHA, T0)), [ALPHA]);
+    core.icon_unreached(ALPHA, T0 + 10);
+    assert_eq!(fetches(&visit(&mut core, ALPHA, T0 + HOUR)), [ALPHA]);
+    Ok(())
+}
+
+#[test]
+fn r11_unreached_and_failed_differ_in_what_the_next_load_does() -> Res<()> {
+    // R11: `icon_fetched(None, ...)` still counts; `icon_unreached` does not.
+    let mut counted = open(&fresh_paths("r11-counted")?);
+    visit(&mut counted, ALPHA, T0);
+    counted.icon_fetched(ALPHA, None, T0 + 10);
+    assert!(fetches(&visit(&mut counted, ALPHA, T0 + HOUR)).is_empty());
+    let mut skipped = open(&fresh_paths("r11-skipped")?);
+    visit(&mut skipped, ALPHA, T0);
+    skipped.icon_unreached(ALPHA, T0 + 10);
+    assert_eq!(fetches(&visit(&mut skipped, ALPHA, T0 + HOUR)), [ALPHA]);
+    Ok(())
+}
+
+#[test]
+fn r11_the_attempt_time_from_before_comes_back() -> Res<()> {
+    // R11: a good fetch at T0, a retry after 25 h that never reached the site. The time
+    // of T0 is back, so it is still expired, and the next load asks again.
+    let mut core = open(&fresh_paths("r11-before")?);
+    visit(&mut core, ALPHA, T0);
+    core.icon_fetched(ALPHA, Some(icon()?), T0);
+    let retry = T0 + DAY + HOUR;
+    assert_eq!(fetches(&visit(&mut core, ALPHA, retry)), [ALPHA]);
+    core.icon_unreached(ALPHA, retry + 10);
+    assert_eq!(fetches(&visit(&mut core, ALPHA, retry + HOUR)), [ALPHA]);
+    Ok(())
+}
+
+#[test]
+fn r11_an_unreached_attempt_leaves_no_trace_after_a_restart() -> Res<()> {
+    // R11, R8: the restored time is what the disk holds.
+    let paths = fresh_paths("r11-restart")?;
+    let mut core = open(&paths);
+    visit(&mut core, ALPHA, T0);
+    core.icon_unreached(ALPHA, T0 + 10);
+    drop(core);
+    let mut again = open(&paths);
+    assert_eq!(fetches(&visit(&mut again, ALPHA, T0 + HOUR)), [ALPHA]);
+    Ok(())
+}
+
+#[test]
+fn r11_an_unreached_attempt_keeps_the_stored_icon() -> Res<()> {
+    // R11, R25: no icon is touched.
+    let paths = fresh_paths("r11-keep")?;
+    let mut core = open(&paths);
+    add_site(&mut core, ALPHA, Keep::Both)?;
+    visit(&mut core, ALPHA, T0 + DAY + HOUR);
+    core.icon_unreached(ALPHA, T0 + DAY + HOUR + 10);
+    assert_eq!(tab_icon(&core), Some(data_url(&icon()?.small)));
+    assert!(has_files(&paths, ALPHA_STEM));
+    Ok(())
+}
+
+#[test]
+fn r11_an_unreached_attempt_frees_its_slot_and_starts_the_next_host() -> Res<()> {
+    // R10, R11: gamma waits; alpha never reached its site; gamma starts.
+    let mut core = open(&fresh_paths("r11-slot")?);
+    start_all(&mut core, &[ALPHA, BETA, GAMMA, DELTA]);
+    assert_eq!(fetches(&core.icon_unreached(ALPHA, T0 + 10)), [GAMMA]);
+    assert_eq!(fetches(&core.icon_unreached(BETA, T0 + 11)), [DELTA]);
+    assert!(fetches(&core.icon_unreached(GAMMA, T0 + 12)).is_empty());
+    Ok(())
+}
+
+#[test]
+fn r11_a_host_whose_fetch_is_running_is_not_asked_again_until_it_ends() -> Res<()> {
+    // R8, R11: the time is recorded when the request starts. While it runs, no second ask.
+    let mut core = open(&fresh_paths("r11-running")?);
+    assert_eq!(fetches(&visit(&mut core, ALPHA, T0)), [ALPHA]);
+    assert!(fetches(&visit(&mut core, ALPHA, T0 + 1000)).is_empty());
+    core.icon_unreached(ALPHA, T0 + 2000);
+    assert_eq!(fetches(&visit(&mut core, ALPHA, T0 + 3000)), [ALPHA]);
+    Ok(())
+}
+
+#[test]
+fn r8_an_attempt_time_later_than_now_counts_as_expired() -> Res<()> {
+    // R8: the clock went back by 5 days. The recorded attempt is in the future.
+    let mut core = open(&fresh_paths("r8-clock")?);
+    let future = T0 + 5 * DAY;
+    visit(&mut core, ALPHA, future);
+    core.icon_fetched(ALPHA, None, future);
+    assert_eq!(fetches(&visit(&mut core, ALPHA, T0)), [ALPHA]);
+    Ok(())
+}
+
+#[test]
+fn r8_a_future_attempt_time_read_from_disk_counts_as_expired() -> Res<()> {
+    // R8: the same after a restart.
+    let paths = fresh_paths("r8-clock-restart")?;
+    let mut core = open(&paths);
+    let future = T0 + 5 * DAY;
+    visit(&mut core, ALPHA, future);
+    core.icon_fetched(ALPHA, Some(icon()?), future);
+    drop(core);
+    let mut again = open(&paths);
+    assert_eq!(fetches(&visit(&mut again, ALPHA, T0)), [ALPHA]);
+    Ok(())
+}
+
+/// A core with no files, so 10 000 visits do not write 10 000 history files.
+fn memory_core() -> Core {
+    let mut core = Core::new(None, "127.0.0.1:4444", 0);
+    core.router_changed(ok_status());
+    core
+}
+
+/// Loads the pages `pages` of `host`, each its own history entry, one time unit apart
+/// from `start`. Returns the effects of the last load.
+fn visit_pages(
+    core: &mut Core,
+    host: &str,
+    pages: std::ops::Range<u64>,
+    start: u64,
+) -> Vec<Effect> {
+    let mut last = Vec::new();
+    for n in pages {
+        let url = format!("http://{host}/page-{n}");
+        core.navigate(&url);
+        let id = core.tabs().active_id();
+        core.page_started(id, &url);
+        last = core.page_finished(id, &url, start + n);
+    }
+    last
+}
+
+#[test]
+fn r26_a_visit_that_pushes_the_last_entry_of_a_host_out_at_the_cap_deletes_its_icon() -> Res<()> {
+    // R26, R30: alpha has one entry and an icon. 10 000 pages of beta follow: 10 001 in all,
+    // so the oldest entry (alpha) goes. Its icon goes, with its attempt time (R29).
+    let mut core = memory_core();
+    visit(&mut core, ALPHA, T0);
+    core.icon_fetched(ALPHA, Some(icon()?), T0);
+    assert_eq!(tab_icon(&core), Some(data_url(&icon()?.small)));
+    visit_pages(&mut core, BETA, 0..9_999, T0 + 1);
+    let last = visit_pages(&mut core, BETA, 9_999..10_000, T0 + 20_000);
+    assert_icons_changed(&last);
+    let again = visit(&mut core, ALPHA, T0 + 30_000);
+    assert_eq!(fetches(&again), [ALPHA], "R29: asked again inside 24 h");
+    assert_eq!(tab_icon(&core), None, "the icon was deleted with its entry");
+    Ok(())
+}
+
+#[test]
+fn r26_the_cap_keeps_the_icon_of_a_host_with_a_bookmark() -> Res<()> {
+    // R26: the entry goes, the bookmark keeps the host alive.
+    let mut core = memory_core();
+    add_site(&mut core, ALPHA, Keep::Both)?;
+    visit_pages(&mut core, BETA, 0..10_000, T0 + 1);
+    visit(&mut core, ALPHA, T0 + 30_000);
+    assert_eq!(tab_icon(&core), Some(data_url(&icon()?.small)));
+    Ok(())
+}
+
+#[test]
+fn r26_the_cap_keeps_the_icon_of_a_host_with_another_entry() -> Res<()> {
+    // R26: alpha has two entries; only the older goes.
+    let mut core = memory_core();
+    add_site(&mut core, ALPHA, Keep::History)?;
+    visit_pages(&mut core, ALPHA, 0..1, T0 + 1);
+    visit_pages(&mut core, BETA, 0..9_999, T0 + 2);
+    core.navigate(&format!("http://{ALPHA}/page-0"));
+    assert_eq!(tab_icon(&core), Some(data_url(&icon()?.small)));
+    Ok(())
+}

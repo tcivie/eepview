@@ -357,3 +357,79 @@ fn r16_the_content_type_does_not_change_what_fetch_returns() -> Res<()> {
     }
     Ok(())
 }
+
+#[test]
+fn r11_reached_site_is_false_for_the_failures_that_never_reached_the_site() {
+    // R11: no connection, timeout, and the gatekeeper's or the router's own 502 and 503.
+    for error in [
+        FetchError::NotI2p,
+        FetchError::Io("closed".to_owned()),
+        FetchError::Timeout,
+        FetchError::Status(502),
+        FetchError::Status(503),
+    ] {
+        assert!(
+            !error.reached_site(),
+            "R11: {error:?} did not reach the site"
+        );
+    }
+}
+
+#[test]
+fn r11_reached_site_is_true_for_every_other_failure() {
+    // R11: every other failure counts.
+    for error in [
+        FetchError::Status(301),
+        FetchError::Status(403),
+        FetchError::Status(404),
+        FetchError::Status(500),
+        FetchError::Status(504),
+        FetchError::TooLarge,
+        FetchError::Chunked,
+        FetchError::Malformed,
+    ] {
+        assert!(error.reached_site(), "R11: {error:?} reached the site");
+    }
+}
+
+#[test]
+fn r11_a_closed_gatekeeper_a_503_and_a_stalled_router_did_not_reach_the_site() -> Res<()> {
+    // R11: the real failures, through a real gatekeeper.
+    let router = router_sending(ok(b"x"), false)?;
+    let gate = router.gatekeeper()?;
+    gate.close();
+    let closed = fetch_with(&gate, SITE, quick())
+        .err()
+        .ok_or("closed gatekeeper answered")?;
+    assert!(!closed.reached_site(), "{closed:?}");
+    let busy = router_sending(http("503 Busy", &["Content-Length: 0"], b""), false)?;
+    let got = fetch_with(&busy.gatekeeper()?, SITE, quick())
+        .err()
+        .ok_or("503 accepted")?;
+    assert!(!got.reached_site(), "{got:?}");
+    let silent = router_sending(Vec::new(), true)?;
+    let limits = Limits {
+        timeout: Duration::from_millis(500),
+        max_body: 65_536,
+    };
+    let late = fetch_with(&silent.gatekeeper()?, SITE, limits)
+        .err()
+        .ok_or("no timeout")?;
+    assert_eq!(late, FetchError::Timeout);
+    assert!(!late.reached_site());
+    Ok(())
+}
+
+#[test]
+fn r11_a_404_and_a_redirect_from_the_site_count_as_reached() -> Res<()> {
+    // R11: the site answered, so the attempt counts.
+    for code in [404_u16, 301] {
+        let answer = http(&format!("{code} X"), &["Content-Length: 0"], b"");
+        let router = router_sending(answer, false)?;
+        let got = fetch_with(&router.gatekeeper()?, SITE, quick())
+            .err()
+            .ok_or("accepted")?;
+        assert!(got.reached_site(), "{got:?}");
+    }
+    Ok(())
+}
