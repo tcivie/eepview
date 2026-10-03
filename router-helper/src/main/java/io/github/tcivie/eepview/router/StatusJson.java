@@ -8,7 +8,7 @@ import net.i2p.stat.Rate;
 import net.i2p.stat.RateStat;
 
 final class StatusJson {
-    private static final long ONE_MINUTE = 60_000L;
+    private static final long TEN_MINUTES = 600_000L;
 
     private StatusJson() {}
 
@@ -47,18 +47,21 @@ final class StatusJson {
 
     private static String buildSuccess(RouterContext ctx) {
         StringBuilder sb = new StringBuilder("{");
-        field(sb, "exploratory", rateAverage(ctx, "tunnel.buildExploratorySuccessRate"));
-        field(sb, "client", rateAverage(ctx, "tunnel.buildClientSuccessRate"));
+        field(sb, "exploratory", successPercent(ctx, "tunnel.buildExploratory"));
+        field(sb, "client", successPercent(ctx, "tunnel.buildClient"));
         return close(sb);
     }
 
-    private static String rateAverage(RouterContext ctx, String name) {
+    private static String successPercent(RouterContext ctx, String prefix) {
+        long ok = recentEvents(ctx, prefix + "Success");
+        long total = ok + recentEvents(ctx, prefix + "Expire") + recentEvents(ctx, prefix + "Reject");
+        return total == 0 ? "null" : Long.toString(100 * ok / total);
+    }
+
+    private static long recentEvents(RouterContext ctx, String name) {
         RateStat stat = ctx.statManager().getRate(name);
-        Rate rate = stat == null ? null : stat.getRate(ONE_MINUTE);
-        if (rate == null || rate.getLifetimeEventCount() == 0) {
-            return "null";
-        }
-        return Long.toString(Math.round(rate.getAvgOrLifetimeAvg()));
+        Rate rate = stat == null ? null : stat.getRate(TEN_MINUTES);
+        return rate == null ? 0 : rate.getCurrentEventCount() + rate.getLastEventCount();
     }
 
     private static void field(StringBuilder sb, String key, Object value) {

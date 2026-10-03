@@ -51,8 +51,11 @@ curl -H "Authorization: Bearer $(cat status.token)" http://127.0.0.1:37600/statu
 
 The response holds the router version, the uptime, the network status, the
 known routers, the active peers, the tunnel counts, the bandwidth (1 s and
-15 s), and the tunnel build success rate. The build success rate is `null`
-until the router has sampled it once.
+15 s), and the tunnel build success rate. The build success rate is the
+percent of builds that succeeded in the last 10 to 20 minutes, from the
+router's required stats. It is `null` while no build has finished. The
+console's own `tunnel.build*SuccessRate` stats exist only with `stat.full=true`,
+so the helper does not read them.
 
 The endpoint checks each request in this order:
 
@@ -89,4 +92,11 @@ headers.
   `update_delay` hours (default 12).
 - The first news check runs 5 to 10 minutes after start, or 25 to 30 minutes
   on a router installed less than 30 minutes ago. These delays are constants
-  in `NewsTimerTask`. No property shortens them.
+  in `NewsTimerTask`. No property shortens them. After the first check, the
+  timer runs every 10 minutes. A failed fetch is tried again on the next run.
+  A good fetch waits `router.newsRefreshFrequency` (default 36 hours).
+
+## Stop
+
+Send SIGTERM to the router JVM. The router runs its shutdown hooks and stops
+in a few seconds.
