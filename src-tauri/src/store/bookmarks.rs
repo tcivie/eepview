@@ -183,6 +183,28 @@ impl Bookmarks {
     }
 }
 
+/// The export file name for a time in Unix ms: `eepview-bookmarks-<YYYYMMDD>.json` (UTC).
+#[must_use]
+pub fn export_file_name(now_ms: u64) -> String {
+    let (y, m, d) = civil_date(now_ms / 86_400_000);
+    format!("eepview-bookmarks-{y:04}{m:02}{d:02}.json")
+}
+
+/// Year, month and day of a count of days since 1970-01-01 (Hinnant's civil-from-days).
+#[must_use]
+pub fn civil_date(days: u64) -> (u64, u64, u64) {
+    let z = days + 719_468;
+    let era = z / 146_097;
+    let doe = z - era * 146_097;
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    let y = yoe + era * 400 + u64::from(m <= 2);
+    (y, m, d)
+}
+
 /// One level of folders: no slashes, no empty names.
 fn clean_folder(folder: Option<&str>) -> Option<String> {
     let name = folder?.trim().replace('/', " ");
@@ -264,6 +286,17 @@ mod tests {
         assert_eq!(b.import(bare, 3).unwrap(), 1);
         assert!(b.import("{}", 3).is_err());
         assert!(a.export().contains("\"version\": 1"));
+    }
+
+    #[test]
+    fn export_names() {
+        assert_eq!(civil_date(0), (1970, 1, 1));
+        assert_eq!(civil_date(59), (1970, 3, 1));
+        assert_eq!(civil_date(11_016), (2000, 2, 29));
+        assert_eq!(
+            export_file_name(1_791_000_000_000),
+            "eepview-bookmarks-20261003.json"
+        );
     }
 
     #[test]

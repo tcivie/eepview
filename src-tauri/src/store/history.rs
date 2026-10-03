@@ -6,6 +6,8 @@ use std::path::Path;
 use serde::{Deserialize, Serialize};
 
 use super::{VERSION, new_id, read_json, write_json};
+#[cfg(test)]
+use crate::types::Cursor;
 use crate::types::{HistoryEntry, HistoryQuery};
 
 /// Most entries kept.
@@ -109,11 +111,14 @@ impl History {
     #[must_use]
     pub fn query(&self, q: &HistoryQuery) -> Vec<HistoryEntry> {
         let needle = q.q.as_deref().unwrap_or("").trim().to_lowercase();
-        let before = q.before.unwrap_or(u64::MAX);
-        self.entries
+        let mut hits: Vec<&HistoryEntry> = self
+            .entries
             .iter()
-            .filter(|e| e.visited < before)
+            .filter(|e| q.before.as_ref().is_none_or(|c| c.admits(e.visited, &e.id)))
             .filter(|e| needle.is_empty() || matches_text(e, &needle))
+            .collect();
+        hits.sort_by(|a, b| (b.visited, &b.id).cmp(&(a.visited, &a.id)));
+        hits.into_iter()
             .take(q.limit.unwrap_or(DEFAULT_LIMIT))
             .cloned()
             .collect()
@@ -159,7 +164,7 @@ mod tests {
     fn q(text: Option<&str>, before: Option<u64>, limit: Option<usize>) -> HistoryQuery {
         HistoryQuery {
             q: text.map(str::to_owned),
-            before,
+            before: before.map(Cursor::Time),
             limit,
         }
     }
@@ -210,6 +215,17 @@ mod tests {
         assert_eq!(h.query(&q(Some("stats"), None, None)).len(), 2);
         assert_eq!(h.query(&q(Some("stats"), Some(20), None)).len(), 1);
         assert_eq!(h.query(&q(None, None, Some(1)))[0].url, "http://reg.i2p/");
+        let first = &h.query(&q(None, None, Some(1)))[0];
+        let next = HistoryQuery {
+            q: None,
+            before: Some(Cursor::Entry {
+                visited: first.visited,
+                id: first.id.clone(),
+            }),
+            limit: Some(5),
+        };
+        let page: Vec<String> = h.query(&next).into_iter().map(|e| e.url).collect();
+        assert_eq!(page, ["http://forum.i2p/", "http://stats.i2p/"]);
     }
 
     #[test]

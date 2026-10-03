@@ -129,12 +129,41 @@ pub struct HistoryQuery {
     /// Text in the URL or the title.
     #[serde(default)]
     pub q: Option<String>,
-    /// Only visits before this time, Unix ms.
+    /// Page cursor: only entries after this one in (visited desc, id desc) order.
     #[serde(default)]
-    pub before: Option<u64>,
+    pub before: Option<Cursor>,
     /// Most entries to return.
     #[serde(default)]
     pub limit: Option<usize>,
+}
+
+/// A history page cursor: the last entry of the previous page.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(untagged)]
+pub enum Cursor {
+    /// `{visited, id}` (contract v1.1).
+    Entry {
+        /// Visit time of the last entry, Unix ms.
+        visited: u64,
+        /// Id of the last entry.
+        id: String,
+    },
+    /// A bare time, Unix ms (contract v1).
+    Time(u64),
+}
+
+impl Cursor {
+    /// True when `(visited, id)` sorts after the cursor (older, or same time and smaller id).
+    #[must_use]
+    pub fn admits(&self, visited: u64, id: &str) -> bool {
+        match self {
+            Self::Entry {
+                visited: v,
+                id: last,
+            } => (visited, id) < (*v, last.as_str()),
+            Self::Time(t) => visited < *t,
+        }
+    }
 }
 
 /// One address-bar suggestion.
@@ -228,6 +257,13 @@ mod tests {
         assert_eq!(b.folder, None);
         let q: HistoryQuery = serde_json::from_str("{}").unwrap();
         assert_eq!(q, HistoryQuery::default());
+        let c: HistoryQuery =
+            serde_json::from_str(r#"{"before":{"visited":5,"id":"b"},"limit":2}"#).unwrap();
+        let cursor = c.before.unwrap();
+        assert!(cursor.admits(4, "z") && cursor.admits(5, "a"));
+        assert!(!cursor.admits(5, "b") && !cursor.admits(6, "a"));
+        let t: HistoryQuery = serde_json::from_str(r#"{"before":5}"#).unwrap();
+        assert!(t.before.unwrap().admits(4, "x"));
         let status = RouterStatus {
             state: "ok",
             proxy: String::new(),
