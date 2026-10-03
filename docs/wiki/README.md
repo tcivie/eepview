@@ -30,7 +30,7 @@ This wiki is generated from docs/wiki in the repository. Edit it there, in a PR.
 | Reproducible builds | shipped | [Reproducible builds](reproducible-builds.md) | [#37](https://github.com/tcivie/eepview/pull/37) |
 | Release and support | in progress | [Release and support](release-and-support.md) | [#37](https://github.com/tcivie/eepview/pull/37) |
 | Coverage | shipped | [Coverage](coverage.md) | [#13](https://github.com/tcivie/eepview/pull/13) |
-| Brand | in progress | [Brand](brand.md) | [#11](https://github.com/tcivie/eepview/pull/11) |
+| Brand | shipped | [Brand](brand.md) | [#11](https://github.com/tcivie/eepview/pull/11) |
 
 ## Project
 
