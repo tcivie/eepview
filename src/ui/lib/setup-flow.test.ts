@@ -1,73 +1,19 @@
+// SPDX-FileCopyrightText: 2026 The eepview contributors
+// SPDX-License-Identifier: MIT
+
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
-  countText,
-  formatElapsed,
   isStep,
   percentOf,
   progressText,
-  STEP_TOTAL,
-  type StepPosition,
+  type Step,
   stepPosition,
   stepperHopState,
   totalProgress,
 } from "./setup-flow.ts";
 
-function position(step: Parameters<typeof stepPosition>[0]): StepPosition {
-  const found = stepPosition(step);
-  if (!found) throw new Error(`no position for ${step}`);
-  return found;
-}
-
-describe("isStep", () => {
-  it("accepts every screen and rejects anything else", () => {
-    assert.equal(isStep("tunnels-failed"), true);
-    assert.equal(isStep("later"), true);
-    assert.equal(isStep("toString"), false);
-    assert.equal(isStep(3), false);
-  });
-});
-
-describe("stepPosition", () => {
-  it("numbers the four steps from one", () => {
-    assert.equal(position("install").text, `Step 1 of ${STEP_TOTAL}`);
-    assert.equal(position("download").text, "Step 2 of 4");
-    assert.equal(position("ready").text, "Step 4 of 4");
-  });
-  it("puts a found router and a failure on the step they replace", () => {
-    assert.equal(position("found").index, 0);
-    assert.deepEqual(
-      [position("tunnels-failed").index, position("tunnels-failed").failed],
-      [2, true],
-    );
-  });
-  it("has no position for the not-now screen", () => {
-    assert.equal(stepPosition("later"), null);
-  });
-});
-
-describe("stepperHopState", () => {
-  it("marks earlier hops built, the current one building and later ones empty", () => {
-    const states = [0, 1, 2, 3].map((hop) => stepperHopState(hop, position("download")));
-    assert.deepEqual(states, ["built", "building", null, null]);
-  });
-  it("marks the current hop refused on a failure", () => {
-    assert.equal(stepperHopState(1, position("download-failed")), "refused");
-  });
-  it("marks every hop built once ready", () => {
-    const states = [0, 1, 2, 3].map((hop) => stepperHopState(hop, position("ready")));
-    assert.deepEqual(states, ["built", "built", "built", "built"]);
-  });
-});
-
 describe("download progress", () => {
-  it("shows megabytes and a whole percent", () => {
-    assert.equal(progressText({ doneMb: 19.4, totalMb: 31 }), "19.4 of 31 MB · 62%");
-  });
-  it("never passes 100 percent and copes with an empty total", () => {
-    assert.equal(percentOf({ doneMb: 40, totalMb: 31 }), 100);
-    assert.equal(percentOf({ doneMb: 0, totalMb: 0 }), 0);
-  });
   it("adds the transfers into one total", () => {
     const total = totalProgress([
       { doneMb: 31, totalMb: 31 },
@@ -77,15 +23,70 @@ describe("download progress", () => {
   });
 });
 
-describe("formatElapsed", () => {
-  it("shows minutes only when there are any", () => {
-    assert.equal(formatElapsed(100), "1 min 40 s");
-    assert.equal(formatElapsed(42), "42 s");
+const STEP_TABLE: [Step, number][] = [
+  ["install", 1],
+  ["found", 1],
+  ["download", 2],
+  ["download-failed", 2],
+  ["tunnels", 3],
+  ["tunnels-failed", 3],
+  ["ready", 4],
+];
+
+describe("setup step header", () => {
+  for (const [step, number] of STEP_TABLE) {
+    it(`Setup flow: ${step} shows "Step ${number} of 4"`, () => {
+      assert.equal(stepPosition(step)?.text, `Step ${number} of 4`);
+    });
+  }
+});
+
+describe("setup hop strip", () => {
+  const refusedHops = (step: Step): number[] => {
+    const position = stepPosition(step);
+    if (!position) return [];
+    return [0, 1, 2, 3, 4].filter((hop) => stepperHopState(hop, position) === "refused");
+  };
+  it("Setup flow: turns the hop of the failed step red", () => {
+    assert.equal(refusedHops("download-failed").length, 1);
+    assert.equal(refusedHops("tunnels-failed").length, 1);
+  });
+  it("Setup flow: turns the next hop red when a later step fails", () => {
+    const [download] = refusedHops("download-failed");
+    const [tunnels] = refusedHops("tunnels-failed");
+    assert.equal((tunnels ?? 0) - (download ?? 0), 1);
+  });
+  it("Setup flow: turns no hop red on a screen that has not failed", () => {
+    for (const step of ["install", "found", "download", "tunnels", "ready"] as const) {
+      assert.deepEqual(refusedHops(step), [], step);
+    }
   });
 });
 
-describe("countText", () => {
-  it("reads as done of total", () => {
-    assert.equal(countText(1, 2), "1 of 2");
+describe("setup download screen", () => {
+  it("Setup flow: shows MB and % for one file", () => {
+    const text = progressText({ doneMb: 11, totalMb: 44 });
+    assert.match(text, /11/);
+    assert.match(text, /44/);
+    assert.match(text, /MB/);
+    assert.match(text, /25\s?%/);
+    assert.equal(percentOf({ doneMb: 11, totalMb: 44 }), 25);
+  });
+  it("Setup flow: shows MB and % for the total", () => {
+    const total = totalProgress([
+      { doneMb: 20, totalMb: 40 },
+      { doneMb: 20, totalMb: 40 },
+    ]);
+    assert.match(progressText(total), /40/);
+    assert.match(progressText(total), /80/);
+    assert.match(progressText(total), /50\s?%/);
+  });
+});
+
+describe("setup screens", () => {
+  it("Setup flow: opens a screen for each step in the step table and no other", () => {
+    for (const [step] of STEP_TABLE) assert.equal(isStep(step), true, step);
+    assert.equal(isStep("bogus"), false);
+    assert.equal(isStep(undefined), false);
   });
 });

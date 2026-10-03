@@ -1,0 +1,36 @@
+# SPDX-FileCopyrightText: 2026 The eepview contributors
+# SPDX-License-Identifier: MIT
+
+name: docs-check
+
+on:
+  pull_request:
+    # edited: the check reads the PR title, so a title change must run it again.
+    types: [opened, synchronize, reopened, edited]
+
+permissions: {}
+
+concurrency:
+  group: docs-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  docs-check:
+    name: docs-check
+    if: github.actor != 'dependabot[bot]'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install the pinned git-cliff
+        run: ./scripts/install-git-cliff.sh "$RUNNER_TEMP/git-cliff"
+      - name: docs-check script tests
+        run: ./scripts/docs-check.test.sh
+      - name: feat PRs update the wiki, CHANGELOG.md is not edited, wiki pages indexed, docs placed in docs/wiki
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: ./scripts/docs-check.sh

@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: 2026 The eepview contributors
+# SPDX-License-Identifier: MIT
 # Fail unless the tagged commit is on main and every required check passed on it.
 # Required checks come from the active ruleset that targets the default branch.
 # Env: REPO (owner/name), SHA (the tagged commit). Needs a full checkout and origin/main.

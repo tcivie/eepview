@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 The eepview contributors
+# SPDX-License-Identifier: MIT
+
 # Small, simple functions. Same limits as Biome and lizard (see scripts/complexity.sh).
 cognitive-complexity-threshold = 10
 too-many-lines-threshold = 40

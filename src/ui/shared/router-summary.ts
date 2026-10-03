@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The eepview contributors
+// SPDX-License-Identifier: MIT
+
 import { type RouterLike, type RouterView, routerView } from "../lib/router-view.ts";
 
 export interface TextTarget {

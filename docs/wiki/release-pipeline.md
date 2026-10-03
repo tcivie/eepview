@@ -22,7 +22,17 @@ A `v*` tag builds installers for four targets, adds SBOMs, debug symbols and che
 - The `publish` job flattens all artifacts into one folder and writes `SHA256SUMS` for every file.
 - The same job signs every file, `SHA256SUMS` included, with Sigstore `cosign sign-blob`. The signature is keyless: the job's OIDC token gets a short-lived certificate from Fulcio, and the Rekor transparency log records each signature. Each file gets a `<file>.sigstore.json` bundle. The job then runs `cosign verify-blob` on every bundle against the identity of this workflow run, and fails on a bad signature.
 - The same job attests build provenance with `actions/attest-build-provenance`.
-- Last, `gh release create --draft --generate-notes` uploads the files and the `.sigstore.json` bundles. A person reads the draft and publishes it.
+- The same job writes the release notes with git-cliff (see [Changelog and release notes](#changelog-and-release-notes)).
+- Last, `gh release create --draft --notes-file` uploads the files and the `.sigstore.json` bundles. A person reads the draft and publishes it.
+
+## Changelog and release notes
+
+- Nobody edits `CHANGELOG.md` in a PR. This stops the merge conflicts that a shared line caused. `docs-check` fails a PR that changes it.
+- git-cliff builds the changelog and the release notes from the Conventional Commit titles on `main`. `cliff.toml` groups `feat` under Added, `fix` under Fixed, `security` under Security, `perf` and `refactor` under Changed, and `docs`, `ci`, `test` and `chore` under their own sections. It links each `(#N)` to its pull request and skips merge commits.
+- The squash-merge title is the commit title. Write a clear Conventional Commit PR title.
+- `scripts/release-notes.sh` prints the notes for one tag: the commits since the previous `v*` tag. The `publish` job installs a pinned git-cliff with `scripts/install-git-cliff.sh`, which checks the SHA-256 of the download. The notes become the draft release body.
+- The release job writes the release notes. It does not commit `CHANGELOG.md`, because `main` is protected. `CHANGELOG.md` is a snapshot of the generated history. A maintainer refreshes it in a PR with `scripts/changelog.sh --write origin/main`. It needs git-cliff (`brew install git-cliff`).
+- `docs-check` accepts a `CHANGELOG.md` change only when the file equals the output of `scripts/changelog.sh` for the base branch tip, or for the commit where the PR branched off. A merge to `main` after that does not turn the PR red.
 
 ## Release files
 
@@ -83,7 +93,7 @@ sha256sum --check --ignore-missing SHA256SUMS
 - The macOS release ships only the `.dmg`. `bundle.macOS.signingIdentity` is `-` in `src-tauri/tauri.conf.json`, so the Tauri bundler ad-hoc signs the `.app` before it builds the `.dmg`. A build step mounts the `.dmg` and runs `codesign --verify --deep --strict` and `codesign -dv` on the app. It fails unless the report says `Signature=adhoc`. There is no Developer ID signature and no notarization.
 - Windows installers are not signed.
 - The `gates` job skips its check on a branch dry run, so a pipeline change can be tested before merge. It needs a green `main` at the tagged commit. A dry run on `main` fails while the checks of `main` HEAD are red or still running.
-- The pipeline has no lint exclusion. actionlint and `zizmor --offline` report nothing.
+- The pipeline has no lint exclusion. actionlint and `zizmor --offline --persona=pedantic` report nothing.
 
 ## History
 
@@ -91,3 +101,5 @@ sha256sum --check --ignore-missing SHA256SUMS
 - [#24](https://github.com/tcivie/eepview/pull/24): release gates job without lint exclusions; the macOS app is signed inside the dmg.
 - [#37](https://github.com/tcivie/eepview/pull/37): Sigstore signatures for every release file, provenance without the private-repo guard, separate debug symbols, repeatable build environment.
 - [#39](https://github.com/tcivie/eepview/pull/39): the gate also reads the checks of the merged PR head.
+- [#47](https://github.com/tcivie/eepview/pull/47): permission comments in `release.yml`; zizmor runs with the pedantic persona.
+- [#50](https://github.com/tcivie/eepview/pull/50): generated changelog and release notes from commit titles with git-cliff.

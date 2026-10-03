@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 The eepview contributors
+# SPDX-License-Identifier: MIT
+
 name: security
 
 on:
@@ -64,3 +67,6 @@ jobs:
         with:
           # Code scanning upload needs a public repo on the free plan. Print and fail instead.
           advanced-security: false
+          persona: pedantic
+          # Pinned, so a new zizmor release cannot turn CI red.
+          version: 1.30.1

@@ -8,6 +8,10 @@
 - Release pipeline.
 - Coverage gate.
 
+## Wanted: co-maintainer
+
+eepview has one maintainer. The project wants a second active maintainer. This closes a real gap: nobody else can review, merge or release today. See [Access continuity](access-continuity.md) and [Governance](governance.md). Open an issue if you want to help.
+
 ## Next
 
 - Startup state machine and router detection (Phase 2).

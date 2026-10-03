@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: 2026 The eepview contributors
+# SPDX-License-Identifier: MIT
 # Build the Linux release twice, in two different directories, and compare the outputs.
 # Fails if the stripped binary or the frontend dist/ differ.
 # Reports, but does not fail on, the .deb and the debug-symbol file.

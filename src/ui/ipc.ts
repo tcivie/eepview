@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The eepview contributors
+// SPDX-License-Identifier: MIT
+
 import { isTauri, invoke as tauriInvoke } from "@tauri-apps/api/core";
 import { emit as tauriEmit, listen as tauriListen } from "@tauri-apps/api/event";
 import type { CommandName, Commands, EventName, Events, UiEvents } from "./contract.ts";

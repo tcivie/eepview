@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The eepview contributors
+// SPDX-License-Identifier: MIT
+
 import { type RouterLike, type RouterTone, routerView } from "./router-view.ts";
 import { formatCount, formatPercent, formatRate, formatUptime, MISSING } from "./stats-view.ts";
 

@@ -1,3 +1,10 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/tcivie/eepview/main/assets/brand/eepview-logo-horizontal-dark.svg">
+    <img alt="eepview" src="https://raw.githubusercontent.com/tcivie/eepview/main/assets/brand/eepview-logo-horizontal-light.svg" width="280">
+  </picture>
+</p>
+
 # eepview wiki
 
 This wiki is generated from docs/wiki in the repository. Edit it there, in a PR. Each PR that changes a feature updates its page. See [AGENTS.md](https://github.com/tcivie/eepview/blob/main/AGENTS.md).
@@ -41,7 +48,21 @@ This wiki is generated from docs/wiki in the repository. Edit it there, in a PR.
   - [ADR 0001: No-leak architecture](adr-0001-no-leak-architecture.md)
 - [Going public](going-public.md)
 
+## Project governance
+
+- [Governance](governance.md)
+- [Roles](roles.md)
+- [Access continuity](access-continuity.md)
+- [Security requirements](security-requirements.md)
+- [Assurance case](assurance-case.md)
+- [Vulnerability response](vulnerability-response.md)
+- [Coding standards](coding-standards.md)
+- [Testing policy](testing-policy.md)
+- [Release and support](release-and-support.md)
+- [Security review](security-review.md)
+
 ## Policies
+
 
 - [README](https://github.com/tcivie/eepview/blob/main/README.md)
 - [Security policy](https://github.com/tcivie/eepview/blob/main/SECURITY.md)

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The eepview contributors
+// SPDX-License-Identifier: MIT
+
 export const MISSING = "—";
 
 export interface StatsLike {
@@ -38,6 +41,7 @@ const DAY_S = 86_400;
 
 export function formatRate(bps: number | null): string {
   if (bps === null) return MISSING;
+  if (bps < BYTES_PER_KIB) return `${bps.toFixed(1)} B/s`;
   const kb = bps / BYTES_PER_KIB;
   return kb >= BYTES_PER_KIB ? `${(kb / BYTES_PER_KIB).toFixed(1)} MB/s` : `${kb.toFixed(1)} KB/s`;
 }
@@ -47,7 +51,7 @@ export function formatCount(n: number | null): string {
 }
 
 export function formatPercent(rate: number | null): string {
-  return rate === null ? MISSING : `${Math.round(rate * 100)}%`;
+  return rate === null ? MISSING : `${(rate * 100).toFixed(1)}%`;
 }
 
 export function formatUptime(seconds: number | null): string {

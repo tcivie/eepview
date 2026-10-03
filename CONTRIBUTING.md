@@ -7,9 +7,9 @@ eepview is a small desktop browser for I2P sites. It uses Tauri 2, Rust, TypeScr
 - Rust. The version is pinned in `rust-toolchain.toml`. Rustup installs it for you.
 - Node 24 and npm.
 - On Linux, the WebKitGTK packages. The list is in `.github/workflows/ci.yml`.
-- The tools that the git hooks use: lefthook, taplo, shellcheck, actionlint, gitleaks, and lizard.
+- The tools that the git hooks use: lefthook, taplo, shellcheck, actionlint, zizmor (1.30.1 or newer), gitleaks, and lizard.
 
-Install lizard with `pip install -r scripts/requirements-lint.txt`.
+Install lizard with `pip install --no-deps --require-hashes -r scripts/requirements-lint.txt`. Install reuse with `pipx install 'reuse[charset-normalizer]'`. CI installs reuse from `scripts/requirements-reuse.txt`.
 
 ## Setup
 
@@ -30,6 +30,30 @@ See the [roadmap](https://github.com/tcivie/eepview/wiki/roadmap) for what comes
 5. A maintainer merges the pull request with a squash merge.
 
 Nobody can push to `main` directly. Do not bypass the hooks with `--no-verify`.
+
+## Developer Certificate of Origin
+
+eepview uses the [Developer Certificate of Origin](https://developercertificate.org/) (DCO). It says that you wrote the change, or that you have the right to send it under the project license.
+
+Sign off every commit. Add the `-s` flag:
+
+```sh
+git commit -s -m "fix: reject a loopback address"
+```
+
+This adds a line like `Signed-off-by: Your Name <you@example.com>`. The name and email must match the commit author. The `dco` check fails a pull request that has an unsigned commit. To fix older commits, run `git rebase --signoff main` and push again.
+
+## Licensing headers
+
+Each source file starts with two SPDX lines: `SPDX-FileCopyrightText: 2026 The eepview contributors` and `SPDX-License-Identifier: MIT`. Use the comment syntax of the file type. Files that cannot hold a comment, such as JSON and images, are listed in `REUSE.toml`. Run `reuse lint` before you push. The git hook runs `reuse lint-file` on the staged files. See [Coding standards](https://github.com/tcivie/eepview/wiki/coding-standards).
+
+## Tests
+
+A new feature needs tests. A bug fix needs a regression test that fails before the fix. Read the [testing policy](https://github.com/tcivie/eepview/wiki/testing-policy).
+
+## Wanted: co-maintainer
+
+eepview has one maintainer. The project wants a second active maintainer who can review, merge and release. If you want to help, send good pull requests and open an issue. See [Governance](https://github.com/tcivie/eepview/wiki/governance) and [Access continuity](https://github.com/tcivie/eepview/wiki/access-continuity).
 
 ## Code rules
 
@@ -68,6 +92,10 @@ cargo-deny allows crates from crates.io only. It blocks wildcard versions. npm i
 - Add no telemetry.
 - Add no external fonts, CDNs, or remote assets to the bundled pages.
 - Add no new network path that breaks the "No-leak design" or "Consent first" principles. These documents arrive in docs/ with Phase 1.
+
+## Governance
+
+Read [Governance](https://github.com/tcivie/eepview/wiki/governance) and [Roles](https://github.com/tcivie/eepview/wiki/roles) to see how decisions are made.
 
 ## Report a security issue
 

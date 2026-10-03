@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: 2026 The eepview contributors
+# SPDX-License-Identifier: MIT
 # Print the environment for a repeatable release build, one KEY=VALUE per line.
 # Run it from the repo root. In CI: ./scripts/repro-env.sh >> "$GITHUB_ENV"
 # - SOURCE_DATE_EPOCH is the commit time, so build tools stamp the same date.

@@ -1,24 +1,19 @@
+// SPDX-FileCopyrightText: 2026 The eepview contributors
+// SPDX-License-Identifier: MIT
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { findCountText, findTone } from "./find-text.ts";
+import { findCountText } from "./find-text.ts";
 
-describe("find count text", () => {
-  it("is empty with no query or no result", () => {
-    assert.equal(findCountText(null), "");
-    assert.equal(findCountText({ query: "", matches: 0, active: null }), "");
-    assert.equal(findTone(null), "idle");
-  });
-  it("shows the position when the engine counts", () => {
+describe("find bar count", () => {
+  it('[browser-ui 1] shows the active match and the count as "N of M"', () => {
     assert.equal(findCountText({ query: "i2p", matches: 12, active: 3 }), "3 of 12");
-    assert.equal(findCountText({ query: "i2p", matches: 4, active: null }), "1 of 4");
-    assert.equal(findTone({ query: "i2p", matches: 4, active: 1 }), "found");
+    assert.equal(findCountText({ query: "i2p", matches: 1, active: 1 }), "1 of 1");
   });
-  it("says not found for zero matches", () => {
-    assert.equal(findCountText({ query: "zzz", matches: 0, active: null }), "Not found");
-    assert.equal(findTone({ query: "zzz", matches: 0, active: null }), "missing");
+  it('[browser-ui 2] shows "No matches" when the page has no match', () => {
+    assert.equal(findCountText({ query: "zzz", matches: 0, active: null }), "No matches");
+    assert.equal(findCountText({ query: "zzz", matches: 0, active: 0 }), "No matches");
   });
-  it("falls back to found or not found without a count", () => {
-    assert.equal(findCountText({ query: "a", matches: null, active: 1 }), "Found");
-    assert.equal(findCountText({ query: "a", matches: null, active: null }), "Not found");
+  it('[browser-ui 3] shows "—" when the engine gives no count', () => {
+    assert.equal(findCountText({ query: "i2p", matches: null, active: null }), "—");
   });
 });

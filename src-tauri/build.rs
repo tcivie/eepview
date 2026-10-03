@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The eepview contributors
+// SPDX-License-Identifier: MIT
+
 //! Build script: Tauri code generation, and one permission per IPC command, so the
 //! capabilities in `capabilities/` decide which webviews may call each one.
 

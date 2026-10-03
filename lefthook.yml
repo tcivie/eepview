@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 The eepview contributors
+# SPDX-License-Identifier: MIT
+
 # Fast checks before each commit. CI runs the full set and is the real gate.
 # Install once per clone: `lefthook install`.
 pre-commit:
@@ -18,6 +21,9 @@ pre-commit:
     - name: actionlint
       glob: ".github/workflows/*.{yml,yaml}"
       run: actionlint {staged_files}
+    - name: zizmor
+      glob: ".github/**/*.{yml,yaml}"
+      run: zizmor --offline --persona=pedantic .
     - name: complexity
       glob: "*.{rs,ts}"
       run: ./scripts/complexity.sh
@@ -26,3 +32,5 @@ pre-commit:
       run: ./scripts/palette-check.sh
     - name: gitleaks
       run: gitleaks git --staged --no-banner --redact
+    - name: reuse
+      run: reuse lint-file {staged_files}

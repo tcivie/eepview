@@ -66,6 +66,32 @@ The toolbar also uses `chrome_insets() -> { left }` and the `chrome-insets-chang
 
 Until the shell implements them, the dev mock (`src/ui/mock.ts`) answers these commands. Add `?managed=0` or `?paused=1` to a page URL to preview those states.
 
+## Requirements
+
+Tests check these. Each one names the behavior, not the code.
+
+1. The find bar shows the active match and the count as "N of M", for example "3 of 12".
+2. The find bar shows "No matches" when the page has no match.
+3. The find bar shows "—" when the engine gives no count.
+4. In the address suggestions, Up and Down move the highlight.
+5. In the address suggestions, Enter opens the highlighted entry.
+6. In the address suggestions, Esc closes the list.
+7. The address bar shows at most 8 suggestions.
+8. The History page groups its entries by day: "Today", then "Yesterday", then one group per older date.
+9. Bookmark folders are one level deep. A folder holds no other folder.
+10. A tab with no page title shows the host of its address.
+11. The Network page shows a rate in B/s, KB/s or MB/s, with one decimal.
+12. The Network page shows a ratio as a percentage, with one decimal.
+
+13. The address bar ignores blank or whitespace-only input: no navigation and no error.
+14. One word with no dot, no colon and no scheme searches history and bookmarks.
+15. Any other input that is not an http(s) URL or a host on `*.i2p` or `*.b32.i2p` is refused as "not-i2p".
+16. Input that cannot be parsed at all, such as `1a:b`, is refused as "invalid".
+
 ## Checks
 
 `npx biome ci .`, `npm run typecheck`, `./scripts/complexity.sh` and `npm run build` must pass. The unit tests for the pure parts live next to them (`src/ui/lib/*.test.ts`) and run with `node --test`.
+
+## History
+
+- 2026-10-03 — Numbered PO requirements for the find bar, suggestions, history, bookmarks, tabs and stats — [#49](https://github.com/tcivie/eepview/pull/49)

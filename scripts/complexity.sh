@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: 2026 The eepview contributors
+# SPDX-License-Identifier: MIT
 # Fail when a function is too complex or too long, in Rust and TypeScript.
 # Limits match clippy.toml and biome.json:
 #   cyclomatic complexity <= 10, length <= 40 lines of code, parameters <= 5.

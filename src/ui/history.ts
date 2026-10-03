@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The eepview contributors
+// SPDX-License-Identifier: MIT
+
 import "./boot.ts";
 import type { ClearRange, HistoryEntry } from "./contract.ts";
 import { announce, byId } from "./dom.ts";

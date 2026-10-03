@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The eepview contributors
+// SPDX-License-Identifier: MIT
+
 //! eepview: a browser that opens I2P sites only.
 //!
 //! Pure modules (no Tauri runtime, unit-tested): [`core`], [`nav`], [`net`], [`session`],
