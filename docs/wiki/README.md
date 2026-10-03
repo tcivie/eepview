@@ -10,7 +10,7 @@ The project wiki lives in the repo, because GitHub wikis are not available for p
 | Browser shell | in progress | [browser-shell.md](browser-shell.md) | branch `feat/browser-shell` |
 | No-leak architecture | in progress | [no-leak-architecture.md](no-leak-architecture.md) | branch `feat/browser-shell` |
 | Leak test | in progress | [leak-test.md](leak-test.md) | branch `test/leak-harness` |
-| Release pipeline | in progress | [release-pipeline.md](release-pipeline.md) | [branch ci/release](https://github.com/tcivie/eepview/tree/ci/release) |
+| Release pipeline | shipped | [release-pipeline.md](release-pipeline.md) | [#14](https://github.com/tcivie/eepview/pull/14) |
 | Coverage | in progress | [coverage.md](coverage.md) | [branch ci/coverage](https://github.com/tcivie/eepview/tree/ci/coverage) |
 | Brand | in progress | [brand.md](brand.md) | [#11](https://github.com/tcivie/eepview/pull/11) |
 
