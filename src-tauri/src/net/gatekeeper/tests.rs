@@ -50,9 +50,10 @@ fn serve(listener: &TcpListener, count: &Arc<AtomicUsize>, log: &Arc<Mutex<Vec<S
 }
 
 fn answer(mut stream: TcpStream, log: &Mutex<Vec<String>>) {
-    let Ok(Some((head, rest))) = read_head(&mut stream) else {
+    let Ok(Some((head, mut rest))) = read_head(&mut stream) else {
         return;
     };
+    read_body(&mut stream, &head, &mut rest);
     log.lock().unwrap().push(head.start.clone());
     let reply: Vec<u8> = match head.start.split(' ').nth(1).unwrap_or("") {
         "http://proxy.i2p/" => b"HTTP/1.1 200 OK\r\n\r\nI2P HTTP proxy OK".to_vec(),
@@ -64,6 +65,13 @@ fn answer(mut stream: TcpStream, log: &Mutex<Vec<String>>) {
         }
     };
     let _ = stream.write_all(&reply);
+}
+
+/// Reads the rest of the body: the gatekeeper writes the head and the body separately.
+fn read_body(stream: &mut TcpStream, head: &http::Head, rest: &mut Vec<u8>) {
+    let length = head.body_length().unwrap_or(0);
+    let missing = length.saturating_sub(rest.len() as u64);
+    let _ = stream.take(missing).read_to_end(rest);
 }
 
 fn echo_tunnel(mut stream: TcpStream) {
@@ -228,6 +236,7 @@ fn dead_router_gives_bad_gateway() {
         upstream: addr,
         open: Arc::new(AtomicBool::new(true)),
         active: Arc::new(AtomicUsize::new(0)),
+        limit: MAX_CONNECTIONS,
         allow_tls: true,
     };
     let (client_side, server_side) = socket_pair();
@@ -253,9 +262,10 @@ fn socket_pair() -> (TcpStream, TcpStream) {
 #[test]
 fn busy_limit_refuses() {
     let router = FakeRouter::start();
-    let gate = Gatekeeper::start_with(&router.verified(), true).unwrap();
+    let limit = 4;
+    let gate = Gatekeeper::start_limited(&router.verified(), true, limit).unwrap();
     // Hold connections open without a request so the handlers wait.
-    let held: Vec<TcpStream> = (0..MAX_CONNECTIONS)
+    let held: Vec<TcpStream> = (0..limit)
         .map(|_| gate.addr.connect(Duration::from_secs(2)).unwrap())
         .collect();
     thread::sleep(Duration::from_millis(300));

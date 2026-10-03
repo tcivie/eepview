@@ -37,6 +37,7 @@ struct Shared {
     upstream: LoopbackAddr,
     open: Arc<AtomicBool>,
     active: Arc<AtomicUsize>,
+    limit: usize,
     allow_tls: bool,
 }
 
@@ -54,12 +55,21 @@ impl Gatekeeper {
     }
 
     fn start_with(upstream: &VerifiedUpstream, allow_tls: bool) -> io::Result<Self> {
+        Self::start_limited(upstream, allow_tls, MAX_CONNECTIONS)
+    }
+
+    fn start_limited(
+        upstream: &VerifiedUpstream,
+        allow_tls: bool,
+        limit: usize,
+    ) -> io::Result<Self> {
         let (listener, addr) = LoopbackAddr::listen_any()?;
         let open = Arc::new(AtomicBool::new(true));
         let shared = Shared {
             upstream: upstream.addr(),
             open: Arc::clone(&open),
             active: Arc::new(AtomicUsize::new(0)),
+            limit,
             allow_tls,
         };
         thread::Builder::new()
@@ -95,7 +105,7 @@ fn accept_loop(listener: &TcpListener, shared: &Shared) {
             return;
         }
         let Ok(stream) = stream else { continue };
-        if shared.active.fetch_add(1, Ordering::SeqCst) >= MAX_CONNECTIONS {
+        if shared.active.fetch_add(1, Ordering::SeqCst) >= shared.limit {
             shared.active.fetch_sub(1, Ordering::SeqCst);
             let mut stream = stream;
             let _ = stream.write_all(&Refusal::Busy.response());
