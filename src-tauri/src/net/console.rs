@@ -449,11 +449,14 @@ fn get_bounded(addr: LoopbackAddr, path: &str, timeout: Duration, max: u64) -> A
         .write_all(head.as_bytes())
         .map_err(|e| format!("{addr}: {e}"))?;
     let raw = read_until(&mut stream, deadline, max);
+    if !raw.windows(4).any(|w| w == b"\r\n\r\n") {
+        return Err(format!("{addr}: no complete answer head"));
+    }
     parse_answer(&raw).ok_or_else(|| format!("{addr}: not an HTTP answer"))
 }
 
 /// Reads until the peer closes, `max` bytes are in, or `deadline` passes. A timeout after
-/// some bytes still leaves a usable answer.
+/// some bytes still leaves a usable body, but the head of the answer must be whole.
 fn read_until(stream: &mut TcpStream, deadline: Instant, max: u64) -> Vec<u8> {
     let max = usize::try_from(max).unwrap_or(usize::MAX);
     let mut raw = Vec::new();

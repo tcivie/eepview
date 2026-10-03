@@ -238,7 +238,6 @@ pub fn parse_i2pd_main(body: &str) -> RouterStats {
         known_routers: count("Routers", "&nbsp;"),
         floodfills: count("Floodfills", "&nbsp;"),
         tunnels: Tunnels {
-            client: count("Client Tunnels", "&nbsp;"),
             participating: count("Transit Tunnels", "<br>"),
             ..Tunnels::default()
         },

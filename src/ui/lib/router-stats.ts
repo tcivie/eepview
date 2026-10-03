@@ -40,12 +40,27 @@ function buildRate(build: RouterStats["tunnelBuildSuccessPercent"]): number | nu
   return percent === null ? null : percent / PERCENT;
 }
 
+const MAX_GAP_MS = 2 * HISTORY_STEP_SECONDS * MS_PER_SECOND;
+
+/** The index where the last run of samples starts: no gap in it is above `MAX_GAP_MS`. */
+function runStart(history: RouterStats["history"]): number {
+  let start = history.length - 1;
+  while (start > 0) {
+    const previous = history[start - 1];
+    const current = history[start];
+    if (!previous || !current || current.t - previous.t > MAX_GAP_MS) break;
+    start -= 1;
+  }
+  return start;
+}
+
 function historyView(history: RouterStats["history"]): StatsView["history"] {
   if (history.length === 0) return null;
+  const run = history.slice(runStart(history));
   return {
     stepSeconds: HISTORY_STEP_SECONDS,
-    inBps: history.map((sample) => sample.in),
-    outBps: history.map((sample) => sample.out),
+    inBps: run.map((sample) => sample.in),
+    outBps: run.map((sample) => sample.out),
   };
 }
 
