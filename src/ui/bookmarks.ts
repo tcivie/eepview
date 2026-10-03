@@ -165,4 +165,4 @@ function wireBookmarks(): void {
 
 wireBookmarks();
 load();
-if (window.location.hash === "#add") openEditor(null);
+if (window.location.hash === "#new") openEditor(null);
