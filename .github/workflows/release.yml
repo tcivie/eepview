@@ -24,9 +24,9 @@ jobs:
     name: gates
     runs-on: ubuntu-24.04
     permissions:
-      checks: read
-      contents: read
-      pull-requests: read
+      checks: read # read the check runs of the tagged commit and its PR heads
+      contents: read # check out the repo and read the ruleset
+      pull-requests: read # find the PR that merged the commit
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -177,9 +177,9 @@ jobs:
     needs: [build, sbom]
     runs-on: ubuntu-24.04
     permissions:
-      contents: write
-      id-token: write
-      attestations: write
+      contents: write # create the draft release and upload the files
+      id-token: write # keyless Sigstore signing and attestation (OIDC token)
+      attestations: write # store the build provenance attestation
     env:
       # A dry run, or a dispatch run on a branch, signs and verifies the files but never attests or releases.
       RELEASE: ${{ startsWith(github.ref, 'refs/tags/v') && (github.event_name == 'push' || !inputs.dry_run) }}

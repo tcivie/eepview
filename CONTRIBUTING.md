@@ -7,7 +7,7 @@ eepview is a small desktop browser for I2P sites. It uses Tauri 2, Rust, TypeScr
 - Rust. The version is pinned in `rust-toolchain.toml`. Rustup installs it for you.
 - Node 24 and npm.
 - On Linux, the WebKitGTK packages. The list is in `.github/workflows/ci.yml`.
-- The tools that the git hooks use: lefthook, taplo, shellcheck, actionlint, gitleaks, and lizard.
+- The tools that the git hooks use: lefthook, taplo, shellcheck, actionlint, zizmor (1.30.1 or newer), gitleaks, and lizard.
 
 Install lizard with `pip install --no-deps --require-hashes -r scripts/requirements-lint.txt`. Install reuse with `pipx install 'reuse[charset-normalizer]'`. CI installs reuse from `scripts/requirements-reuse.txt`.
 

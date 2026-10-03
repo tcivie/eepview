@@ -83,7 +83,7 @@ sha256sum --check --ignore-missing SHA256SUMS
 - The macOS release ships only the `.dmg`. `bundle.macOS.signingIdentity` is `-` in `src-tauri/tauri.conf.json`, so the Tauri bundler ad-hoc signs the `.app` before it builds the `.dmg`. A build step mounts the `.dmg` and runs `codesign --verify --deep --strict` and `codesign -dv` on the app. It fails unless the report says `Signature=adhoc`. There is no Developer ID signature and no notarization.
 - Windows installers are not signed.
 - The `gates` job skips its check on a branch dry run, so a pipeline change can be tested before merge. It needs a green `main` at the tagged commit. A dry run on `main` fails while the checks of `main` HEAD are red or still running.
-- The pipeline has no lint exclusion. actionlint and `zizmor --offline` report nothing.
+- The pipeline has no lint exclusion. actionlint and `zizmor --offline --persona=pedantic` report nothing.
 
 ## History
 
@@ -91,3 +91,4 @@ sha256sum --check --ignore-missing SHA256SUMS
 - [#24](https://github.com/tcivie/eepview/pull/24): release gates job without lint exclusions; the macOS app is signed inside the dmg.
 - [#37](https://github.com/tcivie/eepview/pull/37): Sigstore signatures for every release file, provenance without the private-repo guard, separate debug symbols, repeatable build environment.
 - [#39](https://github.com/tcivie/eepview/pull/39): the gate also reads the checks of the merged PR head.
+- [#47](https://github.com/tcivie/eepview/pull/47): permission comments in `release.yml`; zizmor runs with the pedantic persona.
