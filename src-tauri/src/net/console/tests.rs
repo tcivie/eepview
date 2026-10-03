@@ -29,7 +29,7 @@ use crate::net::console::{
     java_ports_in, judge, page_path, probe, probe_path,
 };
 use crate::net::testing::FakeConsole;
-use crate::shell::console::{ConsoleWebview, current, detect_now, set_console};
+use crate::shell::console::{ConsoleWebview, current, detect_now, set_console, stop};
 use crate::shell::state::Shared;
 
 const JAVA_BODY: &str = r#"<link rel="stylesheet" href="/themes/console/light/console.css">"#;
@@ -1249,6 +1249,20 @@ fn mock_app() -> App<MockRuntime> {
     app
 }
 
+/// Calls `shell::console::stop` when dropped, also when the test fails, so the re-check
+/// and retry loops of one test never keep probing the ports during the next one.
+struct StopOnDrop(AppHandle<MockRuntime>);
+
+impl Drop for StopOnDrop {
+    fn drop(&mut self) {
+        stop(&self.0);
+    }
+}
+
+fn stop_on_drop(handle: &AppHandle<MockRuntime>) -> StopOnDrop {
+    StopOnDrop(handle.clone())
+}
+
 /// The `console-changed` payloads of `handle`.
 fn changes(handle: &AppHandle<MockRuntime>) -> Receiver<String> {
     let (tx, rx) = channel();
@@ -1274,6 +1288,7 @@ fn r6_start_up_opens_no_connection_to_a_console_port() {
         return;
     };
     let mut app = mock_app();
+    let _stop = stop_on_drop(app.handle());
     crate::shell::chrome::build(&mut app).unwrap();
     crate::shell::watch::start(app.handle(), Err("EEPVIEW_PROXY: test".to_owned()));
     thread::sleep(Duration::from_secs(12));
@@ -1308,6 +1323,7 @@ fn r6_detect_now_probes_stores_emits_and_answers_the_info() {
         return;
     };
     let app = mock_app();
+    let _stop = stop_on_drop(app.handle());
     let events = changes(app.handle());
     let info = detect_now(app.handle());
     assert!(java.hits() >= 1, "detect_now probes");
@@ -1332,6 +1348,7 @@ fn r6_detect_now_with_nothing_listening_answers_no_console() {
     java.set_up(false);
     i2pd.set_up(false);
     let app = mock_app();
+    let _stop = stop_on_drop(app.handle());
     let info = detect_now(app.handle());
     assert_eq!(info, ConsoleInfo::none());
     assert!(current(app.handle()).is_none());
@@ -1347,6 +1364,7 @@ fn r6_detect_now_replaces_a_stored_console_and_closes_its_window() {
     java.set_up(false);
     i2pd.set_up(false);
     let app = mock_app();
+    let _stop = stop_on_drop(app.handle());
     let fake = FakeConsole::start(ConsoleKind::Java);
     let old = fake.verified();
     set_console(app.handle(), Some(old.clone()));
@@ -1363,14 +1381,18 @@ fn r21_a_known_console_survives_two_misses_and_is_cleared_by_the_third() {
     // R6 and R21: re-check every 10 s; the console stays through 2 misses, no event; the
     // third miss clears it with console-changed found:false.
     let _guard = detect_lock();
-    let Some((java, _i2pd)) = default_spies() else {
+    let Some((java, i2pd)) = default_spies() else {
         return;
     };
     let app = mock_app();
+    let _stop = stop_on_drop(app.handle());
     let events = changes(app.handle());
     assert!(detect_now(app.handle()).found);
     let after_first = java.hits();
+    // Both consoles go down: a re-check that found the other one would replace the known
+    // console at once (R21) and the misses would never count.
     java.set_up(false);
+    i2pd.set_up(false);
     assert!(
         wait_until(30, || java.hits() >= after_first + 2),
         "two re-checks ran"
@@ -1400,6 +1422,7 @@ fn r21_a_re_check_that_finds_the_console_again_resets_the_count() {
         return;
     };
     let app = mock_app();
+    let _stop = stop_on_drop(app.handle());
     assert!(detect_now(app.handle()).found);
     let start = java.hits();
     java.set_up(false);
@@ -1426,6 +1449,7 @@ fn r20_no_console_found_retries_and_stops_at_the_first_console() {
     java.set_up(false);
     i2pd.set_up(false);
     let app = mock_app();
+    let _stop = stop_on_drop(app.handle());
     let events = changes(app.handle());
     assert!(!detect_now(app.handle()).found);
     let first = java.hits();
@@ -1452,6 +1476,7 @@ fn r20_a_new_trigger_during_the_retries_starts_no_second_loop() {
     java.set_up(false);
     i2pd.set_up(false);
     let app = mock_app();
+    let _stop = stop_on_drop(app.handle());
     for _ in 0..3 {
         assert!(!detect_now(app.handle()).found);
     }
@@ -1462,6 +1487,39 @@ fn r20_a_new_trigger_during_the_retries_starts_no_second_loop() {
     assert!(
         (1..=3).contains(&retries),
         "one loop retries 2 times in 25 s, saw {retries}"
+    );
+}
+
+#[test]
+fn r22_stop_ends_the_re_check_loop_and_a_later_detect_now_starts_it_again() {
+    // R22: after stop no thread opens a connection to a console port, at the latest one
+    // tick (10 s) later. A later detect_now starts the loops again.
+    let _guard = detect_lock();
+    let Some((java, i2pd)) = default_spies() else {
+        return;
+    };
+    let app = mock_app();
+    let _stop = stop_on_drop(app.handle());
+    assert!(detect_now(app.handle()).found);
+    let looping = java.hits();
+    assert!(
+        wait_until(30, || java.hits() > looping),
+        "the re-check loop probes the known console"
+    );
+    stop(app.handle());
+    thread::sleep(Duration::from_secs(11));
+    let settled = (java.hits(), i2pd.hits());
+    thread::sleep(Duration::from_secs(11));
+    assert_eq!(
+        (java.hits(), i2pd.hits()),
+        settled,
+        "no connection to a console port after stop and one tick"
+    );
+    assert!(detect_now(app.handle()).found);
+    let restarted = java.hits();
+    assert!(
+        wait_until(30, || java.hits() > restarted),
+        "a later detect_now starts the re-check loop again"
     );
 }
 
