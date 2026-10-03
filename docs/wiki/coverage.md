@@ -7,8 +7,8 @@ Unit-test coverage gate for Rust and TypeScript.
 ## How it works
 
 - The `coverage` job in `.github/workflows/ci.yml` runs on ubuntu-24.04 only.
-- Rust lines: `cargo llvm-cov --workspace --all-targets --summary-only`, then `cargo llvm-cov report --fail-under-lines <N>`. Every file counts. There are no exclusions.
-- Rust branches: the pinned `nightly-2026-10-01` runs the same tests with `--branch`. cargo-llvm-cov has no `--fail-under-branches`, so `jq` reads `totals.branches.percent` from the JSON summary and fails below the floor.
+- Rust lines (stable toolchain): `cargo llvm-cov --workspace --all-targets --summary-only --fail-under-lines <N>`. The gate is on the run itself, because `cargo llvm-cov report` has no `--workspace` and would gate the root crate only. Every file of both crates counts. There are no exclusions.
+- Rust branches (pinned `nightly-2026-10-01`): the same tests with `--branch --json`. cargo-llvm-cov has no `--fail-under-branches`, so `jq` prints `totals.branches.percent` and fails below the floor.
 - TypeScript: `npm run test:coverage` first runs `scripts/check-tested.sh`, the traceability check. Then it runs the Node built-in test runner with coverage thresholds. It adds no npm package.
 - Traceability: every numbered requirement under "Requirements" in [Browser UI](browser-ui.md), and every IPC contract section the UI depends on, must be named by at least one test title. The script fails when a requirement has no test.
   - Tag a test title with `[browser-ui N]` for requirement N on the Browser UI page.
@@ -18,12 +18,17 @@ Unit-test coverage gate for Rust and TypeScript.
 
 ## Ratchet values
 
-- Rust: lines 91, branches 82. CI on ubuntu-24.04 measured 91.64% lines and 82.23% branches on the nightly run after [#29](https://github.com/tcivie/eepview/pull/29). The floor is that value rounded down. Raise it when coverage rises. Never lower it.
+- Rust lines: 93. The stable run on ubuntu-24.04 measured 93.96% after [#29](https://github.com/tcivie/eepview/pull/29).
+- Rust branches: 82. The nightly run on ubuntu-24.04 measured 82.23% after #29.
+- Each floor is the measured value of its own run, rounded down. Raise it when coverage rises. Never lower it.
 - TypeScript: lines 80, branches 70, functions 80. [#49](https://github.com/tcivie/eepview/pull/49) removed the tests that lock in the implementation. Coverage is below the floor until the requirement tests land in that PR.
 
 ## How to use / run locally
 
-- Rust: `cargo install cargo-llvm-cov --locked`, `rustup component add llvm-tools-preview`, then `cargo llvm-cov --all-targets --summary-only` in `src-tauri`. Run `npm run build` first.
+- Rust: `cargo install cargo-llvm-cov --locked`, `rustup component add llvm-tools-preview`, then in `src-tauri`:
+  - lines: `cargo llvm-cov --workspace --all-targets --summary-only`
+  - branches: `rustup toolchain install nightly-2026-10-01 --component llvm-tools-preview`, then `cargo +nightly-2026-10-01 llvm-cov --workspace --all-targets --branch --summary-only`
+  - Run `npm run build` first. CI measures on Linux; macOS and Windows compile other platform code, so their numbers differ.
 - TypeScript: `npm run test` and `npm run test:coverage`. Node 22.18 or later is needed.
 
 ## Test rule
@@ -38,6 +43,7 @@ Unit-test coverage gate for Rust and TypeScript.
 
 - The Rust gate checks lines and branches, not functions or regions.
 - Branch coverage needs a nightly compiler, so the branch number comes from one dated nightly. A nightly bump can move it a little.
+- The job builds and runs the instrumented tests twice: on stable for lines, on the nightly for branches. The line gate stays on the toolchain that ships the app. The cost is a few minutes of CI.
 - Test files are excluded from the TypeScript report only.
 - Node counts only the files that a test loads. A module that no requirement test reaches does not count against the floor. Such a module is dead code: inline it or delete it.
 
@@ -45,4 +51,4 @@ Unit-test coverage gate for Rust and TypeScript.
 
 - 2026-10-03 — Add the coverage gate for Rust and TypeScript — [#13](https://github.com/tcivie/eepview/pull/13)
 - 2026-10-03 — State the test rule; remove UI tests that lock in the implementation — [#49](https://github.com/tcivie/eepview/pull/49)
-- 2026-10-03 — Raise the Rust gate to the measured floor: lines 91, branches 82 — [#58](https://github.com/tcivie/eepview/pull/58)
+- 2026-10-03 — Raise the Rust gate to the measured floor: lines 93, branches 82 — [#58](https://github.com/tcivie/eepview/pull/58)
