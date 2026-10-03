@@ -224,3 +224,37 @@ fn console_answer(
     let reply = format!("HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n{body}");
     let _ = stream.write_all(reply.as_bytes());
 }
+
+/// A fake router helper on a free loopback port. It answers every request with `200` and
+/// a JSON body.
+pub struct FakeHelper {
+    addr: LoopbackAddr,
+}
+
+impl FakeHelper {
+    /// Starts the fake helper; every request gets `200` and `json`.
+    pub fn serving(json: &str) -> Self {
+        let (listener, addr) = LoopbackAddr::listen_any().unwrap();
+        let body = json.to_owned();
+        thread::spawn(move || serve_helper(&listener, &body));
+        Self { addr }
+    }
+
+    /// The address it listens on.
+    pub fn addr(&self) -> LoopbackAddr {
+        self.addr
+    }
+}
+
+fn serve_helper(listener: &TcpListener, body: &str) {
+    for mut stream in listener.incoming().flatten() {
+        if read_head(&mut stream).is_none() {
+            continue;
+        }
+        let reply = format!(
+            "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+            body.len()
+        );
+        let _ = stream.write_all(reply.as_bytes());
+    }
+}

@@ -73,7 +73,7 @@ fn expected_i2pd() -> RouterStats {
             inbound: None,
             out: None,
             participating: Some(157),
-            client: Some(14),
+            client: None,
             exploratory: None,
         },
         tunnel_build_success_percent: BuildSuccess {
@@ -249,6 +249,12 @@ fn r30_i2pd_never_gives_the_version_or_the_fields_the_main_page_lacks() {
     assert_eq!(got.bandwidth_bytes_per_second.out5m, None, "out5m");
     assert_eq!(got.tunnel_build_success_percent.exploratory, None);
     assert_eq!(got.tunnel_build_success_percent.client, None);
+}
+
+#[test]
+fn r30_i2pd_fixture_gives_no_client_tunnel_count() {
+    // R30: the `Client Tunnels` line of the fixture holds 14, and it is not read.
+    assert_eq!(parse_i2pd_main(I2PD).tunnels.client, None, "tunnels.client");
 }
 
 #[test]
@@ -1295,8 +1301,8 @@ fn r30_i2pd_bandwidth_that_does_not_match_its_form_is_null_for_that_field() {
     check("sent, no br", &got, &expected_i2pd(), &["bw.out1s"], &[]);
 }
 
-// R27, R30: Routers, Floodfills and Client Tunnels end with `&nbsp;`, Transit with `<br>`.
-const I2PD_COUNTS: [(&str, &str, &str, &str); 4] = [
+// R27, R30: Routers and Floodfills end with `&nbsp;`, Transit with `<br>`.
+const I2PD_COUNTS: [(&str, &str, &str, &str); 3] = [
     (
         "<b>Routers:</b> 3021",
         "&nbsp;",
@@ -1308,12 +1314,6 @@ const I2PD_COUNTS: [(&str, &str, &str, &str); 4] = [
         "&nbsp;",
         "<b>Floodfills:</b> {}",
         "floodfills",
-    ),
-    (
-        "<b>Client Tunnels:</b> 14",
-        "&nbsp;",
-        "<b>Client Tunnels:</b> {}",
-        "tunnels.client",
     ),
     (
         "<b>Transit Tunnels:</b> 157",
@@ -1366,7 +1366,7 @@ fn r30_i2pd_counts_that_are_not_integers_are_null_one_by_one() {
 
 #[test]
 fn r30_i2pd_counts_need_their_own_terminator() {
-    // Routers, Floodfills, Client Tunnels: `&nbsp;`. Transit Tunnels: `<br>`.
+    // Routers, Floodfills: `&nbsp;`. Transit Tunnels: `<br>`.
     let wrong = [
         ("3021&nbsp;", "3021<br>", "known_routers"),
         ("812&nbsp;", "812<br>", "floodfills"),
@@ -1378,6 +1378,28 @@ fn r30_i2pd_counts_need_their_own_terminator() {
         let got = parse_i2pd_main(&swap(I2PD, from, to));
         check(to, &got, &expected_i2pd(), &[field], &[]);
     }
+}
+
+#[test]
+fn r30_i2pd_never_reads_the_client_tunnels_figure() {
+    // R30: the `Client Tunnels` figure of i2pd counts every inbound and outbound tunnel,
+    // exploratory ones included; `tunnels.client` is always null, whatever the line holds.
+    let from = "<b>Client Tunnels:</b> 14&nbsp;";
+    for line in [
+        "<b>Client Tunnels:</b> 14&nbsp;",
+        "<b>Client Tunnels:</b> 0&nbsp;",
+        "<b>Client Tunnels:</b> 2&nbsp;",
+        "<b>Client Tunnels:</b> 99999&nbsp;",
+        "<b>Client Tunnels:</b> abc&nbsp;",
+        "",
+    ] {
+        let got = i2pd_with(from, line);
+        assert_eq!(got.tunnels.client, None, "line {line:?}");
+        check(line, &got, &expected_i2pd(), &["tunnels.client"], &[]);
+    }
+    let two = format!("{from}<b>Client Tunnels:</b> 3&nbsp;");
+    let got = i2pd_with(from, &two);
+    assert_eq!(got.tunnels.client, None, "a doubled line");
 }
 
 // R30: `<b><label>:</b> `; a translated or changed label gives null for its field.
@@ -1952,4 +1974,122 @@ fn r25_a_value_cut_by_the_size_cap_is_null() {
         &["tunnels.participating"],
         &tunnels,
     );
+}
+
+// ------------------------------------------------------------ R38: one deadline
+
+/// The longest a call may last: the 3 s of R25 plus the time to close the socket.
+const R38_LIMIT: Duration = Duration::from_millis(3_800);
+
+/// A gap shorter than the 3 s of one read, so a deadline that restarts at every read
+/// never fires while the peer keeps sending.
+const DRIP_GAP: Duration = Duration::from_millis(1_200);
+
+/// Writes `bytes` one at a time, `DRIP_GAP` apart, then holds the socket open for `hold`.
+fn drip(stream: &mut TcpStream, bytes: &[u8], hold: Duration) {
+    for byte in bytes {
+        if stream
+            .write_all(&[*byte])
+            .and_then(|()| stream.flush())
+            .is_err()
+        {
+            return;
+        }
+        thread::sleep(DRIP_GAP);
+    }
+    thread::sleep(hold);
+}
+
+#[test]
+fn r38_a_peer_that_sends_slowly_past_3_seconds_ends_the_call_at_3_seconds() {
+    // R38: the head and the start of the body arrive at once; then one byte every 1.2 s.
+    // Each read is inside 3 s, the whole request is not. The call returns at the deadline.
+    let end = JAVA.find(">398<").unwrap() + ">3".len();
+    let prefix = JAVA[..end].to_owned();
+    let server = Scripted::start(move |stream| {
+        let _ = stream.write_all(format!("HTTP/1.0 200 OK\r\n\r\n{prefix}").as_bytes());
+        drip(stream, b"98<", Duration::from_secs(8));
+    });
+    let console = server.console();
+    let start = Instant::now();
+    let got = fetch_stats(&console);
+    let took = start.elapsed();
+    assert!(took < R38_LIMIT, "the call lasted {took:?}");
+    assert!(got.is_some(), "a body cut by the deadline is still parsed");
+}
+
+#[test]
+fn r38_a_value_cut_by_the_deadline_is_null() {
+    // R38, R27: `398` arrives at 2.4 s but its terminator at 3.6 s, after the deadline.
+    let end = JAVA.find(">398<").unwrap() + ">3".len();
+    let prefix = JAVA[..end].to_owned();
+    let server = Scripted::start(move |stream| {
+        let _ = stream.write_all(format!("HTTP/1.0 200 OK\r\n\r\n{prefix}").as_bytes());
+        drip(stream, b"98<", Duration::from_secs(8));
+    });
+    let console = server.console();
+    let start = Instant::now();
+    let got = fetch_stats(&console).expect("a body cut by the deadline is still parsed");
+    assert!(
+        start.elapsed() < R38_LIMIT,
+        "the call lasted {:?}",
+        start.elapsed()
+    );
+    let tunnels = ["tunnels.client", "tunnels.exploratory"];
+    check(
+        "deadline cut",
+        &got,
+        &expected_java(),
+        &["tunnels.participating"],
+        &tunnels,
+    );
+}
+
+#[test]
+fn r38_figures_that_arrived_before_the_deadline_are_kept() {
+    // R38: "gets figures from what arrived within 3 s".
+    let end = JAVA.find(">398<").unwrap() + ">3".len();
+    let prefix = JAVA[..end].to_owned();
+    let server = Scripted::start(move |stream| {
+        let _ = stream.write_all(format!("HTTP/1.0 200 OK\r\n\r\n{prefix}").as_bytes());
+        drip(stream, b"98<", Duration::from_secs(8));
+    });
+    let got = fetch_stats(&server.console()).expect("a cut body is still parsed");
+    assert_eq!(got.uptime_ms, Some(28_800_000));
+    assert_eq!(got.known_routers, Some(4905));
+    assert_eq!(got.floodfills, Some(1570));
+    assert_eq!(got.bandwidth_bytes_per_second.in1s, Some(53_910));
+}
+
+#[test]
+fn r38_no_complete_head_within_3_seconds_means_the_console_does_not_answer() {
+    // R38, R25: the status line is at once, the head never ends; a header byte comes every
+    // 1.2 s. At 3 s there is no complete head: no answer, and the call ends at 3 s.
+    let server = Scripted::start(|stream| {
+        let _ = stream.write_all(b"HTTP/1.0 200 OK\r\n");
+        drip(stream, b"X-Slow: aaaaaaaaaa", Duration::from_secs(8));
+    });
+    let console = server.console();
+    let start = Instant::now();
+    let got = fetch_stats(&console);
+    let took = start.elapsed();
+    assert_eq!(got, None);
+    assert!(took < R38_LIMIT, "the call lasted {took:?}");
+}
+
+#[test]
+fn r38_a_head_that_completes_after_3_seconds_means_the_console_does_not_answer() {
+    // R38: the head ends at 3.6 s, with a full body behind it: too late, no answer.
+    let body = JAVA.to_owned();
+    let server = Scripted::start(move |stream| {
+        let _ = stream.write_all(b"HTTP/1.0 200 OK\r\n");
+        drip(stream, b"X:a", Duration::ZERO);
+        let _ = stream.write_all(format!("\r\n\r\n{body}").as_bytes());
+    });
+    let console = server.console();
+    let start = Instant::now();
+    let got = fetch_stats(&console);
+    let took = start.elapsed();
+    assert_eq!(got, None);
+    assert!(took < R38_LIMIT, "the call lasted {took:?}");
 }

@@ -194,8 +194,8 @@ mod stats_from_console {
     use super::*;
     use crate::net::console::{ConsoleKind, stats_path};
     use crate::net::stats::{RouterStats, Sample};
-    use crate::net::testing::FakeConsole;
-    use crate::shell::console::set_console;
+    use crate::net::testing::{FakeConsole, FakeHelper};
+    use crate::shell::console::{detect_now, set_console, stop};
 
     const JAVA: &str =
         include_str!("../../../tests/fixtures/console/java-2.13.0-xhr1-summaryframe.txt");
@@ -283,7 +283,10 @@ mod stats_from_console {
         assert_eq!(stats.bandwidth_bytes_per_second.out1s, Some(5_806));
         assert_eq!(stats.known_routers, Some(3021));
         assert_eq!(stats.floodfills, Some(812));
-        assert_eq!(stats.tunnels.client, Some(14));
+        assert_eq!(
+            stats.tunnels.client, None,
+            "R30: i2pd gives no client count"
+        );
         assert_eq!(stats.tunnels.participating, Some(157));
         assert_eq!(stats.tunnel_build_success_percent.total, Some(42));
     }
@@ -424,5 +427,97 @@ mod stats_from_console {
         assert_eq!(value["tunnels"]["client"], Value::Null);
         assert_eq!(value["tunnelBuildSuccessPercent"]["total"], Value::Null);
         assert_eq!(value["history"], json!([]));
+    }
+
+    // ------------------------------------------------ R37: no console request after stop
+
+    const HELPER_JSON: &str = r#"{"version":"helper-2.10.0","uptimeMs":5000}"#;
+
+    /// Calls `stop` when dropped, also when the test fails, so the loops that `detect_now`
+    /// starts never keep probing the ports during the next test.
+    struct StopOnDrop(AppHandle<Mock>);
+
+    impl Drop for StopOnDrop {
+        fn drop(&mut self) {
+            stop(&self.0);
+        }
+    }
+
+    /// An app with a stored Java console, stopped. The fake has seen no request since.
+    fn stopped_app() -> (App<Mock>, FakeConsole, usize) {
+        let app = app();
+        let fake = java_console(&app);
+        stop(&handle(&app));
+        let seen = fake.requests().len();
+        (app, fake, seen)
+    }
+
+    #[test]
+    fn r37_after_stop_current_stats_sends_no_request_to_the_console() {
+        let (app, fake, seen) = stopped_app();
+        let _ = current_stats(&handle(&app), None);
+        let _ = current_stats(&handle(&app), None);
+        assert_eq!(
+            fake.requests().len(),
+            seen,
+            "requests after stop: {:?}",
+            fake.requests()
+        );
+    }
+
+    #[test]
+    fn r37_after_stop_with_no_helper_every_field_is_null_and_the_history_is_empty() {
+        let (app, _fake, _) = stopped_app();
+        let stats = current_stats(&handle(&app), None);
+        assert_eq!(stats, RouterStats::default());
+    }
+
+    #[test]
+    fn r37_after_stop_the_router_stats_command_answers_all_null_and_asks_no_console() {
+        let (app, fake, seen) = stopped_app();
+        let value = ok(&app, "router_stats", json!({}));
+        assert_eq!(fake.requests().len(), seen);
+        assert_eq!(value["tunnels"]["participating"], Value::Null);
+        assert_eq!(value["uptimeMs"], Value::Null);
+        assert_eq!(value["history"], json!([]));
+    }
+
+    #[test]
+    fn r37_after_stop_a_helper_that_answers_still_gives_the_figures_and_no_console_sample() {
+        let (app, fake, seen) = stopped_app();
+        let helper = FakeHelper::serving(HELPER_JSON);
+        let stats = current_stats(&handle(&app), Some((helper.addr(), "token".into())));
+        assert_eq!(stats.version.as_deref(), Some("helper-2.10.0"));
+        assert_eq!(stats.uptime_ms, Some(5_000));
+        assert_eq!(stats.tunnels.participating, None, "no console figure");
+        assert_eq!(fake.requests().len(), seen, "the console is not asked");
+        assert!(
+            stats.history.iter().all(|s| s.inbound != 53_910),
+            "no console sample: {:?}",
+            stats.history
+        );
+    }
+
+    #[test]
+    fn r37_after_stop_a_helper_that_does_not_answer_gives_all_null_not_the_console() {
+        let (app, fake, seen) = stopped_app();
+        let dead = Some((dead_addr(), "token".into()));
+        let stats = current_stats(&handle(&app), dead);
+        assert_eq!(stats, RouterStats::default());
+        assert_eq!(fake.requests().len(), seen);
+    }
+
+    #[test]
+    fn r37_after_detect_now_the_console_is_queried_again() {
+        // R37: "until `detect_now` runs again". `detect_now` probes the default ports and
+        // stores what it finds; the stored console is then the fake.
+        let (app, fake, _) = stopped_app();
+        let _guard = StopOnDrop(handle(&app));
+        let _ = detect_now(&handle(&app));
+        set_console(app.handle(), Some(fake.verified()));
+        let before = stats_requests(&fake);
+        let stats = current_stats(&handle(&app), None);
+        assert_eq!(stats_requests(&fake), before + 1, "one request again");
+        assert_eq!(stats.tunnels.participating, Some(398));
     }
 }

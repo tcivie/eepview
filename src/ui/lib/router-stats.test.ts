@@ -251,3 +251,84 @@ describe("[R33] statsView history", () => {
     assert.deepEqual(view.history, { stepSeconds: 5, inBps: [5], outBps: [6] });
   });
 });
+
+type Sample = RouterStats["history"][number];
+
+/** A sample at `t` ms whose in and out are `t / 1000` and `t / 1000 + 1`, so a test reads which sample was kept. */
+const sampleAt = (t: number): Sample => ({ t, in: t / 1000, out: t / 1000 + 1 });
+
+const runOf = (times: number[]): StatsView["history"] =>
+  statsView(stats({ history: times.map(sampleAt) })).history;
+
+const historyOf = (times: number[]): StatsView["history"] => ({
+  stepSeconds: 5,
+  inBps: times.map((t) => t / 1000),
+  outBps: times.map((t) => t / 1000 + 1),
+});
+
+describe("[R33] statsView history run", () => {
+  it("[R33] a gap above 10 000 ms ends the run: only the samples after it are kept", () => {
+    assert.deepEqual(runOf([0, 5000, 10_000, 20_001, 25_001]), historyOf([20_001, 25_001]));
+  });
+
+  it("[R33] a gap of 10 001 ms ends the run, a gap of 10 000 ms does not", () => {
+    assert.deepEqual(runOf([0, 10_001]), historyOf([10_001]));
+    assert.deepEqual(runOf([0, 10_000]), historyOf([0, 10_000]));
+  });
+
+  it("[R33] a gap of exactly 10 000 ms stays in the run", () => {
+    assert.deepEqual(runOf([0, 10_000, 20_000, 30_000]), historyOf([0, 10_000, 20_000, 30_000]));
+  });
+
+  it("[R33] a gap just under 10 000 ms stays in the run", () => {
+    assert.deepEqual(runOf([0, 9999]), historyOf([0, 9999]));
+  });
+
+  it("[R33] keeps only the last run when there are several gaps", () => {
+    const times = [0, 5000, 20_000, 25_000, 40_000, 45_000, 50_000];
+    assert.deepEqual(runOf(times), historyOf([40_000, 45_000, 50_000]));
+  });
+
+  it("[R33] a gap before the newest sample leaves that one sample as the run", () => {
+    assert.deepEqual(runOf([0, 5000, 10_000, 30_000]), historyOf([30_000]));
+  });
+});
+
+describe("[R33] statsView history run edge cases", () => {
+  it("[R33] a single sample is a run", () => {
+    assert.deepEqual(runOf([7000]), historyOf([7000]));
+  });
+
+  it("[R33] an empty history gives a null history", () => {
+    assert.equal(runOf([]), null);
+  });
+
+  it("[R33] a history with no gap is kept whole, oldest first", () => {
+    const times = [1000, 6000, 11_000, 16_000, 21_000];
+    assert.deepEqual(runOf(times), historyOf(times));
+  });
+});
+
+describe("[R33] statsView history run keeps samples as they are", () => {
+  it("[R33] never adds, repeats or interpolates a sample", () => {
+    const view = runOf([0, 5000, 25_000, 30_000]);
+    assert.deepEqual(view, historyOf([25_000, 30_000]));
+    assert.equal(view?.inBps.length, 2);
+    assert.equal(view?.outBps.length, 2);
+  });
+
+  it("[R33] keeps the in and out of each kept sample unchanged", () => {
+    const history: Sample[] = [
+      { t: 0, in: 1, out: 2 },
+      { t: 30_000, in: 33, out: 44 },
+      { t: 35_000, in: 0, out: 0 },
+    ];
+    const view = statsView(stats({ history })).history;
+    assert.deepEqual(view, { stepSeconds: 5, inBps: [33, 0], outBps: [44, 0] });
+  });
+
+  it("[R33] the run rule uses the time of the samples, not their number", () => {
+    const times = [0, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10_000, 11_000];
+    assert.deepEqual(runOf(times), historyOf(times));
+  });
+});

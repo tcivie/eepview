@@ -13,6 +13,7 @@ import {
   recentWindow,
   sparkSeries,
 } from "./router-panel.ts";
+import { statsView } from "./router-stats.ts";
 
 const status = (patch: Partial<PanelStatusLike> = {}): PanelStatusLike => ({
   state: "ok",
@@ -244,5 +245,25 @@ describe("[R35] the tunnels line keeps the in and out form", () => {
     assert.equal(tunnelsLine({ ...NO_SPLIT, participatingTunnels: 345 }), line);
     const nulled = { ...NO_SPLIT, clientTunnels: null, exploratoryTunnels: null };
     assert.equal(tunnelsLine({ ...nulled, participatingTunnels: 345 }), line);
+  });
+});
+
+describe("[R35] the tunnels line of an i2pd answer", () => {
+  it("[R35] shows — in · — out · <participating> participating", () => {
+    // R30: i2pd gives no tunnels.in, out, client or exploratory; only participating.
+    const view = statsView({
+      version: null,
+      uptimeMs: 93_784_000,
+      uptimeResolutionMs: 1000,
+      networkStatus: "OK",
+      knownRouters: 3021,
+      floodfills: 812,
+      activePeers: null,
+      tunnels: { in: null, out: null, participating: 157, client: null, exploratory: null },
+      bandwidthBytesPerSecond: { in1s: 12_636, out1s: 5806, in5m: null, out5m: null },
+      tunnelBuildSuccessPercent: { exploratory: null, client: null, total: 42 },
+      history: [],
+    });
+    assert.equal(panelText(view).tunnels, "— in · — out · 157 participating");
   });
 });
