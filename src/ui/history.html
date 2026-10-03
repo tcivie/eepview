@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <script src="/theme-boot.js"></script>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <title>History</title>
+    <link rel="stylesheet" href="./theme.css" />
+    <link rel="stylesheet" href="./ui.css" />
+    <link rel="stylesheet" href="./pages.css" />
+    <script type="module" src="./history.ts"></script>
+  </head>
+  <body>
+    <div class="shell">
+      <aside class="rail">
+        <a class="brand" href="./home.html">
+          <svg class="mark" viewBox="0 0 28 28" aria-hidden="true">
+            <rect x="1.75" y="1.75" width="24.5" height="24.5" rx="8" />
+            <rect x="6.5" y="6.5" width="15" height="15" rx="5" />
+            <rect class="core" x="11" y="11" width="6" height="6" rx="2" />
+          </svg>
+          eepview
+        </a>
+        <nav class="rail-nav" aria-label="eepview pages">
+          <ul>
+            <li>
+              <a href="./home.html">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M4.5 11 12 4.5l7.5 6.5M6.5 9.5V19h11V9.5" />
+                </svg>
+                Home
+              </a>
+            </li>
+            <li>
+              <a href="./bookmarks.html">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M7 4.5h10v15l-5-3.5-5 3.5z" />
+                </svg>
+                Bookmarks
+              </a>
+            </li>
+            <li>
+              <a href="./history.html" aria-current="page">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <circle cx="12" cy="12" r="7.5" />
+                  <path d="M12 8v4l3 2" />
+                </svg>
+                History
+              </a>
+            </li>
+            <li>
+              <a href="./stats.html">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M3.5 12h4l2-5 4 10 2-5h5" />
+                </svg>
+                Network
+              </a>
+            </li>
+            <li>
+              <a href="./settings.html">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M4 7h10m4 0h2M4 17h4m4 0h8" />
+                  <circle cx="16" cy="7" r="2" />
+                  <circle cx="10" cy="17" r="2" />
+                </svg>
+                Settings
+              </a>
+            </li>
+          </ul>
+        </nav>
+        <p class="rail-foot">These pages live inside eepview. Opening them sends nothing.</p>
+      </aside>
+
+      <main class="content" id="main">
+        <header class="page-head">
+          <div>
+            <h1>History</h1>
+            <p>Kept on this computer only. Turn it off in Settings.</p>
+          </div>
+          <div class="actions">
+            <button
+              class="btn"
+              type="button"
+              id="clear-btn"
+              aria-expanded="false"
+              aria-controls="clear-panel"
+            >
+              Clear history
+            </button>
+          </div>
+        </header>
+
+        <form class="panel clear-panel" id="clear-panel" aria-labelledby="clear-title" hidden>
+          <h2 id="clear-title">Clear history</h2>
+          <fieldset class="clear-ranges">
+            <legend class="visually-hidden">Time range</legend>
+            <div class="segmented">
+              <label><input type="radio" name="range" value="hour" checked />Last hour</label>
+              <label><input type="radio" name="range" value="day" />Last day</label>
+              <label><input type="radio" name="range" value="week" />Last week</label>
+              <label><input type="radio" name="range" value="all" />Everything</label>
+            </div>
+          </fieldset>
+          <p class="clear-warning" id="clear-warning">
+            Pages you visited in the last hour are removed. This cannot be undone.
+          </p>
+          <div class="actions">
+            <button class="btn" type="button" id="clear-cancel">Cancel</button>
+            <button class="btn btn-danger-solid" type="submit" id="clear-confirm">Clear</button>
+          </div>
+        </form>
+
+        <div class="history-search">
+          <label class="visually-hidden" for="history-q">Search history</label>
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="11" cy="11" r="6" />
+            <path d="m16 16 4 4" />
+          </svg>
+          <input
+            class="input"
+            id="history-q"
+            type="search"
+            placeholder="Search titles and addresses"
+            autocomplete="off"
+            spellcheck="false"
+          />
+        </div>
+
+        <p class="notice-inline" id="history-off" hidden>
+          History is off. eepview does not record the pages you visit.
+          <a href="./settings.html#privacy">Turn it on</a>
+        </p>
+
+        <p class="visually-hidden" id="history-status" role="status" aria-live="polite"></p>
+        <div class="history" id="history" aria-busy="false"></div>
+        <p class="history-empty" id="history-empty" hidden></p>
+        <div class="history-sentinel" id="history-sentinel" aria-hidden="true"></div>
+      </main>
+    </div>
+
+    <template id="day-template">
+      <section class="history-day">
+        <h2 class="history-day-title">Day</h2>
+        <ul class="history-rows"></ul>
+      </section>
+    </template>
+
+    <template id="entry-template">
+      <li class="history-row">
+        <time class="history-time num">00:00</time>
+        <a class="history-link" href="./history.html">
+          <span class="history-title">Title</span>
+          <span class="history-host">host.i2p</span>
+        </a>
+        <button class="icon-btn icon-btn-danger" type="button" data-remove="" aria-label="Remove">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="m7 7 10 10M17 7 7 17" />
+          </svg>
+        </button>
+      </li>
+    </template>
+  </body>
+</html>
