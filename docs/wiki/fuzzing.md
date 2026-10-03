@@ -1,6 +1,6 @@
 # Fuzzing
 
-Status: in progress, PR number to be added.
+Status: in progress, in [#62](https://github.com/tcivie/eepview/pull/62).
 
 Fuzzing feeds random input to the parsers that decide what eepview may load. It checks that they never panic and never let a clearnet address through. It runs on every code change and once a day.
 
@@ -53,4 +53,4 @@ To replay a crash input: `cargo +nightly-2026-10-01 fuzz run <target> <file>`.
 
 ## History
 
-- 2026-10-03 — Add cargo-fuzz targets and ClusterFuzzLite — PR number to be added
+- 2026-10-03 — Add cargo-fuzz targets and ClusterFuzzLite — [#62](https://github.com/tcivie/eepview/pull/62)
