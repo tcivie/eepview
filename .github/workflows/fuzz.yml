@@ -32,6 +32,7 @@ jobs:
     timeout-minutes: 90
     permissions:
       contents: read # check out the repository
+      actions: read # list the earlier corpus and crash artifacts of the repository
     env:
       MODE: ${{ github.event_name == 'pull_request' && 'code-change' || 'batch' }}
       # Total time for all four targets: 5 minutes each on a pull request, 15 each in the batch.
@@ -43,12 +44,14 @@ jobs:
         with:
           language: rust
           sanitizer: address
+          github-token: ${{ github.token }}
       - name: Run the fuzz targets
         uses: google/clusterfuzzlite/actions/run_fuzzers@884713a6c30a92e5e8544c39945cd7cb630abcd1 # v1
         with:
           fuzz-seconds: ${{ env.FUZZ_SECONDS }}
           mode: ${{ env.MODE }}
           sanitizer: address
+          github-token: ${{ github.token }}
       - name: Upload the crash inputs
         if: failure() && steps.build.outcome == 'success'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
