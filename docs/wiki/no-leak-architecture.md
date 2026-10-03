@@ -14,6 +14,12 @@ Five independent layers keep the web engine away from the clearnet and from loca
 | L4 navigation guard | Only `http(s)://*.i2p` may load in a tab or open a new one. |
 | L5 WebRTC off | WebRTC sends UDP outside the proxy, so it is removed in every frame. |
 
+### The one clearnet action: Report a problem
+
+| Path | Why it is not a leak |
+|---|---|
+| "Open a GitHub issue" on `eepview://report` | It runs only after the user's click. eepview opens no socket: the system browser opens the page, outside eepview and outside I2P. The URL always starts with the fixed prefix `https://github.com/tcivie/eepview/issues/new`, and its text is the scrubbed preview the user just read. Only the `internal` webview may call it, and JavaScript gets no opener permission. See [Diagnostics and bug reports](diagnostics-and-bug-reports.md). |
+
 JavaScript is on. The layers sit below JavaScript, so they hold with it on. You can turn it off per site.
 
 ## How to use / run locally
@@ -28,4 +34,5 @@ JavaScript is on. The layers sit below JavaScript, so they hold with it on. You 
 
 ## History
 
+- 2026-10-03 — The report path, the only clearnet action, after a click — [#56](https://github.com/tcivie/eepview/pull/56)
 - 2026-10-03 — Five layers, the platform bridge and the architecture test — [#29](https://github.com/tcivie/eepview/pull/29)

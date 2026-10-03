@@ -3,6 +3,7 @@
 
 import "./boot.ts";
 import { announce, byId } from "./dom.ts";
+import { reportHref } from "./lib/report-page.ts";
 
 type Phase = "waiting" | "trying" | "gave-up";
 
@@ -75,6 +76,7 @@ function tick(): void {
   render();
 }
 
+byId<HTMLAnchorElement>("report-link").href = reportHref("router-down");
 byId("retry-now").addEventListener("click", () => {
   startTry();
   render();

@@ -130,6 +130,14 @@ function wireRouterPreview(): void {
   }
 }
 
+function wireDeleteLogs(): void {
+  byId("delete-logs").addEventListener("click", () => {
+    const task = () => call("diag_logs_delete", {});
+    runAndAnnounce(task, status(), "Diagnostics logs deleted.").catch(() => undefined);
+  });
+}
+
 wireTheme();
 wireSettings();
+wireDeleteLogs();
 wireRouterPreview();

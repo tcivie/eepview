@@ -10,12 +10,13 @@ use std::time::Duration;
 use tauri::{AppHandle, Runtime};
 
 use super::apply::with_core;
-use super::log;
 use super::state::{lock, now_ms, shared};
 use crate::core::router::status_of;
+use crate::diag::{self, Code, ErrorKind, Field, OpKind, RouterState};
 use crate::net::gatekeeper::Gatekeeper;
 use crate::net::loopback::LoopbackAddr;
 use crate::net::verify::{Verdict, verify};
+use crate::types::RouterStatus;
 
 const PERIOD: Duration = Duration::from_secs(5);
 
@@ -23,7 +24,7 @@ const PERIOD: Duration = Duration::from_secs(5);
 /// `EEPVIEW_PROXY`, which keeps the router "down" forever: fail closed).
 pub fn start<R: Runtime>(app: &AppHandle<R>, proxy: Result<LoopbackAddr, String>) {
     let app = app.clone();
-    spawn("router-watch", "router watcher", move || {
+    spawn("router-watch", move || {
         loop {
             tick(&app, &proxy, super::env::router_helper());
             thread::sleep(PERIOD);
@@ -53,16 +54,19 @@ fn sample<R: Runtime>(app: &AppHandle<R>, helper: Option<(LoopbackAddr, String)>
 /// VERIFY now, off the main thread (after `connection_resume()`).
 pub fn check_now<R: Runtime>(app: &AppHandle<R>, proxy: Result<LoopbackAddr, String>) {
     let app = app.clone();
-    spawn("router-check", "router check", move || {
+    spawn("router-check", move || {
         let verdict = proxy.map_or_else(Verdict::Down, verify);
         apply(&app, &verdict);
     });
 }
 
-/// Runs `f` on a named thread; `what` names it in the error line.
-fn spawn(name: &str, what: &str, f: impl FnOnce() + Send + 'static) {
+/// Runs `f` on a named thread.
+fn spawn(name: &str, f: impl FnOnce() + Send + 'static) {
     if let Err(e) = thread::Builder::new().name(name.into()).spawn(f) {
-        log::error(what, &e.to_string());
+        diag::event(
+            Code::ThreadFailed,
+            &[Field::Op(OpKind::Spawn), Field::Error(ErrorKind::from(&e))],
+        );
     }
 }
 
@@ -79,10 +83,29 @@ fn apply<R: Runtime>(app: &AppHandle<R>, verdict: &Verdict) {
         close_gate(app);
         false
     };
-    let proxy = lock(&shared(app).core).router().proxy.clone();
-    let status = status_of(verdict, &proxy, gate_ok);
-    log::router(status.state, status.detail.as_deref());
+    let before = lock(&shared(app).core).router().clone();
+    let status = status_of(verdict, &before.proxy, gate_ok);
+    record(&before, matches!(verdict, Verdict::Ok(_)), &status);
     with_core(app, |core| core.router_changed(status));
+}
+
+/// Records a change of the router state: the VERIFY result, then up or down.
+fn record(before: &RouterStatus, verified: bool, after: &RouterStatus) {
+    if before.state == after.state {
+        return;
+    }
+    let state = Field::Router(RouterState::from_contract(after.state));
+    if verified {
+        diag::event(Code::VerifyPassed, &[]);
+    } else {
+        diag::event(Code::VerifyFailed, &[state]);
+    }
+    let now_ok = after.state == "ok" && !before.paused;
+    if now_ok && !before.is_ok() {
+        diag::event(Code::RouterUp, &[state]);
+    } else if before.is_ok() && !now_ok {
+        diag::event(Code::RouterDown, &[state]);
+    }
 }
 
 fn ensure_gate<R: Runtime>(
@@ -105,7 +128,10 @@ fn ensure_gate<R: Runtime>(
             true
         }
         Err(e) => {
-            log::error("gatekeeper", &e.to_string());
+            diag::event(
+                Code::GatekeeperStartFailed,
+                &[Field::Error(ErrorKind::from(&e))],
+            );
             false
         }
     }
@@ -169,7 +195,7 @@ mod tests {
     #[test]
     fn spawn_runs_the_closure() {
         let (tx, rx) = std::sync::mpsc::channel();
-        spawn("test-spawn", "test", move || tx.send(7).unwrap());
+        spawn("test-spawn", move || tx.send(7).unwrap());
         assert_eq!(rx.recv().unwrap(), 7);
     }
 }

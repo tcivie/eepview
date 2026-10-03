@@ -19,6 +19,7 @@ use std::time::Duration;
 use super::http::{self, Head, Plan, Refusal};
 use super::loopback::LoopbackAddr;
 use super::verify::VerifiedUpstream;
+use crate::diag::{self, Code, ErrorKind, Field};
 
 /// Most connections handled at once.
 const MAX_CONNECTIONS: usize = 256;
@@ -147,18 +148,26 @@ fn accept_loop(listener: &TcpListener, shared: &Shared) {
         if shared.active.fetch_add(1, Ordering::SeqCst) >= shared.limit {
             shared.active.fetch_sub(1, Ordering::SeqCst);
             let mut stream = stream;
+            refused(Refusal::Busy);
             let _ = stream.write_all(&Refusal::Busy.response());
             continue;
         }
         let active = Arc::clone(&shared.active);
         let shared = shared.clone();
         let spawned = thread::Builder::new().spawn(move || {
-            let _ = handle(stream, &shared);
+            serve(stream, &shared);
             shared.active.fetch_sub(1, Ordering::SeqCst);
         });
         if spawned.is_err() {
             active.fetch_sub(1, Ordering::SeqCst);
         }
+    }
+}
+
+/// Handles one connection; a failed one records `page-load-failed` with its error kind.
+fn serve(client: TcpStream, shared: &Shared) {
+    if let Err(e) = handle(client, shared) {
+        diag::event(Code::PageLoadFailed, &[Field::Error(ErrorKind::from(&e))]);
     }
 }
 
@@ -187,7 +196,20 @@ fn handle(mut client: TcpStream, shared: &Shared) -> io::Result<()> {
     }
 }
 
+/// Records a refusal by its reason kind only.
+fn refused(reason: Refusal) {
+    diag::event(Code::GatekeeperRefused, &[Field::Refuse(reason.reason())]);
+}
+
+/// Records a router error page (5xx) by its status code only.
+fn upstream_status(head: &Head) {
+    if let Some(status) = http::status_code(&head.start).filter(|s| *s >= 500) {
+        diag::event(Code::PageLoadFailed, &[Field::Status(status)]);
+    }
+}
+
 fn refuse(client: &mut TcpStream, reason: Refusal) -> io::Result<()> {
+    refused(reason);
     client.write_all(&reason.response())?;
     client.flush()
 }
@@ -260,6 +282,7 @@ fn forward(client: &mut TcpStream, rest: &[u8], req: &Request, shared: &Shared) 
     let Some((head, body)) = read_head(&mut upstream)? else {
         return refuse(client, Refusal::Upstream);
     };
+    upstream_status(&head);
     client.write_all(&http::rewrite_response(head))?;
     client.write_all(&body)?;
     io::copy(&mut upstream, client)?;

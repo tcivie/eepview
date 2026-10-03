@@ -3,6 +3,7 @@
 
 import "./boot.ts";
 import { announce, byId } from "./dom.ts";
+import { reportHref } from "./lib/report-page.ts";
 
 const SAMPLE_REFUSED = "https://www.example.com/account/login?next=%2Fsettings&lang=en";
 const MAX_SHOWN = 2048;
@@ -24,6 +25,7 @@ async function copyAddress(address: string): Promise<void> {
 
 const address = refusedAddress();
 byId("refused-url").textContent = address;
+byId<HTMLAnchorElement>("report-link").href = reportHref("blocked");
 byId("back-btn").addEventListener("click", () => window.history.back());
 byId("copy-btn").addEventListener("click", () => {
   copyAddress(address).catch(() => undefined);

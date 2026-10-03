@@ -12,8 +12,9 @@ use tauri::{AppHandle, Emitter, Manager, Runtime, Url, Webview};
 
 use super::content::ContentWebview;
 use super::state::{lock, shared};
-use super::{engine, log, view};
+use super::{engine, view};
 use crate::core::{Core, Effect, Event, Load, WebOp};
+use crate::diag::{self, Code, ErrorKind, Field, OpKind, TabKind};
 use crate::hover::SHOW_DELAY_MS;
 
 /// The webviews that receive contract events.
@@ -36,7 +37,13 @@ pub fn later<R: Runtime>(app: &AppHandle<R>, fx: Vec<Effect>) {
     outside(move || {
         let runner = handle.clone();
         if let Err(e) = runner.run_on_main_thread(move || apply(&handle, fx)) {
-            log::error("main thread", &e.to_string());
+            diag::event(
+                Code::ThreadFailed,
+                &[
+                    Field::Op(OpKind::MainThread),
+                    Field::Error(ErrorKind::from(&e)),
+                ],
+            );
         }
     });
 }
@@ -47,7 +54,10 @@ pub fn later<R: Runtime>(app: &AppHandle<R>, fx: Vec<Effect>) {
 /// for that lock forever. From another thread the call goes through the event loop instead.
 pub fn outside(f: impl FnOnce() + Send + 'static) {
     if let Err(e) = thread::Builder::new().name("webview-call".into()).spawn(f) {
-        log::error("thread", &e.to_string());
+        diag::event(
+            Code::ThreadFailed,
+            &[Field::Op(OpKind::Spawn), Field::Error(ErrorKind::from(&e))],
+        );
     }
 }
 
@@ -173,7 +183,10 @@ fn create<R: Runtime>(app: &AppHandle<R>, load: &Load) {
             lock(&state.labels).insert(load.tab, label);
             view::raise_chrome(app, &window);
         }
-        Err(e) => log::error("content webview", &e.to_string()),
+        Err(e) => diag::event(
+            Code::WebviewCreateFailed,
+            &[Field::Tab(TabKind::Web), Field::Error(ErrorKind::from(&e))],
+        ),
     }
 }
 

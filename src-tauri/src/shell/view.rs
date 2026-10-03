@@ -73,7 +73,6 @@ pub fn sync<R: Runtime>(app: &AppHandle<R>) {
     for label in labels.iter().filter(|l| Some(*l) != active.as_ref()) {
         hide(app, label);
     }
-    super::log::view(&format!("{view:?} active={active:?} labels={labels:?}"));
     match (view, active) {
         (View::Web(_), Some(label)) => show(app, &label, content),
         (View::Internal(page), _) => show_internal(app, &page, content),

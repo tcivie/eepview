@@ -46,9 +46,29 @@ const COMMANDS: &[&str] = &[
     "platform",
     "chrome_insets",
     "window_fullscreen",
+    "report_preview",
+    "report_open",
+    "diag_crash_status",
+    "diag_crash_dismiss",
+    "diag_logs_delete",
 ];
 
+/// The short git commit, for the report (`EEPVIEW_COMMIT`); `unknown` outside a git tree.
+fn commit() -> String {
+    std::process::Command::new("git")
+        .args(["rev-parse", "--short=12", "HEAD"])
+        .output()
+        .ok()
+        .filter(|o| o.status.success())
+        .and_then(|o| String::from_utf8(o.stdout).ok())
+        .map(|s| s.trim().to_owned())
+        .filter(|s| !s.is_empty() && s.bytes().all(|b| b.is_ascii_hexdigit()))
+        .unwrap_or_else(|| "unknown".to_owned())
+}
+
 fn main() {
+    println!("cargo:rustc-env=EEPVIEW_COMMIT={}", commit());
+    println!("cargo:rerun-if-changed=../.git/HEAD");
     let manifest = tauri_build::AppManifest::new().commands(COMMANDS);
     // tauri-build would embed the Windows manifest into the app binary only; test binaries
     // then fail to start (STATUS_ENTRYPOINT_NOT_FOUND). Embed one manifest everywhere.

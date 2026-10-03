@@ -27,6 +27,7 @@ use tauri::{
 use super::apply::{self, with_core};
 use super::state::{lock, now_ms, shared};
 use crate::core::{Core, Load};
+use crate::diag::{self, Code, ErrorKind, Field, OpKind};
 use crate::layout::Rect;
 use crate::nav;
 use crate::net::gatekeeper::Gatekeeper;
@@ -138,10 +139,22 @@ fn load_after_rules<R: Runtime>(
         // Linux, Windows and a cached macOS rule list call this inside `with_webview`.
         Ok(()) => apply::outside(move || {
             if let Err(e) = webview.navigate(url) {
-                super::log::error("first load", &e.to_string());
+                diag::event(
+                    Code::EngineCallFailed,
+                    &[
+                        Field::Op(OpKind::FirstLoad),
+                        Field::Error(ErrorKind::from(&e)),
+                    ],
+                );
             }
         }),
-        Err(e) => super::log::error("engine filter, page not loaded", &e),
+        Err(_) => diag::event(
+            Code::EngineCallFailed,
+            &[
+                Field::Op(OpKind::EngineFilter),
+                Field::Error(ErrorKind::Platform),
+            ],
+        ),
     })
 }
 
@@ -214,7 +227,6 @@ fn download<R: Runtime>(app: &AppHandle<R>, event: &DownloadEvent<'_>) -> bool {
 
 fn page_load<R: Runtime>(app: &AppHandle<R>, tab: u32, event: PageLoadEvent, url: &Url) {
     let url = url.to_string();
-    super::log::page(tab, matches!(event, PageLoadEvent::Started), &url);
     with_core(app, |core| match event {
         PageLoadEvent::Started => core.page_started(tab, &url),
         PageLoadEvent::Finished => core.page_finished(tab, &url, now_ms()),

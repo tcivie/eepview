@@ -1,6 +1,6 @@
 # Diagnostics and bug reports
 
-Status: in progress on branch `feat/diagnostics-report`.
+Status: in progress in [#56](https://github.com/tcivie/eepview/pull/56).
 
 eepview keeps a small diagnostics log on your computer. When something goes wrong, you can turn that log into a GitHub issue. The app never sends the log. You send it yourself, from your normal web browser, after you read it.
 
@@ -28,7 +28,7 @@ No URL, host, path, query, page title, `.i2p` or b32 name, bookmark, history ent
 
 The folder holds `eepview.log`, `eepview.1.log` and `eepview.2.log` (512 KB each at most), and a `crashed` marker after a crash. Report files go to your Downloads folder.
 
-To delete the logs, open Settings > Privacy > Delete diagnostics logs. Or delete the folder by hand while eepview is closed.
+To delete the logs, open Settings > Privacy > Delete diagnostics logs. This also deletes the `crashed` marker. Report files you saved stay in Downloads: delete them there. Or delete the folder by hand while eepview is closed.
 
 ## How a report works
 
@@ -103,12 +103,14 @@ The requirement tests are written from this section. Names in `code` are the int
 - R2.1 `Ring::new(capacity)`, `Ring::push(Record)`, `Ring::len()`, `Ring::is_empty()`, `Ring::last(n) -> Vec<Record>` (oldest first), `Ring::clear()`. `Ring::CAPACITY` is 2000. A full ring drops its oldest record.
 - R2.2 `LogFiles::new(dir: PathBuf)` uses `LogFiles::MAX_BYTES` (524288) and `LogFiles::FILES` (3). `LogFiles::with_limit(dir, max_bytes)` sets another size. `append(&mut self, line: &str) -> io::Result<()>` writes the line and `\n` to `dir/eepview.log`, and creates `dir` when it is missing.
 - R2.3 Rotation: when the current file is not empty and the line would make it larger than the limit, `eepview.1.log` becomes `eepview.2.log` (the old one is lost), `eepview.log` becomes `eepview.1.log`, and the line starts a new `eepview.log`. There are never more than 3 log files. `LogFiles::paths()` lists the files that exist, newest first. `LogFiles::delete_all()` removes them all.
-- R2.4 `diag::init(log_dir: &Path)` starts writing to `LogFiles` in that folder. Events before `init` stay in the ring. `diag::recent(n) -> Vec<Record>` reads the ring. `diag::delete_logs() -> io::Result<()>` empties the ring and deletes the files.
+- R2.4 `diag::init(log_dir: &Path)` starts writing to `LogFiles` in that folder. Events before `init` stay in the ring. `diag::recent(n) -> Vec<Record>` reads the ring. `diag::delete_logs() -> io::Result<()>` empties the ring, and deletes the files and the crash marker. No file handle stays open between two lines, so the delete also works on Windows while eepview runs.
+- R2.6 `diag::default_log_dir(identifier: &str) -> Option<PathBuf>` gives the app log folder without Tauri, the same folder as `app_log_dir()`: macOS `$HOME/Library/Logs/<identifier>`, Windows `%LOCALAPPDATA%\<identifier>\logs`, Linux `$XDG_DATA_HOME/<identifier>/logs` (or `$HOME/.local/share/<identifier>/logs`). `run()` installs the panic hook and calls `init` with it before the Tauri builder, so `StartFailed` and an early panic reach the disk.
+- R2.7 `LogFiles::append` writes each line with one unbuffered write, so a line is on disk before a `panic = "abort"` ends the process.
 - R2.5 Nothing is ever sent. The diag module opens no socket.
 
 ### R3 Crashes
 
-- R3.1 `diag::install_panic_hook()` sets a hook that records `Code::Panic` with `diag::panic_fields(file, line, thread)` and writes the crash marker. It never records the panic message.
+- R3.1 `diag::install_panic_hook()` sets a hook that records `Code::Panic` with `diag::panic_fields(file, line, thread)` and writes the crash marker. It never records the panic message. The hook takes the log lock with `try_lock`; when this thread already holds it, or it is poisoned and held, the hook skips the record and does not block.
 - R3.2 `diag::panic_fields(file: &str, line: u32, thread: Option<&str>) -> Vec<Field>` is `[Source(SourceFile::from_path(file)), Line(line), Thread(ThreadName::of(thread))]`.
 - R3.3 `diag::CRASH_MARKER` is `crashed`. `diag::write_crash_marker(dir: &Path) -> io::Result<()>` creates `dir/crashed` (empty). `diag::take_crash_marker(dir: &Path) -> bool` says whether it existed and removes it.
 - R3.4 `diag::init` takes the marker. `diag::crashed_last_run() -> bool` then says whether it existed, until `diag::dismiss_crash()`.
@@ -122,13 +124,14 @@ The requirement tests are written from this section. Names in `code` are the int
   - a name that ends in `.i2p` (any case), with any port, path or query after it;
   - a host name: two or more dot-separated labels whose last label is 2 to 24 letters, except a file name that ends in `.rs`, `.txt`, `.log`, `.json`, `.html`, `.ts`, `.js`, `.css`, `.md`, `.toml`, `.yml` or `.plist`;
   - a run of 52 or more base32 characters (`a-z`, `2-7`, any case);
+  - a run of 44 or more base64 characters (`A-Z a-z 0-9 + / = - ~`) with both upper-case and lower-case letters: an I2P destination (about 516) or a router hash (44);
   - an IPv4 address (four numbers from 0 to 255) that is not part of a longer dotted run;
   - an IPv6 address, also inside `[ ]` and with a zone;
   - an email address;
-  - `/Users/<name>`, `/home/<name>` and `<drive>:\Users\<name>`, the name included;
+  - `/Users/<name>`, `/home/<name>`, `<drive>:\Users\<name>` and `<drive>:/Users/<name>` (also after `\\?\`), the drive letter and the name included;
   - `user` and `host` (case does not matter, whole words only, 3 characters or more). For a host name with dots, its first label is removed too.
 - R4.3 Version numbers such as `0.1.0`, `16.0`, `621.1.15.10.7` and `10.0.26100`, and times such as `12:00:00` and `2026-10-03T12:00:00Z`, stay.
-- R4.4 Property: for any text, an injected URL, IPv4 address, IPv6 address, `.i2p` name, email address or home folder path, set apart by spaces, is not in the output.
+- R4.4 Property: for any text, an injected URL, IPv4 address, IPv6 address, `.i2p` name, email address, home folder path or base64 destination, set apart by spaces, is not in the output.
 
 ### R5 System info (`diag::sysinfo`)
 
@@ -151,7 +154,7 @@ The requirement tests are written from this section. Names in `code` are the int
 ### R6 Report (`diag::report`)
 
 - R6.1 `ReportKind::from_param(&str)`: `crash`, `blocked`, `router-down`, `load-failed`, anything else `General`. `ReportKind::title()`: `Problem report`, `Crash report`, `Blocked page report`, `Router down report`, `Page load report` (for `General`, `Crash`, `Blocked`, `RouterDown`, `LoadFailed`).
-- R6.2 `Report { kind: ReportKind, description: String, info: SystemInfo, log: Vec<String>, include_log: bool }`. `log` holds formatted lines, oldest first.
+- R6.2 `Report { kind: ReportKind, description: String, info: SystemInfo, log: Vec<String>, include_log: bool }`. `log` holds report lines, oldest first. The shell makes them with `diag::report_lines(&[Record]) -> Vec<String>`: `+<minutes>m <LEVEL> <code>` and the fields, where the minutes count from the oldest record. A report never holds a clock time, so nobody can match a log line to a request seen at that second. The local files keep the UTC time.
 - R6.3 `report::text(&Report) -> String` is the preview and the file. It is scrubbed (R4), and is:
 
 ```
@@ -168,9 +171,13 @@ Diagnostics log (last <n> events):
   The log part is left out when `include_log` is false. `report::PREVIEW_EVENTS` is 200: the shell passes at most that many lines.
 - R6.4 `report::issue_url(&Report) -> (String, bool)` gives the URL and whether the log was trimmed. The URL is `report::ISSUE_PREFIX` (`https://github.com/tcivie/eepview/issues/new`), then `?template=bug.yml&labels=bug&title=…&version=…&os=…&what-happened=…&diagnostics=…`, in that order. `version` is `<version> (<commit>)`, `os` is `<os> (<arch>)`, `what-happened` is the description, `diagnostics` is the `System:` part and the log part of R6.3. Every value is scrubbed, then encoded with `report::percent_encode`.
 - R6.5 `report::percent_encode(&str) -> String` keeps `A-Z a-z 0-9 - _ . ~` and writes every other UTF-8 byte as `%XX` (upper-case hex). A space is `%20`.
-- R6.6 The URL is at most `report::MAX_URL` (8000) characters. The oldest log lines go first. When any line goes, the line `report::TRIM_NOTE` (`[log trimmed, the full log is in the attached file]`) is the first line of the log part. When the URL is still too long without log lines, the description is cut.
+- R6.6 The URL is at most `report::MAX_URL` (8000) characters. The oldest log lines go first. When any line goes, the line `report::TRIM_NOTE` (`[log trimmed, the full log is in the attached file]`) is the first line of the log part. When the URL is still too long without log lines, the description is cut: on the raw text, at a char boundary, before `percent_encode`, with `…` at the end.
 - R6.7 `report::is_issue_url(&str) -> bool` is true only for `ISSUE_PREFIX` alone or followed by `?`.
 - R6.8 `report::file_name(secs: u64) -> String` is `eepview-report-<YYYY-MM-DD>T<HH-MM-SS>Z.txt`, for example `eepview-report-2026-10-03T12-00-00Z.txt`.
+
+### R6b Issue form
+
+- R6.9 `.github/ISSUE_TEMPLATE/bug.yml` has the ids `version`, `os` (inputs), `router` (dropdown, not required), `what-happened` (textarea, required), `steps` (textarea, not required) and `diagnostics` (textarea, `render: text`, not required). So every prefilled value of R6.4 lands in a field, and no required field is left empty that the URL cannot fill.
 
 ### R7 IPC commands
 
@@ -220,6 +227,7 @@ Only the `internal` webview may call these (capability `capabilities/report.json
 
 ### R11 UI
 
+- R11.0 `report` is in `nav::INTERNAL_PAGES`, so `eepview://report` and `src/ui/report.html` load in the `internal` webview.
 - R11.1 The page `eepview://report` (`src/ui/report.html`) has a description box (empty, placeholder "What did you do, and what went wrong? Do not include site addresses."), a read-only preview, the checkbox "Include the diagnostics log" (on), the note "This opens GitHub in your normal web browser, outside I2P. GitHub sees your IP address and your GitHub account. Nothing is sent until you submit the issue on GitHub.", and the button "Open a GitHub issue". After a click it says "Drag this file into the GitHub issue to attach it."
 - R11.2 `src/ui/lib/report-page.ts` exports:
   - `reportKind(search: string): "general" | "crash" | "blocked" | "router-down" | "load-failed"`;
@@ -236,4 +244,4 @@ Only the `internal` webview may call these (capability `capabilities/report.json
 
 ## History
 
-- 2026-10-03 — Spec — branch `feat/diagnostics-report`
+- 2026-10-03 — Diagnostics log and report flow — [#56](https://github.com/tcivie/eepview/pull/56)
