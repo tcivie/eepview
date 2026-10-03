@@ -7,12 +7,13 @@ Working rules for any human or AI agent on this repo.
 - Start one branch per unit of work from main.
 - Commit small after each working change.
 - Write Conventional Commits.
-- Open a PR to main. Enable squash auto-merge: `gh pr merge --auto --squash`.
+- Open a PR to main. Turn on squash auto-merge as soon as the PR is ready: `gh pr merge <n> --squash --auto`.
 - Never use `--admin`. Never bypass the ruleset. Never use `--no-verify`.
-- Keep the branch up to date with main.
-- Before you finish, fix and resolve every review thread. Zero unresolved.
-- Before you finish, make sure every required check is green.
-- Own your PR until it is merged. Do not stop while it is open: update the branch when it is behind, fix failing checks, and fix and resolve every review thread. Spike PRs are the exception: they close with a comment that says where the findings live.
+- A PR does not need to be up to date with main. Merge main in only when the PR has a conflict (DIRTY).
+- Resolve review threads while CI runs, not after. Fix or answer each thread, then resolve it. Auto-merge does not fire while a thread is open. Zero unresolved.
+- When any check turns red, fix it at once. Do not wait for the other checks to finish.
+- If a check is red on main too, the cause is on main. Report it; do not change the gate in your PR.
+- You own your PR until it is MERGED. Do not stop while it is open: fix failing checks and resolve every review thread. Spike PRs are the exception: they close with a comment that says where the findings live.
 
 ## Quality
 
