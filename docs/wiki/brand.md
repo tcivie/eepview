@@ -28,7 +28,7 @@ Open a preview page with `#light` or `#dark` to force a theme.
 - The app copy of the mark lives in `src/ui/assets/`. It is the same file as `assets/brand/eepview-mark-small.svg`, so change both together.
 - In dark mode a 1 px ring (`--color-mark-ring`, white at 12%) separates the green body from the dark surface. In light mode the ring is transparent.
 
-Added in [#BRANDPR](https://github.com/tcivie/eepview/pull/BRANDPR).
+Added in [#61](https://github.com/tcivie/eepview/pull/61).
 
 ## Screenshots
 
@@ -163,4 +163,4 @@ All variants are the same artwork. None is redrawn.
 - 2026-10-03 — Add the logo, the app icons and the brand assets — [#11](https://github.com/tcivie/eepview/pull/11)
 - 2026-10-03 — One color source, the palette check — [#38](https://github.com/tcivie/eepview/pull/38)
 - 2026-10-03 — Neutral surfaces, green only as the accent — [#51](https://github.com/tcivie/eepview/pull/51)
-- 2026-10-03 — The bulb mark in the brand slot and the favicon; scripts/screenshots.sh — [#BRANDPR](https://github.com/tcivie/eepview/pull/BRANDPR)
+- 2026-10-03 — The bulb mark in the brand slot and the favicon; scripts/screenshots.sh — [#61](https://github.com/tcivie/eepview/pull/61)
