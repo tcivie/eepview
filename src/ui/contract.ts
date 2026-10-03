@@ -127,6 +127,7 @@ export interface Events {
   shortcut: { action: string };
   toast: Toast;
   "link-hover": { text: string; blocked: boolean };
+  "fullscreen-changed": boolean;
 }
 
 export type CommandName = keyof Commands;
