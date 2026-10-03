@@ -98,7 +98,8 @@ impl Core {
     }
 
     /// Clears per-tab UI state (find, hover) before the active tab changes.
-    fn leave_tab(&mut self) -> Vec<Effect> {
+    pub(super) fn leave_tab(&mut self) -> Vec<Effect> {
+        self.link_run = None;
         let mut fx = Vec::new();
         if let Some(find) = self.find.take() {
             fx.push(Effect::Web(WebOp::Engine(find.tab, EngineOp::FindClear)));

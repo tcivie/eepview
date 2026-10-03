@@ -7,7 +7,10 @@ use tauri::Url;
 
 use super::{Core, Effect, EngineOp, Event, WebOp};
 use crate::hover;
-use crate::nav::{guard, host_of, internal_from_file, internal_with, is_allowed, is_web};
+use crate::input::Disposition;
+use crate::nav::{
+    guard, host_of, internal_from_file, internal_with, is_allowed, is_allowed_web, is_web,
+};
 use crate::tabs::Place;
 
 /// Titles of the error pages of the I2P router proxy.
@@ -154,10 +157,48 @@ impl Core {
     /// A page asked for a new window (`target=_blank`, `window.open`): a new tab, same guard.
     pub fn new_window(&mut self, url: &Url) -> Vec<Effect> {
         if !guard(url) || url.as_str().starts_with("about:") {
-            let shown = hover::link(url.as_str()).map_or_else(String::new, |t| t.text);
-            return vec![Self::toast("warn", shown)];
+            return Self::refused_tab(url);
         }
         self.tab_new(Some(url.as_str()), Place::AfterActive).1
+    }
+
+    /// A link the user opened from a page or the context menu (L1 to L13). Only an I2P URL
+    /// passes (L9); a new tab opens right after its opener, or after the last tab of the run.
+    pub fn open_link(&mut self, url: &Url, how: Disposition) -> Vec<Effect> {
+        if !is_allowed_web(url) {
+            return Self::refused_tab(url);
+        }
+        match how {
+            Disposition::CurrentTab => self.navigate(url.as_str()).1,
+            Disposition::NewBackgroundTab => self.link_tab(url, false),
+            Disposition::NewForegroundTab => self.link_tab(url, true),
+        }
+    }
+
+    fn link_tab(&mut self, url: &Url, foreground: bool) -> Vec<Effect> {
+        let opener = self.tabs.active_id();
+        let after = self
+            .link_run
+            .filter(|(o, last)| *o == opener && self.tabs.get(*last).is_some())
+            .map_or(opener, |(_, last)| last);
+        let mut fx = if foreground {
+            self.leave_tab()
+        } else {
+            Vec::new()
+        };
+        let id = self
+            .tabs
+            .open(url.as_str(), Place::After(after), foreground);
+        fx.extend(self.go_web(id, url.as_str()));
+        fx.push(Effect::Emit(Event::TabsChanged));
+        self.link_run = Some((opener, id));
+        fx
+    }
+
+    /// The warning for a tab that may not open: the address, shortened, or nothing.
+    fn refused_tab(url: &Url) -> Vec<Effect> {
+        let shown = hover::link(url.as_str()).map_or_else(String::new, |t| t.text);
+        vec![Self::toast("warn", shown)]
     }
 
     /// A page tried to download a file. Downloads are refused for now.

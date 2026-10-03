@@ -194,6 +194,8 @@ pub struct Core {
     pointed: Option<Url>,
     /// The tab whose next commit takes keyboard focus: its navigation came from the address bar.
     focus_on_commit: Option<u32>,
+    /// The run of link tabs (L8): the opener and the last tab it opened. A tab change ends it.
+    link_run: Option<(u32, u32)>,
 }
 
 impl Core {
@@ -230,6 +232,7 @@ impl Core {
             stats: StatsHistory::default(),
             pointed: None,
             focus_on_commit: None,
+            link_run: None,
         };
         // Effects are dropped: no UI listens yet, and a save error shows on the next save.
         let _ = core.sweep_icons();

@@ -54,6 +54,8 @@ pub enum Place {
     End,
     /// Right after the active tab (links that open a new tab).
     AfterActive,
+    /// Right after this tab (the next tab of a run of links, L8); the end when it is gone.
+    After(u32),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -85,6 +87,7 @@ impl Tabs {
             Place::AfterActive => self
                 .index_of(self.active)
                 .map_or(self.list.len(), |i| i + 1),
+            Place::After(id) => self.index_of(id).map_or(self.list.len(), |i| i + 1),
         };
         self.insert(url, index, activate)
     }

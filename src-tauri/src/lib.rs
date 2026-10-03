@@ -5,12 +5,14 @@
 //!
 //! Pure modules (no Tauri runtime, unit-tested): [`core`], [`icons`], [`nav`], [`net`],
 //! [`session`], [`tabs`], [`store`], [`suggest`], [`shortcuts`], [`layout`], [`popup`], [`hover`],
-//! [`types`].
+//! [`types`], [`input`], [`context_menu`].
 //! Tauri glue: [`shell`].
 
+pub mod context_menu;
 pub mod core;
 pub mod hover;
 pub mod icons;
+pub mod input;
 pub mod layout;
 pub mod nav;
 pub mod net;
