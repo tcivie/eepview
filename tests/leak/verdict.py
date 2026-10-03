@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 The eepview contributors
+# SPDX-License-Identifier: MIT
+
 """Turn the event log and the strace log of one run into result rows.
 
 A row is (check, result, detail). LEAK and FAIL rows fail the test. pass, info and warn do not.

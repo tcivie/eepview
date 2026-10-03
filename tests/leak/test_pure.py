@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 The eepview contributors
+# SPDX-License-Identifier: MIT
+
 """Unit tests for the pure parts of the leak harness: host rules and the strace parser.
 
 Run with: python3 -m unittest discover -s tests/leak

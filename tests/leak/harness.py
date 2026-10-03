@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: 2026 The eepview contributors
+# SPDX-License-Identifier: MIT
 """eepview leak test. Runs the real eepview binary against a fake I2P proxy and canaries.
 
 Exit code 0 only when every canary got zero hits, the fake upstream saw only `.i2p` hosts,

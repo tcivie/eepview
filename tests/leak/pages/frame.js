@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The eepview contributors
+// SPDX-License-Identifier: MIT
+
 // The cross-origin frame: WebRTC and a loopback fetch from a second .i2p origin.
 const { cfg, report, probe, webrtc } = window.leak;
 

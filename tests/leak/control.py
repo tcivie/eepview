@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 The eepview contributors
+# SPDX-License-Identifier: MIT
+
 """Negative control: prove that the leak test CAN fail.
 
 The harness itself leaks on purpose, with no eepview involved: it connects straight to every

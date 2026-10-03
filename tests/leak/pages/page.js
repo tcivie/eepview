@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The eepview contributors
+// SPDX-License-Identifier: MIT
+
 // Every vector from ADR 0001. Each one must be stopped by eepview; none may reach a canary
 // or a clearnet host. Navigation vectors run last, because a leak there leaves the page.
 const { cfg, report, probe, sleep, webrtc } = window.leak;

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The eepview contributors
+// SPDX-License-Identifier: MIT
+
 // Shared by the page and the cross-origin frame. Every report goes back to /report on the
 // same .i2p host, so it travels through the gatekeeper like any page request.
 // Wrapped so its names do not clash with the page script in the shared global scope.

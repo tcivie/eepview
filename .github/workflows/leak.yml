@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 The eepview contributors
+# SPDX-License-Identifier: MIT
+
 name: leak
 
 # The permanent leak test from docs/wiki/adr-0001-no-leak-architecture.md. It runs the real

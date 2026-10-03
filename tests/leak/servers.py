@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 The eepview contributors
+# SPDX-License-Identifier: MIT
+
 """Detectors for the leak test: a fake upstream I2P proxy and the canaries.
 
 The fake upstream acts like an I2P HTTP proxy with no outproxy. It never connects anywhere.
