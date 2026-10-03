@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Settings</title>
+    <link rel="stylesheet" href="./theme.css" />
+    <link rel="stylesheet" href="./ui.css" />
+    <link rel="stylesheet" href="./pages.css" />
+    <script type="module" src="./settings.ts" blocking="render"></script>
+  </head>
+  <body>
+    <div class="shell">
+      <aside class="rail">
+        <a class="brand" href="./home.html">
+          <svg class="mark" viewBox="0 0 28 28" aria-hidden="true">
+            <rect x="1.75" y="1.75" width="24.5" height="24.5" rx="8" />
+            <rect x="6.5" y="6.5" width="15" height="15" rx="5" />
+            <rect class="core" x="11" y="11" width="6" height="6" rx="2" />
+          </svg>
+          eepview
+        </a>
+        <nav class="rail-nav" aria-label="eepview pages">
+          <ul>
+            <li>
+              <a href="./home.html">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M4.5 11 12 4.5l7.5 6.5M6.5 9.5V19h11V9.5" />
+                </svg>
+                Home
+              </a>
+            </li>
+            <li>
+              <a href="./bookmarks.html">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M7 4.5h10v15l-5-3.5-5 3.5z" />
+                </svg>
+                Bookmarks
+              </a>
+            </li>
+            <li>
+              <a href="./stats.html">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M3.5 12h4l2-5 4 10 2-5h5" />
+                </svg>
+                Network
+              </a>
+            </li>
+            <li>
+              <a href="./settings.html" aria-current="page">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M4 7h10m4 0h2M4 17h4m4 0h8" />
+                  <circle cx="16" cy="7" r="2" />
+                  <circle cx="10" cy="17" r="2" />
+                </svg>
+                Settings
+              </a>
+            </li>
+          </ul>
+        </nav>
+        <p class="rail-foot">These pages live inside eepview. Opening them sends nothing.</p>
+      </aside>
+
+      <main class="content" id="main">
+        <header class="page-head">
+          <div>
+            <h1>Settings</h1>
+            <p>Changes save as you make them.</p>
+          </div>
+        </header>
+
+        <nav class="toc" aria-label="Settings sections">
+          <a href="#appearance">Appearance</a>
+          <a href="#homepage">Homepage</a>
+          <a href="#privacy">Privacy</a>
+          <a href="#router">Router</a>
+          <a href="#about">About</a>
+        </nav>
+
+        <p class="visually-hidden" id="settings-status" role="status" aria-live="polite"></p>
+
+        <section class="section settings-group" id="appearance" aria-labelledby="appearance-title">
+          <h2 id="appearance-title">Appearance</h2>
+          <div class="panel settings-panel">
+            <fieldset class="setting">
+              <legend class="setting-label">Theme</legend>
+              <p class="setting-hint">System follows the light or dark setting of your computer.</p>
+              <div class="segmented setting-control" id="theme-choice">
+                <label><input type="radio" name="theme" value="system" />System</label>
+                <label><input type="radio" name="theme" value="light" />Light</label>
+                <label><input type="radio" name="theme" value="dark" />Dark</label>
+              </div>
+            </fieldset>
+          </div>
+        </section>
+
+        <section class="section settings-group" id="homepage" aria-labelledby="homepage-title">
+          <h2 id="homepage-title">Homepage</h2>
+          <div class="panel settings-panel">
+            <fieldset class="setting setting-stack">
+              <legend class="setting-label">When eepview opens, show</legend>
+              <div class="radio-list">
+                <label class="check">
+                  <input type="radio" name="homepage" value="home" checked />
+                  <span class="check-text">The eepview home page</span>
+                  <span class="check-hint">Your bookmarks and the router status.</span>
+                </label>
+                <label class="check">
+                  <input type="radio" name="homepage" value="custom" />
+                  <span class="check-text">An eepsite</span>
+                </label>
+              </div>
+              <div class="field homepage-field">
+                <label class="field-label" for="homepage-url">Eepsite address</label>
+                <input
+                  class="input mono"
+                  id="homepage-url"
+                  value="notbob.i2p"
+                  spellcheck="false"
+                  disabled
+                />
+              </div>
+            </fieldset>
+          </div>
+        </section>
+
+        <section class="section settings-group" id="privacy" aria-labelledby="privacy-title">
+          <h2 id="privacy-title">Privacy</h2>
+          <div class="panel settings-panel">
+            <div class="setting">
+              <label class="setting-label" for="js-default">Run JavaScript on eepsites</label>
+              <p class="setting-hint" id="js-default-hint">
+                Off by default. Scripts can fingerprint you. Turn it on for one site from the
+                toolbar.
+              </p>
+              <input
+                class="switch setting-control"
+                type="checkbox"
+                id="js-default"
+                aria-describedby="js-default-hint"
+              />
+            </div>
+            <div class="setting">
+              <label class="setting-label" for="keep-cookies">Keep cookies after I quit</label>
+              <p class="setting-hint" id="keep-cookies-hint">
+                Off: every session starts clean and sites forget you.
+              </p>
+              <input
+                class="switch setting-control"
+                type="checkbox"
+                id="keep-cookies"
+                aria-describedby="keep-cookies-hint"
+              />
+            </div>
+          </div>
+        </section>
+
+        <section class="section settings-group" id="router" aria-labelledby="router-title">
+          <h2 id="router-title">Router</h2>
+          <div class="panel settings-panel">
+            <fieldset class="setting">
+              <legend class="setting-label">Router updates</legend>
+              <p class="setting-hint">Updates are signed and arrive over I2P, never the clearnet.</p>
+              <div class="segmented setting-control">
+                <label><input type="radio" name="updates" value="auto" checked />Automatic</label>
+                <label><input type="radio" name="updates" value="ask" />Ask me</label>
+                <label><input type="radio" name="updates" value="off" />Off</label>
+              </div>
+            </fieldset>
+            <div class="setting">
+              <p class="setting-label" id="installed-label">Installed version</p>
+              <p class="setting-hint">I2P 2.10.0, installed 14 September 2026. Previous: 2.9.0.</p>
+              <button class="btn setting-control" type="button" id="restore-btn">
+                Restore 2.9.0
+              </button>
+            </div>
+            <div class="setting">
+              <p class="setting-label">Bandwidth limits</p>
+              <p class="setting-hint">The router never uses more than this.</p>
+              <div class="setting-control bw-limits">
+                <div class="field">
+                  <label class="field-label" for="bw-in">In, KB/s</label>
+                  <input class="input num" id="bw-in" type="number" min="16" value="256" />
+                </div>
+                <div class="field">
+                  <label class="field-label" for="bw-out">Out, KB/s</label>
+                  <input class="input num" id="bw-out" type="number" min="16" value="128" />
+                </div>
+              </div>
+            </div>
+            <div class="setting">
+              <label class="setting-label" for="share">Share with the network</label>
+              <p class="setting-hint">
+                The part of your bandwidth other people's tunnels can use. More sharing makes
+                your own traffic harder to pick out.
+              </p>
+              <div class="setting-control share">
+                <input id="share" type="range" min="10" max="90" step="5" value="80" />
+                <output class="num" for="share" id="share-out">80%</output>
+              </div>
+            </div>
+            <div class="setting">
+              <label class="setting-label" for="transit">Relay tunnels for others</label>
+              <p class="setting-hint" id="transit-hint">
+                Recommended. A router that relays looks like every other router.
+              </p>
+              <input
+                class="switch setting-control"
+                type="checkbox"
+                id="transit"
+                aria-describedby="transit-hint"
+                checked
+              />
+            </div>
+          </div>
+        </section>
+
+        <section class="section settings-group" id="about" aria-labelledby="about-title">
+          <h2 id="about-title">About</h2>
+          <div class="panel settings-panel">
+            <dl class="facts about-versions">
+              <div>
+                <dt>eepview</dt>
+                <dd>0.1.0</dd>
+              </div>
+              <div>
+                <dt>I2P router</dt>
+                <dd>2.10.0</dd>
+              </div>
+              <div>
+                <dt>Java</dt>
+                <dd>Temurin 21.0.8, bundled</dd>
+              </div>
+              <div>
+                <dt>Web view</dt>
+                <dd>WebKit 621.1</dd>
+              </div>
+            </dl>
+
+            <div class="about-block">
+              <h3>Where eepview connects</h3>
+              <p class="setting-hint">The complete list. Nothing else leaves this computer.</p>
+              <table class="paths">
+                <thead>
+                  <tr>
+                    <th scope="col">What</th>
+                    <th scope="col">To</th>
+                    <th scope="col">Route</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>Every eepsite you open</td>
+                    <td class="mono">127.0.0.1:4444</td>
+                    <td><span class="route route-i2p">I2P</span></td>
+                  </tr>
+                  <tr>
+                    <td>Router updates and news</td>
+                    <td class="mono">tc73n4kivdroccekirco7rhgxdg5f3cjvbaapabupeyzrqwv5guq.b32.i2p</td>
+                    <td><span class="route route-i2p">I2P</span></td>
+                  </tr>
+                  <tr>
+                    <td>Java security check, if allowed</td>
+                    <td class="mono">api.adoptium.net</td>
+                    <td><span class="route route-clear">Clearnet</span></td>
+                  </tr>
+                  <tr>
+                    <td>First install only</td>
+                    <td class="mono">files.i2p-projekt.de, github.com</td>
+                    <td><span class="route route-clear">Clearnet, once</span></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="about-block">
+              <h3>Permissions you gave at setup</h3>
+              <ul class="grants">
+                <li class="grant">
+                  <div>
+                    <p class="setting-label">Update the router automatically over I2P</p>
+                    <p class="setting-hint grant-state">Allowed on 14 September 2026</p>
+                  </div>
+                  <button class="btn btn-danger btn-small" type="button" data-grant="router-updates">
+                    Revoke
+                  </button>
+                </li>
+                <li class="grant">
+                  <div>
+                    <p class="setting-label">Check for Java security updates</p>
+                    <p class="setting-hint grant-state">Allowed on 14 September 2026</p>
+                  </div>
+                  <button class="btn btn-danger btn-small" type="button" data-grant="java-check">
+                    Revoke
+                  </button>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>
