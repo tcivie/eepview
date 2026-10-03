@@ -41,7 +41,9 @@
     "allow-router-status",
     "allow-router-stats",
     "allow-chrome-set-height",
-    "allow-toolbar-set-height",
-    "allow-platform"
+    "allow-platform",
+    "allow-connection-pause",
+    "allow-connection-resume",
+    "allow-router-control"
   ]
 }

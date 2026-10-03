@@ -188,14 +188,27 @@ pub struct RouterStatus {
     pub version: Option<String>,
     /// A short explanation for the user.
     pub detail: Option<String>,
+    /// The user paused the connection: the gatekeeper is closed until resume.
+    pub paused: bool,
+    /// eepview runs the router itself (false for an external router).
+    pub managed: bool,
 }
 
 impl RouterStatus {
-    /// True when web tabs may exist.
+    /// True when web tabs may exist: verified and not paused.
     #[must_use]
     pub fn is_ok(&self) -> bool {
-        self.state == "ok"
+        self.state == "ok" && !self.paused
     }
+}
+
+/// The `router_control` answer.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct ControlResult {
+    /// True when the router did what was asked.
+    pub ok: bool,
+    /// Why not: `external` while eepview does not run the router.
+    pub reason: Option<&'static str>,
 }
 
 /// The `find-result` event.
@@ -269,7 +282,14 @@ mod tests {
             proxy: String::new(),
             version: None,
             detail: None,
+            paused: false,
+            managed: false,
         };
         assert!(status.is_ok());
+        let paused = RouterStatus {
+            paused: true,
+            ..status
+        };
+        assert!(!paused.is_ok());
     }
 }

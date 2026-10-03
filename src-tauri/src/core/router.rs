@@ -23,13 +23,18 @@ pub fn status_of(verdict: &Verdict, proxy: &str, gate_ok: bool) -> RouterStatus 
         proxy: proxy.to_owned(),
         version: None,
         detail,
+        paused: false,
+        managed: false,
     }
 }
 
 impl Core {
     /// A new VERIFY result. Going down destroys every tab webview (the tabs then show
     /// `eepview://router-down`); coming back loads the active tab again.
-    pub fn router_changed(&mut self, status: RouterStatus) -> Vec<Effect> {
+    ///
+    /// While paused, the new status is kept but counts as not ok: nothing loads.
+    pub fn router_changed(&mut self, mut status: RouterStatus) -> Vec<Effect> {
+        status.paused = self.router.paused;
         let was_ok = self.router.is_ok();
         let now_ok = status.is_ok();
         self.router = status;
@@ -43,6 +48,39 @@ impl Core {
             fx.extend([Effect::Emit(Event::TabsChanged), Effect::Layout]);
         }
         fx
+    }
+
+    /// True while the user has paused the connection.
+    #[must_use]
+    pub fn paused(&self) -> bool {
+        self.router.paused
+    }
+
+    /// `connection_pause()`: every tab webview goes; tabs show the router-down page with
+    /// `reason=paused`. The shell closes the gatekeeper after this.
+    pub fn pause(&mut self) -> Vec<Effect> {
+        if self.router.paused {
+            return Vec::new();
+        }
+        self.router.paused = true;
+        let mut fx = vec![Effect::Emit(Event::Router)];
+        fx.extend(self.destroy_all());
+        fx
+    }
+
+    /// `connection_resume()`: back to `verifying`. The next VERIFY that passes opens the
+    /// gatekeeper and loads the active tab again; one that fails keeps it closed.
+    pub fn resume(&mut self) -> Vec<Effect> {
+        if !self.router.paused {
+            return Vec::new();
+        }
+        self.router.paused = false;
+        self.router.state = "verifying";
+        vec![
+            Effect::Emit(Event::Router),
+            Effect::Emit(Event::TabsChanged),
+            Effect::Layout,
+        ]
     }
 
     fn destroy_all(&mut self) -> Vec<Effect> {

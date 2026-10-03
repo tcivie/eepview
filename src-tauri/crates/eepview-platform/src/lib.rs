@@ -197,8 +197,8 @@ mod tests {
     #[test]
     fn js_string_escapes() {
         assert_eq!(js_string("a\"b\\c"), r#""a\"b\\c""#);
-        assert_eq!(js_string("</script>"), r#""</script>""#);
-        assert_eq!(js_string("x\ny\u{2028}"), r#""x\u000ay ""#);
+        assert_eq!(js_string("</script>"), r#""\u003c/script>""#);
+        assert_eq!(js_string("x\ny\u{2028}"), r#""x\u000ay\u2028""#);
     }
 
     #[test]

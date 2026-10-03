@@ -3,6 +3,7 @@
 //! The helper runs inside a managed router (spike S9). An external router has no helper, so
 //! every field of [`RouterStats`] may be `null`.
 
+use std::collections::VecDeque;
 use std::io::{Read, Write};
 use std::time::Duration;
 
@@ -14,6 +15,52 @@ use super::verify::parse_answer;
 
 const TIMEOUT: Duration = Duration::from_secs(3);
 const MAX_ANSWER: u64 = 64 * 1024;
+
+/// How far back [`History`] reaches: 10 minutes.
+pub const HISTORY_SPAN_MS: u64 = 10 * 60 * 1000;
+
+/// One bandwidth sample, bytes per second over the last second.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+pub struct Sample {
+    /// Unix time in ms.
+    pub t: u64,
+    /// Inbound.
+    #[serde(rename = "in")]
+    pub inbound: u64,
+    /// Outbound.
+    pub out: u64,
+}
+
+/// The bandwidth of the last 10 minutes, one sample per watcher tick (5 s). Memory only.
+#[derive(Debug, Default)]
+pub struct History {
+    samples: VecDeque<Sample>,
+}
+
+impl History {
+    /// Records the 1 s bandwidth of `stats` at `now`, when the helper gave it, and drops
+    /// samples older than [`HISTORY_SPAN_MS`].
+    pub fn record(&mut self, now: u64, stats: &RouterStats) {
+        let bw = &stats.bandwidth_bytes_per_second;
+        if let (Some(inbound), Some(out)) = (bw.in1s, bw.out1s) {
+            self.samples.push_back(Sample {
+                t: now,
+                inbound,
+                out,
+            });
+        }
+        let oldest = now.saturating_sub(HISTORY_SPAN_MS);
+        while self.samples.front().is_some_and(|s| s.t < oldest) {
+            self.samples.pop_front();
+        }
+    }
+
+    /// The samples, oldest first.
+    #[must_use]
+    pub fn samples(&self) -> Vec<Sample> {
+        self.samples.iter().copied().collect()
+    }
+}
 
 /// Tunnel counts.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
@@ -70,6 +117,8 @@ pub struct RouterStats {
     pub bandwidth_bytes_per_second: Bandwidth,
     /// Tunnel build success.
     pub tunnel_build_success_percent: BuildSuccess,
+    /// Bandwidth of the last 10 minutes at 5 s steps, oldest first.
+    pub history: Vec<Sample>,
 }
 
 /// Maps the helper status JSON to [`RouterStats`].
@@ -103,6 +152,7 @@ pub fn from_helper(v: &Value) -> RouterStats {
             exploratory: num(&["tunnelBuildSuccessPercent", "exploratory"]),
             client: num(&["tunnelBuildSuccessPercent", "client"]),
         },
+        history: Vec::new(),
     }
 }
 
@@ -158,6 +208,26 @@ mod tests {
         assert_eq!(wire["bandwidthBytesPerSecond"]["out1s"], 20);
         assert_eq!(wire["uptimeMs"], 5000);
         assert_eq!(from_helper(&json!(null)), RouterStats::default());
+    }
+
+    #[test]
+    fn history_keeps_ten_minutes() {
+        let mut h = History::default();
+        let stats = from_helper(&sample());
+        h.record(1_000, &stats);
+        h.record(1_000, &RouterStats::default());
+        assert_eq!(h.samples().len(), 1);
+        h.record(1_000 + HISTORY_SPAN_MS, &stats);
+        assert_eq!(h.samples().len(), 2);
+        h.record(2_000 + HISTORY_SPAN_MS, &stats);
+        let samples = h.samples();
+        assert_eq!(samples.len(), 2);
+        assert_eq!(samples[0].t, 1_000 + HISTORY_SPAN_MS);
+        let wire = serde_json::to_value(samples[0]).unwrap();
+        assert_eq!(
+            wire,
+            json!({"t": 1_000 + HISTORY_SPAN_MS, "in": 10, "out": 20})
+        );
     }
 
     #[test]

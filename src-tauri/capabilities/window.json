@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "window-drag",
+  "description": "The toolbar's empty tab strip moves the window and toggles maximize on double click.",
+  "webviews": ["toolbar"],
+  "permissions": ["core:window:allow-start-dragging", "core:window:allow-toggle-maximize"]
+}

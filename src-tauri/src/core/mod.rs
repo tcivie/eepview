@@ -12,6 +12,7 @@ mod tab_ops;
 #[cfg(test)]
 mod tests;
 
+use crate::net::stats::{History as StatsHistory, RouterStats, Sample};
 use std::path::PathBuf;
 
 use crate::hover::{Debounce, HoverText};
@@ -172,6 +173,7 @@ pub struct Core {
     toolbar_request: f64,
     hover: Debounce,
     js_forced_off: bool,
+    stats: StatsHistory,
 }
 
 impl Core {
@@ -200,12 +202,15 @@ impl Core {
                 proxy: proxy.to_owned(),
                 version: None,
                 detail: None,
+                paused: false,
+                managed: false,
             },
             find: None,
             find_open: false,
             toolbar_request: 0.0,
             hover: Debounce::default(),
             js_forced_off: false,
+            stats: StatsHistory::default(),
         };
         let home = core.home_url();
         core.tabs.open(&home, crate::tabs::Place::End, true);
@@ -266,10 +271,11 @@ impl Core {
         if self.router.is_ok() && tab.web_js.is_some() {
             return View::Web(tab.id);
         }
-        View::Internal(internal_with(
-            "router-down",
-            &[("url", &tab.url), ("state", self.router.state)],
-        ))
+        let mut params = vec![("url", tab.url.as_str()), ("state", self.router.state)];
+        if self.router.paused {
+            params.push(("reason", "paused"));
+        }
+        View::Internal(internal_with("router-down", &params))
     }
 
     /// Every tab, in strip order.
@@ -314,6 +320,17 @@ impl Core {
 
     fn js_of(&self, host: &str) -> bool {
         !self.js_forced_off && self.prefs.js(host, self.settings.js_default)
+    }
+
+    /// Records one router stats sample (every watcher tick).
+    pub fn record_stats(&mut self, now: u64, stats: &RouterStats) {
+        self.stats.record(now, stats);
+    }
+
+    /// The router bandwidth of the last 10 minutes.
+    #[must_use]
+    pub fn stats_history(&self) -> Vec<Sample> {
+        self.stats.samples()
     }
 
     /// Turns page JavaScript off for every site for this run (`EEPVIEW_JS=off`).

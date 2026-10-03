@@ -19,6 +19,8 @@ fn ok_status() -> RouterStatus {
         proxy: "127.0.0.1:4444".into(),
         version: None,
         detail: None,
+        paused: false,
+        managed: false,
     }
 }
 
@@ -548,4 +550,54 @@ fn js_can_be_forced_off() {
     c.site_js_set("stats.i2p", true);
     let fx = c.navigate(STATS).1;
     assert!(!loads(&fx)[0].js);
+}
+
+#[test]
+fn pause_destroys_webviews_and_refuses_loads() {
+    let mut c = core();
+    visit(&mut c, STATS);
+    let fx = c.pause();
+    assert!(has(&fx, &Effect::Web(WebOp::Destroy(1))));
+    assert!(c.paused() && !c.router().is_ok());
+    assert!(matches!(c.view(), View::Internal(u) if u.contains("reason=paused")));
+    assert!(c.pause().is_empty());
+    let (res, fx) = c.navigate(REG);
+    assert_eq!(res, NavResult::refused("router-down"));
+    assert!(loads(&fx).is_empty());
+}
+
+#[test]
+fn verify_while_paused_keeps_the_gate_closed() {
+    let mut c = core();
+    visit(&mut c, STATS);
+    c.pause();
+    let fx = c.router_changed(ok_status());
+    assert!(loads(&fx).is_empty());
+    assert!(c.paused() && !c.router().is_ok());
+}
+
+#[test]
+fn resume_verifies_then_reloads() {
+    let mut c = core();
+    visit(&mut c, STATS);
+    c.pause();
+    assert!(!c.resume().is_empty());
+    assert!(!c.paused());
+    assert_eq!(c.router().state, "verifying");
+    assert!(c.resume().is_empty());
+    let l = c.router_changed(ok_status());
+    assert_eq!(loads(&l).len(), 1);
+    assert_eq!(c.view(), View::Web(1));
+}
+
+#[test]
+fn resume_with_a_failed_verify_stays_closed() {
+    let mut c = core();
+    visit(&mut c, STATS);
+    c.pause();
+    c.resume();
+    let fx = c.router_changed(down_status());
+    assert!(loads(&fx).is_empty());
+    assert!(!c.router().is_ok());
+    assert!(matches!(c.view(), View::Internal(u) if u.starts_with("eepview://router-down")));
 }

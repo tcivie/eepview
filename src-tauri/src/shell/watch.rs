@@ -8,7 +8,7 @@ use tauri::{AppHandle, Runtime};
 
 use super::apply::with_core;
 use super::log;
-use super::state::{lock, shared};
+use super::state::{lock, now_ms, shared};
 use crate::core::router::status_of;
 use crate::net::gatekeeper::Gatekeeper;
 use crate::net::loopback::LoopbackAddr;
@@ -24,11 +24,9 @@ pub fn start<R: Runtime>(app: &AppHandle<R>, proxy: Result<LoopbackAddr, String>
         .name("router-watch".into())
         .spawn(move || {
             loop {
-                let verdict = match proxy {
-                    Ok(addr) => verify(addr),
-                    Err(ref e) => Verdict::Down(e.clone()),
-                };
+                let verdict = proxy.clone().map_or_else(Verdict::Down, verify);
                 apply(&app, &verdict);
+                sample(&app);
                 thread::sleep(PERIOD);
             }
         });
@@ -37,12 +35,39 @@ pub fn start<R: Runtime>(app: &AppHandle<R>, proxy: Result<LoopbackAddr, String>
     }
 }
 
+/// Records the router bandwidth for `router_stats().history`, when a helper is configured.
+fn sample<R: Runtime>(app: &AppHandle<R>) {
+    if let Some((addr, token)) = super::env::router_helper() {
+        let stats = crate::net::stats::fetch(addr, &token);
+        lock(&shared(app).core).record_stats(now_ms(), &stats);
+    }
+}
+
+/// VERIFY now, off the main thread (after `connection_resume()`).
+pub fn check_now<R: Runtime>(app: &AppHandle<R>, proxy: Result<LoopbackAddr, String>) {
+    let app = app.clone();
+    let spawned = thread::Builder::new()
+        .name("router-check".into())
+        .spawn(move || {
+            let verdict = proxy.map_or_else(Verdict::Down, verify);
+            apply(&app, &verdict);
+        });
+    if let Err(e) = spawned {
+        log::error("router check", &e.to_string());
+    }
+}
+
+/// Closes the gatekeeper (after `connection_pause()`).
+pub fn close_gate<R: Runtime>(app: &AppHandle<R>) {
+    lock(&shared(app).gate).take().inspect(|g| g.close());
+}
+
 /// Starts or stops the gatekeeper for a verdict, then tells the core.
 fn apply<R: Runtime>(app: &AppHandle<R>, verdict: &Verdict) {
     let gate_ok = if let Verdict::Ok(upstream) = verdict {
         ensure_gate(app, upstream)
     } else {
-        lock(&shared(app).gate).take().inspect(|g| g.close());
+        close_gate(app);
         false
     };
     let proxy = lock(&shared(app).core).router().proxy.clone();
@@ -57,6 +82,11 @@ fn ensure_gate<R: Runtime>(
 ) -> bool {
     let state = shared(app);
     let mut gate = lock(&state.gate);
+    // Lock order gate, then core. A pause sets the core flag first and closes the gate
+    // second, so a gate opened here before the pause is closed by it.
+    if lock(&state.core).paused() {
+        return false;
+    }
     if gate.is_some() {
         return true;
     }

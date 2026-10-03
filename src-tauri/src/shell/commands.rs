@@ -14,7 +14,8 @@ use crate::store::bookmarks::export_file_name;
 use crate::store::settings::Settings;
 use crate::tabs::Place;
 use crate::types::{
-    Bookmark, HistoryEntry, HistoryQuery, NavResult, NewBookmark, RouterStatus, Suggestion, TabInfo,
+    Bookmark, ControlResult, HistoryEntry, HistoryQuery, NavResult, NewBookmark, RouterStatus,
+    Suggestion, TabInfo,
 };
 
 type Res<T> = Result<T, String>;
@@ -289,25 +290,56 @@ pub fn router_status(app: AppHandle) -> RouterStatus {
 }
 
 /// `router_stats()`: from the router helper named by `EEPVIEW_ROUTER_STATUS` and
-/// `EEPVIEW_ROUTER_STATUS_TOKEN`; all fields `null` without one.
+/// `EEPVIEW_ROUTER_STATUS_TOKEN`; all fields `null` without one. `history` holds the
+/// bandwidth of the last 10 minutes.
 #[tauri::command]
 #[must_use]
-pub fn router_stats() -> RouterStats {
-    super::env::router_helper().map_or_else(RouterStats::default, |(addr, token)| {
-        crate::net::stats::fetch(addr, &token)
-    })
+pub fn router_stats(app: AppHandle) -> RouterStats {
+    let mut stats = super::env::router_helper()
+        .map_or_else(RouterStats::default, |(addr, token)| {
+            crate::net::stats::fetch(addr, &token)
+        });
+    stats.history = read(app, Core::stats_history);
+    stats
+}
+
+/// `connection_pause()`: closes the gatekeeper and every tab webview until resume.
+#[tauri::command]
+pub fn connection_pause(app: AppHandle) {
+    let gate = app.clone();
+    act(app, Core::pause);
+    super::watch::close_gate(&gate);
+}
+
+/// `connection_resume()`: VERIFY again; the gatekeeper opens only when it passes.
+#[tauri::command]
+pub fn connection_resume(app: AppHandle) {
+    let check = app.clone();
+    act(app, Core::resume);
+    super::watch::check_now(&check, super::env::proxy());
+}
+
+/// `router_control(action)`: `stop`, `start` or `restart`. eepview does not run the router
+/// yet, so every action answers `{ ok: false, reason: "external" }`.
+///
+/// # Errors
+///
+/// Fails for an unknown action.
+#[tauri::command]
+pub fn router_control(action: &str) -> Res<ControlResult> {
+    match action {
+        "stop" | "start" | "restart" => Ok(ControlResult {
+            ok: false,
+            reason: Some("external"),
+        }),
+        other => Err(format!("unknown action: {other}")),
+    }
 }
 
 /// `chrome_set_height(px)`: the toolbar grows over the content while a popup is open; 0 ends it.
 #[tauri::command]
 pub fn chrome_set_height(app: AppHandle, px: f64) {
     act(app, move |c| c.set_toolbar_request(px));
-}
-
-/// `toolbar_set_height(px)`: the v1.1 draft name of [`chrome_set_height`], kept as a shim.
-#[tauri::command]
-pub fn toolbar_set_height(app: AppHandle, px: f64) {
-    chrome_set_height(app, px);
 }
 
 /// `platform()`: `macos`, `windows` or `linux`.

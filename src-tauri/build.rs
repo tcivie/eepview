@@ -36,8 +36,10 @@ const COMMANDS: &[&str] = &[
     "settings_set",
     "router_status",
     "router_stats",
+    "connection_pause",
+    "connection_resume",
+    "router_control",
     "chrome_set_height",
-    "toolbar_set_height",
     "platform",
 ];
 

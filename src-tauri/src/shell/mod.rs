@@ -51,46 +51,55 @@ pub fn run() -> tauri::Result<()> {
     Ok(())
 }
 
+/// Every IPC command of the contract, as one `generate_handler!` list.
+macro_rules! contract_handler {
+    () => {
+        tauri::generate_handler![
+            commands::tab_new,
+            commands::tab_close,
+            commands::tab_select,
+            commands::tab_move,
+            commands::tab_list,
+            commands::navigate,
+            commands::go_back,
+            commands::go_forward,
+            commands::reload,
+            commands::stop,
+            commands::home,
+            commands::find,
+            commands::find_close,
+            commands::zoom_in,
+            commands::zoom_out,
+            commands::zoom_reset,
+            commands::site_js_set,
+            commands::bookmarks_list,
+            commands::bookmark_add,
+            commands::bookmark_update,
+            commands::bookmark_remove,
+            commands::bookmark_find,
+            commands::bookmarks_export,
+            commands::bookmarks_export_file,
+            commands::bookmarks_import,
+            commands::history_query,
+            commands::history_remove,
+            commands::history_clear,
+            commands::suggest,
+            commands::settings_get,
+            commands::settings_set,
+            commands::router_status,
+            commands::router_stats,
+            commands::connection_pause,
+            commands::connection_resume,
+            commands::router_control,
+            commands::chrome_set_height,
+            commands::platform,
+        ]
+    };
+}
+
 /// Every IPC command of the contract.
 fn handler() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static {
-    tauri::generate_handler![
-        commands::tab_new,
-        commands::tab_close,
-        commands::tab_select,
-        commands::tab_move,
-        commands::tab_list,
-        commands::navigate,
-        commands::go_back,
-        commands::go_forward,
-        commands::reload,
-        commands::stop,
-        commands::home,
-        commands::find,
-        commands::find_close,
-        commands::zoom_in,
-        commands::zoom_out,
-        commands::zoom_reset,
-        commands::site_js_set,
-        commands::bookmarks_list,
-        commands::bookmark_add,
-        commands::bookmark_update,
-        commands::bookmark_remove,
-        commands::bookmark_find,
-        commands::bookmarks_export,
-        commands::bookmarks_export_file,
-        commands::bookmarks_import,
-        commands::history_query,
-        commands::history_remove,
-        commands::history_clear,
-        commands::suggest,
-        commands::settings_get,
-        commands::settings_set,
-        commands::router_status,
-        commands::router_stats,
-        commands::chrome_set_height,
-        commands::toolbar_set_height,
-        commands::platform,
-    ]
+    contract_handler!()
 }
 
 fn paths(app: &App) -> Option<Paths> {
