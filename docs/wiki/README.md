@@ -1,6 +1,6 @@
 # eepview wiki
 
-This wiki is generated from docs/wiki in the repository. Edit it there, in a PR. Each PR that changes a feature updates its page. See [AGENTS.md](../../AGENTS.md).
+This wiki is generated from docs/wiki in the repository. Edit it there, in a PR. Each PR that changes a feature updates its page. See [AGENTS.md](https://github.com/tcivie/eepview/blob/main/AGENTS.md).
 
 | Feature | Status | Page | Added in |
 | --- | --- | --- | --- |
@@ -14,10 +14,18 @@ This wiki is generated from docs/wiki in the repository. Edit it there, in a PR.
 | Coverage | shipped | [Coverage](coverage.md) | [#13](https://github.com/tcivie/eepview/pull/13) |
 | Brand | in progress | [Brand](brand.md) | [#11](https://github.com/tcivie/eepview/pull/11) |
 
-## Links
+## Project
 
-- [ADRs](../adr/)
-- [Roadmap](../../ROADMAP.md)
-- [Going public](../going-public.md)
-- [Security policy](../../SECURITY.md)
-- [Contributing](../../CONTRIBUTING.md)
+- [Roadmap](roadmap.md)
+- [Decisions](decisions.md)
+- [Going public](going-public.md)
+
+## Policies
+
+- [README](https://github.com/tcivie/eepview/blob/main/README.md)
+- [Security policy](https://github.com/tcivie/eepview/blob/main/SECURITY.md)
+- [Contributing](https://github.com/tcivie/eepview/blob/main/CONTRIBUTING.md)
+- [Code of conduct](https://github.com/tcivie/eepview/blob/main/CODE_OF_CONDUCT.md)
+- [Changelog](https://github.com/tcivie/eepview/blob/main/CHANGELOG.md)
+- [AGENTS.md](https://github.com/tcivie/eepview/blob/main/AGENTS.md)
+- [License](https://github.com/tcivie/eepview/blob/main/LICENSE)

@@ -30,7 +30,7 @@ Working rules for any human or AI agent on this repo.
 
 ## Security
 
-- Read `docs/adr/0001-no-leak-architecture.md` before you touch networking or webviews. It lands with the browser shell PR (branch `feat/browser-shell`). Until it is on main, read it on that branch.
+- Read `docs/wiki/no-leak-architecture.md` before you touch networking or webviews. ADR 0001 lands with the browser shell PR, as `docs/wiki/adr-0001-no-leak-architecture.md`.
 - The five layers are mandatory.
 - Keep the architecture test and the leak test green.
 - Add no new HTTP client crates.
@@ -42,6 +42,8 @@ Working rules for any human or AI agent on this repo.
 
 ## Documentation
 
+- All docs live in the wiki. The source is docs/wiki/ in this repo; edit it there in a PR, and CI publishes it. ADRs are docs/wiki/adr-NNNN-<slug>.md. The interface contract is docs/wiki/ipc-contract.md.
+- Do not add Markdown files outside docs/wiki/. The allowed root files are listed in scripts/docs-check.sh.
 - A PR that adds or changes a user-visible feature or a quality gate must update its `docs/wiki` page. Create the page if it is new.
 - Edit `docs/wiki/` in the repo. The GitHub wiki is generated from it.
 - Add a History line with the PR link.
