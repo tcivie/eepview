@@ -1,8 +1,8 @@
 // SPDX-FileCopyrightText: 2026 The eepview contributors
 // SPDX-License-Identifier: MIT
 
-//! The IPC commands of `docs/ipc.md`. Only the `toolbar` and `internal` webviews may call
-//! them (capabilities/). Each one runs the core and queues its effects.
+//! The IPC commands of `docs/wiki/ipc-contract.md`. Only the bundled webviews may call
+//! them, each one only the commands its capability names (capabilities/). Each one runs the core and queues its effects.
 
 use serde_json::Value;
 use std::path::Path;
@@ -10,11 +10,13 @@ use std::path::Path;
 use tauri::{AppHandle, Manager, Runtime};
 
 use super::apply::apply;
+use super::popup::Anchor;
 use super::state::{lock, now_ms, shared};
 use crate::core::find::Zoom;
 use crate::core::{Core, Effect};
 use crate::net::loopback::LoopbackAddr;
 use crate::net::stats::RouterStats;
+use crate::popup::Kind;
 use crate::session::Step;
 use crate::store::bookmarks::export_file_name;
 use crate::store::settings::Settings;
@@ -493,7 +495,8 @@ pub fn router_control(action: &str) -> Res<ControlResult> {
     }
 }
 
-/// `chrome_set_height(px)`: the toolbar grows over the content while a popup is open; 0 ends it.
+/// `chrome_set_height(px)`: the toolbar reports its find bar (124 or more: open). The toolbar
+/// never takes another height than 84 or 124; popups show in the `popup` webview.
 ///
 /// # Errors
 ///
@@ -501,6 +504,53 @@ pub fn router_control(action: &str) -> Res<ControlResult> {
 #[tauri::command]
 pub async fn chrome_set_height<R: Runtime>(app: AppHandle<R>, px: f64) -> Res<()> {
     act(app, move |c| c.set_toolbar_request(px)).await
+}
+
+/// `popup_open({kind, anchor, data?}) -> id`: opens a toolbar popup under `anchor`.
+///
+/// # Errors
+///
+/// Fails for an anchor that is not finite or has a negative side.
+#[tauri::command]
+pub async fn popup_open<R: Runtime>(
+    app: AppHandle<R>,
+    kind: Kind,
+    anchor: Anchor,
+    data: Option<Value>,
+) -> Res<u64> {
+    let rect = anchor.rect().ok_or_else(|| "bad anchor".to_owned())?;
+    let data = data.unwrap_or(Value::Null);
+    blocking(move || super::popup::open(&app, kind, rect, &data)).await
+}
+
+/// `popup_size({id, width, height})`: the popup page measured its card.
+///
+/// # Errors
+///
+/// Fails only when the worker thread that runs the command panics.
+#[tauri::command]
+pub async fn popup_size<R: Runtime>(
+    app: AppHandle<R>,
+    id: u64,
+    width: f64,
+    height: f64,
+) -> Res<()> {
+    blocking(move || super::popup::sized(&app, id, (width, height))).await
+}
+
+/// `popup_close({id?, refocus?})`: closes popup `id`, or any popup without one.
+///
+/// # Errors
+///
+/// Fails only when the worker thread that runs the command panics.
+#[tauri::command]
+pub async fn popup_close<R: Runtime>(
+    app: AppHandle<R>,
+    id: Option<u64>,
+    refocus: Option<bool>,
+) -> Res<()> {
+    let refocus = refocus.unwrap_or(false);
+    blocking(move || super::popup::close(&app, id, refocus)).await
 }
 
 /// `chrome_insets()`: the space the tab strip leaves for the macOS window buttons (0 in

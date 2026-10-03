@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "toolbar-popup",
+  "description": "The toolbar opens and closes its popups in the popup webview.",
+  "webviews": ["toolbar"],
+  "permissions": ["allow-popup-open", "allow-popup-close"]
+}

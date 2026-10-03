@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-popup-size"
+description = "Enables the popup_size command without any pre-configured scope."
+commands.allow = ["popup_size"]
+
+[[permission]]
+identifier = "deny-popup-size"
+description = "Denies the popup_size command without any pre-configured scope."
+commands.deny = ["popup_size"]

@@ -191,7 +191,7 @@ fn permissions(cap: &serde_json::Value) -> Vec<&str> {
 
 #[test]
 fn capabilities_never_reach_tabs() {
-    let allowed = ["toolbar", "internal", "status"];
+    let allowed = ["toolbar", "internal", "status", "popup"];
     for (file, cap) in capabilities().unwrap() {
         assert!(!labels(&cap).is_empty(), "{file} names no webview");
         for label in labels(&cap) {
@@ -213,6 +213,66 @@ fn status_bubble_gets_events_only() {
             .filter(|p| !p.starts_with("core:event:"))
             .collect();
         assert!(bad.is_empty(), "{file}: status gets {bad:?}");
+    }
+}
+
+/// What the `popup` webview may do: events, and the commands of its four popups.
+const POPUP_PERMISSIONS: [&str; 15] = [
+    "core:event:allow-listen",
+    "core:event:allow-unlisten",
+    "allow-popup-size",
+    "allow-popup-close",
+    "allow-navigate",
+    "allow-tab-new",
+    "allow-tab-list",
+    "allow-zoom-in",
+    "allow-zoom-out",
+    "allow-zoom-reset",
+    "allow-router-status",
+    "allow-router-stats",
+    "allow-connection-pause",
+    "allow-connection-resume",
+    "allow-router-control",
+];
+
+#[test]
+fn popup_gets_only_its_commands() {
+    let caps = capabilities().unwrap();
+    for (file, cap) in caps.iter().filter(|(_, c)| labels(c).contains(&"popup")) {
+        assert_eq!(labels(cap), ["popup"], "{file}: popup shares a capability");
+        let perms = permissions(cap);
+        let bad: Vec<&&str> = perms
+            .iter()
+            .filter(|p| !POPUP_PERMISSIONS.contains(p))
+            .collect();
+        assert!(bad.is_empty(), "{file}: popup gets {bad:?}");
+    }
+}
+
+#[test]
+fn only_the_toolbar_opens_popups() {
+    for (file, cap) in capabilities().unwrap() {
+        if permissions(&cap).contains(&"allow-popup-open") {
+            assert_eq!(labels(&cap), ["toolbar"], "{file}");
+        }
+    }
+}
+
+#[test]
+fn the_popup_webview_is_bundled_and_transparent() {
+    let chrome = code(&root().join("src/shell/chrome.rs"))
+        .unwrap()
+        .join("\n");
+    let at = chrome
+        .find("WebviewBuilder::new(\"popup\"")
+        .expect("popup webview");
+    let builder = &chrome[at..chrome[at..].find(';').map_or(chrome.len(), |e| at + e)];
+    for call in [
+        "WebviewUrl::App(POPUP_PAGE",
+        ".transparent(true)",
+        ".on_navigation(",
+    ] {
+        assert!(builder.contains(call), "the popup webview must use {call}");
     }
 }
 

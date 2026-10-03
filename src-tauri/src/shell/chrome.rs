@@ -1,8 +1,8 @@
 // SPDX-FileCopyrightText: 2026 The eepview contributors
 // SPDX-License-Identifier: MIT
 
-//! The main window and the bundled webviews: `toolbar`, `internal` and `status`. They load
-//! only bundled pages (`WebviewUrl::App`); remote pages live in `content.rs`.
+//! The main window and the bundled webviews: `toolbar`, `internal`, `status` and `popup`.
+//! They load only bundled pages (`WebviewUrl::App`); remote pages live in `content.rs`.
 
 use tauri::webview::PageLoadEvent;
 use tauri::window::Color;
@@ -23,8 +23,10 @@ pub const TOOLBAR_PAGE: &str = "src/ui/toolbar.html";
 pub const HOME_PAGE: &str = "src/ui/home.html";
 /// The status bubble page.
 pub const STATUS_PAGE: &str = "src/ui/status.html";
+/// The toolbar popups page.
+pub const POPUP_PAGE: &str = "src/ui/popup.html";
 
-/// Builds the window and the three bundled webviews.
+/// Builds the window and the four bundled webviews.
 ///
 /// # Errors
 ///
@@ -32,7 +34,7 @@ pub const STATUS_PAGE: &str = "src/ui/status.html";
 pub fn build<R: Runtime>(app: &mut App<R>) -> tauri::Result<Window<R>> {
     let window = window_builder(app)?.build()?;
     let (w, h) = (1200.0, 800.0);
-    let (bar, content) = layout::split(w, h, layout::TOOLBAR, false);
+    let (bar, content) = layout::split(w, h, layout::TOOLBAR);
     let toolbar = WebviewBuilder::new("toolbar", WebviewUrl::App(TOOLBAR_PAGE.into()));
     let toolbar = window.add_child(
         toolbar,
@@ -57,8 +59,33 @@ pub fn build<R: Runtime>(app: &mut App<R>) -> tauri::Result<Window<R>> {
     )?;
     status.hide()?;
     listen_status_size(app.handle());
+    add_popup(app.handle(), &window)?;
     view::raise_chrome(app.handle(), &window);
     Ok(window)
+}
+
+/// The `popup` webview: the toolbar popups, over the page. Transparent, so only the card
+/// shows; hidden until a popup opens (`shell::popup`). It never takes the focus by itself
+/// and never leaves the bundled pages.
+fn add_popup<R: Runtime>(app: &AppHandle<R>, window: &Window<R>) -> tauri::Result<()> {
+    let nav_app = app.clone();
+    let popup = WebviewBuilder::new("popup", WebviewUrl::App(POPUP_PAGE.into()))
+        .transparent(true)
+        .background_color(Color(0, 0, 0, 0))
+        .focused(false)
+        .on_navigation(move |url| bundled(&nav_app, url));
+    let popup = window.add_child(
+        popup,
+        LogicalPosition::new(0.0, layout::TOOLBAR),
+        LogicalSize::new(360.0, 480.0),
+    )?;
+    popup.hide()
+}
+
+/// True for a bundled page.
+fn bundled<R: Runtime>(app: &AppHandle<R>, url: &Url) -> bool {
+    let base = lock(&shared(app).base).clone();
+    base.is_some_and(|b| b.origin() == url.origin()) || url.scheme() == "tauri"
 }
 
 /// The status page reports the size of its pill (`status-size`); the shell fits the
@@ -115,8 +142,7 @@ fn internal_page_load<R: Runtime>(app: &AppHandle<R>, event: PageLoadEvent, url:
 }
 
 fn internal_navigation<R: Runtime>(app: &AppHandle<R>, url: &Url) -> bool {
-    let base = lock(&shared(app).base).clone();
-    if base.is_some_and(|b| b.origin() == url.origin()) || url.scheme() == "tauri" {
+    if bundled(app, url) {
         return true;
     }
     let target = url.to_string();
