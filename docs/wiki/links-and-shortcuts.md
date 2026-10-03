@@ -5,7 +5,7 @@ SPDX-License-Identifier: MIT
 
 # Links, menus and shortcuts
 
-Status: in progress.
+Status: in progress in [#77](https://github.com/tcivie/eepview/pull/77).
 
 How a click on a link, the right-click menu, the keyboard shortcuts and the extra mouse buttons work. Everything on this page works with page JavaScript off. The engine reports the click, the key or the menu request, and the shell acts on it. No page script takes part.
 
@@ -160,4 +160,4 @@ The `eepview-platform` crate holds the engine glue for each system, the only pla
 
 ## History
 
-- 2026-10-03 — Requirements for link clicks, the context menu, keyboard shortcuts and mouse buttons.
+- 2026-10-03 — Requirements for link clicks, the context menu, keyboard shortcuts and mouse buttons — [#77](https://github.com/tcivie/eepview/pull/77)
