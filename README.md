@@ -6,6 +6,8 @@
 
 <p align="center">
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue"></a>
+  <a href="https://scorecard.dev/viewer/?uri=github.com/tcivie/eepview"><img alt="OpenSSF Scorecard" src="https://api.scorecard.dev/projects/github.com/tcivie/eepview/badge"></a>
+  <a href="https://deps.rs/repo/github/tcivie/eepview?path=src-tauri"><img alt="dependency status" src="https://deps.rs/repo/github/tcivie/eepview/status.svg?path=src-tauri"></a>
 </p>
 
 ## What it is

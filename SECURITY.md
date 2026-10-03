@@ -10,12 +10,10 @@ eepview has no release yet. Nothing is supported today. After v0.1, only the lat
 
 Report privately. Use one of two channels.
 
-**Channel 1: GitHub private vulnerability reporting.**
+**Channel 1: GitHub private vulnerability reporting.** This is the first channel.
 
-1. Open the [Security tab](https://github.com/tcivie/eepview/security) of the repository.
-2. Select "Report a vulnerability". Or go direct to <https://github.com/tcivie/eepview/security/advisories/new>.
-
-Private vulnerability reporting is turned on when the repository becomes public.
+1. Open <https://github.com/tcivie/eepview/security/advisories/new>.
+2. Fill in the form and submit it. Only the maintainers can read it.
 
 **Channel 2: email.** Write to gleb@tcivie.com. Start the subject line with "[eepview security]".
 
@@ -57,6 +55,6 @@ These issues are out of scope:
 - cargo-deny allows crates from crates.io only. It also blocks wildcard versions.
 - gitleaks scans the code and the full history for secrets.
 - zizmor checks the GitHub workflows.
-- CodeQL and OpenSSF Scorecard run after the repository becomes public.
+- CodeQL, OpenSSF Scorecard and dependency review run on GitHub Actions.
 - Every GitHub Action is pinned by commit SHA.
 - The `main` branch is protected. Changes go through a pull request, and the required checks must pass.
