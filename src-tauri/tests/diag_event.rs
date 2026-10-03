@@ -333,7 +333,12 @@ fn r1_6_source_files_is_a_sorted_list_of_base_names() {
     assert!(!SOURCE_FILES.is_empty());
     assert!(SOURCE_FILES.windows(2).all(|w| w[0] <= w[1]), "sorted");
     for name in SOURCE_FILES {
-        assert!(name.ends_with(".rs"), "{name}");
+        assert!(
+            std::path::Path::new(name)
+                .extension()
+                .is_some_and(|e| e == "rs"),
+            "{name}"
+        );
         assert!(!name.contains('/') && !name.contains('\\'), "{name}");
     }
 }
