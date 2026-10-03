@@ -8,13 +8,13 @@ Unit-test coverage gate for Rust and TypeScript.
 
 - The `coverage` job in `.github/workflows/ci.yml` runs on ubuntu-24.04 only.
 - Rust: `cargo llvm-cov --all-targets --summary-only`, then `cargo llvm-cov report --fail-under-lines <N>`. Every file counts. There are no exclusions.
-- TypeScript: `npm run test:coverage` runs the Node built-in test runner with coverage thresholds. It adds no npm package.
+- TypeScript: `npm run test:coverage` first runs `scripts/check-tested.sh`. Node counts only files that a test loads, so the script fails when a module in `src/ui/lib` or `src/ui/shared` has no sibling `.test.ts`. Then it runs the Node built-in test runner with coverage thresholds. It adds no npm package.
 - The job is not a required check yet. The owner adds it to the ruleset after it passes on main.
 
 ## Ratchet values
 
 - Rust lines: 0. Today there are no Rust tests, so coverage is 0%. Raise the number when coverage rises. Never lower it.
-- TypeScript: lines 80, branches 70, functions 80. There is no `src/**/*.test.ts` file yet, so the run passes with zero tests.
+- TypeScript: lines 80, branches 70, functions 80. Measured: lines 100%, branches 98%, functions 100% on the tested modules.
 
 ## How to use / run locally
 
@@ -25,6 +25,8 @@ Unit-test coverage gate for Rust and TypeScript.
 
 - The Rust gate checks lines only, not branches or functions.
 - Test files are excluded from the TypeScript report only.
+- DOM glue outside `src/ui/lib` and `src/ui/shared` is not loaded by any test, so TypeScript coverage does not count it.
+- The Rust floor is 0 because there are no Rust tests yet. The gate checks nothing until the first test lands. Raise it in that PR.
 
 ## History
 
