@@ -13,14 +13,14 @@ describe("[ipc-contract events] link-hover bubble", () => {
   it("[ipc-contract events] a link shows its text", () => {
     const view = linkStatus({ text: "http://notbob.i2p/", blocked: false });
     assert.equal(view.visible, true);
-    assert.match(`${view.prefix ?? ""} ${view.text}`, /notbob\.i2p/);
+    assert.equal(new URL(view.text).hostname, "notbob.i2p");
   });
   it("[ipc-contract events] blocked: true shows as blocked", () => {
     const view = linkStatus({ text: "Blocked: evil.com", blocked: true });
     assert.equal(view.visible, true);
     const shown = `${view.prefix ?? ""} ${view.text}`;
     assert.match(shown, /Blocked/);
-    assert.match(shown, /evil\.com/);
+    assert.ok(shown.split(/\s+/).includes("evil.com"), shown);
   });
   it("[ipc-contract events] a link that is not blocked does not show as blocked", () => {
     const view = linkStatus({ text: "http://notbob.i2p/", blocked: false });
