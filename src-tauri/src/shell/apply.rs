@@ -25,15 +25,20 @@ pub fn with_core<R: Runtime>(app: &AppHandle<R>, f: impl FnOnce(&mut Core) -> Ve
     later(app, fx);
 }
 
-/// Queues `fx` on the main thread.
+/// Queues `fx` on the main thread, always through the event loop: called on the main thread,
+/// `run_on_main_thread` would run them inline, inside whatever engine callback or
+/// `with_webview` closure is on the stack (the deadlock of `outside`).
 pub fn later<R: Runtime>(app: &AppHandle<R>, fx: Vec<Effect>) {
     if fx.is_empty() {
         return;
     }
     let handle = app.clone();
-    if let Err(e) = app.run_on_main_thread(move || apply(&handle, fx)) {
-        log::error("main thread", &e.to_string());
-    }
+    outside(move || {
+        let runner = handle.clone();
+        if let Err(e) = runner.run_on_main_thread(move || apply(&handle, fx)) {
+            log::error("main thread", &e.to_string());
+        }
+    });
 }
 
 /// Runs `f` on a new thread. Use it for any Tauri webview call that starts inside a

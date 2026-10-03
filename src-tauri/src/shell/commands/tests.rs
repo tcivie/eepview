@@ -6,6 +6,7 @@
 
 use serde_json::{Value, json};
 use tauri::App;
+use tauri::async_runtime::block_on;
 
 use super::*;
 use crate::net::testing::{FakeRouter, dead_addr};
@@ -147,14 +148,14 @@ fn pause_closes_the_gate_and_resume_verifies_again() {
     assert!(core(&app).paused());
     ok(&app, "connection_resume", json!({}));
     assert!(!core(&app).paused());
-    resume(handle(&app), Ok(router.addr));
+    block_on(resume(handle(&app), Ok(router.addr))).unwrap();
     assert!(wait_for(|| gate_open(&app)));
 }
 
 #[test]
 fn resume_with_a_bad_proxy_keeps_the_gate_closed() {
     let app = app();
-    resume(handle(&app), Err("EEPVIEW_PROXY: bad".into()));
+    block_on(resume(handle(&app), Err("EEPVIEW_PROXY: bad".into()))).unwrap();
     assert!(wait_for(|| core(&app).router().state == "down"));
     assert!(!gate_open(&app));
 }
@@ -179,7 +180,10 @@ fn export_files_land_in_the_folder() {
 #[test]
 fn direct_calls_match_the_ipc_answers() {
     let app = app();
-    assert_eq!(tab_list(handle(&app)).len(), 1);
-    assert!(tab_new(handle(&app), None).is_ok());
-    assert_eq!(router_status(handle(&app)).proxy, "127.0.0.1:4444");
+    assert_eq!(block_on(tab_list(handle(&app))).unwrap().len(), 1);
+    assert!(block_on(tab_new(handle(&app), None)).is_ok());
+    assert_eq!(
+        block_on(router_status(handle(&app))).unwrap().proxy,
+        "127.0.0.1:4444"
+    );
 }

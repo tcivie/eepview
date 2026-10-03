@@ -26,11 +26,26 @@ use crate::types::{
 
 type Res<T> = Result<T, String>;
 
+/// Runs blocking work on a worker thread. Every command that takes the app is `async` and
+/// does its work here: a plain `fn` command runs on the main thread, and core calls may write
+/// a store file, wait on a lock or reach the router.
+async fn blocking<T: Send + 'static>(f: impl FnOnce() -> T + Send + 'static) -> Res<T> {
+    tauri::async_runtime::spawn_blocking(f)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 /// Runs `f` on the core and queues the effects it returns with its value.
-fn run<T, R: Runtime>(app: AppHandle<R>, f: impl FnOnce(&mut Core) -> (T, Vec<Effect>)) -> T {
-    let (value, fx) = f(&mut lock(&shared(&app).core));
-    queue(app, fx);
-    value
+async fn run<T: Send + 'static, R: Runtime>(
+    app: AppHandle<R>,
+    f: impl FnOnce(&mut Core) -> (T, Vec<Effect>) + Send + 'static,
+) -> Res<T> {
+    blocking(move || {
+        let (value, fx) = f(&mut lock(&shared(&app).core));
+        queue(app, fx);
+        value
+    })
+    .await
 }
 
 /// Queues `fx` on the main thread (never applied while the core lock is held).
@@ -45,13 +60,19 @@ fn queue<R: Runtime>(app: AppHandle<R>, fx: Vec<Effect>) {
 }
 
 /// Runs `f` on the core for effects only.
-fn act<R: Runtime>(app: AppHandle<R>, f: impl FnOnce(&mut Core) -> Vec<Effect>) {
-    run(app, |core| ((), f(core)));
+async fn act<R: Runtime>(
+    app: AppHandle<R>,
+    f: impl FnOnce(&mut Core) -> Vec<Effect> + Send + 'static,
+) -> Res<()> {
+    run(app, |core| ((), f(core))).await
 }
 
 /// Reads from the core.
-fn read<T, R: Runtime>(app: AppHandle<R>, f: impl FnOnce(&Core) -> T) -> T {
-    run(app, |core| (f(core), Vec::new()))
+async fn read<T: Send + 'static, R: Runtime>(
+    app: AppHandle<R>,
+    f: impl FnOnce(&Core) -> T + Send + 'static,
+) -> Res<T> {
+    run(app, |core| (f(core), Vec::new())).await
 }
 
 /// A core result as a command result: the effects of a failed call are none.
@@ -68,113 +89,185 @@ fn split<T>(result: Result<(T, Vec<Effect>), String>) -> (Res<T>, Vec<Effect>) {
 ///
 /// Never in practice: the new tab always exists.
 #[tauri::command]
-pub fn tab_new<R: Runtime>(app: AppHandle<R>, url: Option<String>) -> Res<TabInfo> {
-    run(app, move |c| c.tab_new(url.as_deref(), Place::End)).ok_or_else(|| "no tab".into())
+pub async fn tab_new<R: Runtime>(app: AppHandle<R>, url: Option<String>) -> Res<TabInfo> {
+    run(app, move |c| c.tab_new(url.as_deref(), Place::End))
+        .await?
+        .ok_or_else(|| "no tab".into())
 }
 
 /// `tab_close(id)`.
+///
+/// # Errors
+///
+/// Fails only when the worker thread that runs the command panics.
 #[tauri::command]
-pub fn tab_close<R: Runtime>(app: AppHandle<R>, id: u32) {
-    act(app, move |c| c.tab_close(id));
+pub async fn tab_close<R: Runtime>(app: AppHandle<R>, id: u32) -> Res<()> {
+    act(app, move |c| c.tab_close(id)).await
 }
 
 /// `tab_select(id)`.
+///
+/// # Errors
+///
+/// Fails only when the worker thread that runs the command panics.
 #[tauri::command]
-pub fn tab_select<R: Runtime>(app: AppHandle<R>, id: u32) {
-    act(app, move |c| c.tab_select(id));
+pub async fn tab_select<R: Runtime>(app: AppHandle<R>, id: u32) -> Res<()> {
+    act(app, move |c| c.tab_select(id)).await
 }
 
 /// `tab_move(id, index)`.
+///
+/// # Errors
+///
+/// Fails only when the worker thread that runs the command panics.
 #[tauri::command]
-pub fn tab_move<R: Runtime>(app: AppHandle<R>, id: u32, index: usize) {
-    act(app, move |c| c.tab_move(id, index));
+pub async fn tab_move<R: Runtime>(app: AppHandle<R>, id: u32, index: usize) -> Res<()> {
+    act(app, move |c| c.tab_move(id, index)).await
 }
 
 /// `tab_list()`.
+///
+/// # Errors
+///
+/// Fails only when the worker thread that runs the command panics.
 #[tauri::command]
-#[must_use]
-pub fn tab_list<R: Runtime>(app: AppHandle<R>) -> Vec<TabInfo> {
-    read(app, Core::tab_infos)
+pub async fn tab_list<R: Runtime>(app: AppHandle<R>) -> Res<Vec<TabInfo>> {
+    read(app, Core::tab_infos).await
 }
 
 /// `navigate(input)`.
+///
+/// # Errors
+///
+/// Fails only when the worker thread that runs the command panics.
 #[tauri::command]
-#[must_use]
-pub fn navigate<R: Runtime>(app: AppHandle<R>, input: String) -> NavResult {
-    run(app, move |c| c.navigate(&input))
+pub async fn navigate<R: Runtime>(app: AppHandle<R>, input: String) -> Res<NavResult> {
+    run(app, move |c| c.navigate(&input)).await
 }
 
 /// `go_back()`.
+///
+/// # Errors
+///
+/// Fails only when the worker thread that runs the command panics.
 #[tauri::command]
-pub fn go_back<R: Runtime>(app: AppHandle<R>) {
-    act(app, move |c| c.step(Step::Back));
+pub async fn go_back<R: Runtime>(app: AppHandle<R>) -> Res<()> {
+    act(app, move |c| c.step(Step::Back)).await
 }
 
 /// `go_forward()`.
+///
+/// # Errors
+///
+/// Fails only when the worker thread that runs the command panics.
 #[tauri::command]
-pub fn go_forward<R: Runtime>(app: AppHandle<R>) {
-    act(app, move |c| c.step(Step::Forward));
+pub async fn go_forward<R: Runtime>(app: AppHandle<R>) -> Res<()> {
+    act(app, move |c| c.step(Step::Forward)).await
 }
 
 /// `reload(hard?)`.
+///
+/// # Errors
+///
+/// Fails only when the worker thread that runs the command panics.
 #[tauri::command]
-pub fn reload<R: Runtime>(app: AppHandle<R>, hard: Option<bool>) {
-    act(app, move |c| c.reload(hard.unwrap_or(false)));
+pub async fn reload<R: Runtime>(app: AppHandle<R>, hard: Option<bool>) -> Res<()> {
+    act(app, move |c| c.reload(hard.unwrap_or(false))).await
 }
 
 /// `stop()`.
+///
+/// # Errors
+///
+/// Fails only when the worker thread that runs the command panics.
 #[tauri::command]
-pub fn stop<R: Runtime>(app: AppHandle<R>) {
-    act(app, Core::stop);
+pub async fn stop<R: Runtime>(app: AppHandle<R>) -> Res<()> {
+    act(app, Core::stop).await
 }
 
 /// `home()`.
+///
+/// # Errors
+///
+/// Fails only when the worker thread that runs the command panics.
 #[tauri::command]
-pub fn home<R: Runtime>(app: AppHandle<R>) {
-    act(app, Core::home);
+pub async fn home<R: Runtime>(app: AppHandle<R>) -> Res<()> {
+    act(app, Core::home).await
 }
 
 /// `find(query, forward, matchCase)`.
+///
+/// # Errors
+///
+/// Fails only when the worker thread that runs the command panics.
 #[tauri::command]
-pub fn find<R: Runtime>(app: AppHandle<R>, query: String, forward: bool, match_case: bool) {
-    act(app, move |c| c.find(&query, forward, match_case));
+pub async fn find<R: Runtime>(
+    app: AppHandle<R>,
+    query: String,
+    forward: bool,
+    match_case: bool,
+) -> Res<()> {
+    act(app, move |c| c.find(&query, forward, match_case)).await
 }
 
 /// `find_close()`.
+///
+/// # Errors
+///
+/// Fails only when the worker thread that runs the command panics.
 #[tauri::command]
-pub fn find_close<R: Runtime>(app: AppHandle<R>) {
-    act(app, Core::find_close);
+pub async fn find_close<R: Runtime>(app: AppHandle<R>) -> Res<()> {
+    act(app, Core::find_close).await
 }
 
 /// `zoom_in()`.
+///
+/// # Errors
+///
+/// Fails only when the worker thread that runs the command panics.
 #[tauri::command]
-pub fn zoom_in<R: Runtime>(app: AppHandle<R>) {
-    act(app, move |c| c.zoom(Zoom::In));
+pub async fn zoom_in<R: Runtime>(app: AppHandle<R>) -> Res<()> {
+    act(app, move |c| c.zoom(Zoom::In)).await
 }
 
 /// `zoom_out()`.
+///
+/// # Errors
+///
+/// Fails only when the worker thread that runs the command panics.
 #[tauri::command]
-pub fn zoom_out<R: Runtime>(app: AppHandle<R>) {
-    act(app, move |c| c.zoom(Zoom::Out));
+pub async fn zoom_out<R: Runtime>(app: AppHandle<R>) -> Res<()> {
+    act(app, move |c| c.zoom(Zoom::Out)).await
 }
 
 /// `zoom_reset()`.
+///
+/// # Errors
+///
+/// Fails only when the worker thread that runs the command panics.
 #[tauri::command]
-pub fn zoom_reset<R: Runtime>(app: AppHandle<R>) {
-    act(app, move |c| c.zoom(Zoom::Reset));
+pub async fn zoom_reset<R: Runtime>(app: AppHandle<R>) -> Res<()> {
+    act(app, move |c| c.zoom(Zoom::Reset)).await
 }
 
 /// `site_js_set(host, on)`.
+///
+/// # Errors
+///
+/// Fails only when the worker thread that runs the command panics.
 #[tauri::command]
-pub fn site_js_set<R: Runtime>(app: AppHandle<R>, host: String, on: bool) {
-    act(app, move |c| c.site_js_set(&host, on));
+pub async fn site_js_set<R: Runtime>(app: AppHandle<R>, host: String, on: bool) -> Res<()> {
+    act(app, move |c| c.site_js_set(&host, on)).await
 }
 
 /// `bookmarks_list()`.
+///
+/// # Errors
+///
+/// Fails only when the worker thread that runs the command panics.
 #[tauri::command]
-#[must_use]
-pub fn bookmarks_list<R: Runtime>(app: AppHandle<R>) -> Vec<Bookmark> {
-    read(app, Core::bookmarks_list)
+pub async fn bookmarks_list<R: Runtime>(app: AppHandle<R>) -> Res<Vec<Bookmark>> {
+    read(app, Core::bookmarks_list).await
 }
 
 /// `bookmark_add({bookmark})`.
@@ -183,34 +276,48 @@ pub fn bookmarks_list<R: Runtime>(app: AppHandle<R>) -> Vec<Bookmark> {
 ///
 /// Fails for a URL that is not an I2P site or an internal page.
 #[tauri::command]
-pub fn bookmark_add<R: Runtime>(app: AppHandle<R>, bookmark: NewBookmark) -> Res<Bookmark> {
-    run(app, move |c| split(c.bookmark_add(&bookmark, now_ms())))
+pub async fn bookmark_add<R: Runtime>(app: AppHandle<R>, bookmark: NewBookmark) -> Res<Bookmark> {
+    run(app, move |c| split(c.bookmark_add(&bookmark, now_ms()))).await?
 }
 
 /// `bookmark_update({bookmark})`.
+///
+/// # Errors
+///
+/// Fails only when the worker thread that runs the command panics.
 #[tauri::command]
-pub fn bookmark_update<R: Runtime>(app: AppHandle<R>, bookmark: Bookmark) {
-    act(app, move |c| c.bookmark_update(&bookmark));
+pub async fn bookmark_update<R: Runtime>(app: AppHandle<R>, bookmark: Bookmark) -> Res<()> {
+    act(app, move |c| c.bookmark_update(&bookmark)).await
 }
 
 /// `bookmark_remove(id)`.
+///
+/// # Errors
+///
+/// Fails only when the worker thread that runs the command panics.
 #[tauri::command]
-pub fn bookmark_remove<R: Runtime>(app: AppHandle<R>, id: String) {
-    act(app, move |c| c.bookmark_remove(&id));
+pub async fn bookmark_remove<R: Runtime>(app: AppHandle<R>, id: String) -> Res<()> {
+    act(app, move |c| c.bookmark_remove(&id)).await
 }
 
 /// `bookmark_find(url)`.
+///
+/// # Errors
+///
+/// Fails only when the worker thread that runs the command panics.
 #[tauri::command]
-#[must_use]
-pub fn bookmark_find<R: Runtime>(app: AppHandle<R>, url: String) -> Option<Bookmark> {
-    read(app, move |c| c.bookmark_find(&url))
+pub async fn bookmark_find<R: Runtime>(app: AppHandle<R>, url: String) -> Res<Option<Bookmark>> {
+    read(app, move |c| c.bookmark_find(&url)).await
 }
 
 /// `bookmarks_export()`.
+///
+/// # Errors
+///
+/// Fails only when the worker thread that runs the command panics.
 #[tauri::command]
-#[must_use]
-pub fn bookmarks_export<R: Runtime>(app: AppHandle<R>) -> String {
-    read(app, Core::bookmarks_export)
+pub async fn bookmarks_export<R: Runtime>(app: AppHandle<R>) -> Res<String> {
+    read(app, Core::bookmarks_export).await
 }
 
 /// `bookmarks_export_file()`: writes the export to the Downloads folder, returns the path.
@@ -219,9 +326,10 @@ pub fn bookmarks_export<R: Runtime>(app: AppHandle<R>) -> String {
 ///
 /// Fails when there is no Downloads folder or the file cannot be written.
 #[tauri::command]
-pub fn bookmarks_export_file<R: Runtime>(app: AppHandle<R>) -> Res<String> {
+pub async fn bookmarks_export_file<R: Runtime>(app: AppHandle<R>) -> Res<String> {
     let dir = app.path().download_dir().map_err(|e| e.to_string())?;
-    write_export(&dir, &read(app, Core::bookmarks_export), now_ms())
+    let text = read(app, Core::bookmarks_export).await?;
+    blocking(move || write_export(&dir, &text, now_ms())).await?
 }
 
 /// Writes a bookmark export into `dir`, returns the path.
@@ -237,24 +345,31 @@ fn write_export(dir: &Path, text: &str, now: u64) -> Res<String> {
 ///
 /// Fails when the text is not bookmark JSON.
 #[tauri::command]
-pub fn bookmarks_import<R: Runtime>(app: AppHandle<R>, json: String) -> Res<usize> {
-    run(app, move |c| split(c.bookmarks_import(&json, now_ms())))
+pub async fn bookmarks_import<R: Runtime>(app: AppHandle<R>, json: String) -> Res<usize> {
+    run(app, move |c| split(c.bookmarks_import(&json, now_ms()))).await?
 }
 
 /// `history_query({query})`.
+///
+/// # Errors
+///
+/// Fails only when the worker thread that runs the command panics.
 #[tauri::command]
-#[must_use]
-pub fn history_query<R: Runtime>(
+pub async fn history_query<R: Runtime>(
     app: AppHandle<R>,
     query: Option<HistoryQuery>,
-) -> Vec<HistoryEntry> {
-    read(app, move |c| c.history_query(&query.unwrap_or_default()))
+) -> Res<Vec<HistoryEntry>> {
+    read(app, move |c| c.history_query(&query.unwrap_or_default())).await
 }
 
 /// `history_remove(id)`.
+///
+/// # Errors
+///
+/// Fails only when the worker thread that runs the command panics.
 #[tauri::command]
-pub fn history_remove<R: Runtime>(app: AppHandle<R>, id: String) {
-    act(app, move |c| c.history_remove(&id));
+pub async fn history_remove<R: Runtime>(app: AppHandle<R>, id: String) -> Res<()> {
+    act(app, move |c| c.history_remove(&id)).await
 }
 
 /// `history_clear(range)`.
@@ -263,24 +378,31 @@ pub fn history_remove<R: Runtime>(app: AppHandle<R>, id: String) {
 ///
 /// Fails for an unknown range.
 #[tauri::command]
-pub fn history_clear<R: Runtime>(app: AppHandle<R>, range: String) -> Res<()> {
+pub async fn history_clear<R: Runtime>(app: AppHandle<R>, range: String) -> Res<()> {
     run(app, move |c| {
         split(c.history_clear(&range, now_ms()).map(|fx| ((), fx)))
     })
+    .await?
 }
 
 /// `suggest(input)`.
+///
+/// # Errors
+///
+/// Fails only when the worker thread that runs the command panics.
 #[tauri::command]
-#[must_use]
-pub fn suggest<R: Runtime>(app: AppHandle<R>, input: String) -> Vec<Suggestion> {
-    read(app, move |c| c.suggest(&input, now_ms()))
+pub async fn suggest<R: Runtime>(app: AppHandle<R>, input: String) -> Res<Vec<Suggestion>> {
+    read(app, move |c| c.suggest(&input, now_ms())).await
 }
 
 /// `settings_get()`.
+///
+/// # Errors
+///
+/// Fails only when the worker thread that runs the command panics.
 #[tauri::command]
-#[must_use]
-pub fn settings_get<R: Runtime>(app: AppHandle<R>) -> Settings {
-    read(app, move |c| c.settings().clone())
+pub async fn settings_get<R: Runtime>(app: AppHandle<R>) -> Res<Settings> {
+    read(app, move |c| c.settings().clone()).await
 }
 
 /// `settings_set({patch})`.
@@ -289,26 +411,32 @@ pub fn settings_get<R: Runtime>(app: AppHandle<R>) -> Settings {
 ///
 /// Fails for a bad patch.
 #[tauri::command]
-pub fn settings_set<R: Runtime>(app: AppHandle<R>, patch: Value) -> Res<Settings> {
-    run(app, move |c| split(c.settings_set(&patch)))
+pub async fn settings_set<R: Runtime>(app: AppHandle<R>, patch: Value) -> Res<Settings> {
+    run(app, move |c| split(c.settings_set(&patch))).await?
 }
 
 /// `router_status()`.
+///
+/// # Errors
+///
+/// Fails only when the worker thread that runs the command panics.
 #[tauri::command]
-#[must_use]
-pub fn router_status<R: Runtime>(app: AppHandle<R>) -> RouterStatus {
-    read(app, move |c| c.router().clone())
+pub async fn router_status<R: Runtime>(app: AppHandle<R>) -> Res<RouterStatus> {
+    read(app, move |c| c.router().clone()).await
 }
 
 /// `router_stats()`: from the router helper named by `EEPVIEW_ROUTER_STATUS` and
 /// `EEPVIEW_ROUTER_STATUS_TOKEN`; all fields `null` without one. `history` holds the
 /// bandwidth of the last 10 minutes.
+///
+/// # Errors
+///
+/// Fails only when the worker thread that runs the command panics.
 #[tauri::command]
-#[must_use]
-pub fn router_stats<R: Runtime>(app: AppHandle<R>) -> RouterStats {
-    let mut stats = helper_stats(super::env::router_helper());
-    stats.history = read(app, Core::stats_history);
-    stats
+pub async fn router_stats<R: Runtime>(app: AppHandle<R>) -> Res<RouterStats> {
+    let mut stats = blocking(|| helper_stats(super::env::router_helper())).await?;
+    stats.history = read(app, Core::stats_history).await?;
+    Ok(stats)
 }
 
 /// The router helper statistics, all `null` without a helper.
@@ -319,24 +447,33 @@ pub fn helper_stats(helper: Option<(LoopbackAddr, String)>) -> RouterStats {
 }
 
 /// `connection_pause()`: closes the gatekeeper and every tab webview until resume.
+///
+/// # Errors
+///
+/// Fails only when the worker thread that runs the command panics.
 #[tauri::command]
-pub fn connection_pause<R: Runtime>(app: AppHandle<R>) {
+pub async fn connection_pause<R: Runtime>(app: AppHandle<R>) -> Res<()> {
     let gate = app.clone();
-    act(app, Core::pause);
-    super::watch::close_gate(&gate);
+    act(app, Core::pause).await?;
+    blocking(move || super::watch::close_gate(&gate)).await
 }
 
 /// `connection_resume()`: VERIFY again; the gatekeeper opens only when it passes.
+///
+/// # Errors
+///
+/// Fails only when the worker thread that runs the command panics.
 #[tauri::command]
-pub fn connection_resume<R: Runtime>(app: AppHandle<R>) {
-    resume(app, super::env::proxy());
+pub async fn connection_resume<R: Runtime>(app: AppHandle<R>) -> Res<()> {
+    resume(app, super::env::proxy()).await
 }
 
 /// Resumes the core, then VERIFYs `proxy` off the main thread.
-fn resume<R: Runtime>(app: AppHandle<R>, proxy: Result<LoopbackAddr, String>) {
+async fn resume<R: Runtime>(app: AppHandle<R>, proxy: Result<LoopbackAddr, String>) -> Res<()> {
     let check = app.clone();
-    act(app, Core::resume);
+    act(app, Core::resume).await?;
     super::watch::check_now(&check, proxy);
+    Ok(())
 }
 
 /// `router_control(action)`: `stop`, `start` or `restart`. eepview does not run the router
@@ -357,28 +494,38 @@ pub fn router_control(action: &str) -> Res<ControlResult> {
 }
 
 /// `chrome_set_height(px)`: the toolbar grows over the content while a popup is open; 0 ends it.
+///
+/// # Errors
+///
+/// Fails only when the worker thread that runs the command panics.
 #[tauri::command]
-pub fn chrome_set_height<R: Runtime>(app: AppHandle<R>, px: f64) {
-    act(app, move |c| c.set_toolbar_request(px));
+pub async fn chrome_set_height<R: Runtime>(app: AppHandle<R>, px: f64) -> Res<()> {
+    act(app, move |c| c.set_toolbar_request(px)).await
 }
 
 /// `chrome_insets()`: the space the tab strip leaves for the macOS window buttons (0 in
 /// full screen and on Windows and Linux).
+///
+/// # Errors
+///
+/// Fails only when the worker thread that runs the command panics.
 #[tauri::command]
-#[must_use]
-pub fn chrome_insets<R: Runtime>(app: AppHandle<R>) -> ChromeInsets {
-    let insets = super::view::chrome_insets(&app);
-    drop(app);
-    insets
+pub async fn chrome_insets<R: Runtime>(app: AppHandle<R>) -> Res<ChromeInsets> {
+    blocking(move || super::view::chrome_insets(&app)).await
 }
 
 /// `window_fullscreen()`: whether the window is in full screen now.
+///
+/// # Errors
+///
+/// Fails only when the worker thread that runs the command panics.
 #[tauri::command]
-#[must_use]
-pub fn window_fullscreen<R: Runtime>(app: AppHandle<R>) -> bool {
-    let window = app.get_window("main");
-    drop(app);
-    window.is_some_and(|w| w.is_fullscreen().unwrap_or(false))
+pub async fn window_fullscreen<R: Runtime>(app: AppHandle<R>) -> Res<bool> {
+    blocking(move || {
+        let window = app.get_window("main");
+        window.is_some_and(|w| w.is_fullscreen().unwrap_or(false))
+    })
+    .await
 }
 
 /// `platform()`: `macos`, `windows` or `linux`.

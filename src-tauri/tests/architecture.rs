@@ -295,3 +295,22 @@ fn nested_webview_calls_leave_the_with_webview_closure() {
         );
     }
 }
+
+#[test]
+fn commands_that_take_the_app_are_async() {
+    // A plain `fn` command runs on the main thread. Every command that takes the app reaches
+    // the core, a store, a lock or the router, so it must be `async` and work off that thread.
+    let lines = code(&root().join("src/shell/commands.rs")).unwrap();
+    let mut checked = 0;
+    for (i, line) in lines.iter().enumerate() {
+        if line.trim() != "#[tauri::command]" {
+            continue;
+        }
+        let sig: String = lines[i + 1..].iter().take(3).cloned().collect();
+        if sig.contains("AppHandle") {
+            assert!(sig.starts_with("pub async fn"), "sync command: {sig}");
+        }
+        checked += 1;
+    }
+    assert!(checked > 30, "found only {checked} commands");
+}
