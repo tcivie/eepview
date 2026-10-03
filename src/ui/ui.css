@@ -191,7 +191,7 @@ a:hover {
 }
 
 .btn-quiet:hover {
-  background: var(--color-accent-soft);
+  background: var(--color-selected);
   color: var(--color-accent);
 }
 
@@ -242,7 +242,7 @@ a:hover {
 
 .icon-btn[aria-pressed="true"] {
   color: var(--color-accent);
-  background: var(--color-accent-soft);
+  background: var(--color-selected);
 }
 
 /* Form controls */
@@ -391,8 +391,9 @@ a:hover {
 }
 
 .rail-nav a[aria-current="page"] {
-  background: var(--color-accent-soft);
-  color: var(--color-accent);
+  background: var(--color-selected);
+  color: var(--color-text);
+  box-shadow: inset 3px 0 0 var(--color-accent);
 }
 
 .rail-foot {
@@ -468,19 +469,20 @@ a:hover {
   background: currentColor;
 }
 
-.chip[data-tone="ready"] {
-  background: var(--color-success-soft);
-  color: var(--color-success);
+.chip[data-tone] {
+  color: var(--color-text);
 }
 
-.chip[data-tone="building"] {
-  background: var(--color-warning-soft);
-  color: var(--color-warning);
+.chip[data-tone="ready"]::before {
+  background: var(--color-success);
 }
 
-.chip[data-tone="stopped"] {
-  background: var(--color-danger-soft);
-  color: var(--color-danger);
+.chip[data-tone="building"]::before {
+  background: var(--color-warning);
+}
+
+.chip[data-tone="stopped"]::before {
+  background: var(--color-danger);
 }
 
 /* Hop strip: a tunnel drawn as you, three hops, then the far end. */
@@ -538,7 +540,7 @@ a:hover {
 
 .hop[data-state="built"] + .hop[data-state="built"]::before {
   border-top-style: solid;
-  border-top-color: var(--color-accent-line);
+  border-top-color: var(--color-border-strong);
 }
 
 .hop[data-state="building"] .hop-node {
@@ -589,7 +591,12 @@ a:hover {
   color: var(--color-text-muted);
 }
 
+.facts > div {
+  min-width: 0;
+}
+
 .facts dd {
+  overflow-wrap: anywhere;
   margin-top: 2px;
   font-weight: var(--fw-medium);
   font-variant-numeric: tabular-nums;

@@ -116,19 +116,19 @@
   width: 16px;
   height: 16px;
   border-radius: 4px;
-  background: var(--color-accent-soft);
-  color: var(--color-accent);
+  background: var(--color-selected);
+  color: var(--color-text-muted);
   font-size: 10px;
   font-weight: var(--fw-strong);
 }
 
 .tab.is-internal .tab-icon {
-  border: 1.5px solid var(--color-accent-line);
+  border: 1.5px solid var(--color-border-strong);
   background: transparent;
 }
 
 .tab.is-loading .tab-icon {
-  border: 2px solid var(--color-accent-soft);
+  border: 2px solid var(--color-border);
   border-top-color: var(--color-accent);
   border-radius: 50%;
   background: transparent;
@@ -339,7 +339,7 @@
 
 .suggestion:hover,
 .suggestion[aria-selected="true"] {
-  background: var(--color-accent-soft);
+  background: var(--color-selected);
 }
 
 .suggestion-title {
@@ -766,8 +766,8 @@
 }
 
 .rp-spark-area {
-  fill: var(--color-accent-soft);
-  opacity: 0.7;
+  fill: var(--color-accent);
+  opacity: 0.14;
 }
 
 .rp-spark-line {
