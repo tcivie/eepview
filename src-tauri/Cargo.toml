@@ -21,6 +21,11 @@ name = "eepview_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [dev-dependencies]
+# Property tests of the robustness suite (tests/robust_*.rs). No default features: no fork, no timeout.
+proptest = { version = "1.11.0", default-features = false, features = ["std"] }
+# The L3 rule is a regex; the tests run the real rule against the same URLs as the guard.
+# Already in the tree through Tauri.
+regex = { version = "1", default-features = false, features = ["std"] }
 # The mock runtime (`tauri::test`) for the shell tests.
 tauri = { version = "2", default-features = false, features = ["test", "unstable", "wry"] }
 
