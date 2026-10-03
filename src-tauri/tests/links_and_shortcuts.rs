@@ -8,7 +8,7 @@
 
 use std::collections::{BTreeSet, HashMap};
 
-use eepview_lib::context_menu::{Entry, ItemId, Target, context_menu};
+use eepview_lib::context_menu::{Entry, ItemId, PageHistory, Target, context_menu};
 use eepview_lib::core::{Core, Effect, Event, WebOp};
 use eepview_lib::input::{Disposition, Modifiers, MouseButton, link_disposition};
 use eepview_lib::shortcuts::{self, Action, Chord};
@@ -25,11 +25,11 @@ fn mods(spec: &str) -> Modifiers {
     let mut m = Modifiers::default();
     for part in spec.split('+').filter(|p| !p.is_empty()) {
         match part {
-            "meta" => m.meta = true,
-            "ctrl" => m.ctrl = true,
-            "alt" => m.alt = true,
-            "shift" => m.shift = true,
-            other => panic!("bad modifier {other}"),
+            "meta" => m = m.with_meta(true),
+            "ctrl" => m = m.with_ctrl(true),
+            "alt" => m = m.with_alt(true),
+            "shift" => m = m.with_shift(true),
+            other => unreachable!("bad modifier {other}"),
         }
     }
     m
@@ -37,17 +37,32 @@ fn mods(spec: &str) -> Modifiers {
 
 /// The four modifier flags as one number, so a combination can be a map key.
 fn bits(m: Modifiers) -> u8 {
-    u8::from(m.meta) | (u8::from(m.ctrl) << 1) | (u8::from(m.alt) << 2) | (u8::from(m.shift) << 3)
+    u8::from(m.meta())
+        | (u8::from(m.ctrl()) << 1)
+        | (u8::from(m.alt()) << 2)
+        | (u8::from(m.shift()) << 3)
 }
 
 /// Every one of the 16 modifier combinations.
 fn all_modifiers() -> Vec<Modifiers> {
     (0..16u8)
-        .map(|b| Modifiers {
-            meta: b & 1 != 0,
-            ctrl: b & 2 != 0,
-            alt: b & 4 != 0,
-            shift: b & 8 != 0,
+        .map(|b| {
+            Modifiers::default()
+                .with_meta(b & 1 != 0)
+                .with_ctrl(b & 2 != 0)
+                .with_alt(b & 4 != 0)
+                .with_shift(b & 8 != 0)
+        })
+        .collect()
+}
+
+/// Every `(mac, button, modifiers)` case for the given systems and buttons.
+fn link_cases(macs: &[bool], buttons: &[MouseButton]) -> Vec<(bool, MouseButton, Modifiers)> {
+    macs.iter()
+        .flat_map(|&mac| {
+            buttons
+                .iter()
+                .flat_map(move |&button| all_modifiers().into_iter().map(move |m| (mac, button, m)))
         })
         .collect()
 }
@@ -84,9 +99,9 @@ const BUTTONS: [MouseButton; 6] = [
 
 /// The rules L1-L7 as the interface section states them.
 fn expected_disposition(mac: bool, m: Modifiers, button: MouseButton) -> Disposition {
-    let new_tab_key = if mac { m.meta } else { m.ctrl };
+    let new_tab_key = if mac { m.meta() } else { m.ctrl() };
     let primary_like = matches!(button, MouseButton::Primary | MouseButton::None);
-    if mac && m.ctrl && primary_like {
+    if mac && m.ctrl() && primary_like {
         // L6: Ctrl+click is the secondary click on macOS, whatever the other modifiers.
         return Disposition::CurrentTab;
     }
@@ -95,7 +110,7 @@ fn expected_disposition(mac: bool, m: Modifiers, button: MouseButton) -> Disposi
         MouseButton::Primary | MouseButton::None => new_tab_key,
         _ => return Disposition::CurrentTab,
     };
-    if m.shift {
+    if m.shift() {
         Disposition::NewForegroundTab
     } else if opens_tab {
         Disposition::NewBackgroundTab
@@ -194,18 +209,14 @@ fn l5_shift_click_alone_opens_a_foreground_tab() {
 
 #[test]
 fn l6_alt_never_changes_the_result() {
-    for mac in [true, false] {
-        for button in BUTTONS {
-            for m in all_modifiers() {
-                let with_alt = Modifiers { alt: true, ..m };
-                let without_alt = Modifiers { alt: false, ..m };
-                assert_eq!(
-                    link_disposition(mac, with_alt, button),
-                    link_disposition(mac, without_alt, button),
-                    "mac={mac} {button:?} {m:?}"
-                );
-            }
-        }
+    for (mac, button, m) in link_cases(&[true, false], &BUTTONS) {
+        let with_alt = m.with_alt(true);
+        let without_alt = m.with_alt(false);
+        assert_eq!(
+            link_disposition(mac, with_alt, button),
+            link_disposition(mac, without_alt, button),
+            "mac={mac} {button:?} {m:?}"
+        );
     }
 }
 
@@ -232,16 +243,14 @@ fn l6_macos_ctrl_click_never_opens_a_tab() {
 
 #[test]
 fn l6_super_changes_nothing_on_windows_and_linux() {
-    for button in BUTTONS {
-        for m in all_modifiers() {
-            let meta_on = Modifiers { meta: true, ..m };
-            let meta_off = Modifiers { meta: false, ..m };
-            assert_eq!(
-                link_disposition(false, meta_on, button),
-                link_disposition(false, meta_off, button),
-                "Windows Super {button:?} {m:?}"
-            );
-        }
+    for (_, button, m) in link_cases(&[false], &BUTTONS) {
+        let meta_on = m.with_meta(true);
+        let meta_off = m.with_meta(false);
+        assert_eq!(
+            link_disposition(false, meta_on, button),
+            link_disposition(false, meta_off, button),
+            "Windows Super {button:?} {m:?}"
+        );
     }
 }
 
@@ -249,7 +258,7 @@ fn l6_super_changes_nothing_on_windows_and_linux() {
 fn l6_macos_ctrl_on_a_primary_or_keyboard_activation_is_the_current_tab_with_any_other_key() {
     for button in [MouseButton::Primary, MouseButton::None] {
         for m in all_modifiers() {
-            let with_ctrl = Modifiers { ctrl: true, ..m };
+            let with_ctrl = m.with_ctrl(true);
             assert_eq!(
                 link_disposition(true, with_ctrl, button),
                 Disposition::CurrentTab,
@@ -273,8 +282,8 @@ fn l6_macos_ctrl_shift_click_and_ctrl_cmd_click_never_open_a_tab() {
 #[test]
 fn l3_macos_ctrl_does_not_change_a_middle_click() {
     for m in all_modifiers() {
-        let ctrl_on = Modifiers { ctrl: true, ..m };
-        let ctrl_off = Modifiers { ctrl: false, ..m };
+        let ctrl_on = m.with_ctrl(true);
+        let ctrl_off = m.with_ctrl(false);
         assert_eq!(
             link_disposition(true, ctrl_on, MouseButton::Middle),
             link_disposition(true, ctrl_off, MouseButton::Middle),
@@ -307,35 +316,28 @@ fn l7_a_keyboard_activation_follows_the_click_rules() {
 
 #[test]
 fn l1_to_l7_secondary_back_and_forward_buttons_never_follow_a_link() {
-    for mac in [true, false] {
-        for button in [
-            MouseButton::Secondary,
-            MouseButton::Back,
-            MouseButton::Forward,
-        ] {
-            for m in all_modifiers() {
-                assert_eq!(
-                    link_disposition(mac, m, button),
-                    Disposition::CurrentTab,
-                    "mac={mac} {button:?} {m:?}"
-                );
-            }
-        }
+    let buttons = [
+        MouseButton::Secondary,
+        MouseButton::Back,
+        MouseButton::Forward,
+    ];
+    for (mac, button, m) in link_cases(&[true, false], &buttons) {
+        assert_eq!(
+            link_disposition(mac, m, button),
+            Disposition::CurrentTab,
+            "mac={mac} {button:?} {m:?}"
+        );
     }
 }
 
 #[test]
 fn l1_to_l7_full_table_of_system_by_modifiers_by_button() {
-    for mac in [true, false] {
-        for button in BUTTONS {
-            for m in all_modifiers() {
-                assert_eq!(
-                    link_disposition(mac, m, button),
-                    expected_disposition(mac, m, button),
-                    "mac={mac} {button:?} {m:?}"
-                );
-            }
-        }
+    for (mac, button, m) in link_cases(&[true, false], &BUTTONS) {
+        assert_eq!(
+            link_disposition(mac, m, button),
+            expected_disposition(mac, m, button),
+            "mac={mac} {button:?} {m:?}"
+        );
     }
 }
 
@@ -363,7 +365,10 @@ fn core() -> Core {
 }
 
 fn parse(s: &str) -> Url {
-    Url::parse(s).unwrap_or_else(|e| panic!("bad test url {s}: {e}"))
+    match Url::parse(s) {
+        Ok(url) => url,
+        Err(e) => unreachable!("bad test url {s}: {e}"),
+    }
 }
 
 fn tab_ids(c: &Core) -> Vec<u32> {
@@ -371,9 +376,10 @@ fn tab_ids(c: &Core) -> Vec<u32> {
 }
 
 fn tab_url(c: &Core, id: u32) -> String {
-    c.tab_info(id)
-        .map(|t| t.url)
-        .unwrap_or_else(|| panic!("no tab {id}"))
+    match c.tab_info(id) {
+        Some(t) => t.url,
+        None => unreachable!("no tab {id}"),
+    }
 }
 
 fn loads(fx: &[Effect]) -> Vec<(u32, String)> {
@@ -395,11 +401,9 @@ fn takes_focus(fx: &[Effect]) -> bool {
 fn opener_and_other() -> (Core, u32, u32) {
     let mut c = core();
     let opener = c.tabs().active_id();
-    let other = c
-        .tab_new(None, Place::End)
-        .0
-        .map(|t| t.id)
-        .expect("tab_new gave no tab");
+    let Some(other) = c.tab_new(None, Place::End).0.map(|t| t.id) else {
+        unreachable!("tab_new gave no tab");
+    };
     c.tab_select(opener);
     assert_eq!(c.tabs().active_id(), opener);
     (c, opener, other)
@@ -457,15 +461,15 @@ fn l8_background_tab_opens_right_after_the_tab_that_opened_it() {
 #[test]
 fn l8_several_background_opens_keep_the_order_of_the_clicks() {
     let (mut c, opener, other) = opener_and_other();
-    let mut opened = Vec::new();
+    let mut run = Vec::new();
     for n in 1..=3 {
         let before = tab_ids(&c);
         let url = parse(&format!("http://site{n}.i2p/"));
         c.open_link(&url, Disposition::NewBackgroundTab);
-        opened.push(only_new(&before, &c));
+        run.push(only_new(&before, &c));
     }
     let mut want = vec![opener];
-    want.extend(&opened);
+    want.extend(&run);
     want.push(other);
     assert_eq!(tab_ids(&c), want);
     assert_eq!(c.tabs().active_id(), opener);
@@ -677,7 +681,10 @@ fn os_rows(mac: bool) -> Vec<(String, String)> {
 }
 
 fn action_of(id: &str) -> Action {
-    shortcuts::action(id).unwrap_or_else(|| panic!("action({id:?}) is None"))
+    match shortcuts::action(id) {
+        Some(action) => action,
+        None => unreachable!("action({id:?}) is None"),
+    }
 }
 
 fn assert_rows_map_to_actions(mac: bool) {
@@ -700,43 +707,45 @@ fn k1_every_row_maps_to_its_action_on_windows_and_linux() {
     assert_rows_map_to_actions(false);
 }
 
+/// Codes beyond the rows of K1 that must give no shortcut with any modifiers.
+const EXTRA: [&str; 33] = [
+    "KeyA",
+    "KeyC",
+    "KeyV",
+    "KeyX",
+    "KeyZ",
+    "KeyQ",
+    "KeyU",
+    "Backspace",
+    "Delete",
+    "ArrowLeft",
+    "ArrowRight",
+    "ArrowUp",
+    "ArrowDown",
+    "Home",
+    "End",
+    "PageUp",
+    "PageDown",
+    "F1",
+    "F4",
+    "F5",
+    "F6",
+    "F11",
+    "F12",
+    "Enter",
+    "Space",
+    "Tab",
+    "Escape",
+    "Period",
+    "Comma",
+    "Slash",
+    "Backslash",
+    "Backquote",
+    "Digit0",
+];
+
 #[test]
 fn k1_extra_codes_are_checked_with_every_modifier_combination() {
-    const EXTRA: [&str; 33] = [
-        "KeyA",
-        "KeyC",
-        "KeyV",
-        "KeyX",
-        "KeyZ",
-        "KeyQ",
-        "KeyU",
-        "Backspace",
-        "Delete",
-        "ArrowLeft",
-        "ArrowRight",
-        "ArrowUp",
-        "ArrowDown",
-        "Home",
-        "End",
-        "PageUp",
-        "PageDown",
-        "F1",
-        "F4",
-        "F5",
-        "F6",
-        "F11",
-        "F12",
-        "Enter",
-        "Space",
-        "Tab",
-        "Escape",
-        "Period",
-        "Comma",
-        "Slash",
-        "Backslash",
-        "Backquote",
-        "Digit0",
-    ];
     for mac in [true, false] {
         let mut model: HashMap<(String, u8), String> = HashMap::new();
         let mut codes: BTreeSet<String> = EXTRA.iter().map(|c| (*c).to_owned()).collect();
@@ -746,12 +755,21 @@ fn k1_extra_codes_are_checked_with_every_modifier_combination() {
             let clash = model.insert((c.code, bits(c.modifiers)), id);
             assert!(clash.is_none(), "K1 gives one chord to two ids: {clash:?}");
         }
-        for code in &codes {
-            for m in all_modifiers() {
-                let got = shortcuts::lookup(mac, &press(code, m));
-                let want = model.get(&(code.clone(), bits(m))).map(|id| action_of(id));
-                assert!(got == want, "mac={mac} {code} {m:?}: got {got:?}");
-            }
+        assert_model_matches(mac, &model, &codes);
+    }
+}
+
+/// `lookup` agrees with the model of K1 for every code and every modifier combination.
+fn assert_model_matches(
+    mac: bool,
+    model: &HashMap<(String, u8), String>,
+    codes: &BTreeSet<String>,
+) {
+    for code in codes {
+        for m in all_modifiers() {
+            let got = shortcuts::lookup(mac, &press(code, m));
+            let want = model.get(&(code.clone(), bits(m))).map(|id| action_of(id));
+            assert!(got == want, "mac={mac} {code} {m:?}: got {got:?}");
         }
     }
 }
@@ -869,12 +887,12 @@ fn parse_accel(mac: bool, accel: &str) -> Chord {
     let mut m = Modifiers::default();
     for part in parts {
         match part {
-            "CmdOrCtrl" if mac => m.meta = true,
-            "CmdOrCtrl" | "Ctrl" | "Control" => m.ctrl = true,
-            "Cmd" | "Command" | "Super" => m.meta = true,
-            "Alt" | "Option" => m.alt = true,
-            "Shift" => m.shift = true,
-            other => panic!("unknown accelerator part {other} in {accel}"),
+            "CmdOrCtrl" if mac => m = m.with_meta(true),
+            "CmdOrCtrl" | "Ctrl" | "Control" => m = m.with_ctrl(true),
+            "Cmd" | "Command" | "Super" => m = m.with_meta(true),
+            "Alt" | "Option" => m = m.with_alt(true),
+            "Shift" => m = m.with_shift(true),
+            other => unreachable!("unknown accelerator part {other} in {accel}"),
         }
     }
     Chord { code, modifiers: m }
@@ -882,7 +900,7 @@ fn parse_accel(mac: bool, accel: &str) -> Chord {
 
 fn assert_table_matches_k1(mac: bool) {
     let table = shortcuts::table(mac);
-    let ids: Vec<String> = table.iter().map(|s| s.id.to_string()).collect();
+    let ids: Vec<String> = table.iter().map(|s| s.id.clone()).collect();
     let unique: BTreeSet<&String> = ids.iter().collect();
     assert_eq!(unique.len(), ids.len(), "mac={mac}: ids repeat: {ids:?}");
     let want: BTreeSet<String> = k1(mac).into_iter().map(|(id, _)| id).collect();
@@ -897,9 +915,9 @@ fn assert_table_matches_k1(mac: bool) {
         .collect();
     let mut seen = BTreeSet::new();
     for row in &table {
-        let c = parse_accel(mac, &row.accel.to_string());
+        let c = parse_accel(mac, &row.accel.clone());
         let key = (c.code, bits(c.modifiers));
-        assert_eq!(chords.get(&row.id.to_string()), Some(&key), "{}", row.id);
+        assert_eq!(chords.get(&row.id.clone()), Some(&key), "{}", row.id);
         assert!(seen.insert(key), "mac={mac}: accelerators repeat");
     }
 }
@@ -918,9 +936,7 @@ fn k1_table_on_windows_and_linux_has_the_rows_ids_and_accelerators_of_the_spec()
 fn k1_quit_is_not_in_the_table() {
     for mac in [true, false] {
         assert!(
-            shortcuts::table(mac)
-                .iter()
-                .all(|s| !s.id.to_string().contains("quit")),
+            shortcuts::table(mac).iter().all(|s| !s.id.contains("quit")),
             "mac={mac}"
         );
     }
@@ -930,8 +946,8 @@ fn k1_quit_is_not_in_the_table() {
 fn k1_a_row_accelerator_looks_up_to_the_action_of_the_same_row() {
     for mac in [true, false] {
         for row in shortcuts::table(mac) {
-            let c = parse_accel(mac, &row.accel.to_string());
-            let id = row.id.to_string();
+            let c = parse_accel(mac, &row.accel.clone());
+            let id = row.id.clone();
             assert!(
                 shortcuts::lookup(mac, &c) == Some(action_of(&id)),
                 "mac={mac} {id}"
@@ -943,15 +959,21 @@ fn k1_a_row_accelerator_looks_up_to_the_action_of_the_same_row() {
 #[test]
 fn k1_no_two_actions_share_one_chord_on_one_system() {
     for mac in [true, false] {
-        let mut owner: HashMap<(String, u8), String> = HashMap::new();
-        for (id, spec) in k1(mac) {
-            let c = chord(&spec);
-            let key = (c.code, bits(c.modifiers));
-            let action = format!("{:?}", action_of(&id));
-            if let Some(other) = owner.insert(key.clone(), id.clone()) {
-                panic!("mac={mac} {key:?} belongs to {other} and {id} ({action})");
-            }
-        }
+        assert_chords_are_unique(mac);
+    }
+}
+
+fn assert_chords_are_unique(mac: bool) {
+    let mut owner: HashMap<(String, u8), String> = HashMap::new();
+    for (id, spec) in k1(mac) {
+        let c = chord(&spec);
+        let key = (c.code, bits(c.modifiers));
+        let action = format!("{:?}", action_of(&id));
+        let other = owner.insert(key.clone(), id.clone());
+        assert!(
+            other.is_none(),
+            "mac={mac} {key:?} belongs to {other:?} and {id} ({action})"
+        );
     }
 }
 
@@ -1036,12 +1058,12 @@ fn k5_alt_left_and_alt_right_are_back_and_forward_on_windows_and_linux_only() {
 fn k5_clipboard_and_undo_keys_are_never_shortcuts() {
     for mac in [true, false] {
         let key = if mac { "meta" } else { "ctrl" };
-        for letter in ["KeyA", "KeyC", "KeyV", "KeyX", "KeyZ"] {
-            for extra in ["", "+shift"] {
-                let spec = format!("{key}{extra}+{letter}");
-                let got = shortcuts::lookup(mac, &chord(&spec));
-                assert!(got.is_none(), "mac={mac} {spec} gave {got:?}");
-            }
+        let specs = ["KeyA", "KeyC", "KeyV", "KeyX", "KeyZ"]
+            .into_iter()
+            .flat_map(|letter| ["", "+shift"].map(|extra| format!("{key}{extra}+{letter}")));
+        for spec in specs {
+            let got = shortcuts::lookup(mac, &chord(&spec));
+            assert!(got.is_none(), "mac={mac} {spec} gave {got:?}");
         }
     }
 }
@@ -1112,10 +1134,9 @@ fn p1_no_menu_bar_row_has_an_item_that_sends_data_out() {
     ];
     for mac in [true, false] {
         for row in shortcuts::table(mac) {
-            let label = row.label.to_string().to_lowercase();
-            for word in FORBIDDEN {
-                assert!(!label.contains(word), "mac={mac} {}: {label}", row.id);
-            }
+            let label = row.label.to_lowercase();
+            let hit = FORBIDDEN.iter().find(|word| label.contains(**word));
+            assert!(hit.is_none(), "mac={mac} {}: {label}", row.id);
         }
     }
 }
@@ -1181,7 +1202,12 @@ fn with_image(url: &str) -> Target {
 
 fn is_i2p(url: &str) -> bool {
     Url::parse(url).is_ok_and(|u| {
-        matches!(u.scheme(), "http" | "https") && u.host_str().is_some_and(|h| h.ends_with(".i2p"))
+        matches!(u.scheme(), "http" | "https")
+            && u.host_str().is_some_and(|h| {
+                std::path::Path::new(h)
+                    .extension()
+                    .is_some_and(|ext| ext.eq_ignore_ascii_case("i2p"))
+            })
     })
 }
 
@@ -1218,8 +1244,8 @@ fn editable_menu(selection: bool) -> Vec<Entry> {
 
 fn page_group(t: &Target) -> Vec<Entry> {
     vec![
-        item(ItemId::Back, t.can_back),
-        item(ItemId::Forward, t.can_forward),
+        item(ItemId::Back, t.history.can_back),
+        item(ItemId::Forward, t.history.can_forward),
         item(ItemId::Reload, true),
         Entry::Separator,
         item(ItemId::BookmarkPage, is_i2p(&t.page) && !t.bookmarked),
@@ -1342,8 +1368,10 @@ fn c6_selected_text_outside_a_text_field_gives_copy_only() {
 fn c7_an_empty_target_gives_the_page_menu() {
     let t = Target {
         page: I2P_PAGE.to_owned(),
-        can_back: true,
-        can_forward: true,
+        history: PageHistory {
+            can_back: true,
+            can_forward: true,
+        },
         ..target()
     };
     assert_eq!(
@@ -1366,8 +1394,10 @@ fn c7_back_and_forward_follow_the_history_of_the_tab() {
     for (back, forward) in [(false, false), (true, false), (false, true), (true, true)] {
         let t = Target {
             page: I2P_PAGE.to_owned(),
-            can_back: back,
-            can_forward: forward,
+            history: PageHistory {
+                can_back: back,
+                can_forward: forward,
+            },
             ..target()
         };
         let menu = context_menu(&t);
@@ -1447,30 +1477,45 @@ fn c8_the_page_group_shows_only_when_no_other_group_shows() {
     }
 }
 
+/// One target of the space: the link, the image, the page and five flags in one number.
+fn space_target(link: Option<&str>, image: Option<&str>, page: &str, flags: u8) -> Target {
+    Target {
+        link: link.map(str::to_owned),
+        image: image.map(str::to_owned),
+        selection: flags & 1 != 0,
+        editable: flags & 2 != 0,
+        page: page.to_owned(),
+        history: PageHistory {
+            can_back: flags & 4 != 0,
+            can_forward: flags & 8 != 0,
+        },
+        bookmarked: flags & 16 != 0,
+    }
+}
+
 fn target_space() -> Vec<Target> {
     let links = [None, Some(I2P_LINK), Some(CLEAR_LINK)];
     let images = [None, Some(I2P_IMAGE), Some(CLEAR_IMAGE)];
     let pages = ["", I2P_PAGE, CLEAR_LINK];
-    let mut space = Vec::new();
-    for link in links {
-        for image in images {
-            for page in pages {
-                for flags in 0..32u8 {
-                    space.push(Target {
-                        link: link.map(str::to_owned),
-                        image: image.map(str::to_owned),
-                        selection: flags & 1 != 0,
-                        editable: flags & 2 != 0,
-                        page: page.to_owned(),
-                        can_back: flags & 4 != 0,
-                        can_forward: flags & 8 != 0,
-                        bookmarked: flags & 16 != 0,
-                    });
-                }
-            }
-        }
-    }
-    space
+    links
+        .into_iter()
+        .flat_map(|link| images.into_iter().map(move |image| (link, image)))
+        .flat_map(|(link, image)| pages.into_iter().map(move |page| (link, image, page)))
+        .flat_map(|(link, image, page)| {
+            (0..32u8).map(move |flags| space_target(link, image, page, flags))
+        })
+        .collect()
+}
+
+/// The item ids of one menu, separators dropped.
+fn item_ids(t: &Target) -> Vec<ItemId> {
+    context_menu(t)
+        .into_iter()
+        .filter_map(|e| match e {
+            Entry::Item { id, .. } => Some(id),
+            Entry::Separator => None,
+        })
+        .collect()
 }
 
 #[test]
@@ -1579,65 +1624,63 @@ fn c10_copy_address_items_stay_enabled_for_any_target() {
 // ---------------------------------------------------------------------------------------------
 
 /// Every context menu id with its string id and its label, as the interface section lists them.
-fn spec_items() -> [(ItemId, &'static str, &'static str); 18] {
-    [
-        (
-            ItemId::OpenLinkInNewTab,
-            "open-link-new-tab",
-            "Open Link in New Tab",
-        ),
-        (
-            ItemId::OpenLinkInBackgroundTab,
-            "open-link-background-tab",
-            "Open Link in New Background Tab",
-        ),
-        (
-            ItemId::CopyLinkAddress,
-            "copy-link-address",
-            "Copy Link Address",
-        ),
-        (
-            ItemId::OpenImageInNewTab,
-            "open-image-new-tab",
-            "Open Image in New Tab",
-        ),
-        (
-            ItemId::CopyImageAddress,
-            "copy-image-address",
-            "Copy Image Address",
-        ),
-        (ItemId::CopyImage, "copy-image", "Copy Image"),
-        (ItemId::Undo, "undo", "Undo"),
-        (ItemId::Redo, "redo", "Redo"),
-        (ItemId::Cut, "cut", "Cut"),
-        (ItemId::Copy, "copy", "Copy"),
-        (ItemId::Paste, "paste", "Paste"),
-        (ItemId::SelectAll, "select-all", "Select All"),
-        (ItemId::Back, "back", "Back"),
-        (ItemId::Forward, "forward", "Forward"),
-        (ItemId::Reload, "reload", "Reload"),
-        (ItemId::BookmarkPage, "bookmark-page", "Bookmark This Page"),
-        (
-            ItemId::CopyPageAddress,
-            "copy-page-address",
-            "Copy Page Address",
-        ),
-        (ItemId::Find, "find", "Find"),
-    ]
-}
+const SPEC_ITEMS: [(ItemId, &str, &str); 18] = [
+    (
+        ItemId::OpenLinkInNewTab,
+        "open-link-new-tab",
+        "Open Link in New Tab",
+    ),
+    (
+        ItemId::OpenLinkInBackgroundTab,
+        "open-link-background-tab",
+        "Open Link in New Background Tab",
+    ),
+    (
+        ItemId::CopyLinkAddress,
+        "copy-link-address",
+        "Copy Link Address",
+    ),
+    (
+        ItemId::OpenImageInNewTab,
+        "open-image-new-tab",
+        "Open Image in New Tab",
+    ),
+    (
+        ItemId::CopyImageAddress,
+        "copy-image-address",
+        "Copy Image Address",
+    ),
+    (ItemId::CopyImage, "copy-image", "Copy Image"),
+    (ItemId::Undo, "undo", "Undo"),
+    (ItemId::Redo, "redo", "Redo"),
+    (ItemId::Cut, "cut", "Cut"),
+    (ItemId::Copy, "copy", "Copy"),
+    (ItemId::Paste, "paste", "Paste"),
+    (ItemId::SelectAll, "select-all", "Select All"),
+    (ItemId::Back, "back", "Back"),
+    (ItemId::Forward, "forward", "Forward"),
+    (ItemId::Reload, "reload", "Reload"),
+    (ItemId::BookmarkPage, "bookmark-page", "Bookmark This Page"),
+    (
+        ItemId::CopyPageAddress,
+        "copy-page-address",
+        "Copy Page Address",
+    ),
+    (ItemId::Find, "find", "Find"),
+];
 
 #[test]
 fn p2_all_has_exactly_the_18_ids_of_the_spec_once_each() {
     let got: Vec<&str> = ItemId::ALL.iter().map(|id| id.as_str()).collect();
     assert_eq!(got.len(), 18);
     let got_set: BTreeSet<&str> = got.iter().copied().collect();
-    let want: BTreeSet<&str> = spec_items().iter().map(|(_, s, _)| *s).collect();
+    let want: BTreeSet<&str> = SPEC_ITEMS.iter().map(|(_, s, _)| *s).collect();
     assert_eq!(got_set, want, "ALL is not the allowed set");
 }
 
 #[test]
 fn p2_every_id_has_its_string_and_its_label_of_the_spec() {
-    for (id, as_str, label) in spec_items() {
+    for (id, as_str, label) in SPEC_ITEMS {
         assert_eq!(id.as_str(), as_str);
         assert_eq!(id.label(), label);
     }
@@ -1646,10 +1689,8 @@ fn p2_every_id_has_its_string_and_its_label_of_the_spec() {
 #[test]
 fn p2_every_menu_for_every_target_uses_only_ids_in_all() {
     for t in target_space() {
-        for entry in context_menu(&t) {
-            if let Entry::Item { id, .. } = entry {
-                assert!(ItemId::ALL.contains(&id), "{t:?}: {}", id.as_str());
-            }
+        for id in item_ids(&t) {
+            assert!(ItemId::ALL.contains(&id), "{t:?}: {}", id.as_str());
         }
     }
 }
@@ -1713,11 +1754,9 @@ fn p1_no_label_is_a_default_engine_or_system_item() {
 #[test]
 fn p3_no_menu_has_inspect_element() {
     for t in target_space() {
-        for entry in context_menu(&t) {
-            if let Entry::Item { id, .. } = entry {
-                assert!(!id.label().to_lowercase().contains("inspect"), "{t:?}");
-                assert!(!id.as_str().contains("inspect"), "{t:?}");
-            }
+        for id in item_ids(&t) {
+            assert!(!id.label().to_lowercase().contains("inspect"), "{t:?}");
+            assert!(!id.as_str().contains("inspect"), "{t:?}");
         }
     }
 }
