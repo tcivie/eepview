@@ -23,7 +23,6 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Add the user guide and the developer guide to the wiki ([#28](https://github.com/tcivie/eepview/pull/28))
 - Polish the setup flow and add the router panel to the toolbar (#27)
 - Release gates job replaces the reusable-workflow calls; the macOS app is ad-hoc signed inside the dmg (#24)
-- Mark the README as pre-release and match it to the roadmap
 - Release gate accepts checks that run on pull requests only (#39)
 - Sign releases with Sigstore, build the Linux binary repeatably, harden the release profile (#37)
 - Use only the brand palette, enforced by scripts/palette-check.sh (#38)
