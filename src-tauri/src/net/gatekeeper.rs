@@ -14,7 +14,7 @@ use std::net::{Shutdown, TcpListener, TcpStream};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use super::failures::{Failures, is_server_error};
 use super::http::{self, Head, Plan, Refusal};
@@ -27,6 +27,12 @@ const MAX_CONNECTIONS: usize = 256;
 const CLIENT_TIMEOUT: Duration = Duration::from_mins(1);
 /// Wait for the router: I2P tunnels can take minutes on a cold start.
 const UPSTREAM_TIMEOUT: Duration = Duration::from_mins(5);
+/// Connect to the router proxy. A live loopback listener accepts at once; without this bound
+/// Windows retries a refused connect for about 2 s before the 502 (ADR 0001).
+const UPSTREAM_CONNECT: Duration = Duration::from_millis(500);
+/// After an early answer, unread input is drained for at most this long and this much.
+const DRAIN_TIME: Duration = Duration::from_secs(1);
+const DRAIN_BYTES: usize = 64 * 1024;
 /// Whether `CONNECT *.i2p:443` is relayed (see [`Gatekeeper::start`]).
 const TLS_TUNNELS: bool = cfg!(windows);
 const ESTABLISHED: &[u8] = b"HTTP/1.1 200 Connection established\r\n\r\n";
@@ -44,6 +50,8 @@ struct Shared {
     upstream: LoopbackAddr,
     open: Arc<AtomicBool>,
     active: Arc<AtomicUsize>,
+    /// Busy answers still draining; capped at `limit`, so a flood cannot spawn threads freely.
+    draining: Arc<AtomicUsize>,
     limit: usize,
     allow_tls: bool,
     failures: Arc<Failures>,
@@ -79,6 +87,7 @@ impl Gatekeeper {
             upstream: upstream.addr(),
             open: Arc::clone(&open),
             active: Arc::new(AtomicUsize::new(0)),
+            draining: Arc::new(AtomicUsize::new(0)),
             limit,
             allow_tls,
             failures: Arc::new(Failures::default()),
@@ -167,8 +176,7 @@ fn accept_loop(listener: &TcpListener, shared: &Shared) {
         backoff.reset();
         if shared.active.fetch_add(1, Ordering::SeqCst) >= shared.limit {
             shared.active.fetch_sub(1, Ordering::SeqCst);
-            let mut stream = stream;
-            let _ = stream.write_all(&Refusal::Busy.response());
+            answer_busy(stream, shared);
             continue;
         }
         let active = Arc::clone(&shared.active);
@@ -180,6 +188,25 @@ fn accept_loop(listener: &TcpListener, shared: &Shared) {
         if spawned.is_err() {
             active.fetch_sub(1, Ordering::SeqCst);
         }
+    }
+}
+
+/// The busy 503, off the accept thread: the drain after it may take up to [`DRAIN_TIME`].
+/// When `limit` busy answers are already draining, the answer goes out without the drain.
+fn answer_busy(mut stream: TcpStream, shared: &Shared) {
+    let _ = stream.set_write_timeout(Some(DRAIN_TIME));
+    if shared.draining.fetch_add(1, Ordering::SeqCst) >= shared.limit {
+        shared.draining.fetch_sub(1, Ordering::SeqCst);
+        let _ = stream.write_all(&Refusal::Busy.response());
+        return;
+    }
+    let slot = Arc::clone(&shared.draining);
+    let spawned = thread::Builder::new().spawn(move || {
+        let _ = refuse(&mut stream, Refusal::Busy);
+        slot.fetch_sub(1, Ordering::SeqCst);
+    });
+    if spawned.is_err() {
+        shared.draining.fetch_sub(1, Ordering::SeqCst);
     }
 }
 
@@ -208,9 +235,34 @@ fn handle(mut client: TcpStream, shared: &Shared) -> io::Result<()> {
     }
 }
 
+/// Sends a refusal and ends the connection so that the answer reaches the client.
 fn refuse(client: &mut TcpStream, reason: Refusal) -> io::Result<()> {
     client.write_all(&reason.response())?;
-    client.flush()
+    client.flush()?;
+    close_gently(client);
+    Ok(())
+}
+
+/// Ends a connection after an answer without a reset (ADR 0001): shuts the write side, then
+/// reads and discards what the client still sends, until it closes, [`DRAIN_TIME`] passes or
+/// [`DRAIN_BYTES`] are read. A close with unread input makes the OS send a reset, and a
+/// Windows client then drops the answer it already has.
+fn close_gently(client: &mut TcpStream) {
+    let _ = client.shutdown(Shutdown::Write);
+    let deadline = Instant::now() + DRAIN_TIME;
+    let mut left = DRAIN_BYTES;
+    let mut chunk = [0u8; 4096];
+    while left > 0 {
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        if remaining.is_zero() || client.set_read_timeout(Some(remaining)).is_err() {
+            return;
+        }
+        let size = left.min(chunk.len());
+        match client.read(&mut chunk[..size]) {
+            Ok(0) | Err(_) => return,
+            Ok(n) => left -= n,
+        }
+    }
 }
 
 /// Reads one message head. `None` on a clean EOF, a broken head or a head over the limit.
@@ -289,7 +341,10 @@ fn forward(client: &mut TcpStream, rest: &[u8], req: &Request, shared: &Shared) 
         Ok(n) => n,
         Err(reason) => return refuse_page(client, req, shared, reason),
     };
-    let Ok(mut upstream) = shared.upstream.connect(UPSTREAM_TIMEOUT) else {
+    let Ok(mut upstream) = shared
+        .upstream
+        .connect_bounded(UPSTREAM_CONNECT, UPSTREAM_TIMEOUT)
+    else {
         return refuse_page(client, req, shared, Refusal::Upstream);
     };
     upstream.write_all(&http::upstream_request(
@@ -332,7 +387,10 @@ fn send_body(
 
 /// `CONNECT <host>:443`: open the same tunnel through the router and relay the TLS bytes.
 fn relay(mut client: TcpStream, rest: &[u8], host: &str, shared: &Shared) -> io::Result<()> {
-    let Ok(mut upstream) = shared.upstream.connect(UPSTREAM_TIMEOUT) else {
+    let Ok(mut upstream) = shared
+        .upstream
+        .connect_bounded(UPSTREAM_CONNECT, UPSTREAM_TIMEOUT)
+    else {
         return refuse(&mut client, Refusal::Upstream);
     };
     upstream.write_all(&http::upstream_connect(host))?;

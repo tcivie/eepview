@@ -76,9 +76,19 @@ impl LoopbackAddr {
     ///
     /// Fails when the connection or the timeouts fail.
     pub fn connect(&self, timeout: Duration) -> io::Result<TcpStream> {
-        let stream = TcpStream::connect_timeout(&self.0, timeout)?;
-        stream.set_read_timeout(Some(timeout))?;
-        stream.set_write_timeout(Some(timeout))?;
+        self.connect_bounded(timeout, timeout)
+    }
+
+    /// Opens a TCP connection that must be accepted within `connect`, with `io` as its read
+    /// and write timeouts.
+    ///
+    /// # Errors
+    ///
+    /// Fails when the connection or the timeouts fail.
+    pub fn connect_bounded(&self, connect: Duration, io: Duration) -> io::Result<TcpStream> {
+        let stream = TcpStream::connect_timeout(&self.0, connect)?;
+        stream.set_read_timeout(Some(io))?;
+        stream.set_write_timeout(Some(io))?;
         Ok(stream)
     }
 
