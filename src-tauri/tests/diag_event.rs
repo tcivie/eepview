@@ -545,7 +545,7 @@ fn any_field() -> impl Strategy<Value = Field> {
         any::<u32>().prop_map(Field::Line),
         any::<u64>().prop_map(Field::DurationMs),
         any::<u64>().prop_map(Field::Count),
-        any::<u16>()
+        (500u16..600)
             .prop_filter_map("a 5xx code", HttpStatus::from_code)
             .prop_map(Field::Status),
         any::<bool>().prop_map(Field::Managed),
