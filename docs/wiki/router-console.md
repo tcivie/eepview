@@ -5,16 +5,16 @@ SPDX-License-Identifier: MIT
 
 # Router console
 
-Status: detection, links and the console view shipped in [#54](https://github.com/tcivie/eepview/pull/54). Router statistics from the console (R23–R36) shipped in [#78](https://github.com/tcivie/eepview/pull/78).
+Status: detection, links and the console view shipped in [#54](https://github.com/tcivie/eepview/pull/54). Router statistics from the console (R23–R38) shipped in [#78](https://github.com/tcivie/eepview/pull/78).
 
-eepview shows router information. It does not change the router configuration. All router configuration goes through the router's own console pages. eepview finds the console of the router in use and gives quick links to it. When the router has no eepview helper, eepview also reads the router statistics from that console (R23–R36).
+eepview shows router information. It does not change the router configuration. All router configuration goes through the router's own console pages. eepview finds the console of the router in use and gives quick links to it. When the router has no eepview helper, eepview also reads the router statistics from that console (R23–R38).
 
 ## How it works
 
 1. **Detect.** When a page that shows the links opens, eepview reads the console port from the router configuration files, when it finds them. Then it sends one loopback `GET` to each candidate port. A port counts only when the answer looks like that router's console.
 2. **Show.** The quick links show in the router panel, on the home page and in Settings. With no console, they are hidden and one line says "No router console found".
 3. **Open.** A quick link opens the `console` view: a webview in its own window, `Router console`. It loads only the detected console origin, `http://127.0.0.1:<port>`.
-4. **Read the statistics.** Without a router helper, `router_stats()` reads the figures of the router panel and the Network page from the detected console: one read-only loopback `GET` per refresh, while those figures show (R23–R36).
+4. **Read the statistics.** Without a router helper, `router_stats()` reads the figures of the router panel and the Network page from the detected console: one read-only loopback `GET` per refresh, while those figures show (R23–R38).
 
 The console view is not a web tab. It is built in `src-tauri/src/shell/console.rs` only. It never uses the gatekeeper, and the gatekeeper never sees it. An engine rule list confines it to the console origin (R19). The `tab-*` webviews keep all five layers and still cannot reach loopback. [ADR 0001](adr-0001-no-leak-architecture.md#router-console-exception) records this exception.
 
@@ -160,10 +160,9 @@ The router panel and the Network page (`eepview://stats`) show the router statis
   | `bandwidthBytesPerSecond.out1s` | `Sent` | the same | `X` × 1 024 |
   | `knownRouters` | `Routers` | `N`, then `&nbsp;` | `N` |
   | `floodfills` | `Floodfills` | `N`, then `&nbsp;` | `N` |
-  | `tunnels.client` | `Client Tunnels` | `N`, then `&nbsp;` | `N`: what i2pd shows under that label |
   | `tunnels.participating` | `Transit Tunnels` | `N`, then `<br>` | `N` |
 
-  Always `null` from i2pd: `version` (R18), `activePeers` (the main page has no peer count), `tunnels.in`, `tunnels.out`, `tunnels.exploratory`, `bandwidthBytesPerSecond.in5m` and `.out5m`, `tunnelBuildSuccessPercent.exploratory` and `.client`. The label `Total tunnel creation success rate` is a different label and is not read.
+  Always `null` from i2pd: `version` (R18), `activePeers` (the main page has no peer count), `tunnels.in`, `tunnels.out`, `tunnels.exploratory`, `tunnels.client` (the `Client Tunnels` figure of i2pd is the sum of every inbound and every outbound tunnel of the router, exploratory tunnels included, so it is not the client count of the contract; eepview does not read it, and adds no contract field for it), `bandwidthBytesPerSecond.in5m` and `.out5m`, `tunnelBuildSuccessPercent.exploratory` and `.client`. The label `Total tunnel creation success rate` is a different label and is not read.
 - **R31 New `RouterStats` fields (contract v1.6).** `uptimeResolutionMs`, `floodfills`, `tunnels.client`, `tunnels.exploratory` and `tunnelBuildSuccessPercent.total`. See [IPC contract](ipc-contract.md). `bandwidthBytesPerSecond.in1s` and `.out1s` hold the shortest window that the source gives, which the UI shows as "now": 1 s from the helper, and the current rate that the console gives from Java I2P and i2pd. (The Java I2P row is labeled "3 sec", but the console only shows the router's current rate there, so it is not a 3 s average.) From the helper: `uptimeResolutionMs` is `1` when `uptimeMs` is set, else `null`. `tunnels.client` is `clientInbound + clientOutbound` and `tunnels.exploratory` is `exploratoryInbound + exploratoryOutbound`, each `null` when a part is missing. `floodfills` and `tunnelBuildSuccessPercent.total` are `null`.
 - **R32 Bandwidth history from the console.** When `router_stats()` answers from the console, it adds that answer's bandwidth sample to the 10-minute history, as the watcher does for the helper. It adds no sample when the newest sample is less than 4 s old, so the panel and the Network page together still add one sample per 5 s. The `history` of the answer includes the new sample. With the console, the history grows only while a page shows the figures.
 - **R33 The UI reads the contract shape.** `router_stats()` answers the `RouterStats` of the [IPC contract](ipc-contract.md). `src/ui/contract.ts` uses that same shape. The router panel and the Network page turn it into their view with one pure function, `statsView` (below):
@@ -178,13 +177,15 @@ The router panel and the Network page (`eepview://stats`) show the router statis
   | `inboundTunnels`, `outboundTunnels`, `participatingTunnels` | `tunnels.in`, `.out`, `.participating` |
   | `clientTunnels`, `exploratoryTunnels` | `tunnels.client`, `.exploratory` |
   | `buildSuccessRate` | `tunnelBuildSuccessPercent.total / 100`; when `total` is `null`, `.exploratory / 100`; else `null` |
-  | `history` | `{ stepSeconds: 5, inBps: history[].in, outBps: history[].out }`, oldest first; `null` when `history` is empty |
+  | `history` | `{ stepSeconds: 5, inBps, outBps }` from the last contiguous run of `history` (below), oldest first; `null` when `history` is empty |
   | `routerKind`, `javaVersion` | `null` |
 
-  `buildSuccessRate` never uses `tunnelBuildSuccessPercent.client`: the build success of client tunnels alone is not the build success of the router, and the panel would show it as the router's rate. A helper that gives only `client` shows "—". A missing or `null` input gives a view with every field `null`.
+  `buildSuccessRate` never uses `tunnelBuildSuccessPercent.client`: the build success of client tunnels alone is not the build success of the router, and the panel would show it as the router's rate. A helper that gives only `client` shows "—". **The history run.** `history[].t` is the sample time in ms. `statsView` keeps only the last contiguous run of samples: it starts from the newest sample and goes back while the gap to the previous sample is at most 2 × `stepSeconds` (10 000 ms, with `stepSeconds` 5). The first larger gap ends the run, and the samples before it are dropped. `inBps` and `outBps` hold the `in` and `out` of the kept samples, oldest first. `statsView` never adds, repeats or interpolates a sample. A single sample is a run. A missing or `null` input gives a view with every field `null`.
 - **R34 Uptime to its resolution.** The UI never shows a unit smaller than the uptime resolution. `formatUptime(seconds, resolutionSeconds)` keeps today's form (`<d> d <h> h`, `<h> h <m> min`, `<m> min`) and drops each unit smaller than `resolutionSeconds`: with a resolution of 3 600 s, 28 800 s is `8 h`, not `8 h 0 min`; with 86 400 s, 172 800 s is `2 d`. A `null` or missing resolution, or one below 60 s, gives today's output. The router panel and the Network page pass `uptimeResolutionSeconds`.
-- **R35 Tunnels line in the router panel.** When `inboundTunnels` and `outboundTunnels` are both `null` and `clientTunnels` or `exploratoryTunnels` is not, the line is `<client> client · <exploratory> exploratory · <participating> participating`, each count as `formatCount` gives it ("—" when `null`). Else it stays `<in> in · <out> out · <participating> participating`.
+- **R35 Tunnels line in the router panel.** When `inboundTunnels` and `outboundTunnels` are both `null` and `clientTunnels` or `exploratoryTunnels` is not, the line is `<client> client · <exploratory> exploratory · <participating> participating`, each count as `formatCount` gives it ("—" when `null`). Else it stays `<in> in · <out> out · <participating> participating`. i2pd gives neither `tunnels.client` nor `tunnels.exploratory` (R30), so its line is `— in · — out · <participating> participating`.
 - **R36 Where eepview connects.** The About list row of the console names the statistics too: "Router console check, router statistics and the console window".
+- **R37 No console request after stop.** After `shell::console::stop` (R22), `current_stats` does not query the console: it sends no request and takes no figures from the console, until `detect_now` runs again. A `router_stats()` call that starts after the stop and before the next `detect_now` answers from the helper when the helper answers (R23), else with every field `null`, and adds no console sample to the history (R32).
+- **R38 One deadline for the whole request.** The 3 s of R25 cover the connect and every read of the request together, not each read alone. A peer that sends bytes slower than that gets figures from what arrived within 3 s: a value cut by the deadline is `null` (R27), and when no complete HTTP answer head arrived within 3 s the console does not answer (R25). A call never lasts longer than 3 s plus the time to close the socket.
 
 ## Interface
 
@@ -368,7 +369,7 @@ Fixtures: `src-tauri/tests/fixtures/console/java-2.13.0-xhr1-summaryframe.txt` i
 | `networkStatus` | `OK` | `OK` |
 | `bandwidthBytesPerSecond` in1s / out1s / in5m / out5m | 53 910 / 37 370 / 37 830 / 33 060 | 12 636 / 5 806 / `null` / `null` |
 | `activePeers` / `knownRouters` / `floodfills` | 1 678 / 4 905 / 1 570 | `null` / 3 021 / 812 |
-| `tunnels` in / out / participating / client / exploratory | `null` / `null` / 398 / 2 / 11 | `null` / `null` / 157 / 14 / `null` |
+| `tunnels` in / out / participating / client / exploratory | `null` / `null` / 398 / 2 / 11 | `null` / `null` / 157 / `null` / `null` |
 | `tunnelBuildSuccessPercent` exploratory / client / total | `null` / `null` / `null` | `null` / `null` / 42 |
 | `version` | `null` | `null` |
 
@@ -453,11 +454,11 @@ export function formatUptime(seconds: number | null, resolutionSeconds?: number 
 - `src-tauri/src/shell/console/tests.rs` (R6, R8, R10–R13, R20–R22; the mock runtime fixtures in `crate::shell::testing`)
 - `src-tauri/tests/architecture.rs` (R4, R8, R11, R14)
 - `src/ui/lib/console-links.test.ts` (R15, R18, R20)
-- `src-tauri/src/net/console/stats_from_console.rs` (R24, R25, R27–R30, with the fixtures; declared from `console.rs` as `#[cfg(test)] mod stats_from_console;`)
+- `src-tauri/src/net/console/stats_from_console.rs` (R24, R25, R27–R30, R38, with the fixtures; declared from `console.rs` as `#[cfg(test)] mod stats_from_console;`)
 - `src-tauri/src/net/stats/requirement_tests.rs` (declared from `stats.rs` as `#[cfg(test)] mod requirement_tests;`: R23 `pick`, R31, R32 `record_spaced`)
-- `src-tauri/src/shell/commands/tests.rs` (R23, R26 one request per call, R32 through `current_stats`)
+- `src-tauri/src/shell/commands/tests.rs` (R23, R26 one request per call, R32 and R37 through `current_stats`)
 - `src-tauri/tests/architecture.rs` (R24: the request code stays in `net/`)
-- `src/ui/lib/router-stats.test.ts` (R33), `src/ui/lib/stats-view.test.ts` (R34), `src/ui/lib/router-panel.test.ts` (R34, R35)
+- `src/ui/lib/router-stats.test.ts` (R33, with the history run), `src/ui/lib/stats-view.test.ts` (R34), `src/ui/lib/router-panel.test.ts` (R34, R35)
 - `src/ui/popup-router.test.ts` and `src/ui/popup-page.test.ts`: their `router_stats` stubs move to the contract v1.6 shape (R33)
 - `src/ui/lib/console-links.test.ts` (R36)
 

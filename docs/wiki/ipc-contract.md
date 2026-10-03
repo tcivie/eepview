@@ -96,7 +96,7 @@ At most 10 000 entries. Nothing is recorded while `history.enabled` is false.
 ### Router and connection
 
 - `router_status() -> RouterStatus`
-- `router_stats() -> RouterStats`. Every field may be `null`. The source is the router helper when it answers, else the detected router console (read only, one loopback `GET`), else none: see [Router console](router-console.md#router-statistics-from-the-console), R23–R36.
+- `router_stats() -> RouterStats`. Every field may be `null`. The source is the router helper when it answers, else the detected router console (read only, one loopback `GET`), else none: see [Router console](router-console.md#router-statistics-from-the-console), R23–R38.
 - `connection_pause()`: closes the gatekeeper, destroys every `tab-*` webview and shows `eepview://router-down?reason=paused`.
 - `connection_resume()`: runs VERIFY again. The gatekeeper opens and the active tab reloads only when VERIFY passes. If it fails, everything stays closed.
 - `router_control({action: "stop" | "start" | "restart"}) -> {ok: boolean, reason?: string}`. It answers `{ok: false, reason: "external"}` until eepview runs its own router (Phase 3).
@@ -183,7 +183,7 @@ type RouterStats = { version: string | null; uptimeMs: number | null;
     in5m: number | null; out5m: number | null };
   tunnelBuildSuccessPercent: { exploratory: number | null; client: number | null;
     total: number | null };
-  history: { t: number; in: number; out: number }[] };  // last 10 min, one sample per 5 s
+  history: { t: number; in: number; out: number }[] };  // last 10 min; the UI draws the last contiguous run (R33)
 type ConsolePage = "home" | "tunnels" | "addressbook" | "config" | "logs";
 type ConsoleInfo = { found: boolean; kind: "java" | "i2pd" | null; origin: string | null;
   pages: ConsolePage[]; version: string | null };  // origin and version: display only
