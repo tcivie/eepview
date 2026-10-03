@@ -132,7 +132,9 @@ fn trim_trailing_dot(url: &mut Url) {
     let Some(host) = url.host_str().map(str::to_owned) else {
         return;
     };
-    if let Some(short) = host.strip_suffix('.') {
+    // A host of only a dot ("data://.:0") has nothing left: `set_host("")` trips a debug
+    // assertion in the url crate. Such a URL is never I2P; the guard refuses it as it is.
+    if let Some(short) = host.strip_suffix('.').filter(|s| !s.is_empty()) {
         // A failed set_host leaves the URL as it was; the guard then refuses it.
         let _ = url.set_host(Some(short));
     }
@@ -260,6 +262,12 @@ mod tests {
             Target::Refused(r) => r,
             other => panic!("{input}: expected Refused, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn a_host_of_only_a_dot_is_refused_without_a_panic() {
+        assert_eq!(refused("data://.:0"), Refusal::NotI2p);
+        assert_eq!(refused("http://./"), Refusal::NotI2p);
     }
 
     #[test]
