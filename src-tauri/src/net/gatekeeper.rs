@@ -26,6 +26,8 @@ const MAX_CONNECTIONS: usize = 256;
 const CLIENT_TIMEOUT: Duration = Duration::from_mins(1);
 /// Wait for the router: I2P tunnels can take minutes on a cold start.
 const UPSTREAM_TIMEOUT: Duration = Duration::from_mins(5);
+/// Whether `CONNECT *.i2p:443` is relayed (see [`Gatekeeper::start`]).
+const TLS_TUNNELS: bool = cfg!(windows);
 const ESTABLISHED: &[u8] = b"HTTP/1.1 200 Connection established\r\n\r\n";
 
 /// A running gatekeeper. Only [`Gatekeeper::start`] builds one; dropping it closes it.
@@ -47,14 +49,16 @@ struct Shared {
 impl Gatekeeper {
     /// Starts the gatekeeper in front of a verified router proxy.
     ///
-    /// TLS tunnels (`CONNECT *.i2p:443`) stay closed on macOS: their responses cannot carry
-    /// the page policy, and `WKWebView` skips the proxy for loopback (spike S1).
+    /// TLS tunnels (`CONNECT *.i2p:443`) open only where the engine has its own request filter
+    /// (L3b), that is on Windows. Relayed TLS responses cannot carry the page policy (L3a), so
+    /// on macOS (`WKWebView` skips the proxy for loopback, spike S1) and on Linux (no engine
+    /// filter) they stay closed: fail closed.
     ///
     /// # Errors
     ///
     /// Fails when no loopback port can be bound.
     pub fn start(upstream: &VerifiedUpstream) -> io::Result<Self> {
-        Self::start_with(upstream, !cfg!(target_os = "macos"))
+        Self::start_with(upstream, TLS_TUNNELS)
     }
 
     fn start_with(upstream: &VerifiedUpstream, allow_tls: bool) -> io::Result<Self> {
@@ -102,12 +106,44 @@ impl Drop for Gatekeeper {
     }
 }
 
+/// Waits after failed `accept` calls: 50 ms, doubling up to 1 s, back to the start after a
+/// success. A persistent error (such as no free file descriptors) then costs no CPU.
+#[derive(Debug)]
+struct Backoff {
+    next: Duration,
+}
+
+impl Backoff {
+    const FIRST: Duration = Duration::from_millis(50);
+    const MAX: Duration = Duration::from_secs(1);
+
+    fn new() -> Self {
+        Self { next: Self::FIRST }
+    }
+
+    /// The wait after one more failure.
+    fn fail(&mut self) -> Duration {
+        let wait = self.next;
+        self.next = (self.next * 2).min(Self::MAX);
+        wait
+    }
+
+    fn reset(&mut self) {
+        self.next = Self::FIRST;
+    }
+}
+
 fn accept_loop(listener: &TcpListener, shared: &Shared) {
+    let mut backoff = Backoff::new();
     for stream in listener.incoming() {
         if !shared.open.load(Ordering::SeqCst) {
             return;
         }
-        let Ok(stream) = stream else { continue };
+        let Ok(stream) = stream else {
+            thread::sleep(backoff.fail());
+            continue;
+        };
+        backoff.reset();
         if shared.active.fetch_add(1, Ordering::SeqCst) >= shared.limit {
             shared.active.fetch_sub(1, Ordering::SeqCst);
             let mut stream = stream;

@@ -9,7 +9,8 @@ use webview2_com::Microsoft::Web::WebView2::Win32::{
     ICoreWebView2Settings8,
 };
 use webview2_com::{
-    StatusBarTextChangedEventHandler, WebResourceRequestedEventHandler, take_pwstr,
+    CallDevToolsProtocolMethodCompletedHandler, StatusBarTextChangedEventHandler,
+    WebResourceRequestedEventHandler, take_pwstr,
 };
 use windows_core::{Interface, PWSTR, w};
 
@@ -88,11 +89,23 @@ pub fn go(webview: &PlatformWebview, nav: Nav) -> Result<(), String> {
         // SAFETY: as above.
         Nav::Forward => unsafe { core.GoForward() },
         // SAFETY: as above.
-        Nav::Reload | Nav::HardReload => unsafe { core.Reload() },
+        Nav::Reload => unsafe { core.Reload() },
+        Nav::HardReload => hard_reload(&core),
         // SAFETY: as above.
         Nav::Stop => unsafe { core.Stop() },
     };
     result.map_err(|e| e.to_string())
+}
+
+/// A reload that skips the cache: `ICoreWebView2::Reload` uses it, the `DevTools` call does
+/// not.
+fn hard_reload(core: &ICoreWebView2) -> windows_core::Result<()> {
+    let done = CallDevToolsProtocolMethodCompletedHandler::create(Box::new(|_, _| Ok(())));
+    // SAFETY: COM call on a live object on the UI thread, with static wide strings; WebView2
+    // keeps the handler until it calls it once.
+    unsafe {
+        core.CallDevToolsProtocolMethod(w!("Page.reload"), w!(r#"{"ignoreCache":true}"#), &done)
+    }
 }
 
 /// No native find with counts: the caller falls back to a script.

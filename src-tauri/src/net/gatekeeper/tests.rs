@@ -197,3 +197,17 @@ fn busy_limit_refuses() {
     assert!(out.starts_with("HTTP/1.1 503"), "{out}");
     drop(held);
 }
+
+#[test]
+fn accept_errors_back_off() {
+    let mut b = Backoff::new();
+    let waits: Vec<u128> = (0..7).map(|_| b.fail().as_millis()).collect();
+    assert_eq!(waits, [50, 100, 200, 400, 800, 1000, 1000]);
+    b.reset();
+    assert_eq!(b.fail().as_millis(), 50);
+}
+
+#[test]
+fn tls_tunnels_only_where_the_engine_filters() {
+    assert_eq!(TLS_TUNNELS, cfg!(windows));
+}

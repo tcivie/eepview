@@ -25,7 +25,7 @@ The Rust side of the browser, in `src-tauri/`: tabs, navigation, bookmarks, hist
 
 - Find on Windows uses an app-injected script (`WebView2` has no native find with a count).
 - The Linux engine filter (L3b) waits for a webkit2gtk binding; the page policy (L3a) holds there.
-- HTTPS eepsites do not load on macOS: TLS tunnels stay closed there (ADR 0001).
+- HTTPS eepsites load only on Windows: TLS tunnels stay closed on macOS and Linux (ADR 0001).
 - The first-run setup flow and router control are Phase 2 and Phase 3.
 
 ## History

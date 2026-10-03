@@ -241,6 +241,7 @@ fn navigation_guard_in_tabs() {
     let ok = Url::parse("http://reg.i2p/x").unwrap();
     assert!(c.tab_navigation(1, &ok).0);
     let bad = Url::parse("http://127.0.0.1:7657/").unwrap();
+    c.hover_link(1, Some(bad.as_str()));
     let (allowed, _) = c.tab_navigation(1, &bad);
     assert!(!allowed);
     assert!(
@@ -602,4 +603,36 @@ fn resume_with_a_failed_verify_stays_closed() {
     assert!(loads(&fx).is_empty());
     assert!(!c.router().is_ok());
     assert!(matches!(c.view(), View::Internal(u) if u.starts_with("eepview://router-down")));
+}
+
+#[test]
+fn refused_frame_navigation_keeps_the_page() {
+    let mut c = core();
+    visit(&mut c, STATS);
+    let frame = Url::parse("http://example.com/").unwrap();
+    let (allowed, fx) = c.tab_navigation(1, &frame);
+    assert!(!allowed);
+    assert!(matches!(&fx[0], Effect::Emit(Event::Toast(_))));
+    assert_eq!(c.tabs().active().unwrap().url, STATS);
+    c.hover_link(1, Some("http://reg.i2p/"));
+    c.tab_navigation(1, &frame);
+    assert_eq!(c.tabs().active().unwrap().url, STATS);
+}
+
+#[test]
+fn hidden_web_view_cannot_pull_the_tab_back() {
+    let mut c = core();
+    visit(&mut c, STATS);
+    c.navigate("eepview://bookmarks");
+    assert!(c.page_started(1, REG).is_empty());
+    assert!(c.page_finished(1, REG, 5).is_empty());
+    assert!(c.title_changed(1, "Reg").is_empty());
+    let tab = c.tabs().active().unwrap();
+    assert_eq!(tab.url, "eepview://bookmarks");
+    assert!(!c.tab_info(1).unwrap().nav.can_forward);
+    assert!(
+        c.history_query(&HistoryQuery::default())
+            .iter()
+            .all(|e| e.url != REG)
+    );
 }

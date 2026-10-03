@@ -11,24 +11,32 @@ use crate::nav::{guard, host_of, internal_from_file, internal_with, is_web};
 use crate::tabs::Place;
 
 impl Core {
-    /// `on_navigation` of a `tab-*` webview (main frame and sub-frames). Returns whether the
-    /// engine may go on (layer L4).
+    /// `on_navigation` of a `tab-*` webview. Returns whether the engine may go on (layer L4).
+    ///
+    /// The engines report main-frame and sub-frame navigations alike, with no frame flag. So a
+    /// refused navigation replaces the tab with the blocked page only when it is the link
+    /// under the mouse (a click). Anything else (a frame, a script, a redirect) gets a toast.
     pub fn tab_navigation(&mut self, id: u32, url: &Url) -> (bool, Vec<Effect>) {
         if guard(url) {
             return (true, Vec::new());
         }
         let shown = hover::link(url.as_str()).map_or_else(String::new, |t| t.text);
-        let idle = self.tabs.get(id).is_some_and(|t| !t.loading);
-        let top_level = idle && matches!(url.scheme(), "http" | "https" | "file" | "ftp");
+        let clicked = self.pointed.as_ref() == Some(url);
+        let top_level = clicked && matches!(url.scheme(), "http" | "https" | "file" | "ftp");
         if top_level {
+            self.pointed = None;
             let page = internal_with("blocked", &[("url", url.as_str())]);
             return (false, self.go_internal(id, &page));
         }
         (false, vec![Self::toast("warn", shown)])
     }
 
-    /// The main frame of a tab started to show `url`.
+    /// The main frame of a tab started to show `url`. Ignored while the tab shows an internal
+    /// page: the hidden web view may still run a timer or a refresh.
     pub fn page_started(&mut self, id: u32, url: &str) -> Vec<Effect> {
+        if !self.shows_web(id) {
+            return Vec::new();
+        }
         let host = host_of(url).unwrap_or_default();
         let js = self.js_of(&host);
         let zoom = self.zoom_of(&host);
@@ -60,6 +68,9 @@ impl Core {
 
     /// The main frame of a tab finished loading `url`.
     pub fn page_finished(&mut self, id: u32, url: &str, now: u64) -> Vec<Effect> {
+        if !self.shows_web(id) {
+            return Vec::new();
+        }
         let record = self.settings.history.enabled;
         let Some(tab) = self.tabs.get_mut(id) else {
             return Vec::new();
@@ -81,6 +92,9 @@ impl Core {
 
     /// The document title of a tab changed.
     pub fn title_changed(&mut self, id: u32, title: &str) -> Vec<Effect> {
+        if !self.shows_web(id) {
+            return Vec::new();
+        }
         let Some(tab) = self.tabs.get_mut(id) else {
             return Vec::new();
         };
@@ -126,11 +140,16 @@ impl Core {
         }
     }
 
+    fn shows_web(&self, id: u32) -> bool {
+        self.tabs.get(id).is_some_and(|t| is_web(&t.url))
+    }
+
     /// The mouse moved over a link (`Some`) or off it (`None`) in tab `id`.
     pub fn hover_link(&mut self, id: u32, target: Option<&str>) -> Vec<Effect> {
         if id != self.tabs.active_id() {
             return Vec::new();
         }
+        self.pointed = target.and_then(|t| Url::parse(t).ok());
         match target.and_then(hover::link) {
             Some(text) => self.show_hover(Some(text)),
             None => self.hover_out(),

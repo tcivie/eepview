@@ -17,6 +17,7 @@ mod tests;
 
 use crate::net::stats::{History as StatsHistory, RouterStats, Sample};
 use std::path::PathBuf;
+use tauri::Url;
 
 use crate::hover::{Debounce, HoverText};
 use crate::nav::{host_of, internal_with, is_web};
@@ -177,6 +178,8 @@ pub struct Core {
     hover: Debounce,
     js_forced_off: bool,
     stats: StatsHistory,
+    /// The link under the mouse in the active tab: a refused navigation to it is a click.
+    pointed: Option<Url>,
 }
 
 impl Core {
@@ -214,6 +217,7 @@ impl Core {
             hover: Debounce::default(),
             js_forced_off: false,
             stats: StatsHistory::default(),
+            pointed: None,
         };
         let home = core.home_url();
         core.tabs.open(&home, crate::tabs::Place::End, true);
