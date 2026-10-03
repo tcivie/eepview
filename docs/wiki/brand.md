@@ -1,25 +1,12 @@
 # Brand
 
-Status: shipped.
+Status: in progress.
 
-The eepview logo and app icons. The mark is a hand-drawn garlic bulb on a pine-green rounded square. The garlic refers to I2P's garlic routing. The wordmark is "eepview" in a monoline geometric lowercase.
+The eepview logo and app icons.
 
-All artwork in `assets/brand/` is original work for eepview, released under the repository's MIT license. It reuses no I2P artwork, and the wordmark does not use the I2P name.
+Work: [PR #11](https://github.com/tcivie/eepview/pull/11)
 
-## Files
-
-All files are in `assets/brand/`.
-
-| File | Use |
-| --- | --- |
-| `eepview-mark.svg` | Master mark, on the 1024 px macOS grid (824 px body, radius 185) |
-| `eepview-mark-small.svg` | Small variant, for 16–32 px |
-| `eepview-mark-mono.svg` | Single-colour variant (`currentColor`), for toolbars and the tray |
-| `eepview-logo-horizontal-light.svg`, `eepview-logo-horizontal-dark.svg` | Mark plus wordmark, for light and dark backgrounds |
-| `app-icon-1024.png` | The master mark rendered at 1024 px with a soft drop shadow, the source for the icon set |
-| `preview.html`, `preview-light.png`, `preview-dark.png` | Preview sheet: master, small 64/48/32/24/16, mono, horizontal logo |
-
-Open a preview page with `#light` or `#dark` to force a theme.
+Page is completed by the PR that ships the feature.
 
 ## Palette
 
@@ -37,26 +24,58 @@ Open a preview page with `#light` or `#dark` to force a theme.
 | garlic root | `#A9845A` | root plate, rootlets |
 | garlic rose | `#C68C9B` | thin seam streaks only |
 
-## Small and mono variants
+## Color rule
 
-All variants are the same artwork. None is redrawn.
+eepview uses only the colors on this page.
 
-- The small variant is the master artwork, scaled to a full-bleed body. It drops the rootlets and the rose streaks, and keeps the same outline, tilt and tones.
-- The mono variant is the exact silhouette of the master: the union of its shapes, filled with `currentColor`.
-- The neck and the root overlap the bulb, so no background shows through at the joints.
-## How to regenerate the icons
+- **One source.** The token block in `src/ui/theme.css` is the only place that sets a color. Every other CSS, HTML and TS file uses `var(--token)`. Only `transparent`, `currentColor` and `inherit` are allowed outside that block.
+- **One list.** `scripts/palette.txt` lists every allowed hex. Each one is named in the tables below.
+- **One check.** `scripts/palette-check.sh` fails on:
+  - a raw color in `src/` outside `theme.css` (hex, `rgb()`, `hsl()`, `oklch()`, `color-mix()`, a named color, or a color set from TS);
+  - a `theme.css` value that is not in the list;
+  - an SVG fill, stroke or stop color in `assets/brand/` or `src/ui/assets/` that is not in the list.
 
-1. Render `app-icon-1024.png` from `eepview-mark.svg` with headless Chrome, on a transparent 1024×1024 page.
-2. Run `npx tauri icon assets/brand/app-icon-1024.png`. This rewrites `src-tauri/icons/`.
-3. Delete the `android/`, `ios/` and `64x64.png` output, because eepview is desktop only.
-4. Render `eepview-mark-small.svg` at 1024 px, run `npx tauri icon` on it with `-o` to a temporary folder, and copy `icon.ico`, `32x32.png`, `Square30x30Logo.png` and `Square44x44Logo.png` into `src-tauri/icons/`. The padded macOS icon is blurry at 16–32 px.
-5. Check that every PNG is RGBA, and run `cargo build --manifest-path src-tauri/Cargo.toml`.
+  lefthook runs it before each commit, and the `biome + tsc` CI job runs it on each PR.
+- **Alpha.** A token may add an alpha byte to a listed hex. For example, `#12302a6b` is `text-on-light` at 42% for the dialog scrim. The check compares only the first six digits.
 
-## Limits
+To add a color, add it to `scripts/palette.txt` and name it in a table here, in the same PR.
 
-- `src/ui/theme.css` uses the same greens for its accent tokens (`--color-accent` `#2a6a56` / `#6ccfa5`, `--color-accent-line` `#23896a`). Change both together.
-- The wordmark is drawn as stroked paths, not as a font.
+## Neutral colors
 
-## History
+| Name | Hex | Use |
+| --- | --- | --- |
+| white | `#FFFFFF` | Raised surfaces in light, text on the accent in light, highlights in shadows and in the mark |
+| black | `#000000` | Shadows and the scrim in dark, the mark's shadow |
 
-- 2026-10-03 — Add the logo, the app icons and the brand assets — [#11](https://github.com/tcivie/eepview/pull/11)
+## Color tokens
+
+Defined in `src/ui/theme.css`. "Brand" marks a value that comes straight from the palette above.
+
+| Token | Light | Dark | Use |
+| --- | --- | --- | --- |
+| `--color-bg` | `#F3EDE0` paper (brand) | `#0D2A23` pine-950 (brand) | Page background, hovered tab |
+| `--color-surface` | `#FAF7F0` paper-50 | `#12342B` pine-900-surface | Panels, the nav row |
+| `--color-surface-sunken` | `#E8E1D2` paper-200 | `#0A211B` pine-975 | Tab strip, wells, progress tracks |
+| `--color-surface-raised` | `#FFFFFF` white | `#173E33` pine-850 | Popovers, menus, dialogs |
+| `--color-border` | `#D3CAB8` paper-300 | `#255044` pine-800 | Hairlines and panel borders |
+| `--color-border-strong` | `#8F8A7C` paper-500 | `#5A8576` pine-500 | Control borders, high-contrast borders |
+| `--color-text` | `#12302A` text-on-light (brand) | `#EEF2EA` text-on-dark (brand) | Body text |
+| `--color-text-muted` | `#45574F` ink-600 | `#ABC0B6` mist-300 | Secondary text |
+| `--color-text-faint` | `#56685F` ink-500 | `#97ADA3` mist-400 | Hints, axis labels |
+| `--color-accent` | `#2A6A56` pine-700 (brand) | `#6CCFA5` accent dark (brand) | Links, primary buttons, the active state |
+| `--color-accent-hover` | `#0F3529` pine-900 (brand) | `#93DFBD` mint-200 | Hovered primary |
+| `--color-accent-text` | `#FFFFFF` white | `#0D2A23` pine-950 (brand) | Text on the accent |
+| `--color-accent-soft` | `#D3EADF` mint-100 | `#1A4A3C` pine-750 | Selected rows, chart fills |
+| `--color-accent-line` | `#23896A` accent light (brand) | `#4FB48A` mint-500 | Built hops, the active tab line |
+| `--color-success` | `#276338` leaf-700 | `#7FCB8F` leaf-300 | Router ready |
+| `--color-success-soft` | `#D6EADB` leaf-100 | `#1B3423` leaf-900 | Ready chip background |
+| `--color-warning` | `#875000` amber-700 | `#E6AE5C` amber-300 | Building, outbound bandwidth |
+| `--color-warning-soft` | `#F4E3C6` amber-100 | `#3A2B14` amber-900 | Building chip background |
+| `--color-danger` | `#A1252B` brick-700 | `#F2918B` brick-300 | Stopped, refused, errors |
+| `--color-danger-soft` | `#F6D9D8` brick-100 | `#3D1C1C` brick-900 | Error box and chip background |
+| `--color-focus` | `#2A6A56` pine-700 (brand) | `#6CCFA5` accent dark (brand) | Focus ring |
+| `--color-scrim` | `#12302A6B` text-on-light at 42% | `#00000099` black at 60% | Behind dialogs |
+| `--shadow-float` | `#12302A14`, `#12302A24` | `#00000066`, `#00000080` | Popovers and menus |
+| `--shadow-inset` | `#FFFFFF99` | `#FFFFFF0A` | The top highlight on panels |
+
+Every text pair passes WCAG AA (4.5:1) in both themes.
