@@ -56,11 +56,10 @@ impl FakeRouter {
     }
 }
 
-/// A loopback address where nothing listens.
+/// A loopback address where nothing listens: port 1 (tcpmux) is never used today, and no
+/// test can bind it, so a parallel test cannot take it over the way it can a freed port.
 pub fn dead_addr() -> LoopbackAddr {
-    let (listener, addr) = LoopbackAddr::listen_any().unwrap();
-    drop(listener);
-    addr
+    LoopbackAddr::parse("127.0.0.1:1").unwrap()
 }
 
 fn serve(listener: &TcpListener, count: &Arc<AtomicUsize>, log: &Arc<Mutex<Vec<String>>>) {

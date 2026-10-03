@@ -4,7 +4,8 @@
 //! Gatekeeper tests with real loopback sockets and a fake router proxy on `127.0.0.1:0`.
 
 use super::*;
-use crate::net::testing::FakeRouter;
+use crate::net::testing::{FakeRouter, dead_addr};
+use crate::net::verify::{Verdict, judge};
 
 fn send(gate: &Gatekeeper, raw: &str) -> String {
     let mut stream = gate.addr.connect(Duration::from_secs(5)).unwrap();
@@ -149,44 +150,17 @@ fn closed_gatekeeper_refuses_all() {
 
 #[test]
 fn dead_router_gives_bad_gateway() {
-    let router = FakeRouter::start();
-    let up = router.verified();
-    let gate = Gatekeeper::start_with(&up, true).unwrap();
-    drop(router);
-    // The fake keeps listening in its thread, so point a fresh gatekeeper at a closed port.
-    let (listener, addr) = LoopbackAddr::listen_any().unwrap();
-    drop(listener);
-    let dead = Shared {
-        upstream: addr,
-        open: Arc::new(AtomicBool::new(true)),
-        active: Arc::new(AtomicUsize::new(0)),
-        limit: MAX_CONNECTIONS,
-        allow_tls: true,
-        failures: Arc::default(),
+    // The router passed VERIFY, then went away: nothing listens at its address any more.
+    let ok = Ok((200, "I2P HTTP proxy OK".to_owned()));
+    let Verdict::Ok(up) = judge(dead_addr(), ok) else {
+        panic!("VERIFY must accept the self-test page");
     };
-    let (client_side, server_side) = socket_pair();
-    let worker = thread::spawn(move || handle(server_side, &dead));
-    let mut client = client_side;
-    client
-        .write_all(b"GET http://site.i2p/ HTTP/1.1\r\n\r\n")
-        .unwrap();
-    let mut out = Vec::new();
-    let read = client.read_to_end(&mut out);
-    let handled = worker.join().unwrap();
-    assert!(
-        out.starts_with(b"HTTP/1.1 502"),
-        "read {read:?}, handler {handled:?}, got {:?}",
-        String::from_utf8_lossy(&out)
+    let gate = Gatekeeper::start_with(&up, true).unwrap();
+    let out = send(
+        &gate,
+        "GET http://site.i2p/ HTTP/1.1\r\nHost: site.i2p\r\n\r\n",
     );
-    handled.unwrap();
-    drop(gate);
-}
-
-fn socket_pair() -> (TcpStream, TcpStream) {
-    let (listener, addr) = LoopbackAddr::listen_any().unwrap();
-    let client = addr.connect(Duration::from_secs(2)).unwrap();
-    let (server, _) = listener.accept().unwrap();
-    (client, server)
+    assert!(out.starts_with("HTTP/1.1 502"), "got {out:?}");
 }
 
 #[test]
