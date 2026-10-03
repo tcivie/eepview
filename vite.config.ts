@@ -1,4 +1,4 @@
-import { defineConfig, loadEnv, type Plugin } from "vite";
+import { defineConfig, loadEnv } from "vite";
 
 const uiPages = [
   "index",
@@ -19,18 +19,6 @@ const input = Object.fromEntries([
   ...uiPages.map((page) => [`ui-${page}`, `src/ui/${page}.html`]),
 ]);
 
-const renderBlockingEntry: Plugin = {
-  name: "eepview-render-blocking-entry",
-  transformIndexHtml: {
-    order: "post",
-    handler: (html) =>
-      html.replace(
-        /<script type="module" crossorigin/g,
-        '<script type="module" blocking="render" crossorigin',
-      ),
-  },
-};
-
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
   // loadEnv also reads the real process environment for keys with this prefix.
@@ -40,7 +28,6 @@ export default defineConfig(({ mode }) => {
     //
     // 1. prevent Vite from obscuring rust errors
     clearScreen: false,
-    plugins: [renderBlockingEntry],
     build: {
       rollupOptions: {
         input,

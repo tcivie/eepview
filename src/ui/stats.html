@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="en">
   <head>
+    <script src="/theme-boot.js"></script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="light dark" />
@@ -8,7 +9,7 @@
     <link rel="stylesheet" href="./theme.css" />
     <link rel="stylesheet" href="./ui.css" />
     <link rel="stylesheet" href="./pages.css" />
-    <script type="module" src="./stats.ts" blocking="render"></script>
+    <script type="module" src="./stats.ts"></script>
   </head>
   <body>
     <div class="shell">
@@ -80,43 +81,17 @@
           <p role="status"><span class="chip" id="net-chip" data-tone="building">Checking</span></p>
         </header>
 
-        <section class="section" aria-labelledby="router-title">
-          <div class="section-head">
-            <h2 id="router-title">Router</h2>
-          </div>
-          <dl class="facts panel router-facts">
-            <div>
-              <dt>Status</dt>
-              <dd id="router-state">Checking</dd>
-            </div>
-            <div>
-              <dt>Router</dt>
-              <dd id="router-version">Unknown</dd>
-            </div>
-            <div>
-              <dt>Proxy</dt>
-              <dd class="mono" id="router-proxy">None yet</dd>
-            </div>
-          </dl>
-          <p class="muted router-detail" id="router-detail"></p>
-        </section>
-
-        <p class="notice-inline figures-missing" id="figures-missing">
-          The router does not share bandwidth and tunnel figures with eepview yet.
-        </p>
-
-        <div id="sample-figures" hidden>
         <section class="section panel bandwidth" aria-labelledby="bw-title">
           <div class="bandwidth-head">
             <h2 id="bw-title">Bandwidth</h2>
             <dl class="bandwidth-now">
               <div class="bw-in">
                 <dt>In now</dt>
-                <dd class="num"><span id="bw-in-now">48.2</span> KB/s</dd>
+                <dd class="num" id="bw-in-now">—</dd>
               </div>
               <div class="bw-out">
                 <dt>Out now</dt>
-                <dd class="num"><span id="bw-out-now">31.0</span> KB/s</dd>
+                <dd class="num" id="bw-out-now">—</dd>
               </div>
             </dl>
           </div>
@@ -136,10 +111,10 @@
               <path class="spark-line spark-line-in" id="spark-in" d="M0 140" />
               <path class="spark-line spark-line-out" id="spark-out" d="M0 140" />
             </svg>
-            <span class="spark-max num" id="spark-max">80 KB/s</span>
-            <figcaption class="spark-axis" id="spark-caption">
+            <span class="spark-max num" id="spark-max">—</span>
+            <figcaption class="spark-axis">
               <span>10 minutes ago</span>
-              <span class="visually-hidden" id="spark-summary"></span>
+              <span class="visually-hidden" id="spark-summary">No bandwidth figures yet.</span>
               <span>Now</span>
             </figcaption>
           </figure>
@@ -148,83 +123,69 @@
         <section class="section" aria-labelledby="tunnels-title">
           <div class="section-head">
             <h2 id="tunnels-title">Tunnels</h2>
+            <span class="muted tunnel-note">Each tunnel lasts 10 minutes, then the router builds a fresh one.</span>
           </div>
-          <div class="tunnel-grid">
-            <div class="panel tunnel-list">
-              <h3>Your tunnels</h3>
-              <p class="muted tunnel-note">
-                Each tunnel lasts 10 minutes, then the router builds a fresh one.
-              </p>
-              <ul class="tunnels">
-                <li class="tunnel">
-                  <span class="tunnel-dir">Outbound</span>
-                  <ol class="hops" aria-label="Outbound tunnel, 3 hops, all built">
-                    <li class="hop" data-state="built"><span class="hop-node"></span>You</li>
-                    <li class="hop" data-state="built"><span class="hop-node"></span>1</li>
-                    <li class="hop" data-state="built"><span class="hop-node"></span>2</li>
-                    <li class="hop" data-state="built"><span class="hop-node"></span>3</li>
-                  </ol>
-                  <span class="tunnel-ttl num">8 min left</span>
-                </li>
-                <li class="tunnel">
-                  <span class="tunnel-dir">Outbound</span>
-                  <ol class="hops" aria-label="Outbound tunnel, 3 hops, all built">
-                    <li class="hop" data-state="built"><span class="hop-node"></span>You</li>
-                    <li class="hop" data-state="built"><span class="hop-node"></span>1</li>
-                    <li class="hop" data-state="built"><span class="hop-node"></span>2</li>
-                    <li class="hop" data-state="built"><span class="hop-node"></span>3</li>
-                  </ol>
-                  <span class="tunnel-ttl num">3 min left</span>
-                </li>
-                <li class="tunnel">
-                  <span class="tunnel-dir">Inbound</span>
-                  <ol class="hops" aria-label="Inbound tunnel, 3 hops, all built">
-                    <li class="hop" data-state="built"><span class="hop-node"></span>3</li>
-                    <li class="hop" data-state="built"><span class="hop-node"></span>2</li>
-                    <li class="hop" data-state="built"><span class="hop-node"></span>1</li>
-                    <li class="hop" data-state="built"><span class="hop-node"></span>You</li>
-                  </ol>
-                  <span class="tunnel-ttl num">6 min left</span>
-                </li>
-                <li class="tunnel">
-                  <span class="tunnel-dir">Inbound</span>
-                  <ol class="hops" aria-label="Inbound tunnel, building, 2 of 3 hops built">
-                    <li class="hop" data-state="built"><span class="hop-node"></span>3</li>
-                    <li class="hop" data-state="built"><span class="hop-node"></span>2</li>
-                    <li class="hop" data-state="building"><span class="hop-node"></span>1</li>
-                    <li class="hop"><span class="hop-node"></span>You</li>
-                  </ol>
-                  <span class="tunnel-ttl">Building</span>
-                </li>
-              </ul>
+          <dl class="panel figures figures-row">
+            <div>
+              <dt>Client tunnels</dt>
+              <dd class="num" id="client-tunnels">—</dd>
+              <dd class="figure-note">Carry your own traffic</dd>
             </div>
-            <dl class="panel figures">
-              <div>
-                <dt>Client tunnels</dt>
-                <dd class="num">6</dd>
-                <dd class="figure-note">3 in, 3 out</dd>
-              </div>
-              <div>
-                <dt>Participating tunnels</dt>
-                <dd class="num">214</dd>
-                <dd class="figure-note">Traffic you relay for others</dd>
-              </div>
-              <div>
-                <dt>Tunnel build success</dt>
-                <dd class="num">68%</dd>
-                <dd class="figure-note">
-                  <svg class="rate" viewBox="0 0 100 6" preserveAspectRatio="none" aria-hidden="true">
-                    <rect class="rate-track" width="100" height="6" rx="3" />
-                    <rect class="rate-fill" width="68" height="6" rx="3" />
-                  </svg>
-                  Last 10 minutes
-                </dd>
-              </div>
-            </dl>
-          </div>
+            <div>
+              <dt>Participating tunnels</dt>
+              <dd class="num" id="participating-tunnels">—</dd>
+              <dd class="figure-note">Traffic you relay for others</dd>
+            </div>
+            <div>
+              <dt>Tunnel build success</dt>
+              <dd class="num" id="build-rate">—</dd>
+              <dd class="figure-note">
+                <svg class="rate" viewBox="0 0 100 6" preserveAspectRatio="none" aria-hidden="true">
+                  <rect class="rate-track" width="100" height="6" rx="3" />
+                  <rect class="rate-fill" id="build-rate-bar" width="0" height="6" rx="3" />
+                </svg>
+                Last 10 minutes
+              </dd>
+            </div>
+          </dl>
         </section>
 
-        </div>
+        <section class="section" aria-labelledby="router-title">
+          <div class="section-head">
+            <h2 id="router-title">Router</h2>
+          </div>
+          <dl class="facts panel router-facts">
+            <div>
+              <dt>Network status</dt>
+              <dd id="network-status">—</dd>
+            </div>
+            <div>
+              <dt>Running for</dt>
+              <dd id="uptime">—</dd>
+            </div>
+            <div>
+              <dt>Router</dt>
+              <dd id="router-kind">—</dd>
+            </div>
+            <div>
+              <dt>Java</dt>
+              <dd id="java-version">—</dd>
+            </div>
+            <div>
+              <dt>Known routers</dt>
+              <dd class="num" id="known-routers">—</dd>
+            </div>
+            <div>
+              <dt>Floodfills</dt>
+              <dd class="num" id="floodfills">—</dd>
+            </div>
+            <div>
+              <dt>Proxy</dt>
+              <dd class="mono" id="router-proxy">—</dd>
+            </div>
+          </dl>
+          <p class="muted router-detail" id="router-detail"></p>
+        </section>
       </main>
     </div>
   </body>
