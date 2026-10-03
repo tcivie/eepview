@@ -60,7 +60,7 @@ These make the wrong code hard to write.
    - a capability names a webview other than `toolbar`, `internal` or `status`, grants by window or remote URL, or gives `status` more than events;
    - the router console view breaks its own rules (see [Router console exception](#router-console-exception)).
 
-   The router console view is the one other remote webview. The test allows it only in `src/shell/console.rs`: `WebviewBuilder::new`, `on_navigation` and `add_child` (with `content.rs` and `chrome.rs`), `WebviewUrl::External` (with `content.rs`, and only for `about:blank`), and `WebviewWindowBuilder` (only there). `proxy_url` stays in `content.rs` only.
+   The router console view is the one other remote webview. The test allows it only in `src/shell/console.rs`: `WebviewBuilder::new`, `on_navigation` and `add_child` (with `content.rs` and `chrome.rs`), `WebviewUrl::External` (with `content.rs`, and only for `about:blank`), and no window builder at all (`WindowBuilder` and `WebviewWindowBuilder` are banned there: the console view is a child of the main window, shown by the console tab). `proxy_url` stays in `content.rs` only.
 5. **Fail closed at runtime.** The gatekeeper runs only while VERIFY passes. VERIFY asks the router proxy for `http://proxy.i2p/` every 5 s and needs 200 with "I2P HTTP proxy OK". It never asks for a non-`.i2p` host: on a router with an outproxy, that request would itself reach the clearnet. The architecture test fails if `verify.rs` or `gatekeeper.rs` names a non-`.i2p` host. When the router goes down, or you pause, the gatekeeper closes and every `tab-*` webview is destroyed.
 
 ## Router console exception
@@ -74,7 +74,7 @@ Amended in [#54](https://github.com/tcivie/eepview/pull/54). eepview shows route
 - **Tabs unchanged.** The `tab-*` webviews keep all five layers. A `tab-*` webview never gets a loopback URL.
 - **No probe at start.** Detection runs only when a page that shows the console links opens, so the leak test sees no extra socket.
 
-See [Router console](router-console.md) for the requirements (R1–R21).
+See [Router console](router-console.md) for the requirements (R1–R30). The console view shows in the console tab since [#76](https://github.com/tcivie/eepview/pull/76); the confinement above is unchanged.
 
 ## The platform bridge
 

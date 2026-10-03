@@ -83,7 +83,7 @@ The console tab is not a web tab, and its webview is not a `tab-*` webview. The 
 
 ### Confinement and retries
 
-- **R19 Console rule list.** Before its first load, the console view gets an engine rule list: block every URL, then allow only URLs on the console origin (R9) and `about:`, `data:`, `blob:`. The view starts on `about:blank` and loads the page only after the list is attached. If it cannot be attached, nothing loads (fail closed). On Windows the same rule answers each `WebResourceRequested` with 403. Linux has no engine filter yet (the same limit as L3b for tabs); there the console view relies on R10 and the router's own pages.
+- **R19 Console rule list.** Before its first load, the console view gets an engine rule list: block every URL, then allow only URLs on the console origin (R9) and `about:`, `data:`, `blob:`. The view starts on `about:blank` and loads the page only after the list is attached. If it cannot be attached, nothing loads (fail closed): the console tab closes, its `console` webview is destroyed, and a warning toast says "The router console could not be opened safely" (`Core::console_failed`). On Windows the same rule answers each `WebResourceRequested` with 403. Linux has no engine filter yet (the same limit as L3b for tabs); there the console view relies on R10 and the router's own pages.
 - **R20 Retry after a miss.** When a `console_detect()` finds no console, eepview retries every 10 s for 2 minutes (12 retries), and stops at the first console found. A new trigger during the retries does not start a second retry loop. The UI also calls `console_detect()` when `router-status` turns `ok` (from any other state, not paused) while a page with the links shows: the home page or Settings as the active tab, or the open router panel.
 - **R21 Re-check misses.** While a console is known, a re-check runs every 10 s. A re-check that finds a different console (another port or type) replaces it at once. A re-check that finds none counts a miss; the known console stays, with no event, until 3 misses in a row. The third miss clears it: `console-changed` with `found: false`, and the console tab closes (R30). A re-check that finds the same console resets the count.
 - **R22 Stop.** `shell::console::stop(app)` ends every re-check and retry loop at its next tick (at most one tick, 10 s). After stop, no thread opens a connection to a console port. The shell calls it on `RunEvent::Exit`. A later `detect_now` starts the loops again.
@@ -92,8 +92,8 @@ The console tab is not a web tab, and its webview is not a `tab-*` webview. The 
 
 - **R23 Tab kind.** The console tab is a tab of kind `console` in the tab strip (`TabInfo.kind`). While it is the active tab, the content area shows the `console` webview, at the place of a web tab. While another tab is active, the `console` webview is hidden. Its `TabInfo` has `kind: "console"`, `zoom: 1`, `jsOn: true` (R11), `bookmarked: false` and `icon: null`. The router state (verifying, down, paused) does not change what the console tab shows: the console is on loopback and does not go through the router proxy.
 - **R24 One console tab.** There is at most one console tab. `console_open()` with a console tab open selects it and loads the home page in it. With none, it makes one right after the active tab and selects it. It never opens a second `console` webview.
-- **R25 Tab state.** The tab title is the document title of the console page. Until the first title arrives, it is `Router console`. The tab URL is the URL the `console` webview shows (main frame), and `loading` follows its page loads. A console page never enters history, never gets a site icon and is never bookmarked. The bookmark star and the JavaScript toggle are disabled in a console tab. Find in page and zoom do nothing there.
-- **R26 Address bar.** In a console tab the address bar shows the console URL and a `Router console` badge in place of the `I2P` badge. Typing in the address bar and pressing Enter navigates like in any tab: the input goes through the normal address rules and the tab guard. The console tab becomes a normal tab (`web` or `internal`) with a new back/forward list, and the `console` webview is destroyed. A console address typed by hand is refused like any other non-I2P address (`not-i2p`); only `console_open()` loads the console.
+- **R25 Tab state.** The tab title is the document title of the console page. Until the first title arrives, it is `Router console`. The tab URL is the URL the `console` webview shows (main frame), and `loading` follows its page loads. A console page never enters history, never gets a site icon and is never bookmarked. The bookmark star and the JavaScript toggle are disabled in a console tab. Find in page and zoom do nothing there: the find shortcut and `find()` leave the find bar closed and make no engine call.
+- **R26 Address bar.** In a console tab the address bar shows the console URL and a `Router console` badge in place of the `I2P` badge. Typing in the address bar and pressing Enter navigates like in any tab: the input goes through the normal address rules and the tab guard. When the input is allowed (an I2P address, an internal page or a search), the console tab becomes a normal tab (`web` or `internal`) with a new back/forward list, and the `console` webview is destroyed. When the input is refused (`not-i2p`, `invalid`), for example an edited console address, the answer is the refusal and the console tab stays as it is: no blocked page, no effect on the `console` webview. A console address typed by hand never loads; only `console_open()` loads the console.
 - **R27 Back, forward, reload, stop.** In a console tab, back, forward, reload, hard reload and stop act on the `console` webview. `canBack` and `canForward` follow the console pages loaded in that tab.
 - **R28 Close.** Closing the console tab destroys the `console` webview. "Reopen closed tab" never brings a console tab back. eepview does not restore tabs at start, so a restart never shows a console tab.
 - **R29 No console URL in a web tab.** The core never makes a `WebOp` (load, engine call, destroy) for the console tab. A console page URL never reaches a `tab-*` webview: a load of a non-I2P URL in a web tab shows the blocked page, as before. ADR 0001 and the leak test do not change.
@@ -177,7 +177,8 @@ impl Core {
     /// The id of the console tab, if one is open.
     pub fn console_tab(&self) -> Option<u32>;
     /// R24: selects the console tab, or makes one right after the active tab and selects
-    /// it, showing `url`. The shell has already started the load. No `WebOp`.
+    /// it, showing `url`. The shell calls it before it starts the load, so the first page
+    /// event finds the tab. No `WebOp`.
     pub fn console_open(&mut self, url: &str) -> Vec<Effect>;
     /// R25: the `console` webview started (`console_started`) or finished
     /// (`console_finished`) a main-frame load of `url`. Updates url, loading and the
@@ -188,10 +189,12 @@ impl Core {
     pub fn console_title(&mut self, title: &str) -> Vec<Effect>;
     /// R30: the console went away: closes the console tab, if open (with `ConsoleOp::Close`).
     pub fn console_gone(&mut self) -> Vec<Effect>;
+    /// R19: the rule list could not be attached: `console_gone` plus a warning toast.
+    pub fn console_failed(&mut self) -> Vec<Effect>;
 }
 ```
 
-The other commands keep their signatures and branch on the console tab: `view()` (R23), `tab_infos()` (`kind: "console"`, R23), `navigate()` (R26), `step()`, `reload()`, `stop()` (R27), `tab_close()`, `tab_reopen()` (R28), `find()`, `zoom()`, `bookmark_toggle()` (R25).
+The other commands keep their signatures and branch on the console tab: `view()` (R23), `tab_infos()` (`kind: "console"`, R23), `navigate()` (R26), `step()`, `reload()`, `stop()` (R27), `tab_close()`, `tab_reopen()` (R28), `find()`, `zoom()`, `bookmark_toggle()`, `shortcut(Find)` (R25). Every path that builds a lazy web tab (`tab_select()`, `tab_cycle()`, `tab_number()`, the tab shown after `tab_close()`, `router_changed()`, `resume()`) skips the console tab, so it never turns into a blocked page.
 
 ### Rust, `eepview_lib::shell::console` (`src-tauri/src/shell/console.rs`)
 
@@ -201,8 +204,10 @@ pub const CONSOLE_LABEL: &str = "console";
 pub struct ConsoleWebview;
 impl ConsoleWebview {
     /// R8, R24: builds the `console` webview in the main window (hidden, at the content
-    /// rect), or reuses it, loads the home page of `console` (after the rule list, R19),
-    /// and opens or selects the console tab (`Core::console_open`).
+    /// rect) and puts the chrome (`toolbar`, `status`, `popup`) above it again
+    /// (`view::raise_chrome`), or reuses the live one. Then it opens or selects the console
+    /// tab (`Core::console_open`), and only then loads the home page of `console` (after
+    /// the rule list, R19).
     pub fn open<R: Runtime>(app: &AppHandle<R>, console: &VerifiedConsole)
         -> tauri::Result<Webview<R>>;
 }
