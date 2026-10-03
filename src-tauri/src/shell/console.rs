@@ -118,15 +118,15 @@ fn build<R: Runtime>(app: &AppHandle<R>, console: &VerifiedConsole) -> tauri::Re
 /// view stays on `about:blank` (fail closed).
 fn arm<R: Runtime>(webview: &Webview<R>, console: &VerifiedConsole, url: Url) -> tauri::Result<()> {
     let live = webview.clone();
-    let rules = console.clone();
+    let json = console.rule_list().to_string();
+    let id = format!("eepview-console-{}", console.port());
+    let allow = console.clone();
+    let allow: Box<dyn Fn(&str) -> bool + Send> = Box::new(move |url| allow.engine_allows(url));
     webview.with_webview(move |platform| {
-        let json = rules.rule_list().to_string();
-        let id = format!("eepview-console-{}", rules.port());
-        let allow = rules.clone();
         let list = Rules {
             id: &id,
             json: &json,
-            allow: Box::new(move |url| allow.engine_allows(url)),
+            allow,
         };
         eepview_platform::attach_rules(&platform, list, load_after_rules(live, url));
     })
@@ -163,8 +163,10 @@ fn hooks<R: Runtime>(
         .on_download(|_webview, _event| false)
 }
 
-/// A navigation of the console view: the console origin stays; an I2P site opens in a tab.
-fn navigation<R: Runtime>(app: &AppHandle<R>, console: &VerifiedConsole, url: &Url) -> bool {
+/// R10: a navigation of the console view. The console origin (and the first
+/// `about:blank`) stays; an I2P site opens in a normal tab instead; anything else is
+/// cancelled.
+pub fn navigation<R: Runtime>(app: &AppHandle<R>, console: &VerifiedConsole, url: &Url) -> bool {
     if url.as_str() == BLANK {
         return true;
     }
@@ -178,8 +180,9 @@ fn navigation<R: Runtime>(app: &AppHandle<R>, console: &VerifiedConsole, url: &U
     }
 }
 
-/// A console page asked for a new window: never an engine window.
-fn new_window<R: Runtime>(
+/// R10: a console page asked for a new window. Never an engine window: the console origin
+/// loads in the console view, an I2P site opens in a normal tab, anything else is dropped.
+pub fn new_window<R: Runtime>(
     app: &AppHandle<R>,
     console: &VerifiedConsole,
     url: &Url,
