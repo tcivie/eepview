@@ -46,7 +46,7 @@ The interface is neutral, like Safari, Chrome and Firefox. Green is only the acc
 - **Status colors:** `--color-success` (the "Ready" dot), `--color-warning` and `--color-danger` mark state. A status chip is neutral, with a colored dot.
 - No green-tinted background, border or text sits on neutral content.
 
-Added in [#45](https://github.com/tcivie/eepview/pull/45).
+Added in [#51](https://github.com/tcivie/eepview/pull/51).
 
 ## Color rule
 
@@ -147,4 +147,4 @@ All variants are the same artwork. None is redrawn.
 
 - 2026-10-03 — Add the logo, the app icons and the brand assets — [#11](https://github.com/tcivie/eepview/pull/11)
 - 2026-10-03 — One color source, the palette check — [#38](https://github.com/tcivie/eepview/pull/38)
-- 2026-10-03 — Neutral surfaces, green only as the accent — [#45](https://github.com/tcivie/eepview/pull/45)
+- 2026-10-03 — Neutral surfaces, green only as the accent — [#51](https://github.com/tcivie/eepview/pull/51)
