@@ -182,6 +182,8 @@ pub struct Core {
     stats: StatsHistory,
     /// The link under the mouse in the active tab: a refused navigation to it is a click.
     pointed: Option<Url>,
+    /// The tab whose next commit takes keyboard focus: its navigation came from the address bar.
+    focus_on_commit: Option<u32>,
 }
 
 impl Core {
@@ -220,6 +222,7 @@ impl Core {
             js_forced_off: false,
             stats: StatsHistory::default(),
             pointed: None,
+            focus_on_commit: None,
         };
         let home = core.home_url();
         core.tabs.open(&home, crate::tabs::Place::End, true);
