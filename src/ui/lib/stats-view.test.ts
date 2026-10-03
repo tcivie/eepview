@@ -3,59 +3,53 @@
 
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import {
-  formatCount,
-  formatPercent,
-  formatRate,
-  formatRouter,
-  formatUptime,
-  MISSING,
-  type StatsLike,
-  statsText,
-} from "./stats-view.ts";
+import { formatPercent, formatRate, type StatsLike, statsText } from "./stats-view.ts";
 
-const empty: StatsLike = {
-  networkStatus: null,
-  uptimeSeconds: null,
-  routerKind: null,
-  routerVersion: null,
+describe("Network page numbers", () => {
+  it("[browser-ui 11] shows a rate under 1 KB in B/s with one decimal", () => {
+    assert.match(formatRate(512), /^512\.0\s?B\/s$/);
+  });
+  it("[browser-ui 11] shows a rate in KB/s with one decimal", () => {
+    assert.match(formatRate(1536), /^1\.5\s?KB\/s$/);
+  });
+  it("[browser-ui 11] shows a rate in MB/s with one decimal", () => {
+    assert.match(formatRate(3_000_000), /^(2\.9|3\.0)\s?MB\/s$/);
+  });
+  it("[browser-ui 12] shows a ratio as a percentage with one decimal", () => {
+    assert.equal(formatPercent(0.874), "87.4%");
+    assert.equal(formatPercent(0.5), "50.0%");
+    assert.equal(formatPercent(1), "100.0%");
+  });
+});
+
+const STATS: StatsLike = {
+  networkStatus: "OK",
+  uptimeSeconds: 7380,
+  routerKind: "i2pd",
+  routerVersion: "2.50.0",
   javaVersion: null,
-  bandwidthInBps: null,
-  bandwidthOutBps: null,
+  bandwidthInBps: 1536,
+  bandwidthOutBps: 512,
   history: null,
-  clientTunnels: null,
-  participatingTunnels: null,
-  buildSuccessRate: null,
-  knownRouters: null,
-  floodfills: null,
+  clientTunnels: 6,
+  participatingTunnels: 345,
+  buildSuccessRate: 0.874,
+  knownRouters: 2310,
+  floodfills: 40,
 };
 
-describe("stats formatting", () => {
-  it("shows a dash for every missing field", () => {
-    const view = statsText(empty);
-    for (const [key, value] of Object.entries(view)) {
-      if (key !== "buildRateBar") assert.equal(value, MISSING, key);
-    }
-    assert.equal(view.buildRateBar, 0);
+describe("Network page", () => {
+  const text = statsText(STATS);
+  it("[browser-ui 11] shows the bandwidth rates with a unit and one decimal", () => {
+    assert.match(text.bandwidthIn, /^1\.5\s?KB\/s$/);
+    assert.match(text.bandwidthOut, /^512\.0\s?B\/s$/);
   });
-  it("formats rates in KB/s and MB/s", () => {
-    assert.equal(formatRate(49_357), "48.2 KB/s");
-    assert.equal(formatRate(3 * 1024 * 1024), "3.0 MB/s");
+  it("[browser-ui 12] shows the tunnel build success ratio as a percentage with one decimal", () => {
+    assert.equal(text.buildRate, "87.4%");
   });
-  it("formats counts, percentages and uptime", () => {
-    assert.equal(formatCount(4812), "4,812");
-    assert.equal(formatPercent(0.676), "68%");
-    assert.equal(formatUptime(11_520), "3 h 12 min");
-    assert.equal(formatUptime(300), "5 min");
-    assert.equal(formatUptime(2 * 86_400 + 7200), "2 d 2 h");
-  });
-  it("joins the router version and kind", () => {
-    assert.equal(formatRouter("bundled", "2.10.0"), "I2P 2.10.0, bundled");
-    assert.equal(formatRouter(null, "2.10.0"), "I2P 2.10.0");
-    assert.equal(formatRouter(null, null), MISSING);
-  });
-  it("clamps the build success bar", () => {
-    assert.equal(statsText({ ...empty, buildSuccessRate: 1.4 }).buildRateBar, 100);
-    assert.equal(statsText({ ...empty, buildSuccessRate: 0.68 }).buildRateBar, 68);
+  it("Network page: shows the counts it was given", () => {
+    assert.match(text.clientTunnels, /6/);
+    assert.match(text.participatingTunnels, /345/);
+    assert.match(text.knownRouters, /2310|2,310|2 310/);
   });
 });

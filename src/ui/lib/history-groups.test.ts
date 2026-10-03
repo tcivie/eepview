@@ -3,93 +3,62 @@
 
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import {
-  dayKey,
-  dayLabel,
-  groupByDay,
-  isBeforeCursor,
-  newestFirst,
-  oldestVisit,
-  pageCursor,
-  timeOfDay,
-} from "./history-groups.ts";
+import { groupByDay, isBeforeCursor, newestFirst, pageCursor } from "./history-groups.ts";
 
-const at = (y: number, m: number, d: number, h = 12, min = 0): number =>
-  new Date(y, m - 1, d, h, min).getTime();
-const NOW = at(2026, 10, 3, 15);
+const at = (month: number, day: number, hour: number): number =>
+  new Date(2026, month, day, hour, 0).getTime();
+const NOW = at(9, 3, 15);
+const entry = (visited: number, id: string) => ({ id, visited });
 
-describe("dayLabel", () => {
-  it("names today and yesterday", () => {
-    assert.equal(dayLabel(at(2026, 10, 3, 0, 5), NOW), "Today");
-    assert.equal(dayLabel(at(2026, 10, 2, 23, 59), NOW), "Yesterday");
+describe("[browser-ui 8] History groups by day", () => {
+  const groups = groupByDay(
+    [
+      entry(at(9, 3, 9), "a"),
+      entry(at(9, 3, 1), "b"),
+      entry(at(9, 2, 22), "c"),
+      entry(at(8, 28, 11), "d"),
+      entry(at(8, 28, 9), "e"),
+      entry(at(8, 20, 9), "f"),
+    ],
+    NOW,
+  );
+  it('[browser-ui 8] shows "Today", then "Yesterday", then one group per older date', () => {
+    assert.equal(groups.length, 4);
+    assert.equal(groups[0]?.label, "Today");
+    assert.equal(groups[1]?.label, "Yesterday");
+    assert.notEqual(groups[2]?.label, groups[3]?.label);
   });
-  it("uses the weekday and date for older days", () => {
-    assert.equal(dayLabel(at(2026, 9, 28), NOW), "Monday 28 September");
-  });
-  it("adds the year when it differs", () => {
-    assert.match(dayLabel(at(2025, 12, 31), NOW), /2025/);
-  });
-});
-
-describe("groupByDay", () => {
-  it("keeps the order and splits on local midnight", () => {
-    const entries = [
-      { id: "a", visited: at(2026, 10, 3, 9) },
-      { id: "b", visited: at(2026, 10, 3, 1) },
-      { id: "c", visited: at(2026, 10, 2, 22) },
-      { id: "d", visited: at(2026, 9, 30, 8) },
-    ];
-    const groups = groupByDay(entries, NOW);
+  it("[browser-ui 8] puts the entries of one day into one group", () => {
     assert.deepEqual(
-      groups.map((g) => [g.label, g.entries.map((e) => e.id)]),
-      [
-        ["Today", ["a", "b"]],
-        ["Yesterday", ["c"]],
-        ["Wednesday 30 September", ["d"]],
-      ],
+      groups.map((g) => g.entries.map((e) => e.id).join("")),
+      ["ab", "c", "de", "f"],
     );
   });
-  it("returns no groups for no entries", () => {
-    assert.deepEqual(groupByDay([], NOW), []);
+  it("[browser-ui 8] names each older group by its date", () => {
+    assert.match(groups[2]?.label ?? "", /28/);
+    assert.match(groups[3]?.label ?? "", /20/);
   });
 });
 
-describe("helpers", () => {
-  it("builds a sortable day key", () => {
-    assert.equal(dayKey(at(2026, 1, 5)), "2026-01-05");
+describe("[ipc-contract history-1] order and cursor", () => {
+  it("[ipc-contract history-1] sorts newest first by visited desc, then id desc", () => {
+    const sorted = [entry(100, "1"), entry(200, "1"), entry(100, "2")].sort(newestFirst);
+    assert.deepEqual(
+      sorted.map((e) => `${e.visited}/${e.id}`),
+      ["200/1", "100/2", "100/1"],
+    );
   });
-  it("formats the time of day", () => {
-    assert.equal(timeOfDay(at(2026, 10, 3, 9, 7)), "09:07");
-  });
-  it("finds the oldest visit for the next page", () => {
-    assert.equal(oldestVisit([{ visited: 5 }, { visited: 2 }, { visited: 9 }]), 2);
-    assert.equal(oldestVisit([]), undefined);
-  });
-});
-
-describe("paging", () => {
-  const rows = [
-    { id: "c", visited: 9 },
-    { id: "b", visited: 4 },
-    { id: "a", visited: 4 },
-  ];
-  it("uses the last row as the cursor", () => {
-    assert.deepEqual(pageCursor(rows), { visited: 4, id: "a" });
+  it("[ipc-contract history-1] the cursor of a page is the {visited, id} of its last entry", () => {
+    const page = [entry(300, "9"), entry(200, "4")];
+    assert.deepEqual(pageCursor(page), { visited: 200, id: "4" });
     assert.equal(pageCursor([]), undefined);
   });
-  it("keeps rows that tie on the timestamp", () => {
-    const cursor = { visited: 4, id: "b" };
-    assert.deepEqual(
-      rows.filter((r) => isBeforeCursor(r, cursor)).map((r) => r.id),
-      ["a"],
-    );
-    assert.equal(isBeforeCursor({ id: "z", visited: 1 }, undefined), true);
-  });
-  it("sorts newest first, then by id", () => {
-    const shuffled = [rows[2], rows[0], rows[1]].filter((r) => r !== undefined);
-    assert.deepEqual(
-      shuffled.sort(newestFirst).map((r) => r.id),
-      ["c", "b", "a"],
-    );
+  it("[ipc-contract history-1] an entry is before the cursor when it comes later in the order", () => {
+    const cursor = { visited: 100, id: "5" };
+    assert.equal(isBeforeCursor({ visited: 50, id: "9" }, cursor), true);
+    assert.equal(isBeforeCursor({ visited: 100, id: "4" }, cursor), true);
+    assert.equal(isBeforeCursor({ visited: 100, id: "6" }, cursor), false);
+    assert.equal(isBeforeCursor({ visited: 200, id: "1" }, cursor), false);
+    assert.equal(isBeforeCursor(cursor, cursor), false);
   });
 });

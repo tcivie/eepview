@@ -44,7 +44,7 @@ const newId = (): string => `m${nextId++}`;
 const settings: Settings = {
   homepage: "eepview://home",
   theme: localThemeStore.get(),
-  jsDefault: false,
+  jsDefault: true,
   history: { enabled: true },
   keepCookies: false,
   zoomDefault: 1,
@@ -177,6 +177,14 @@ function titleFor(url: string): string {
   return hostOf(url);
 }
 
+function isParsable(input: string): boolean {
+  try {
+    return new URL(/^https?:/.test(input) ? input : `${EEPSITE_SCHEME}//${input}`).href !== "";
+  } catch {
+    return false;
+  }
+}
+
 function resolveInput(input: string): { url: string; result: NavResult } {
   const trimmed = input.trim();
   if (trimmed.startsWith("eepview://")) return { url: trimmed, result: { ok: true } };
@@ -187,18 +195,52 @@ function resolveInput(input: string): { url: string; result: NavResult } {
   if (!trimmed.includes(".") && !trimmed.includes(":")) {
     return { url: `eepview://history?q=${encodeURIComponent(trimmed)}`, result: { ok: true } };
   }
+  const reason = isParsable(trimmed) ? "not-i2p" : "invalid";
   const blocked = `eepview://blocked?url=${encodeURIComponent(trimmed)}`;
-  return { url: blocked, result: { ok: false, reason: "not-i2p" } };
+  return { url: blocked, result: { ok: false, reason } };
+}
+
+interface PageHistory {
+  back: string[];
+  forward: string[];
+}
+const pageHistories = new Map<number, PageHistory>();
+const pageHistoryOf = (id: number): PageHistory => {
+  const found = pageHistories.get(id) ?? { back: [], forward: [] };
+  pageHistories.set(id, found);
+  return found;
+};
+
+function show(current: TabInfo, url: string): void {
+  const stacks = pageHistoryOf(current.id);
+  const bookmarked = bookmarks.some((b) => b.url === url);
+  const kind = tab(0, url, "").kind;
+  const canBack = stacks.back.length > 0;
+  const canForward = stacks.forward.length > 0;
+  updateTab(current.id, { url, title: titleFor(url), kind, bookmarked, canBack, canForward });
 }
 
 function navigate(input: string): NavResult {
+  if (input.trim() === "") return { ok: true };
   const { url, result } = resolveInput(input);
   const current = activeTab();
   if (current) {
-    const bookmarked = bookmarks.some((b) => b.url === url);
-    updateTab(current.id, { url, title: titleFor(url), kind: tab(0, url, "").kind, bookmarked });
+    const stacks = pageHistoryOf(current.id);
+    stacks.back.push(current.url);
+    stacks.forward = [];
+    show(current, url);
   }
   return result;
+}
+
+function step(direction: "back" | "forward"): void {
+  const current = activeTab();
+  if (!current) return;
+  const stacks = pageHistoryOf(current.id);
+  const target = (direction === "back" ? stacks.back : stacks.forward).pop();
+  if (target === undefined) return;
+  (direction === "back" ? stacks.forward : stacks.back).push(current.url);
+  show(current, target);
 }
 
 function zoomBy(step: number): void {
@@ -324,8 +366,8 @@ const handlers: Record<CommandName, Handler> = {
   tab_move: (a) => moveTab(arg(a, "id"), arg(a, "index")),
   tab_list: () => tabs,
   navigate: (a) => navigate(arg(a, "input")),
-  go_back: () => undefined,
-  go_forward: () => undefined,
+  go_back: () => step("back"),
+  go_forward: () => step("forward"),
   reload: () => undefined,
   stop: () => {
     const current = activeTab();
@@ -360,7 +402,10 @@ const handlers: Record<CommandName, Handler> = {
   router_status: () => router,
   router_stats: () => sampleStats(),
   router_control: (a) => setRouter({ state: arg(a, "action") === "stop" ? "down" : "building" }),
-  connection_pause: () => setRouter({ paused: true }),
+  connection_pause: () => {
+    setRouter({ paused: true });
+    navigate("eepview://router-down?reason=paused");
+  },
   connection_resume: () => setRouter({ paused: false }),
   chrome_set_height: () => undefined,
   platform: () => platformFromParams(),
