@@ -653,6 +653,10 @@
   color: var(--color-warning);
 }
 
+.route-local {
+  color: var(--color-text-muted);
+}
+
 .grants {
   display: grid;
   gap: var(--space-3);

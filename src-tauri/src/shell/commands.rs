@@ -498,11 +498,8 @@ pub fn router_control(action: &str) -> Res<ControlResult> {
 
 /// `console_status()`: the stored router console detection; no probe.
 #[tauri::command]
-#[must_use]
-pub fn console_status<R: Runtime>(app: AppHandle<R>) -> ConsoleInfo {
-    let console = super::console::current(&app);
-    drop(app);
-    super::console::info_of(console.as_ref())
+pub async fn console_status<R: Runtime>(app: AppHandle<R>) -> ConsoleInfo {
+    super::console::info_of(super::console::current(&app).as_ref())
 }
 
 /// `console_detect()`: probes for the router console now, off the main thread.

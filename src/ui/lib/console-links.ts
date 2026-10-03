@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 The eepview contributors
 // SPDX-License-Identifier: MIT
 
-import type { ConsoleInfo, ConsolePage } from "../contract.ts";
+import type { ConsoleInfo, ConsolePage, RouterStatus } from "../contract.ts";
 
 export const NO_CONSOLE_TEXT = "No router console found";
 
@@ -52,4 +52,11 @@ export function routerVersion(
   info: ConsoleInfo | null | undefined,
 ): string | null {
   return statusVersion ?? (info?.found ? info.version : null) ?? null;
+}
+
+export function shouldRedetect(
+  prev: Pick<RouterStatus, "state" | "paused"> | null,
+  next: Pick<RouterStatus, "state" | "paused">,
+): boolean {
+  return next.state === "ok" && !next.paused && prev?.state !== "ok";
 }

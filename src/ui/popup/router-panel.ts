@@ -5,7 +5,7 @@ import { renderConsoleLinks, wireConsoleClicks } from "../console-nav.ts";
 import type { ConsoleInfo, RouterStats, RouterStatus } from "../contract.ts";
 import { all, byId } from "../dom.ts";
 import { call, on } from "../ipc.ts";
-import { routerVersion } from "../lib/console-links.ts";
+import { routerVersion, shouldRedetect } from "../lib/console-links.ts";
 import {
   type PanelText,
   panelControls,
@@ -60,7 +60,9 @@ export function renderPanelStatus(status: RouterStatus): void {
   byId("rp-text").textContent = state.text;
   byId("rp-proxy").textContent = status.proxy || MISSING;
   renderControls(status);
+  const ready = shouldRedetect(lastStatus, status);
   lastStatus = status;
+  if (ready && !panel().hidden) call("console_detect", {}).then(renderConsole).catch(quiet);
 }
 
 function renderConsole(info: ConsoleInfo): void {

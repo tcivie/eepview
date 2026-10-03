@@ -7,7 +7,7 @@ import type { Bookmark, ConsoleInfo, RouterStatus } from "./contract.ts";
 import { all, byId, cloneTemplate, setText } from "./dom.ts";
 import { call, errorText, on } from "./ipc.ts";
 import { displayUrl, hostOf } from "./lib/address.ts";
-import { routerVersion } from "./lib/console-links.ts";
+import { routerVersion, shouldRedetect } from "./lib/console-links.ts";
 import { hopStates } from "./lib/router-view.ts";
 import { renderRouterSummary } from "./shared/router-summary.ts";
 import { renderSiteMark } from "./site-mark.ts";
@@ -42,7 +42,15 @@ function loadTiles(): void {
     });
 }
 
+function redetectWhenReady(status: RouterStatus): void {
+  if (!shouldRedetect(lastStatus, status)) return;
+  shownInActiveTab("home")
+    .then((shown) => (shown ? call("console_detect", {}).then(renderConsole) : undefined))
+    .catch(quiet);
+}
+
 function renderRouter(status: RouterStatus): void {
+  redetectWhenReady(status);
   const view = renderRouterSummary(
     { chip: byId("router-chip"), text: byId("router-text"), proxy: byId("router-proxy") },
     status,

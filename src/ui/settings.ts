@@ -3,9 +3,10 @@
 
 import "./boot.ts";
 import { renderConsoleLinks, shownInActiveTab, wireConsoleClicks } from "./console-nav.ts";
-import type { ConsoleInfo, Settings } from "./contract.ts";
+import type { ConsoleInfo, RouterStatus, Settings } from "./contract.ts";
 import { all, announce, byId } from "./dom.ts";
 import { call, devMode, on } from "./ipc.ts";
+import { shouldRedetect } from "./lib/console-links.ts";
 import {
   type HomepageMode,
   homepageAddress,
@@ -124,7 +125,24 @@ function renderConsole(info: ConsoleInfo): void {
   renderConsoleLinks({ list: byId("console-links"), note: byId("console-note") }, info, ["config"]);
 }
 
+let lastStatus: RouterStatus | null = null;
+
+function redetectWhenReady(status: RouterStatus): void {
+  const ready = shouldRedetect(lastStatus, status);
+  lastStatus = status;
+  if (!ready) return;
+  shownInActiveTab("settings")
+    .then((shown) => (shown ? call("console_detect", {}).then(renderConsole) : undefined))
+    .catch(() => undefined);
+}
+
 function wireConsole(): void {
+  call("router_status", {})
+    .then((status) => {
+      lastStatus = status;
+    })
+    .catch(() => undefined);
+  on("router-status", redetectWhenReady).catch(() => undefined);
   wireConsoleClicks(byId("console-links"));
   shownInActiveTab("settings")
     .catch(() => false)
