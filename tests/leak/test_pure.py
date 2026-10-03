@@ -13,7 +13,14 @@ import unittest
 from pathlib import Path
 
 from servers import is_i2p, normalize_host
-from verdict import REAL_IP_CANDIDATE, is_loopback, parse_strace, strace_row
+from servers import EventLog
+from verdict import (
+    REAL_IP_CANDIDATE,
+    is_loopback,
+    parse_strace,
+    script_rows,
+    strace_row,
+)
 
 GATE = '1 listen(7, 1024) = 0\n1 getsockname(7, {sa_family=AF_INET, sin_port=htons(41000), sin_addr=inet_addr("127.0.0.1")}, [16]) = 0\n'
 
@@ -69,6 +76,19 @@ class Strace(unittest.TestCase):
         self.assertIn("gatekeeper port unknown", row[2])
         path.write_text(GATE + connect_v4("127.0.0.1", 41001))
         self.assertEqual(strace_row(path, 41001)[1], "pass")
+
+    def test_the_page_must_wait_for_the_frame_signal(self) -> None:
+        def row(waited: str | None) -> tuple:
+            log = EventLog()
+            log.run = "default"
+            if waited:
+                log.add("report", host="leaktest.i2p", k="frame_wait", v=waited)
+            rows = script_rows(log, "default")
+            return next(r for r in rows if r[0].startswith("frame probes"))
+
+        self.assertEqual(row("done")[1], "pass")
+        self.assertEqual(row("timeout")[1], "FAIL")
+        self.assertEqual(row(None)[1], "FAIL")
 
     def test_client_socket_port_is_not_listening(self) -> None:
         text = '3 getsockname(5, {sa_family=AF_INET, sin_port=htons(50000), sin_addr=inet_addr("127.0.0.1")}, [16]) = 0\n'

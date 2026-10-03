@@ -35,12 +35,30 @@ function popupVectors() {
   document.getElementById("blank-link").click();
 }
 
+// The frame says so when all its probes have reported (see frame.js). A page that waits for a
+// fixed time instead can navigate away while a slow runner is still loading the frame's scripts.
+const FRAME_DEADLINE_MS = 18000;
+
+function frameDone() {
+  return new Promise((resolve) => {
+    window.addEventListener("message", (event) => {
+      if (event.data === "leak-frame-done") resolve("done");
+    });
+  });
+}
+
 async function main() {
+  const frame = frameDone();
   await report("js", "on");
   popupVectors();
   await Promise.all(subresourceVectors());
   await report("done", "1");
-  await sleep(4000); // let the frame finish before a navigation could unload the page
+  // Fail closed: when the frame never signals, the page goes on after the deadline and the
+  // harness fails the frame checks, because the frame's reports are missing.
+  await report(
+    "frame_wait",
+    await Promise.race([frame, sleep(FRAME_DEADLINE_MS).then(() => "timeout")]),
+  );
   await report("nav_form", "1"); // reported first: a slow or blocked navigation must not hide a skipped one
   document.getElementById("clearnet-form").submit();
   await sleep(3000);
