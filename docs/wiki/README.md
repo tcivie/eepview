@@ -41,7 +41,7 @@ This wiki is generated from docs/wiki in the repository. Edit it there, in a PR.
 | Score ratchet | shipped | [Score ratchet](score-ratchet.md) | [#40](https://github.com/tcivie/eepview/pull/40) |
 | Brand | shipped | [Brand](brand.md) | [#11](https://github.com/tcivie/eepview/pull/11), [#61](https://github.com/tcivie/eepview/pull/61) |
 | UI screenshots | shipped | [Brand: Screenshots](brand.md#screenshots) | [#61](https://github.com/tcivie/eepview/pull/61) |
-| UI components | shipped | [UI components](ui-components.md) | [#COMPPR](https://github.com/tcivie/eepview/pull/COMPPR) |
+| UI components | shipped | [UI components](ui-components.md) | [#65](https://github.com/tcivie/eepview/pull/65) |
 
 ## Project
 

@@ -1,6 +1,6 @@
 # UI components
 
-Status: shipped in [#COMPPR](https://github.com/tcivie/eepview/pull/COMPPR).
+Status: shipped in [#65](https://github.com/tcivie/eepview/pull/65).
 
 Every internal page and the toolbar use one shared set of components. A page does not restyle a button, a card or a list row. It uses the shared class, and it keeps only the layout that no other page has.
 
@@ -58,3 +58,7 @@ The toolbar gets the width of the macOS window buttons at run time. `src/ui/tool
 ## Screenshots
 
 `scripts/screenshots.sh` takes every page in light and dark (see [Brand](brand.md#screenshots)). The images are in `docs/images/ui/`.
+
+## History
+
+- 2026-10-03 — One shared component set, cascade layers and the style check — [#65](https://github.com/tcivie/eepview/pull/65)
