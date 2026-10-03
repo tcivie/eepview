@@ -12,13 +12,13 @@ use std::thread;
 use std::time::Duration;
 
 use serde_json::{Value, json};
-use tauri::{App, Listener, Manager};
+use tauri::{App, Listener, Manager, Webview};
 
 use crate::net::console::{ConsoleInfo, ConsoleKind, ConsolePage, VerifiedConsole};
 use crate::net::testing::FakeConsole;
 use crate::shell::console::{
     CONSOLE_LABEL, CONSOLE_WINDOW, ConsoleWebview, RETRY_EVERY, RETRY_FOR, close, current,
-    set_console,
+    load_after_rules, set_console,
 };
 use crate::shell::testing::{Mock, app, invoke, wait_for};
 
@@ -107,6 +107,15 @@ fn r8_opening_twice_reuses_the_one_window() {
     assert_eq!(consoles, 1);
 }
 
+/// R19: the first load runs through the rule-list callback. On the mock runtime no list is
+/// attached, so a fresh view stays on about:blank until the callback runs.
+fn first_load(webview: &Webview<Mock>, console: &VerifiedConsole, page: ConsolePage) {
+    assert_eq!(webview.url().unwrap().as_str(), "about:blank");
+    let url = console.url(page).unwrap();
+    load_after_rules(webview.clone(), url.clone())(Ok(()));
+    assert!(wait_for(|| webview.url().is_ok_and(|u| u == url)), "{url}");
+}
+
 // ---------------------------------------------------------------- R9
 
 #[test]
@@ -115,6 +124,7 @@ fn r9_the_view_loads_the_page_on_the_detected_origin() {
     let app = app();
     let (fake, console) = console(ConsoleKind::Java);
     let webview = ConsoleWebview::open(app.handle(), &console, ConsolePage::Config).unwrap();
+    first_load(&webview, &console, ConsolePage::Config);
     let url = webview.url().unwrap();
     assert_eq!(url.scheme(), "http");
     assert_eq!(url.host_str(), Some("127.0.0.1"));
@@ -128,6 +138,7 @@ fn r9_i2pd_pages_load_their_own_paths() {
     let app = app();
     let (fake, console) = console(ConsoleKind::I2pd);
     let webview = ConsoleWebview::open(app.handle(), &console, ConsolePage::Config).unwrap();
+    first_load(&webview, &console, ConsolePage::Config);
     let want = format!("http://127.0.0.1:{}/?page=commands", fake.port());
     assert_eq!(webview.url().unwrap().as_str(), want);
 }
@@ -137,11 +148,26 @@ fn r12_opening_again_loads_the_new_page_in_the_same_view() {
     // R12: reuses the open one and loads the page.
     let app = app();
     let (_fake, console) = console(ConsoleKind::Java);
-    open(&app, &console, ConsolePage::Home);
+    let first = ConsoleWebview::open(app.handle(), &console, ConsolePage::Home).unwrap();
+    first_load(&first, &console, ConsolePage::Home);
+    // The view is armed now: the second open navigates directly.
     let webview = ConsoleWebview::open(app.handle(), &console, ConsolePage::Logs).unwrap();
     assert!(wait_for(|| webview
         .url()
         .is_ok_and(|u| u.path() == "/logs")));
+}
+
+#[test]
+fn r19_when_the_rule_list_cannot_be_attached_nothing_loads() {
+    // R19: fail closed. An Err from the rule list leaves the view on about:blank.
+    let app = app();
+    let (_fake, console) = console(ConsoleKind::Java);
+    let webview = ConsoleWebview::open(app.handle(), &console, ConsolePage::Home).unwrap();
+    assert_eq!(webview.url().unwrap().as_str(), "about:blank");
+    let url = console.url(ConsolePage::Home).unwrap();
+    load_after_rules(webview.clone(), url)(Err("no rule list".to_owned()));
+    thread::sleep(Duration::from_millis(500));
+    assert_eq!(webview.url().unwrap().as_str(), "about:blank");
 }
 
 // ---------------------------------------------------------------- R6: store and event
@@ -313,6 +339,8 @@ fn r12_a_known_page_opens_the_window_and_answers_ok() {
     assert!(got.get("reason").is_none_or(Value::is_null));
     assert!(wait_for(|| window_open(&app)));
     let view = app.get_webview("console").expect("console webview");
+    let found = current(app.handle()).expect("stored console");
+    first_load(&view, &found, ConsolePage::Tunnels);
     assert_eq!(
         view.url().unwrap().as_str(),
         format!("http://127.0.0.1:{}/tunnels", fake.port())
