@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <title>eepview interface</title>
+    <link rel="stylesheet" href="./theme.css" />
+    <link rel="stylesheet" href="./ui.css" />
+    <link rel="stylesheet" href="./pages.css" />
+    <script type="module" src="./gallery.ts" blocking="render"></script>
+  </head>
+  <body>
+    <main class="gallery" id="main">
+      <header class="gallery-head">
+        <span class="brand">
+          <svg class="mark" viewBox="0 0 28 28" aria-hidden="true">
+            <rect x="1.75" y="1.75" width="24.5" height="24.5" rx="8" />
+            <rect x="6.5" y="6.5" width="15" height="15" rx="5" />
+            <rect class="core" x="11" y="11" width="6" height="6" rx="2" />
+          </svg>
+          eepview
+        </span>
+        <fieldset class="gallery-theme">
+          <legend class="visually-hidden">Theme</legend>
+          <div class="segmented">
+            <label><input type="radio" name="theme" value="system" />System</label>
+            <label><input type="radio" name="theme" value="light" />Light</label>
+            <label><input type="radio" name="theme" value="dark" />Dark</label>
+          </div>
+        </fieldset>
+      </header>
+
+      <h1>Interface review</h1>
+      <p class="gallery-lede">
+        Every internal page with sample data. The theme you pick here applies to all of them.
+        Each page also has light and dark links that do not change your saved choice.
+      </p>
+
+      <section class="section" aria-labelledby="g-start">
+        <h2 id="g-start">First start</h2>
+        <ul class="gallery-list">
+          <li>
+            <a href="./setup.html">No router found, install offer</a>
+            <span class="gallery-desc">Download size, sources, Java choice, permissions.</span>
+            <span class="gallery-modes"><a href="./setup.html?theme=light">Light</a><a href="./setup.html?theme=dark">Dark</a></span>
+          </li>
+          <li>
+            <a href="./setup.html?step=download">Download and verify</a>
+            <span class="gallery-desc">Progress per file, then the signature check.</span>
+            <span class="gallery-modes"><a href="./setup.html?step=download&amp;theme=light">Light</a><a href="./setup.html?step=download&amp;theme=dark">Dark</a></span>
+          </li>
+          <li>
+            <a href="./setup.html?step=tunnels">Building tunnels</a>
+            <span class="gallery-desc">The first start, 2 to 10 minutes.</span>
+            <span class="gallery-modes"><a href="./setup.html?step=tunnels&amp;theme=light">Light</a><a href="./setup.html?step=tunnels&amp;theme=dark">Dark</a></span>
+          </li>
+          <li>
+            <a href="./setup.html?step=ready">Ready</a>
+            <span class="gallery-desc">What was set up.</span>
+            <span class="gallery-modes"><a href="./setup.html?step=ready&amp;theme=light">Light</a><a href="./setup.html?step=ready&amp;theme=dark">Dark</a></span>
+          </li>
+          <li>
+            <a href="./setup.html?step=found">Router found on this computer</a>
+            <span class="gallery-desc">Use the running router, or install a separate one.</span>
+            <span class="gallery-modes"><a href="./setup.html?step=found&amp;theme=light">Light</a><a href="./setup.html?step=found&amp;theme=dark">Dark</a></span>
+          </li>
+        </ul>
+      </section>
+
+      <section class="section" aria-labelledby="g-browser">
+        <h2 id="g-browser">Browser</h2>
+        <ul class="gallery-list">
+          <li>
+            <a href="./toolbar.html">Toolbar</a>
+            <span class="gallery-desc">Address bar, JavaScript toggle, router status, menu.</span>
+            <span class="gallery-modes"><a href="./toolbar.html?theme=light">Light</a><a href="./toolbar.html?theme=dark">Dark</a></span>
+          </li>
+          <li>
+            <a href="./home.html">Home</a>
+            <span class="gallery-desc">Bookmark tiles and the router status card.</span>
+            <span class="gallery-modes"><a href="./home.html?theme=light">Light</a><a href="./home.html?theme=dark">Dark</a></span>
+          </li>
+          <li>
+            <a href="./bookmarks.html">Bookmarks</a>
+            <span class="gallery-desc">Folders, add, edit, delete, import, export.</span>
+            <span class="gallery-modes"><a href="./bookmarks.html?theme=light">Light</a><a href="./bookmarks.html?theme=dark">Dark</a></span>
+          </li>
+          <li>
+            <a href="./stats.html">Network</a>
+            <span class="gallery-desc">Bandwidth, tunnels, router facts.</span>
+            <span class="gallery-modes"><a href="./stats.html?theme=light">Light</a><a href="./stats.html?theme=dark">Dark</a></span>
+          </li>
+          <li>
+            <a href="./settings.html">Settings</a>
+            <span class="gallery-desc">Theme, homepage, privacy, router, about.</span>
+            <span class="gallery-modes"><a href="./settings.html?theme=light">Light</a><a href="./settings.html?theme=dark">Dark</a></span>
+          </li>
+        </ul>
+      </section>
+
+      <section class="section" aria-labelledby="g-stops">
+        <h2 id="g-stops">When something stops</h2>
+        <ul class="gallery-list">
+          <li>
+            <a href="./blocked.html">Not an I2P address</a>
+            <span class="gallery-desc">The refused address, shown as text.</span>
+            <span class="gallery-modes"><a href="./blocked.html?theme=light">Light</a><a href="./blocked.html?theme=dark">Dark</a></span>
+          </li>
+          <li>
+            <a href="./router-down.html">The router stopped</a>
+            <span class="gallery-desc">Automatic restarts with a countdown.</span>
+            <span class="gallery-modes"><a href="./router-down.html?theme=light">Light</a><a href="./router-down.html?theme=dark">Dark</a></span>
+          </li>
+        </ul>
+      </section>
+
+      <section class="section" aria-labelledby="g-tokens">
+        <h2 id="g-tokens">Colour tokens</h2>
+        <ul class="swatches">
+          <li><span class="swatch sw-bg"></span>Ground</li>
+          <li><span class="swatch sw-surface"></span>Surface</li>
+          <li><span class="swatch sw-text"></span>Ink</li>
+          <li><span class="swatch sw-muted"></span>Muted ink</li>
+          <li><span class="swatch sw-accent"></span>Spruce</li>
+          <li><span class="swatch sw-success"></span>Ready</li>
+          <li><span class="swatch sw-warning"></span>Building</li>
+          <li><span class="swatch sw-danger"></span>Stopped</li>
+        </ul>
+      </section>
+    </main>
+  </body>
+</html>

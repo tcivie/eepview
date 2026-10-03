@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Toolbar</title>
+    <link rel="stylesheet" href="./theme.css" />
+    <link rel="stylesheet" href="./ui.css" />
+    <link rel="stylesheet" href="./pages.css" />
+    <script type="module" src="./toolbar.ts" blocking="render"></script>
+  </head>
+  <body class="browser">
+    <header class="toolbar">
+      <nav class="toolbar-group" aria-label="History">
+        <button class="icon-btn" type="button" aria-label="Back" title="Back">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6" /></svg>
+        </button>
+        <button class="icon-btn" type="button" aria-label="Forward" title="Forward" disabled>
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
+        </button>
+        <button class="icon-btn" type="button" aria-label="Reload" title="Reload" id="reload">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M18.5 12A6.5 6.5 0 1 1 16.6 7.4M18.5 4.5v3.5H15" />
+          </svg>
+        </button>
+      </nav>
+
+      <form class="address" id="address-form">
+        <span class="address-badge" title="Opened over I2P">
+          <svg class="address-mark" viewBox="0 0 28 28" aria-hidden="true">
+            <rect x="1.75" y="1.75" width="24.5" height="24.5" rx="8" />
+            <rect x="6.5" y="6.5" width="15" height="15" rx="5" />
+            <rect class="core" x="11" y="11" width="6" height="6" rx="2" />
+          </svg>
+          I2P
+        </span>
+        <label class="visually-hidden" for="address-input">Eepsite address</label>
+        <input
+          class="address-input"
+          id="address-input"
+          value="notbob.i2p/uptime"
+          autocomplete="off"
+          spellcheck="false"
+          aria-describedby="address-hint"
+        />
+        <span class="visually-hidden" id="address-hint">Only .i2p addresses open.</span>
+        <button
+          class="icon-btn address-star"
+          type="button"
+          id="star"
+          aria-pressed="true"
+          aria-label="Bookmarked"
+          title="Bookmark"
+        >
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="m12 4.5 2.3 4.7 5.2.8-3.75 3.6.9 5.15L12 16.3l-4.65 2.45.9-5.15L4.5 10l5.2-.8z" />
+          </svg>
+        </button>
+      </form>
+
+      <div class="toolbar-group">
+        <a class="icon-btn" href="./home.html" title="Home">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4.5 11 12 4.5l7.5 6.5M6.5 9.5V19h11V9.5" />
+          </svg>
+          <span class="visually-hidden">Home</span>
+        </a>
+        <button
+          class="icon-btn js-toggle"
+          type="button"
+          id="js-toggle"
+          aria-pressed="false"
+          title="JavaScript for this site"
+        >
+          <span class="js-label" aria-hidden="true">JS</span>
+          <span class="visually-hidden">JavaScript for this site</span>
+        </button>
+        <button
+          class="status-btn"
+          type="button"
+          id="router-status"
+          data-state="ready"
+          aria-expanded="false"
+          aria-controls="status-pop"
+        >
+          <span class="status-dot" aria-hidden="true"></span>
+          <span class="status-label" id="router-status-label">Ready</span>
+        </button>
+        <button
+          class="icon-btn"
+          type="button"
+          id="menu-btn"
+          aria-label="Menu"
+          title="Menu"
+          aria-expanded="false"
+          aria-controls="menu"
+        >
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M5 7h14M5 12h14M5 17h14" />
+          </svg>
+        </button>
+      </div>
+
+      <div class="popover status-pop" id="status-pop" hidden>
+        <p class="status-pop-title" id="status-pop-title">Router ready</p>
+        <p class="status-pop-text" id="status-pop-text">
+          6 tunnels up. Sites open through 3 hops.
+        </p>
+        <a href="./stats.html">Network details</a>
+      </div>
+
+      <nav class="popover menu" id="menu" aria-label="eepview menu" hidden>
+        <ul>
+          <li><a href="./bookmarks.html">Bookmarks</a></li>
+          <li><a href="./stats.html">Network</a></li>
+          <li><a href="./settings.html">Settings</a></li>
+          <li class="menu-sep"><a href="./setup.html">Set up the router again</a></li>
+        </ul>
+      </nav>
+    </header>
+
+    <p class="visually-hidden" id="toolbar-status" role="status" aria-live="polite"></p>
+
+    <main class="viewport" id="main">
+      <div class="viewport-frame">
+        <p class="viewport-title" id="viewport-title">notbob.i2p/uptime</p>
+        <p class="viewport-text">
+          The eepsite renders here, in its own web view. It cannot reach eepview's pages or
+          settings.
+        </p>
+      </div>
+    </main>
+
+    <aside class="review-bar" aria-label="Review controls">
+      <fieldset class="review-states">
+        <legend>Router status</legend>
+        <div class="segmented">
+          <label><input type="radio" name="router-state" value="building" />Building</label>
+          <label><input type="radio" name="router-state" value="ready" checked />Ready</label>
+          <label><input type="radio" name="router-state" value="reconnecting" />Reconnecting</label>
+          <label><input type="radio" name="router-state" value="stopped" />Stopped</label>
+        </div>
+      </fieldset>
+    </aside>
+  </body>
+</html>
