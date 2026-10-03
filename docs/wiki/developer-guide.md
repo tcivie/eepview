@@ -86,3 +86,7 @@ The full list is in [AGENTS.md](https://github.com/tcivie/eepview/blob/main/AGEN
 5. Tests: unit tests for every pure module. Coverage only goes up. Run the architecture and leak tests if you touched networking.
 6. Wiki: add or update the feature page in `docs/wiki/`, link it from `docs/wiki/README.md`, and add a History line with the PR link.
 7. Add a line to `CHANGELOG.md`, open the PR, and run `gh pr merge --auto --squash`.
+
+## History
+
+- 2026-10-03 — Write the page — [#28](https://github.com/tcivie/eepview/pull/28)

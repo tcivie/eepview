@@ -48,3 +48,7 @@ You can build eepview yourself instead. The [developer guide](developer-guide.md
 ## Next
 
 Read [First run](first-run.md).
+
+## History
+
+- 2026-10-03 — Write the page — [#28](https://github.com/tcivie/eepview/pull/28)

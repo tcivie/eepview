@@ -47,3 +47,7 @@ Include logs when you open an issue. Remove any private data first.
 - Run eepview from a terminal to see its output.
 - Copy the text of the router status panel.
 - Open an issue at [github.com/tcivie/eepview/issues](https://github.com/tcivie/eepview/issues). Do not report vulnerabilities there. See [SECURITY.md](https://github.com/tcivie/eepview/blob/main/SECURITY.md).
+
+## History
+
+- 2026-10-03 — Write the page — [#28](https://github.com/tcivie/eepview/pull/28)

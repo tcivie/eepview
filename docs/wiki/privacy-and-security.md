@@ -43,3 +43,7 @@ See [No-leak architecture](no-leak-architecture.md) for the full design.
 ## Report a vulnerability
 
 Report it in private. Never use a public issue. Follow the steps in [SECURITY.md](https://github.com/tcivie/eepview/blob/main/SECURITY.md).
+
+## History
+
+- 2026-10-03 — Write the page — [#28](https://github.com/tcivie/eepview/pull/28)

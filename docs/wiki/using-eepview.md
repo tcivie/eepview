@@ -122,3 +122,7 @@ Use Cmd on macOS and Ctrl on Windows and Linux. (Coming in v0.1.)
 | Zoom in, out, reset | Cmd/Ctrl+Plus, Minus, 0 |
 | Stop loading | Esc |
 | Settings | Cmd/Ctrl+, |
+
+## History
+
+- 2026-10-03 — Write the page — [#28](https://github.com/tcivie/eepview/pull/28)

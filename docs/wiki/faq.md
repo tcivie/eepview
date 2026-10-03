@@ -37,3 +37,7 @@ No. It is pre-release. See the [roadmap](roadmap.md).
 
 **Where do I report a bug or a vulnerability?**
 Bugs go to the issue tracker. Vulnerabilities go to the private channels in [SECURITY.md](https://github.com/tcivie/eepview/blob/main/SECURITY.md).
+
+## History
+
+- 2026-10-03 — Write the page — [#28](https://github.com/tcivie/eepview/pull/28)

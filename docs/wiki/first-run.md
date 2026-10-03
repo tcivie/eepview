@@ -57,3 +57,7 @@ Your router is part of the network. Click Open eepview.
 ## Next
 
 Read [Using eepview](using-eepview.md). If something fails, read [Troubleshooting](troubleshooting.md).
+
+## History
+
+- 2026-10-03 — Write the page — [#28](https://github.com/tcivie/eepview/pull/28)
