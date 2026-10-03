@@ -89,6 +89,7 @@ The console view is not a web tab. It is built in `src-tauri/src/shell/console.r
 - **R19 Console rule list.** Before its first load, the console view gets an engine rule list: block every URL, then allow only URLs on the console origin (R9) and `about:`, `data:`, `blob:`. The view starts on `about:blank` and loads the page only after the list is attached. If it cannot be attached, nothing loads (fail closed). On Windows the same rule answers each `WebResourceRequested` with 403. Linux has no engine filter yet (the same limit as L3b for tabs); there the console view relies on R10 and the router's own pages.
 - **R20 Retry after a miss.** When a `console_detect()` finds no console, eepview retries every 10 s for 2 minutes (12 retries), and stops at the first console found. A new trigger during the retries does not start a second retry loop. The UI also calls `console_detect()` when `router-status` turns `ok` (from any other state, not paused) while a page with the links shows: the home page or Settings as the active tab, or the open router panel.
 - **R21 Re-check misses.** While a console is known, a re-check runs every 10 s. A re-check that finds a different console (another port or type) replaces it at once. A re-check that finds none counts a miss; the known console stays, with no event, until 3 misses in a row. The third miss clears it: `console-changed` with `found: false`, and the console window closes. A re-check that finds the same console resets the count.
+- **R22 Stop.** `shell::console::stop(app)` ends every re-check and retry loop at its next tick (at most one tick, 10 s). After stop, no thread opens a connection to a console port. The shell calls it on `RunEvent::Exit`. A later `detect_now` starts the loops again.
 
 ## Interface
 
@@ -183,6 +184,8 @@ pub const RETRY_FOR: Duration = Duration::from_secs(120);    // R20
 pub fn detect_now<R: Runtime>(app: &AppHandle<R>) -> ConsoleInfo;
 /// The stored detection result.
 pub fn current<R: Runtime>(app: &AppHandle<R>) -> Option<VerifiedConsole>;
+/// R22: ends the re-check and retry loops at their next tick.
+pub fn stop<R: Runtime>(app: &AppHandle<R>);
 /// Closes the console window, if open.
 pub fn close<R: Runtime>(app: &AppHandle<R>);
 ```
@@ -223,7 +226,7 @@ export function shouldRedetect(prev: RouterStatus | null, next: RouterStatus): b
 ### Where the requirement tests live
 
 - `src-tauri/src/net/console/tests.rs` (R1–R7, R9, R10, R18, R19, R21)
-- `src-tauri/src/shell/console/tests.rs` (R6, R8, R10–R13, R20, R21; the mock runtime fixtures in `crate::shell::testing`)
+- `src-tauri/src/shell/console/tests.rs` (R6, R8, R10–R13, R20–R22; the mock runtime fixtures in `crate::shell::testing`)
 - `src-tauri/tests/architecture.rs` (R4, R8, R11, R14)
 - `src/ui/lib/console-links.test.ts` (R15, R18, R20)
 
