@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The eepview contributors
+// SPDX-License-Identifier: MIT
+
 //! The router watcher: VERIFY every 5 s, run the gatekeeper only while VERIFY passes.
 
 use std::sync::Arc;

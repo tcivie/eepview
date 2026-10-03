@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The eepview contributors
+// SPDX-License-Identifier: MIT
+
 //! The status bubble text: link targets under the mouse and "Loading <host>…". Pure.
 
 use tauri::Url;

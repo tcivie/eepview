@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The eepview contributors
+// SPDX-License-Identifier: MIT
+
 //! Router statistics from the eepview router helper (`GET /status`, bearer token, loopback).
 //!
 //! The helper runs inside a managed router (spike S9). An external router has no helper, so

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The eepview contributors
+// SPDX-License-Identifier: MIT
+
 //! Carries out core [`Effect`]s on the main thread. The core lock is never held while a
 //! webview method runs, because engine callbacks take the same lock.
 

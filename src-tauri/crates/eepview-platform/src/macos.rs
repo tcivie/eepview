@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The eepview contributors
+// SPDX-License-Identifier: MIT
+
 //! `WKWebView` calls (macOS 14+). Every `unsafe` block holds one call into Objective-C and
 //! names why it is sound.
 

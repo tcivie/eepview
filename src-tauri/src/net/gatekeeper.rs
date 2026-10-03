@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The eepview contributors
+// SPDX-License-Identifier: MIT
+
 //! The gatekeeper (ADR 0001, layer L1): eepview's own HTTP proxy on `127.0.0.1:<random>`.
 //!
 //! Every content webview uses it as its proxy. It forwards a request to the verified router

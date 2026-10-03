@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The eepview contributors
+// SPDX-License-Identifier: MIT
+
 //! Safe wrappers over engine APIs that Tauri does not expose. This crate is the only place in
 //! eepview with `unsafe` code (ADR 0001); the app crate denies it and calls only the safe
 //! functions below.

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The eepview contributors
+// SPDX-License-Identifier: MIT
+
 //! The main window and the bundled webviews: `toolbar`, `internal` and `status`. They load
 //! only bundled pages (`WebviewUrl::App`); remote pages live in `content.rs`.
 

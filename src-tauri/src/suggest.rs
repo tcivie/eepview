@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The eepview contributors
+// SPDX-License-Identifier: MIT
+
 //! Address-bar suggestions from bookmarks and history. Pure ranking.
 
 use crate::types::{Bookmark, HistoryEntry, Suggestion};

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The eepview contributors
+// SPDX-License-Identifier: MIT
+
 //! The state the shell shares between commands, engine callbacks and the router watcher.
 
 use std::collections::HashMap;

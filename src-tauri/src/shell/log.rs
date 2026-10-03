@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The eepview contributors
+// SPDX-License-Identifier: MIT
+
 //! Diagnostics on stderr. Page-load timing prints only when `EEPVIEW_LOG` is set.
 
 use std::sync::OnceLock;

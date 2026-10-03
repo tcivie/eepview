@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The eepview contributors
+// SPDX-License-Identifier: MIT
+
 //! Everything that calls Tauri. The browser logic is in `core`; this module turns its
 //! effects into webview calls and turns engine callbacks into core calls.
 //!

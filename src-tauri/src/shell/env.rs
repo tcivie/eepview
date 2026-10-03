@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The eepview contributors
+// SPDX-License-Identifier: MIT
+
 //! Process inputs: environment variables and command-line URLs.
 //!
 //! - `EEPVIEW_PROXY`: the router HTTP proxy, a loopback `host:port` (default `127.0.0.1:4444`).

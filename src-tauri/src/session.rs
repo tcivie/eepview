@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The eepview contributors
+// SPDX-License-Identifier: MIT
+
 //! The back/forward list of one tab. Pure logic.
 //!
 //! The list holds both `eepview://` and `http(s)://` entries. The engine of a `tab-*` webview

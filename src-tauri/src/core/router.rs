@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The eepview contributors
+// SPDX-License-Identifier: MIT
+
 //! Router status changes: no `tab-*` webview exists unless the router is verified.
 
 use super::{Core, Effect, Event, WebOp};

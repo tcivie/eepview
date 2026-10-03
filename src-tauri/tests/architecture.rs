@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The eepview contributors
+// SPDX-License-Identifier: MIT
+
 //! The architecture test of ADR 0001 (`docs/wiki/adr-0001-no-leak-architecture.md`).
 //!
 //! It reads the source and fails when a no-leak rule is broken: a remote webview built

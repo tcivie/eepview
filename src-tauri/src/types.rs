@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The eepview contributors
+// SPDX-License-Identifier: MIT
+
 //! The wire types of the IPC contract (`docs/ipc.md`).
 
 use serde::{Deserialize, Serialize};

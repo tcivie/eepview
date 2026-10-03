@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The eepview contributors
+// SPDX-License-Identifier: MIT
+
 //! Engine calls on a `tab-*` webview. They work with page JavaScript off: back, forward,
 //! stop, hard reload and find go through the native engine API in `eepview-platform`;
 //! reload and zoom use Tauri. Only `WebView2` lacks a native find with counts, so it gets an

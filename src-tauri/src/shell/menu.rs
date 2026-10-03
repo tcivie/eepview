@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The eepview contributors
+// SPDX-License-Identifier: MIT
+
 //! The menu bar: every shortcut of the contract as a menu accelerator.
 
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};

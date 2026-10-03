@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The eepview contributors
+// SPDX-License-Identifier: MIT
+
 //! Address-bar input rules and the I2P-only navigation guard.
 //!
 //! Pure functions: no Tauri runtime, no I/O. `tauri::Url` is the `url` crate.

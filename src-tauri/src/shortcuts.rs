@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The eepview contributors
+// SPDX-License-Identifier: MIT
+
 //! Keyboard shortcuts of the contract, as menu items with accelerators. Pure table.
 
 /// What a shortcut does.

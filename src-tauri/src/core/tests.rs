@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The eepview contributors
+// SPDX-License-Identifier: MIT
+
 //! Core state-machine tests: commands and engine events in, effects out.
 
 use super::find::Zoom;

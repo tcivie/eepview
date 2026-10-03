@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The eepview contributors
+// SPDX-License-Identifier: MIT
+
 //! The one host predicate (ADR 0001). The gatekeeper (L1), the engine rules (L3) and the
 //! navigation guard (L4) all call [`is_i2p_host`].
 

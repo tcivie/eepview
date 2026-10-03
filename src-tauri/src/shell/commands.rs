@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The eepview contributors
+// SPDX-License-Identifier: MIT
+
 //! The IPC commands of `docs/ipc.md`. Only the `toolbar` and `internal` webviews may call
 //! them (capabilities/). Each one runs the core and queues its effects.
 

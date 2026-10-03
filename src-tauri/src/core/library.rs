@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The eepview contributors
+// SPDX-License-Identifier: MIT
+
 //! Bookmarks, history, settings and suggestions, with their files.
 
 use std::io;

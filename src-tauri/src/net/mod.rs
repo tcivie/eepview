@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The eepview contributors
+// SPDX-License-Identifier: MIT
+
 //! Everything that opens a socket lives here (ADR 0001 rule 2).
 //!
 //! - [`host`]: the one I2P host predicate.

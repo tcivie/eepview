@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The eepview contributors
+// SPDX-License-Identifier: MIT
+
 //! Bookmarks: one level of folders, JSON import and export. Pure logic plus file I/O.
 
 use std::io;

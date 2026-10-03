@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The eepview contributors
+// SPDX-License-Identifier: MIT
+
 //! The only factory of remote (`tab-*`) webviews (ADR 0001 rule 1).
 //!
 //! A content webview needs a running [`Gatekeeper`], so none can exist before VERIFY passes.

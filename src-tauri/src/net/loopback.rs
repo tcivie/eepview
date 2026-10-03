@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The eepview contributors
+// SPDX-License-Identifier: MIT
+
 //! `LoopbackAddr`: a socket address that can only point at this machine (ADR 0001 rule 2).
 
 use std::fmt;

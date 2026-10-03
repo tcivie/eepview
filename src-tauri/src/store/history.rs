@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The eepview contributors
+// SPDX-License-Identifier: MIT
+
 //! Browsing history: newest first, capped at 10 000 entries, one entry per URL.
 
 use std::io;

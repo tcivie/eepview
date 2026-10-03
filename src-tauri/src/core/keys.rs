@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The eepview contributors
+// SPDX-License-Identifier: MIT
+
 //! Keyboard shortcuts (menu accelerators) to commands.
 
 use super::find::Zoom;

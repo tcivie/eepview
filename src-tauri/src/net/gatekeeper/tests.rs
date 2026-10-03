@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The eepview contributors
+// SPDX-License-Identifier: MIT
+
 //! Gatekeeper tests with real loopback sockets and a fake router proxy on `127.0.0.1:0`.
 
 use super::*;

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The eepview contributors
+// SPDX-License-Identifier: MIT
+
 //! Window layout: the toolbar strip, the content area and the status bubble. Pure math in
 //! logical pixels.
 

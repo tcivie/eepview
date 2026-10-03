@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The eepview contributors
+// SPDX-License-Identifier: MIT
+
 //! Tab commands: new, close, select, move, reopen, cycle.
 
 use super::{Core, Effect, EngineOp, Event, WebOp};

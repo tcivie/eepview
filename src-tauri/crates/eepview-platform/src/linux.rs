@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The eepview contributors
+// SPDX-License-Identifier: MIT
+
 //! `WebKitGTK` calls. The webkit2gtk crate wraps them safely, so this module has no `unsafe`.
 
 use std::cell::Cell;

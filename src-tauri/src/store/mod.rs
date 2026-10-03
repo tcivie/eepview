@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The eepview contributors
+// SPDX-License-Identifier: MIT
+
 //! Small JSON stores with a `version` field, written atomically (temp file + rename).
 
 pub mod bookmarks;

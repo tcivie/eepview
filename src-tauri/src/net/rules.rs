@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The eepview contributors
+// SPDX-License-Identifier: MIT
+
 //! The engine request rules (ADR 0001, layer L3). Pure: builds the policy text only.
 //!
 //! Two forms of one rule set, "block everything, then allow `.i2p`":

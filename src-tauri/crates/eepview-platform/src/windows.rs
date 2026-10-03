@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The eepview contributors
+// SPDX-License-Identifier: MIT
+
 //! `WebView2` calls through webview2-com. Every `unsafe` block holds one COM call and names
 //! why it is sound.
 

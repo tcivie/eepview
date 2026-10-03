@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The eepview contributors
+// SPDX-License-Identifier: MIT
+
 //! Events from the engines: navigation requests, page loads, titles, new windows, hover.
 
 use tauri::Url;

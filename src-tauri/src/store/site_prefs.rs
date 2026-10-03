@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The eepview contributors
+// SPDX-License-Identifier: MIT
+
 //! Per-site zoom and JavaScript choices, keyed by host.
 
 use std::collections::BTreeMap;

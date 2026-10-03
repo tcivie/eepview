@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The eepview contributors
+// SPDX-License-Identifier: MIT
+
 //! Find in page, zoom and the per-site JavaScript switch.
 
 use super::{Core, Effect, EngineOp, Event, FindOp, FindState, WebOp};

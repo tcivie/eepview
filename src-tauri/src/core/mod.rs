@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The eepview contributors
+// SPDX-License-Identifier: MIT
+
 //! The browser state machine. Pure: commands and engine events go in, [`Effect`]s come out,
 //! and the shell (`shell/`) carries them out. No Tauri runtime here, so all of it is tested.
 

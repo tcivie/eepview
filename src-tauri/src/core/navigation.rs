@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The eepview contributors
+// SPDX-License-Identifier: MIT
+
 //! Address-bar navigation, back/forward, reload and stop.
 
 use super::{Core, Effect, EngineOp, Event, Load, WebOp, internal_title};

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The eepview contributors
+// SPDX-License-Identifier: MIT
+
 //! HTTP/1.x message heads: parse, decide, rewrite. Pure functions for the gatekeeper.
 
 use tauri::Url;

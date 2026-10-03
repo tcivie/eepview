@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The eepview contributors
+// SPDX-License-Identifier: MIT
+
 //! VERIFY: prove that a local proxy is an I2P router proxy with no outproxy (fail closed).
 //!
 //! Two requests, no network traffic when the proxy is what it claims:
