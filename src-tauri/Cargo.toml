@@ -23,6 +23,17 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 [dev-dependencies]
 # The mock runtime (`tauri::test`) for the shell tests.
 tauri = { version = "2", default-features = false, features = ["test", "unstable", "wry"] }
+# Real PNG, ICO, GIF, JPEG, WebP and BMP bytes for the site icon tests (tests/site_icons_*.rs).
+image = { version = "0.25", default-features = false, features = [
+  "png",
+  "ico",
+  "gif",
+  "jpeg",
+  "webp",
+  "bmp",
+] }
+# Property tests for the icon file names and the host check (tests/site_icons_props.rs).
+proptest = "1"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
