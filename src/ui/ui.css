@@ -531,7 +531,7 @@ a:hover {
   background: var(--color-accent);
 }
 
-.hop[data-state="built"]::before {
+.hop[data-state="built"] + .hop[data-state="built"]::before {
   border-top-style: solid;
   border-top-color: var(--color-accent-line);
 }
@@ -540,6 +540,19 @@ a:hover {
   border-style: solid;
   border-color: var(--color-accent);
   animation: hop-pulse var(--dur-slow) var(--ease-out) infinite alternate;
+}
+
+.hop[data-state="refused"] {
+  color: var(--color-danger);
+}
+
+.hop[data-state="refused"] .hop-node {
+  border: 2px solid var(--color-danger);
+  background: var(--color-danger-soft);
+}
+
+.hop[data-state="refused"]::before {
+  border-top-color: var(--color-danger);
 }
 
 @keyframes hop-pulse {

@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Not an I2P address</title>
+    <link rel="stylesheet" href="./theme.css" />
+    <link rel="stylesheet" href="./ui.css" />
+    <link rel="stylesheet" href="./pages.css" />
+    <script type="module" src="./blocked.ts" blocking="render"></script>
+  </head>
+  <body>
+    <main class="notice" id="main">
+      <ol class="hops notice-hops" aria-label="The request stopped at your computer">
+        <li class="hop" data-state="built"><span class="hop-node"></span>You</li>
+        <li class="hop hop-end" data-state="refused"><span class="hop-node"></span>Clearnet</li>
+      </ol>
+      <h1>This is not an I2P address</h1>
+      <p class="notice-lede">
+        eepview opens eepsites only. It stopped this request before it left your computer, so
+        nothing went out to the clearnet.
+      </p>
+      <div class="notice-box">
+        <p class="notice-box-label">Refused address</p>
+        <p class="refused-url" id="refused-url">
+          https://www.example.com/
+        </p>
+      </div>
+      <p class="notice-hint">
+        Meant an eepsite? Check the address. It ends in <span class="mono">.i2p</span>, like
+        <span class="mono">stats.i2p</span>.
+      </p>
+      <div class="actions notice-actions">
+        <button class="btn btn-primary" type="button" id="back-btn">Go back</button>
+        <button class="btn" type="button" id="copy-btn">Copy address</button>
+      </div>
+      <p class="visually-hidden" id="blocked-status" role="status" aria-live="polite"></p>
+    </main>
+  </body>
+</html>

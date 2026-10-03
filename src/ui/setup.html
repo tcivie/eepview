@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Set up eepview</title>
+    <link rel="stylesheet" href="./theme.css" />
+    <link rel="stylesheet" href="./ui.css" />
+    <link rel="stylesheet" href="./pages.css" />
+    <script type="module" src="./setup.ts" blocking="render"></script>
+  </head>
+  <body>
+    <div class="setup">
+      <header class="setup-head">
+        <span class="brand">
+          <svg class="mark" viewBox="0 0 28 28" aria-hidden="true">
+            <rect x="1.75" y="1.75" width="24.5" height="24.5" rx="8" />
+            <rect x="6.5" y="6.5" width="15" height="15" rx="5" />
+            <rect class="core" x="11" y="11" width="6" height="6" rx="2" />
+          </svg>
+          eepview
+        </span>
+        <ol class="hops stepper" id="stepper" aria-label="Setup steps">
+          <li class="hop" data-for="install"><span class="hop-node"></span>Install</li>
+          <li class="hop" data-for="download"><span class="hop-node"></span>Download</li>
+          <li class="hop" data-for="tunnels"><span class="hop-node"></span>Connect</li>
+          <li class="hop" data-for="ready"><span class="hop-node"></span>Ready</li>
+        </ol>
+      </header>
+
+      <main class="setup-main" id="main">
+        <section class="step" data-step="install" aria-labelledby="install-title">
+          <h1 id="install-title" tabindex="-1">No I2P router found on this computer</h1>
+          <p class="step-lede">
+            eepview reaches eepsites through an I2P router that runs on your computer. It can
+            install one for you now.
+          </p>
+
+          <div class="install-grid">
+          <div class="panel step-panel install-download">
+            <h2>What will be downloaded</h2>
+            <table class="download-table">
+              <tbody>
+                <tr>
+                  <th scope="row">I2P router 2.10.0</th>
+                  <td class="num">31 MB</td>
+                </tr>
+                <tr id="java-row">
+                  <th scope="row">Java runtime, Temurin 21</th>
+                  <td class="num">44 MB</td>
+                </tr>
+              </tbody>
+              <tfoot>
+                <tr>
+                  <th scope="row">Total</th>
+                  <td class="num" id="download-total">About 75 MB</td>
+                </tr>
+              </tfoot>
+            </table>
+            <p class="setup-note">
+              From <span class="mono">files.i2p-projekt.de</span> and
+              <span class="mono">github.com</span>, over the clearnet, this one time. Each file is
+              checked against its signature before it runs.
+            </p>
+            <h3 class="next-title">Then</h3>
+            <ol class="next-steps">
+              <li>eepview checks the signatures and starts the router.</li>
+              <li>The router joins the network and builds tunnels, 2 to 10 minutes.</li>
+              <li>After that, every request goes over I2P.</li>
+            </ol>
+          </div>
+
+          <fieldset class="panel step-panel">
+            <legend class="panel-legend">Java</legend>
+            <div class="radio-list">
+              <label class="check">
+                <input type="radio" name="java" value="bundled" checked />
+                <span class="check-text">Download Java with the router</span>
+                <span class="check-hint">Temurin 21. eepview keeps it separate from other apps.</span>
+              </label>
+              <label class="check">
+                <input type="radio" name="java" value="system" />
+                <span class="check-text">Use the Java on this computer</span>
+                <span class="check-hint">
+                  Found OpenJDK 17.0.12. Version 17 or newer is required.
+                </span>
+              </label>
+            </div>
+          </fieldset>
+
+          <fieldset class="panel step-panel">
+            <legend class="panel-legend">Allow eepview to</legend>
+            <div class="radio-list">
+              <label class="check">
+                <input type="checkbox" name="perm-updates" checked />
+                <span class="check-text">Update the router automatically over I2P</span>
+                <span class="check-hint">Signed updates, fetched inside the I2P network.</span>
+              </label>
+              <label class="check">
+                <input type="checkbox" name="perm-java" checked />
+                <span class="check-text">Check for Java security updates</span>
+                <span class="check-hint">
+                  One small clearnet request a week to <span class="mono">api.adoptium.net</span>.
+                </span>
+              </label>
+            </div>
+            <p class="setup-note">You can revoke either one later in Settings.</p>
+          </fieldset>
+          </div>
+
+          <div class="step-actions">
+            <button class="btn btn-quiet" type="button" id="have-file">I have the installer file</button>
+            <input
+              class="visually-hidden"
+              type="file"
+              id="installer-file"
+              accept=".jar,.exe,.dmg"
+              tabindex="-1"
+              aria-hidden="true"
+            />
+            <span class="step-actions-main">
+              <button class="btn" type="button" data-goto="later">Not now</button>
+              <button class="btn btn-primary" type="button" data-goto="download">
+                Accept and download
+              </button>
+            </span>
+          </div>
+        </section>
+
+        <section class="step" data-step="download" aria-labelledby="download-title" hidden>
+          <h1 id="download-title" tabindex="-1">Downloading the router</h1>
+          <p class="step-lede">
+            This is the only time eepview uses the clearnet. Keep this window open.
+          </p>
+          <div class="panel step-panel">
+            <ul class="transfers">
+              <li class="transfer">
+                <span class="transfer-name">I2P router 2.10.0</span>
+                <span class="transfer-size num" id="router-size">19.4 of 31 MB</span>
+                <progress id="router-progress" max="100" value="62" aria-label="I2P router download">
+                  62%
+                </progress>
+              </li>
+              <li class="transfer">
+                <span class="transfer-name">Java runtime, Temurin 21</span>
+                <span class="transfer-size num" id="java-size">Waiting</span>
+                <progress id="java-progress" max="100" value="0" aria-label="Java runtime download">
+                  0%
+                </progress>
+              </li>
+              <li class="transfer">
+                <span class="transfer-name">Check signatures</span>
+                <span class="transfer-size" id="verify-state">After download</span>
+              </li>
+            </ul>
+          </div>
+          <p class="setup-live" id="download-status" role="status" aria-live="polite">
+            Downloading the I2P router, 62 percent.
+          </p>
+          <div class="step-actions">
+            <span class="step-actions-main">
+              <button class="btn" type="button" data-goto="install">Cancel</button>
+            </span>
+          </div>
+        </section>
+
+        <section class="step" data-step="tunnels" aria-labelledby="tunnels-title" hidden>
+          <h1 id="tunnels-title" tabindex="-1">Building tunnels</h1>
+          <p class="step-lede">
+            Your router is meeting other routers and building its first tunnels. The first start
+            takes 2 to 10 minutes. Later starts take less than one.
+          </p>
+          <div class="panel step-panel tunnel-build">
+            <div class="tunnel-build-row">
+              <span class="tunnel-dir">Outbound</span>
+              <ol class="hops" id="build-out" aria-label="Outbound tunnel">
+                <li class="hop" data-state="built"><span class="hop-node"></span>You</li>
+                <li class="hop"><span class="hop-node"></span>1</li>
+                <li class="hop"><span class="hop-node"></span>2</li>
+                <li class="hop"><span class="hop-node"></span>3</li>
+              </ol>
+            </div>
+            <div class="tunnel-build-row">
+              <span class="tunnel-dir">Inbound</span>
+              <ol class="hops" id="build-in" aria-label="Inbound tunnel">
+                <li class="hop"><span class="hop-node"></span>3</li>
+                <li class="hop"><span class="hop-node"></span>2</li>
+                <li class="hop"><span class="hop-node"></span>1</li>
+                <li class="hop" data-state="built"><span class="hop-node"></span>You</li>
+              </ol>
+            </div>
+            <dl class="facts tunnel-build-facts">
+              <div>
+                <dt>Time so far</dt>
+                <dd class="num" id="build-elapsed">1 min 40 s</dd>
+              </div>
+              <div>
+                <dt>Routers known</dt>
+                <dd class="num" id="build-peers">312</dd>
+              </div>
+              <div>
+                <dt>Tunnels ready</dt>
+                <dd class="num" id="build-ready">0 of 2</dd>
+              </div>
+            </dl>
+          </div>
+          <p class="setup-live" id="tunnel-status" role="status" aria-live="polite">
+            Building the outbound tunnel.
+          </p>
+          <p class="setup-note">
+            You can close this window. eepview keeps building and tells you when it is ready.
+          </p>
+        </section>
+
+        <section class="step" data-step="ready" aria-labelledby="ready-title" hidden>
+          <h1 id="ready-title" tabindex="-1">Ready</h1>
+          <p class="step-lede">
+            Your router is part of the I2P network. Eepsites open through it, and only through
+            it.
+          </p>
+          <div class="panel step-panel">
+            <ol class="hops" aria-label="Your traffic passes 3 hops before it reaches a site">
+              <li class="hop" data-state="built"><span class="hop-node"></span>You</li>
+              <li class="hop" data-state="built"><span class="hop-node"></span>Hop</li>
+              <li class="hop" data-state="built"><span class="hop-node"></span>Hop</li>
+              <li class="hop" data-state="built"><span class="hop-node"></span>Hop</li>
+              <li class="hop hop-end" data-state="built"><span class="hop-node"></span>Site</li>
+            </ol>
+            <dl class="facts ready-facts">
+              <div>
+                <dt>Router</dt>
+                <dd>I2P 2.10.0</dd>
+              </div>
+              <div>
+                <dt>Java</dt>
+                <dd>Temurin 21.0.8</dd>
+              </div>
+              <div>
+                <dt>Updates</dt>
+                <dd>Automatic, over I2P</dd>
+              </div>
+            </dl>
+          </div>
+          <div class="step-actions">
+            <span class="step-actions-main">
+              <a class="btn btn-primary" href="./home.html">Open eepview</a>
+            </span>
+          </div>
+        </section>
+
+        <section class="step" data-step="found" aria-labelledby="found-title" hidden>
+          <h1 id="found-title" tabindex="-1">Found an I2P router on this computer</h1>
+          <p class="step-lede">
+            A router is already running. eepview can use it, and it will not change its settings.
+          </p>
+          <div class="panel step-panel">
+            <dl class="facts">
+              <div>
+                <dt>Router</dt>
+                <dd>I2P 2.9.0</dd>
+              </div>
+              <div>
+                <dt>Web proxy</dt>
+                <dd class="mono">127.0.0.1:4444</dd>
+              </div>
+              <div>
+                <dt>Status</dt>
+                <dd>Running for 2 days</dd>
+              </div>
+            </dl>
+          </div>
+          <p class="setup-note">
+            If you stop that router, eepview cannot open eepsites until it runs again.
+          </p>
+          <div class="step-actions">
+            <button class="btn btn-quiet" type="button" data-goto="install">
+              Install a separate router
+            </button>
+            <span class="step-actions-main">
+              <button class="btn btn-primary" type="button" data-goto="ready">Use this router</button>
+            </span>
+          </div>
+        </section>
+
+        <section class="step" data-step="later" aria-labelledby="later-title" hidden>
+          <h1 id="later-title" tabindex="-1">Nothing was downloaded</h1>
+          <p class="step-lede">
+            eepview cannot open eepsites without a router. Start setup again from the menu at
+            any time, or install I2P yourself and restart eepview.
+          </p>
+          <div class="step-actions">
+            <span class="step-actions-main">
+              <button class="btn" type="button" data-goto="install">Back to setup</button>
+            </span>
+          </div>
+        </section>
+      </main>
+
+      <nav class="review-nav" aria-label="Review: setup states">
+        <span>Preview a state:</span>
+        <a href="?step=install">No router</a>
+        <a href="?step=download">Download</a>
+        <a href="?step=tunnels">Tunnels</a>
+        <a href="?step=ready">Ready</a>
+        <a href="?step=found">Router found</a>
+      </nav>
+    </div>
+  </body>
+</html>

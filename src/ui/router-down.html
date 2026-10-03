@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <title>The router stopped</title>
+    <link rel="stylesheet" href="./theme.css" />
+    <link rel="stylesheet" href="./ui.css" />
+    <link rel="stylesheet" href="./pages.css" />
+    <script type="module" src="./router-down.ts" blocking="render"></script>
+  </head>
+  <body>
+    <main class="notice" id="main">
+      <ol class="hops notice-hops" aria-label="The router is not running">
+        <li class="hop" data-state="built"><span class="hop-node"></span>You</li>
+        <li class="hop" data-state="refused"><span class="hop-node"></span>Router</li>
+        <li class="hop"><span class="hop-node"></span>Hop</li>
+        <li class="hop hop-end"><span class="hop-node"></span>Site</li>
+      </ol>
+      <h1>The router stopped</h1>
+      <p class="notice-lede">
+        eepview cannot reach eepsites while the I2P router is not running. It did not try any
+        other route.
+      </p>
+
+      <div class="notice-box retry" id="retry" data-phase="waiting">
+        <p class="retry-line">
+          <span class="chip" data-tone="stopped" id="retry-chip">Stopped</span>
+          <span id="retry-text">Restarting the router in 12 s.</span>
+        </p>
+        <p class="notice-hint">Attempt <span class="num" id="retry-attempt">2</span> of 5. The router stopped at 14:02 with exit code 1.</p>
+      </div>
+
+      <p class="visually-hidden" id="retry-status" role="status" aria-live="polite"></p>
+
+      <div class="actions notice-actions">
+        <button class="btn btn-primary" type="button" id="retry-now">Restart now</button>
+        <a class="btn" href="./stats.html">Router details</a>
+      </div>
+
+      <details class="log">
+        <summary>Last lines of the router log</summary>
+        <pre class="log-lines">
+14:01:58 INFO  RouterWatchdog: Router appears hung, clock skew 0 ms
+14:02:01 ERROR Router: java.lang.OutOfMemoryError: Java heap space
+14:02:01 WARN  Router: Shutting down, exit code 1</pre
+        >
+      </details>
+    </main>
+  </body>
+</html>
