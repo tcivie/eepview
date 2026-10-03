@@ -85,6 +85,11 @@ const BUTTONS: [MouseButton; 6] = [
 /// The rules L1-L7 as the interface section states them.
 fn expected_disposition(mac: bool, m: Modifiers, button: MouseButton) -> Disposition {
     let new_tab_key = if mac { m.meta } else { m.ctrl };
+    let primary_like = matches!(button, MouseButton::Primary | MouseButton::None);
+    if mac && m.ctrl && primary_like {
+        // L6: Ctrl+click is the secondary click on macOS, whatever the other modifiers.
+        return Disposition::CurrentTab;
+    }
     let opens_tab = match button {
         MouseButton::Middle => true,
         MouseButton::Primary | MouseButton::None => new_tab_key,
@@ -218,7 +223,7 @@ fn l6_alt_click_acts_as_a_plain_click() {
 #[test]
 fn l6_macos_ctrl_click_never_opens_a_tab() {
     // Ctrl+click on macOS is a secondary click: the shell opens the context menu and never
-    // follows the link. The disposition must not be a new tab.
+    // follows the link. The disposition is the current tab.
     assert_eq!(
         link_disposition(true, mods("ctrl"), MouseButton::Primary),
         Disposition::CurrentTab
@@ -226,24 +231,55 @@ fn l6_macos_ctrl_click_never_opens_a_tab() {
 }
 
 #[test]
-fn l6_the_key_that_is_not_the_new_tab_key_changes_nothing() {
+fn l6_super_changes_nothing_on_windows_and_linux() {
     for button in BUTTONS {
         for m in all_modifiers() {
-            let mac_ctrl_on = Modifiers { ctrl: true, ..m };
-            let mac_ctrl_off = Modifiers { ctrl: false, ..m };
+            let meta_on = Modifiers { meta: true, ..m };
+            let meta_off = Modifiers { meta: false, ..m };
             assert_eq!(
-                link_disposition(true, mac_ctrl_on, button),
-                link_disposition(true, mac_ctrl_off, button),
-                "macOS ctrl {button:?} {m:?}"
-            );
-            let win_meta_on = Modifiers { meta: true, ..m };
-            let win_meta_off = Modifiers { meta: false, ..m };
-            assert_eq!(
-                link_disposition(false, win_meta_on, button),
-                link_disposition(false, win_meta_off, button),
+                link_disposition(false, meta_on, button),
+                link_disposition(false, meta_off, button),
                 "Windows Super {button:?} {m:?}"
             );
         }
+    }
+}
+
+#[test]
+fn l6_macos_ctrl_on_a_primary_or_keyboard_activation_is_the_current_tab_with_any_other_key() {
+    for button in [MouseButton::Primary, MouseButton::None] {
+        for m in all_modifiers() {
+            let with_ctrl = Modifiers { ctrl: true, ..m };
+            assert_eq!(
+                link_disposition(true, with_ctrl, button),
+                Disposition::CurrentTab,
+                "macOS {button:?} {with_ctrl:?}"
+            );
+        }
+    }
+}
+
+#[test]
+fn l6_macos_ctrl_shift_click_and_ctrl_cmd_click_never_open_a_tab() {
+    for spec in ["ctrl+shift", "ctrl+meta", "ctrl+meta+shift"] {
+        assert_eq!(
+            link_disposition(true, mods(spec), MouseButton::Primary),
+            Disposition::CurrentTab,
+            "{spec}"
+        );
+    }
+}
+
+#[test]
+fn l3_macos_ctrl_does_not_change_a_middle_click() {
+    for m in all_modifiers() {
+        let ctrl_on = Modifiers { ctrl: true, ..m };
+        let ctrl_off = Modifiers { ctrl: false, ..m };
+        assert_eq!(
+            link_disposition(true, ctrl_on, MouseButton::Middle),
+            link_disposition(true, ctrl_off, MouseButton::Middle),
+            "{m:?}"
+        );
     }
 }
 
