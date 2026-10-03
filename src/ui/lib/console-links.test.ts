@@ -335,8 +335,8 @@ describe("R44 where eepview connects", () => {
     const connects = about.slice(about.indexOf("Where eepview connects"));
     const list = connects.slice(0, connects.indexOf("</table>"));
     assert.ok(
-      list.includes("Router console check, router statistics and the console window"),
-      "the row reads: Router console check, router statistics and the console window",
+      list.includes("Router console check, router statistics and the console tab"),
+      "the row reads: Router console check, router statistics and the console tab",
     );
   });
 });
