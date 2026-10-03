@@ -31,8 +31,9 @@ use tauri::{
 use super::apply::{self, LISTENERS, with_core};
 use super::state::{lock, shared};
 use super::webrtc::webrtc_off;
-use super::{engine, log, view};
-use crate::core::{ConsoleOp, Core};
+use super::{engine, view};
+use crate::core::{ConsoleOp, Core, EngineOp};
+use crate::diag::{self, Code, ErrorKind, Field, OpKind};
 use crate::net::console::{ConsoleInfo, ConsoleNav, VerifiedConsole, after_recheck, detect_here};
 
 /// The label of the console webview.
@@ -120,17 +121,16 @@ pub fn load_after_rules<R: Runtime>(
     webview: Webview<R>,
     url: Url,
 ) -> Box<dyn FnOnce(Result<(), String>)> {
-    Box::new(move |result| match result {
-        Ok(()) => {
-            shared(webview.app_handle())
-                .console_armed
-                .store(true, Ordering::SeqCst);
-            apply::outside(move || navigate(&webview, url));
-        }
-        Err(e) => {
-            log::error("console rule list, page not loaded", &e);
+    Box::new(move |result| {
+        if result.is_err() {
+            failed(OpKind::EngineFilter, ErrorKind::Platform);
             with_core(webview.app_handle(), Core::console_failed);
+            return;
         }
+        shared(webview.app_handle())
+            .console_armed
+            .store(true, Ordering::SeqCst);
+        apply::outside(move || navigate(&webview, url));
     })
 }
 
@@ -216,14 +216,25 @@ pub fn title_changed<R: Runtime>(app: &AppHandle<R>, title: &str) {
 
 /// R27, R28: carries out a [`ConsoleOp`] on the console webview, when one exists.
 pub fn run<R: Runtime>(app: &AppHandle<R>, op: &ConsoleOp) {
+    let Some(engine_op) = engine_op(op) else {
+        close_webview(app);
+        return;
+    };
+    let tab = lock(&shared(app).core).console_tab().unwrap_or_default();
+    if let Some(webview) = app.get_webview(CONSOLE_LABEL) {
+        engine::run(&webview, tab, &engine_op);
+    }
+}
+
+/// The engine call of a [`ConsoleOp`]. `Close` is not an engine call.
+fn engine_op(op: &ConsoleOp) -> Option<EngineOp> {
     match op {
-        ConsoleOp::Engine(op) => {
-            let tab = lock(&shared(app).core).console_tab().unwrap_or_default();
-            if let Some(webview) = app.get_webview(CONSOLE_LABEL) {
-                engine::run(&webview, tab, op);
-            }
-        }
-        ConsoleOp::Close => close_webview(app),
+        ConsoleOp::Back => Some(EngineOp::Back),
+        ConsoleOp::Forward => Some(EngineOp::Forward),
+        ConsoleOp::Reload => Some(EngineOp::Reload),
+        ConsoleOp::HardReload => Some(EngineOp::HardReload),
+        ConsoleOp::Stop => Some(EngineOp::Stop),
+        ConsoleOp::Close => None,
     }
 }
 
@@ -236,7 +247,7 @@ fn load_here<R: Runtime>(app: &AppHandle<R>, url: Url) {
 
 fn navigate<R: Runtime>(webview: &Webview<R>, url: Url) {
     if let Err(e) = webview.navigate(url) {
-        log::error("console load", &e.to_string());
+        failed(OpKind::ConsoleLoad, ErrorKind::from(&e));
     }
 }
 
@@ -245,13 +256,21 @@ fn open_tab<R: Runtime>(app: &AppHandle<R>, url: &Url) {
     with_core(app, |core| core.new_window(url));
 }
 
+/// Records a failed engine call of the console view.
+fn failed(op: OpKind, error: ErrorKind) {
+    diag::event(
+        Code::EngineCallFailed,
+        &[Field::Op(op), Field::Error(error)],
+    );
+}
+
 /// Destroys the console webview, if any.
 fn close_webview<R: Runtime>(app: &AppHandle<R>) {
     shared(app).console_armed.store(false, Ordering::SeqCst);
     if let Some(webview) = app.get_webview(CONSOLE_LABEL)
         && let Err(e) = webview.close()
     {
-        log::error("console close", &e.to_string());
+        failed(OpKind::ConsoleClose, ErrorKind::from(&e));
     }
 }
 
@@ -339,7 +358,10 @@ fn spawn_once<R: Runtime>(
     });
     if let Err(e) = spawned {
         slot(app).store(0, Ordering::SeqCst);
-        log::error(name, &e.to_string());
+        diag::event(
+            Code::ThreadFailed,
+            &[Field::Op(OpKind::Spawn), Field::Error(ErrorKind::from(&e))],
+        );
     }
 }
 

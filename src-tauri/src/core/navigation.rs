@@ -135,7 +135,7 @@ impl Core {
         let Some(tab) = self.tabs.get(id) else {
             return Vec::new();
         };
-        if tab.console || !is_web(&tab.url) || tab.web_js.is_some() {
+        if self.console_tab == Some(id) || !is_web(&tab.url) || tab.web_js.is_some() {
             return Vec::new();
         }
         let url = tab.url.clone();

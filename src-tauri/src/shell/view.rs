@@ -78,7 +78,6 @@ pub fn sync<R: Runtime>(app: &AppHandle<R>) {
     if !matches!(view, View::Console(_)) {
         hide(app, CONSOLE_LABEL);
     }
-    super::log::view(&format!("{view:?} active={active:?} labels={labels:?}"));
     match (view, active) {
         (View::Web(_), Some(label)) => show(app, &label, content),
         (View::Internal(page), _) => show_internal(app, &page, content),

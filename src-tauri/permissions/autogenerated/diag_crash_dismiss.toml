@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-diag-crash-dismiss"
+description = "Enables the diag_crash_dismiss command without any pre-configured scope."
+commands.allow = ["diag_crash_dismiss"]
+
+[[permission]]
+identifier = "deny-diag-crash-dismiss"
+description = "Denies the diag_crash_dismiss command without any pre-configured scope."
+commands.deny = ["diag_crash_dismiss"]

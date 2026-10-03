@@ -96,7 +96,7 @@ jobs:
           package-manager-cache: false
       - run: npm ci --ignore-scripts
       # SOURCE_DATE_EPOCH, CARGO_INCREMENTAL=0 and --remap-path-prefix. See docs/wiki/reproducible-builds.md.
-      - name: Set the reproducible build environment
+      - name: Set the deterministic build environment
         shell: bash
         run: ./scripts/repro-env.sh >> "$GITHUB_ENV"
       - name: Build the release binary

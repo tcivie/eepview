@@ -7,7 +7,7 @@
 //! console. The core never makes a [`WebOp`](super::WebOp) for it: its engine calls go out
 //! as [`ConsoleOp`], so a console URL never reaches a `tab-*` webview.
 
-use super::{ConsoleOp, Core, Effect, EngineOp, Event};
+use super::{ConsoleOp, Core, Effect, Event};
 use crate::session::{Step, Traverse};
 use crate::tabs::{Place, Tab};
 use crate::types::{NavFlags, TabInfo, TabMarks};
@@ -21,7 +21,7 @@ impl Core {
     /// The id of the console tab, if one is open.
     #[must_use]
     pub fn console_tab(&self) -> Option<u32> {
-        self.tabs.iter().find(|t| t.console).map(|t| t.id)
+        self.console_tab
     }
 
     /// R24: selects the console tab, or makes one right after the active tab and selects
@@ -34,9 +34,10 @@ impl Core {
             self.leave_tab()
         };
         let id = known.unwrap_or_else(|| self.tabs.open(url, Place::AfterActive, true));
+        self.console_tab = Some(id);
         self.tabs.select(id);
         if let Some(tab) = self.tabs.get_mut(id) {
-            mark_console(tab, url);
+            show_console_page(tab, url, known.is_none());
         }
         fx.extend([
             Effect::Emit(Event::TabsChanged),
@@ -92,15 +93,16 @@ impl Core {
 
     /// True while the console tab is the active tab.
     pub(super) fn console_active(&self) -> bool {
-        self.console_tab() == Some(self.tabs.active_id())
+        self.console_tab == Some(self.tabs.active_id())
     }
 
     /// R26: before an address-bar navigation, a console tab becomes a fresh normal tab
     /// showing `landing`, and its `console` webview goes.
     pub(super) fn leave_console(&mut self, id: u32, landing: &str) -> Vec<Effect> {
-        if self.console_tab() != Some(id) || !self.tabs.reset(id, landing) {
+        if self.console_tab != Some(id) || !self.tabs.reset(id, landing) {
             return Vec::new();
         }
+        self.console_tab = None;
         vec![Effect::Console(ConsoleOp::Close)]
     }
 
@@ -117,8 +119,8 @@ impl Core {
             return Vec::new();
         }
         let op = match step {
-            Step::Back => EngineOp::Back,
-            Step::Forward => EngineOp::Forward,
+            Step::Back => ConsoleOp::Back,
+            Step::Forward => ConsoleOp::Forward,
         };
         Self::console_engine(tab, op)
     }
@@ -126,9 +128,9 @@ impl Core {
     /// R27: reload of the console tab.
     pub(super) fn console_reload(&mut self, id: u32, hard: bool) -> Vec<Effect> {
         let op = if hard {
-            EngineOp::HardReload
+            ConsoleOp::HardReload
         } else {
-            EngineOp::Reload
+            ConsoleOp::Reload
         };
         self.tabs
             .get_mut(id)
@@ -143,21 +145,19 @@ impl Core {
         };
         tab.loading = false;
         vec![
-            Effect::Console(ConsoleOp::Engine(EngineOp::Stop)),
+            Effect::Console(ConsoleOp::Stop),
             Effect::Emit(Event::TabUpdated(id)),
         ]
     }
 
-    fn console_engine(tab: &mut Tab, op: EngineOp) -> Vec<Effect> {
+    fn console_engine(tab: &mut Tab, op: ConsoleOp) -> Vec<Effect> {
         tab.loading = true;
-        vec![
-            Effect::Console(ConsoleOp::Engine(op)),
-            Effect::Emit(Event::TabUpdated(tab.id)),
-        ]
+        vec![Effect::Console(op), Effect::Emit(Event::TabUpdated(tab.id))]
     }
 
     fn console_mut(&mut self) -> Option<&mut Tab> {
-        self.tabs.iter_mut().find(|t| t.console)
+        let id = self.console_tab?;
+        self.tabs.get_mut(id)
     }
 
     /// R23, R25: the `TabInfo` of the console tab.
@@ -183,11 +183,10 @@ impl Core {
     }
 }
 
-/// Makes `tab` the console tab, loading `url`. A new console tab is titled
-/// [`CONSOLE_TITLE`] until its page sends a title.
-fn mark_console(tab: &mut Tab, url: &str) {
-    if !tab.console {
-        tab.console = true;
+/// Points `tab` at the console page `url`. A new console tab is titled [`CONSOLE_TITLE`]
+/// until its page sends a title.
+fn show_console_page(tab: &mut Tab, url: &str, fresh: bool) {
+    if fresh {
         CONSOLE_TITLE.clone_into(&mut tab.title);
     }
     url.clone_into(&mut tab.url);

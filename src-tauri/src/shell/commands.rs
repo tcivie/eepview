@@ -32,7 +32,7 @@ type Res<T> = Result<T, String>;
 /// Runs blocking work on a worker thread. Every command that takes the app is `async` and
 /// does its work here: a plain `fn` command runs on the main thread, and core calls may write
 /// a store file, wait on a lock or reach the router.
-async fn blocking<T: Send + 'static>(f: impl FnOnce() -> T + Send + 'static) -> Res<T> {
+pub(super) async fn blocking<T: Send + 'static>(f: impl FnOnce() -> T + Send + 'static) -> Res<T> {
     tauri::async_runtime::spawn_blocking(f)
         .await
         .map_err(|e| e.to_string())
@@ -58,7 +58,13 @@ fn queue<R: Runtime>(app: AppHandle<R>, fx: Vec<Effect>) {
     }
     let runner = app.clone();
     if let Err(e) = runner.run_on_main_thread(move || apply(&app, fx)) {
-        super::log::error("main thread", &e.to_string());
+        crate::diag::event(
+            crate::diag::Code::ThreadFailed,
+            &[
+                crate::diag::Field::Op(crate::diag::OpKind::MainThread),
+                crate::diag::Field::Error((&e).into()),
+            ],
+        );
     }
 }
 
@@ -71,7 +77,7 @@ async fn act<R: Runtime>(
 }
 
 /// Reads from the core.
-async fn read<T: Send + 'static, R: Runtime>(
+pub(super) async fn read<T: Send + 'static, R: Runtime>(
     app: AppHandle<R>,
     f: impl FnOnce(&Core) -> T + Send + 'static,
 ) -> Res<T> {

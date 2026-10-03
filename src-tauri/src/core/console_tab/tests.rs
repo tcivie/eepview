@@ -10,7 +10,7 @@ use serde_json::json;
 use tauri::Url;
 
 use crate::core::find::Zoom;
-use crate::core::{ConsoleOp, Core, Effect, EngineOp, Event, Paths, View, WebOp};
+use crate::core::{ConsoleOp, Core, Effect, Event, Paths, View, WebOp};
 use crate::session::Step;
 use crate::store::testdir;
 use crate::tabs::Place;
@@ -112,13 +112,10 @@ fn web_op_for(fx: &[Effect], id: u32) -> bool {
     })
 }
 
-fn engine_of(fx: &[Effect]) -> Vec<&EngineOp> {
+fn engine_of(fx: &[Effect]) -> Vec<&ConsoleOp> {
     console_ops(fx)
         .into_iter()
-        .filter_map(|op| match op {
-            ConsoleOp::Engine(e) => Some(e),
-            ConsoleOp::Close => None,
-        })
+        .filter(|op| **op != ConsoleOp::Close)
         .collect()
 }
 
@@ -438,6 +435,37 @@ fn r25_the_javascript_toggle_does_nothing_in_a_console_tab() {
     assert!(c.tab_info(id).expect("info").marks.js_on);
 }
 
+#[test]
+fn r25_the_find_shortcut_leaves_the_find_bar_closed_in_a_console_tab() {
+    // R25: the find shortcut does nothing there: no bar, no engine call, no layout change.
+    use crate::shortcuts::Action;
+    let (mut c, id) = loaded();
+    assert!(!c.find_open());
+    let fx = c.shortcut(Action::Find, 0);
+    assert!(!c.find_open(), "the find bar stays closed: {fx:?}");
+    assert!(web_ops(&fx).is_empty(), "{fx:?}");
+    assert!(console_ops(&fx).is_empty(), "{fx:?}");
+    assert!(
+        !has(&fx, &Effect::Layout),
+        "no find bar to make room for: {fx:?}"
+    );
+    assert_eq!(c.console_tab(), Some(id));
+}
+
+#[test]
+fn r25_find_leaves_the_find_bar_closed_and_makes_no_engine_call_in_a_console_tab() {
+    // R25: find() does nothing there, forward or backward, with or without match case.
+    let (mut c, id) = loaded();
+    for (forward, match_case) in [(true, false), (false, false), (true, true), (false, true)] {
+        let fx = c.find("router", forward, match_case);
+        assert!(!c.find_open(), "the find bar stays closed: {fx:?}");
+        assert!(web_ops(&fx).is_empty(), "{fx:?}");
+        assert!(console_ops(&fx).is_empty(), "{fx:?}");
+        assert!(!has(&fx, &Effect::Layout), "{fx:?}");
+    }
+    assert_eq!(c.console_tab(), Some(id));
+}
+
 // ---------------------------------------------------------------- R26: address bar
 
 #[test]
@@ -513,6 +541,44 @@ fn r26_a_console_address_typed_in_a_web_tab_never_loads_there() {
     assert!(c.console_tab().is_some(), "the console tab is not touched");
 }
 
+/// The `Router console` tab as the UI sees it: its url, title and kind.
+fn console_state(c: &Core, id: u32) -> (String, String, String) {
+    let info = c.tab_info(id).expect("the console tab is still there");
+    (info.url, info.title, info.kind.to_string())
+}
+
+#[test]
+fn r26_a_refused_console_address_leaves_the_console_tab_as_it_was() {
+    // R26: refused: the tab stays, no blocked page, no effect on the `console` webview.
+    for typed in [HOME, "http://127.0.0.1:7657/", "http://localhost:7657/home"] {
+        let (mut c, id) = loaded();
+        let before = console_state(&c, id);
+        let (res, fx) = c.navigate(typed);
+        assert_ne!(res, NavResult::ok(), "{typed}");
+        assert_eq!(c.console_tab(), Some(id), "{typed}");
+        assert_eq!(console_state(&c, id), before, "{typed}: nothing changed");
+        assert_eq!(before.2, "console");
+        assert!(!closes(&fx), "{typed}: the console view stays: {fx:?}");
+        assert!(web_ops(&fx).is_empty(), "{typed}: {fx:?}");
+        assert_eq!(c.view(), View::Console(id), "{typed}");
+    }
+}
+
+#[test]
+fn r26_an_invalid_input_leaves_the_console_tab_as_it_was() {
+    // R26: an input the address rules refuse as `invalid` changes nothing either.
+    for typed in ["http://", "http://exa mple.i2p/"] {
+        let (mut c, id) = loaded();
+        let before = console_state(&c, id);
+        let (res, fx) = c.navigate(typed);
+        assert_eq!(res, NavResult::refused("invalid"), "{typed}");
+        assert_eq!(c.console_tab(), Some(id), "{typed}");
+        assert_eq!(console_state(&c, id), before, "{typed}: nothing changed");
+        assert!(!closes(&fx), "{typed}: {fx:?}");
+        assert!(web_ops(&fx).is_empty(), "{typed}: {fx:?}");
+    }
+}
+
 // ---------------------------------------------------------------- R27: back, forward, reload, stop
 
 #[test]
@@ -522,12 +588,12 @@ fn r27_back_and_forward_act_on_the_console_webview() {
     c.console_started(TUNNELS);
     c.console_finished(TUNNELS);
     let fx = c.step(Step::Back);
-    assert_eq!(engine_of(&fx), [&EngineOp::Back], "{fx:?}");
+    assert_eq!(engine_of(&fx), [&ConsoleOp::Back], "{fx:?}");
     assert!(web_ops(&fx).is_empty(), "{fx:?}");
     c.console_started(HOME);
     c.console_finished(HOME);
     let fx = c.step(Step::Forward);
-    assert_eq!(engine_of(&fx), [&EngineOp::Forward], "{fx:?}");
+    assert_eq!(engine_of(&fx), [&ConsoleOp::Forward], "{fx:?}");
     assert!(web_ops(&fx).is_empty(), "{fx:?}");
     assert_eq!(c.console_tab(), Some(id));
 }
@@ -564,10 +630,10 @@ fn r27_reload_and_hard_reload_act_on_the_console_webview() {
     // R27: reload and hard reload are console engine calls.
     let (mut c, _id) = loaded();
     let fx = c.reload(false);
-    assert_eq!(engine_of(&fx), [&EngineOp::Reload], "{fx:?}");
+    assert_eq!(engine_of(&fx), [&ConsoleOp::Reload], "{fx:?}");
     assert!(web_ops(&fx).is_empty(), "{fx:?}");
     let fx = c.reload(true);
-    assert_eq!(engine_of(&fx), [&EngineOp::HardReload], "{fx:?}");
+    assert_eq!(engine_of(&fx), [&ConsoleOp::HardReload], "{fx:?}");
     assert!(web_ops(&fx).is_empty(), "{fx:?}");
 }
 
@@ -577,7 +643,7 @@ fn r27_stop_acts_on_the_console_webview_while_it_loads() {
     let (mut c, _id) = with_console();
     c.console_started(TUNNELS);
     let fx = c.stop();
-    assert_eq!(engine_of(&fx), [&EngineOp::Stop], "{fx:?}");
+    assert_eq!(engine_of(&fx), [&ConsoleOp::Stop], "{fx:?}");
     assert!(web_ops(&fx).is_empty(), "{fx:?}");
 }
 
@@ -597,10 +663,10 @@ fn r27_the_shortcuts_reach_the_console_webview_too() {
     assert!(web_ops(&all).is_empty(), "{all:?}");
     let ops = engine_of(&all);
     for want in [
-        EngineOp::Back,
-        EngineOp::Forward,
-        EngineOp::Reload,
-        EngineOp::HardReload,
+        ConsoleOp::Back,
+        ConsoleOp::Forward,
+        ConsoleOp::Reload,
+        ConsoleOp::HardReload,
     ] {
         assert!(ops.contains(&&want), "{want:?} missing: {all:?}");
     }
@@ -857,4 +923,41 @@ fn r30_the_console_can_be_opened_again_after_it_went_away() {
     assert_ne!(first, second, "a new tab id");
     assert_eq!(c.tab_info(second).expect("info").kind, "console");
     assert_eq!(c.tab_info(second).expect("info").title, "Router console");
+}
+
+// ---------------------------------------------------------------- R19: fail closed
+
+/// The toasts of `fx` as (kind, text).
+fn toasts(fx: &[Effect]) -> Vec<(&'static str, String)> {
+    fx.iter()
+        .filter_map(|e| match e {
+            Effect::Emit(Event::Toast(t)) => Some((t.kind, t.text.clone())),
+            _ => None,
+        })
+        .collect()
+}
+
+#[test]
+fn r19_console_failed_closes_the_console_tab_and_destroys_the_view() {
+    // R19: the rule list could not be attached: the tab closes, the webview is destroyed.
+    let (mut c, id) = with_console();
+    let fx = c.console_failed();
+    assert!(closes(&fx), "{fx:?}");
+    assert!(engine_of(&fx).is_empty(), "{fx:?}");
+    assert_eq!(c.console_tab(), None);
+    assert!(c.tab_info(id).is_none());
+    assert!(kinds(&c).iter().all(|k| k != "console"));
+    assert_ne!(c.view(), View::Console(id));
+}
+
+#[test]
+fn r19_console_failed_shows_one_warning_toast() {
+    // R19: a warning toast says the console could not be opened safely.
+    let (mut c, _id) = with_console();
+    let fx = c.console_failed();
+    let want = (
+        "warn",
+        "The router console could not be opened safely".to_owned(),
+    );
+    assert_eq!(toasts(&fx), [want], "{fx:?}");
 }

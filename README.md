@@ -50,7 +50,7 @@ Items marked "coming in v0.1" or "planned" are not in a release yet.
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/images/ui/router-panel-dark.png">
-    <img alt="The router panel" src="docs/images/ui/router-panel-light.png" width="720">
+    <img alt="The router panel" src="docs/images/ui/router-panel-light.png" width="340">
   </picture>
   <br><em>The router panel shows the state of your connection.</em>
 </p>

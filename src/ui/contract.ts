@@ -109,6 +109,9 @@ export type ClearRange = "hour" | "day" | "week" | "all";
 export type FindResult = { query: string; matches: number | null; active: number | null };
 export type Toast = { kind: string; text: string };
 
+export type ReportArgs = { kind: string; description: string; includeLog: boolean };
+export type ReportOpened = { file: string; trimmed: boolean };
+
 export interface Commands {
   tab_new: { args: { url?: string }; result: TabInfo };
   tab_close: { args: { id: number }; result: undefined };
@@ -162,6 +165,11 @@ export interface Commands {
   };
   popup_size: { args: { id: number; width: number; height: number }; result: undefined };
   popup_close: { args: { id: number; refocus?: boolean }; result: undefined };
+  report_preview: { args: ReportArgs; result: string };
+  report_open: { args: ReportArgs; result: ReportOpened };
+  diag_crash_status: { args: Record<string, never>; result: boolean };
+  diag_crash_dismiss: { args: Record<string, never>; result: undefined };
+  diag_logs_delete: { args: Record<string, never>; result: undefined };
 }
 
 export interface Events {

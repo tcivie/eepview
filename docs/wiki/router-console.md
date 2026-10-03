@@ -91,7 +91,7 @@ The console tab is not a web tab, and its webview is not a `tab-*` webview. The 
 ### The console tab
 
 - **R23 Tab kind.** The console tab is a tab of kind `console` in the tab strip (`TabInfo.kind`). While it is the active tab, the content area shows the `console` webview, at the place of a web tab. While another tab is active, the `console` webview is hidden. Its `TabInfo` has `kind: "console"`, `zoom: 1`, `jsOn: true` (R11), `bookmarked: false` and `icon: null`. The router state (verifying, down, paused) does not change what the console tab shows: the console is on loopback and does not go through the router proxy.
-- **R24 One console tab.** There is at most one console tab. `console_open()` with a console tab open selects it and loads the home page in it. With none, it makes one right after the active tab and selects it. It never opens a second `console` webview.
+- **R24 One console tab.** There is at most one console tab. `console_open()` with a console tab open selects it and loads the home page in it. With none, it makes one right after the active tab and selects it. It never opens a second `console` webview. One field of the core, `console_tab`, names the console tab; a tab has no console flag.
 - **R25 Tab state.** The tab title is the document title of the console page. Until the first title arrives, it is `Router console`. The tab URL is the URL the `console` webview shows (main frame), and `loading` follows its page loads. A console page never enters history, never gets a site icon and is never bookmarked. The bookmark star and the JavaScript toggle are disabled in a console tab. Find in page and zoom do nothing there: the find shortcut and `find()` leave the find bar closed and make no engine call.
 - **R26 Address bar.** In a console tab the address bar shows the console URL and a `Router console` badge in place of the `I2P` badge. Typing in the address bar and pressing Enter navigates like in any tab: the input goes through the normal address rules and the tab guard. When the input is allowed (an I2P address, an internal page or a search), the console tab becomes a normal tab (`web` or `internal`) with a new back/forward list, and the `console` webview is destroyed. When the input is refused (`not-i2p`, `invalid`), for example an edited console address, the answer is the refusal and the console tab stays as it is: no blocked page, no effect on the `console` webview. A console address typed by hand never loads; only `console_open()` loads the console.
 - **R27 Back, forward, reload, stop.** In a console tab, back, forward, reload, hard reload and stop act on the `console` webview. `canBack` and `canForward` follow the console pages loaded in that tab.
@@ -162,17 +162,24 @@ Test helper, `crate::net::testing` (tests only): `FakeConsole::start(kind: Conso
 ### Rust, `eepview_lib::core` (pure; the console tab)
 
 ```rust
-// crate::tabs::Tab gets one field:
-pub console: bool;                    // R23: this is the console tab
+// crate::core::Core holds one private field, `console_tab: Option<u32>` (R23, R24): the id of
+// the console tab. It is the only place that says which tab is the console tab. `Tab` has
+// no console flag, so two console tabs cannot exist.
 
 // crate::core
-pub enum View { Internal(String), Web(u32), Console(u32) }   // Console: the console tab id
+pub enum View { Internal(String), Web(u32), Console(u32) }   // Console: the console tab id, read from `console_tab`
 pub enum Effect { /* as before */ Console(ConsoleOp) }        // R27, R28: act on the `console` webview
 #[derive(Debug, Clone, PartialEq)]
 pub enum ConsoleOp {
-    Engine(EngineOp),   // Back, Forward, Reload, HardReload, Stop (never Find, FindClear, Zoom)
-    Close,              // destroy the `console` webview
+    Back,        // R27: one step back in the console view
+    Forward,     // R27: one step forward
+    Reload,      // R27
+    HardReload,  // R27: reload, bypassing the cache
+    Stop,        // R27
+    Close,       // R28, R30: destroy the `console` webview
 }
+// Only the operations the console tab needs. There is no variant for Find, FindClear or
+// Zoom, so R25 and R27 hold by construction.
 impl Core {
     /// The id of the console tab, if one is open.
     pub fn console_tab(&self) -> Option<u32>;

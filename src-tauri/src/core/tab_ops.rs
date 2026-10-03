@@ -38,13 +38,21 @@ impl Core {
             Vec::new()
         };
         let home = self.home_url();
-        let Some(closed) = self.tabs.close(id, &home) else {
+        let was_console = self.console_tab == Some(id);
+        // The console tab is never reopened: only `console_open` makes one.
+        let closed = if was_console {
+            self.tabs.close_forgotten(id, &home)
+        } else {
+            self.tabs.close(id, &home)
+        };
+        let Some(closed) = closed else {
             return fx;
         };
         if closed.web_js.is_some() {
             fx.push(Effect::Web(WebOp::Destroy(id)));
         }
-        if closed.console {
+        if was_console {
+            self.console_tab = None;
             fx.push(Effect::Console(ConsoleOp::Close));
         }
         fx.extend(self.arrive());

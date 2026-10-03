@@ -31,7 +31,15 @@ RUNS = {
     "js-off": ({"EEPVIEW_JS": "off"}, "off", False),
 }
 START_URL = "http://leaktest.i2p/"
+# Seconds of the EEPVIEW_EXIT_AFTER budget that the frame wait must leave free: app start and
+# page load, the 4 s probe timeout before `done`, the 3 s before the location vector, margin.
+FRAME_WAIT_RESERVE_S = 15
 PROXY_VARS = ("http_proxy", "https_proxy", "all_proxy", "no_proxy")
+
+
+def frame_wait_ms(exit_after: int) -> int:
+    """How long the page waits for the frame's done signal: what the exit budget leaves."""
+    return max(1, exit_after - FRAME_WAIT_RESERVE_S) * 1000
 
 
 def app_env(ports: dict, run: str, exit_after: int) -> dict:
@@ -95,6 +103,8 @@ def leak_test(args) -> int:
     args.out.mkdir(parents=True, exist_ok=True)
     log = EventLog()
     ports = start_detectors(log)
+    # A page setting, not a port: the pages read it like the ports (servers.render).
+    ports["frame_wait"] = frame_wait_ms(args.exit_after)
     results = {}
     for name in args.runs.split(","):
         run = run_app(log, ports, name, args)

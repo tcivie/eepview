@@ -16,7 +16,7 @@ use serde_json::{Value, json};
 use tauri::webview::{NewWindowResponse, PageLoadEvent};
 use tauri::{App, Listener, Manager, Url, Webview};
 
-use crate::core::{ConsoleOp, EngineOp, View};
+use crate::core::{ConsoleOp, View};
 use crate::net::console::{ConsoleInfo, ConsoleKind, VerifiedConsole, probe_path};
 use crate::net::testing::FakeConsole;
 use crate::shell::console::{
@@ -185,6 +185,26 @@ fn r19_when_the_rule_list_cannot_be_attached_nothing_loads() {
     load_after_rules(webview.clone(), console.home())(Err("no rule list".to_owned()));
     thread::sleep(Duration::from_millis(500));
     assert_eq!(webview.url().unwrap().as_str(), "about:blank");
+}
+
+#[test]
+fn r19_a_failed_rule_list_closes_the_console_tab_and_destroys_the_view() {
+    // R19: fail closed: the tab closes, the `console` webview is destroyed, nothing loads.
+    let app = app();
+    let (fake, console) = console(ConsoleKind::Java);
+    let webview = ConsoleWebview::open(app.handle(), &console).unwrap();
+    assert!(tab_open(&app));
+    let before = fake.requests().len();
+    load_after_rules(webview.clone(), console.home())(Err("no rule list".to_owned()));
+    assert!(wait_for(|| !view_open(&app)), "the webview is destroyed");
+    assert!(wait_for(|| !tab_open(&app)), "the console tab is closed");
+    assert!(tab_kinds(&app).iter().all(|k| k != "console"));
+    assert!(!webview.url().is_ok_and(|u| u.as_str() != "about:blank"));
+    assert_eq!(
+        fake.requests().len(),
+        before,
+        "the console was never loaded"
+    );
 }
 
 // ---------------------------------------------------------------- R6: store and event
@@ -829,6 +849,27 @@ fn r26_a_typed_console_address_is_refused_and_never_reaches_a_tab_webview() {
     );
 }
 
+#[test]
+fn r26_a_refused_input_keeps_the_console_tab_and_the_console_view() {
+    // R26: refused (an edited console address): the tab and the `console` webview stay.
+    let app = app();
+    let (_fake, console) = console(ConsoleKind::Java);
+    open(&app, &console);
+    let id = core(&app).console_tab().expect("the console tab");
+    let typed = [
+        console.home().to_string(),
+        format!("{}/logs", console.origin()),
+    ];
+    for input in typed {
+        let got = invoke(&app, "navigate", json!({"input": input})).unwrap();
+        assert_eq!(got["ok"], json!(false), "{input}");
+        thread::sleep(Duration::from_millis(300));
+        assert!(view_open(&app), "{input}: the console view stays");
+        assert_eq!(core(&app).console_tab(), Some(id), "{input}");
+        assert_eq!(tab_kinds(&app), ["internal", "console"], "{input}");
+    }
+}
+
 // ---------------------------------------------------------------- R27
 
 #[test]
@@ -856,24 +897,24 @@ fn r27_run_carries_out_the_engine_ops_on_the_console_view() {
     // R27: `run` does a ConsoleOp::Engine on the console webview; it is safe with none.
     let app = app();
     for op in [
-        EngineOp::Back,
-        EngineOp::Forward,
-        EngineOp::Reload,
-        EngineOp::HardReload,
-        EngineOp::Stop,
+        ConsoleOp::Back,
+        ConsoleOp::Forward,
+        ConsoleOp::Reload,
+        ConsoleOp::HardReload,
+        ConsoleOp::Stop,
     ] {
-        run(app.handle(), &ConsoleOp::Engine(op));
+        run(app.handle(), &op);
     }
     let (_fake, console) = console(ConsoleKind::Java);
     open(&app, &console);
     for op in [
-        EngineOp::Back,
-        EngineOp::Forward,
-        EngineOp::Reload,
-        EngineOp::HardReload,
-        EngineOp::Stop,
+        ConsoleOp::Back,
+        ConsoleOp::Forward,
+        ConsoleOp::Reload,
+        ConsoleOp::HardReload,
+        ConsoleOp::Stop,
     ] {
-        run(app.handle(), &ConsoleOp::Engine(op));
+        run(app.handle(), &op);
     }
     thread::sleep(Duration::from_millis(300));
     assert!(view_open(&app), "an engine op never destroys the view");

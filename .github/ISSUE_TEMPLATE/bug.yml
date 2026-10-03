@@ -27,6 +27,13 @@ body:
         - i2pd
         - Managed
     validations:
+      required: false
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What did you do, what did you expect, and what happened instead? Do not include site addresses.
+    validations:
       required: true
   - type: textarea
     id: steps
@@ -34,16 +41,12 @@ body:
       label: Steps to reproduce
       placeholder: "1. ...\n2. ..."
     validations:
-      required: true
+      required: false
   - type: textarea
-    id: expected
+    id: diagnostics
     attributes:
-      label: Expected behavior
+      label: Diagnostics
+      description: eepview fills this in when you use "Report a problem". It holds no addresses and no names. Drag the saved report file here to attach the full text.
+      render: text
     validations:
-      required: true
-  - type: textarea
-    id: actual
-    attributes:
-      label: Actual behavior
-    validations:
-      required: true
+      required: false

@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 The eepview contributors
 // SPDX-License-Identifier: MIT
 
-// The console tab, on the real toolbar page and a stand-in shell (docs/wiki/router-console.md,
+// The console tab, on the real toolbar page and a stand-in shell (the Router console wiki page,
 // R23 to R27). The tab shows in the strip, the address bar shows its badge, the star and the
 // JavaScript toggle are off, and back, forward and reload send their commands.
 

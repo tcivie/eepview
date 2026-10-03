@@ -29,8 +29,6 @@ pub struct Tab {
     pub web_title: String,
     /// The page of the current load failed (an error page): it is not saved in history.
     pub failed: bool,
-    /// The router console tab: it shows the `console` webview, never a `tab-*` one.
-    pub console: bool,
 }
 
 impl Tab {
@@ -45,7 +43,6 @@ impl Tab {
             web_url: None,
             web_title: String::new(),
             failed: false,
-            console: false,
         }
     }
 }
@@ -105,10 +102,18 @@ impl Tabs {
 
     /// Closes a tab. Closing the last tab opens `home`. Returns the closed tab.
     pub fn close(&mut self, id: u32, home: &str) -> Option<Tab> {
+        self.remove(id, home, true)
+    }
+
+    /// Like [`Tabs::close`], but "reopen closed tab" does not remember the tab.
+    pub fn close_forgotten(&mut self, id: u32, home: &str) -> Option<Tab> {
+        self.remove(id, home, false)
+    }
+
+    fn remove(&mut self, id: u32, home: &str, remember: bool) -> Option<Tab> {
         let index = self.index_of(id)?;
         let tab = self.list.remove(index);
-        // The console tab is never reopened: only `console_open` makes one.
-        if !tab.console {
+        if remember {
             self.closed.push(Closed {
                 url: tab.url.clone(),
                 index,

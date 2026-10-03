@@ -22,19 +22,19 @@ fn assert_i2p(host: &str) {
     assert!(is_i2p_host(name), "forwarded a non-I2P host: {host:?}");
 }
 
-/// The bytes sent to the router: no line holds a bare CR or LF, and the one `Host` header is
-/// the planned host.
+/// The bytes sent to the router: no line holds a bare CR or LF, and the one `Host` header (a
+/// line after the request line) is the planned host.
 fn assert_upstream(head: &Head, method: &str, host: &str, path: &str) {
     let bytes = upstream_request(method, host, path, head);
     let text = String::from_utf8(bytes).unwrap_or_default();
     assert!(!text.is_empty(), "the upstream request is not UTF-8");
     let mut hosts = Vec::new();
-    for line in text.split("\r\n") {
+    for (index, line) in text.split("\r\n").enumerate() {
         assert!(
             !line.contains(['\r', '\n']),
             "bare CR or LF in a line: {text:?}"
         );
-        match line.split_once(':') {
+        match line.split_once(':').filter(|_| index > 0) {
             Some((name, value)) if name.trim().eq_ignore_ascii_case("host") => {
                 hosts.push(value.trim());
             }

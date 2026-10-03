@@ -70,8 +70,16 @@ pub enum Effect {
 /// An operation on the `console` webview (`docs/wiki/router-console.md`, R27, R28).
 #[derive(Debug, Clone, PartialEq)]
 pub enum ConsoleOp {
-    /// An engine call: back, forward, reload, hard reload or stop.
-    Engine(EngineOp),
+    /// One step back in the console tab.
+    Back,
+    /// One step forward in the console tab.
+    Forward,
+    /// Reload the console page.
+    Reload,
+    /// Reload the console page, bypassing the cache.
+    HardReload,
+    /// Stop loading the console page.
+    Stop,
     /// Destroy the webview.
     Close,
 }
@@ -208,6 +216,9 @@ pub struct Core {
     pointed: Option<Url>,
     /// The tab whose next commit takes keyboard focus: its navigation came from the address bar.
     focus_on_commit: Option<u32>,
+    /// The router console tab: it shows the `console` webview, never a `tab-*` one. At most
+    /// one (R24), and the only place that says which tab it is.
+    console_tab: Option<u32>,
 }
 
 impl Core {
@@ -244,6 +255,7 @@ impl Core {
             stats: StatsHistory::default(),
             pointed: None,
             focus_on_commit: None,
+            console_tab: None,
         };
         // Effects are dropped: no UI listens yet, and a save error shows on the next save.
         let _ = core.sweep_icons();
@@ -300,7 +312,7 @@ impl Core {
         let Some(tab) = self.tabs.active() else {
             return View::Internal("eepview://home".into());
         };
-        if tab.console {
+        if self.console_tab == Some(tab.id) {
             return View::Console(tab.id);
         }
         if !is_web(&tab.url) {
@@ -329,7 +341,7 @@ impl Core {
     }
 
     fn info_of(&self, tab: &Tab) -> TabInfo {
-        if tab.console {
+        if self.console_tab == Some(tab.id) {
             return self.console_info(tab);
         }
         let web = is_web(&tab.url);
