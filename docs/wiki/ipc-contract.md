@@ -5,7 +5,7 @@ SPDX-License-Identifier: MIT
 
 # IPC contract
 
-Version 1.4. The Rust shell (`src-tauri/`) and the UI (`src/ui/`) build against this page.
+Version 1.5. The Rust shell (`src-tauri/`) and the UI (`src/ui/`) build against this page.
 Change it in a PR that changes both sides, or keep the old form working as a shim.
 
 ## History
@@ -17,6 +17,7 @@ Change it in a PR that changes both sides, or keep the old form working as a shi
 - v1.2: `connection_pause`, `connection_resume`, `router_control`, `RouterStatus.paused` and `.managed`, `RouterStats.history`. The `outproxy` state is gone: VERIFY no longer asks for a clearnet host.
 - Shipped in [#29](https://github.com/tcivie/eepview/pull/29).
 - v1.4: the `popup` webview, `popup_open`, `popup_size`, `popup_close`, `popup-show`, `popup-closed`, `popup-select`. `chrome_set_height` reports the find bar only; the toolbar never grows for a popup — [#55](https://github.com/tcivie/eepview/pull/55).
+- v1.5: `console_status`, `console_detect`, `console_open`, `console-changed`, `ConsoleInfo`, the `console` webview ([#54](https://github.com/tcivie/eepview/pull/54)).
 
 ## Window layout
 
@@ -29,6 +30,7 @@ One OS window with several webviews (Tauri `unstable` multi-webview).
 | `status` | `src/ui/status.html` (bundled) | events only | The link-hover bubble, bottom left, over the content. |
 | `popup` | `src/ui/popup.html` (bundled) | popup commands | The toolbar popups (suggestions, menu, router panel, router hint). Transparent, hidden until a popup opens, then sized and placed to the popup's own rectangle, on top of every other webview. |
 | `tab-<id>-<n>` | remote `http(s)://*.i2p/` | NO | One per web tab. Only the active one is visible. |
+| `console` | the router console, `http://127.0.0.1:<port>` | NO | In its own window, `console-window`. Built only from a verified console. See [Router console](router-console.md). |
 
 On macOS the window has an overlay title bar with a hidden title. The traffic lights sit in the tab row. Windows and Linux keep the native decorations.
 
@@ -97,6 +99,14 @@ At most 10 000 entries. Nothing is recorded while `history.enabled` is false.
 - `connection_resume()`: runs VERIFY again. The gatekeeper opens and the active tab reloads only when VERIFY passes. If it fails, everything stays closed.
 - `router_control({action: "stop" | "start" | "restart"}) -> {ok: boolean, reason?: string}`. It answers `{ok: false, reason: "external"}` until eepview runs its own router (Phase 3).
 
+### Router console
+
+eepview shows router information and never changes the router configuration; these open the router's own console. See [Router console](router-console.md).
+
+- `console_status() -> ConsoleInfo`: the stored detection result. It never probes.
+- `console_detect() -> ConsoleInfo`: probes now, off the main thread. The UI calls it when the router panel opens, when the home page or Settings loads as the active tab, and when `router-status` turns `ok` while such a page shows.
+- `console_open({page}) -> {ok: boolean, reason?: "no-console" | "no-page"}`: opens the page in the `console` window. `page` is a page key; an unknown key is an error.
+
 ### Window
 
 - `chrome_set_height(px)`: the toolbar reports its find bar: 124 or more while it shows, 84 when it is hidden. The toolbar is 124 px when the core has the find bar open (`find`, the Find shortcut) or the last report is 124 or more, else 84 px. It never takes another height.
@@ -120,6 +130,7 @@ Rust sends them to `toolbar`, `internal`, `status` and `popup`.
 - `toast: {kind: "info" | "warn", text}`: refused downloads, new windows and in-page navigations.
 - `link-hover: {text, blocked}`: the link under the mouse, already decoded and shortened to about 80 characters. `blocked: true` for a link that would be refused (`text` = `Blocked: <host>`). `text` is `Loading <host>…` while a page loads, and empty when there is nothing to show. It shows after 100 ms of hovering (at once when the bubble is already up) and hides at once.
 - `fullscreen-changed: boolean`
+- `console-changed: ConsoleInfo`: when the detected console appears, goes away, moves or changes version.
 - `status-side: "left" | "right"` (to `status` only): the corner the bubble sits in. It moves to the bottom right while the mouse is over the bottom-left spot.
 - `chrome-insets-changed: {left: number}`: on full screen enter and exit, and when the scale factor or the button frames change.
 - `icons-changed: null`: a site icon was stored or deleted. `tabs-changed` follows. Read the lists again for the new `icon` values.
@@ -157,6 +168,9 @@ type RouterStats = { version: string | null; uptimeMs: number | null; networkSta
     in5m: number | null; out5m: number | null };
   tunnelBuildSuccessPercent: { exploratory: number | null; client: number | null };
   history: { t: number; in: number; out: number }[] };  // last 10 min, one sample per 5 s
+type ConsolePage = "home" | "tunnels" | "addressbook" | "config" | "logs";
+type ConsoleInfo = { found: boolean; kind: "java" | "i2pd" | null; origin: string | null;
+  pages: ConsolePage[]; version: string | null };  // origin and version: display only
 ```
 
 `icon` is a `data:image/png;base64,` URL that eepview drew itself, or `null`. `bookmark_update` and `bookmarks_import` ignore an `icon` they receive, and the stores never keep one. See [Site icons](site-icons.md).
@@ -173,6 +187,7 @@ New tab T, close tab W, reopen closed tab Shift+T, next and previous tab Ctrl+Ta
 
 See [ADR 0001](adr-0001-no-leak-architecture.md).
 
+- The `console` webview gets no IPC, no proxy and an engine rule list for its one origin. An `.i2p` link in it opens a normal tab.
 - `tab-*` webviews get no IPC, use the gatekeeper as proxy, run incognito unless `keepCookies`, and have WebRTC off.
 - No `tab-*` webview exists before VERIFY passes. When the router goes down, or you pause, every `tab-*` is destroyed.
 - New-window requests open as a new tab through the same guard. Downloads are refused with a toast.

@@ -15,7 +15,7 @@ eepview has one maintainer. The project wants a second active maintainer. This c
 ## Next
 
 - Startup state machine and router detection (Phase 2).
-- Managed Java I2P install with in-network updates and rollback (Phase 3).
+- Managed Java I2P install with in-network updates and rollback (Phase 3). The managed router keeps its console on, bound to loopback only (`127.0.0.1`), so the [router console](router-console.md) quick links work for it. eepview never changes its configuration.
 - Runtime scan of the downloaded I2P and JRE.
 
 ## Later: OS-level network layer (L6)

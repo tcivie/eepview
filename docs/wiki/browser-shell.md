@@ -72,7 +72,11 @@ TypeScript (pure):
 
 IPC: see the [IPC contract](ipc-contract.md) (v1.4): `popup_open`, `popup_size`, `popup_close`, `popup-show`, `popup-closed` and `popup-select`.
 
-The `popup` webview may call: `popup_size`, `popup_close`, `navigate`, `tab_new`, `tab_list`, `zoom_in`, `zoom_out`, `zoom_reset`, `router_status`, `router_stats`, `connection_pause`, `connection_resume`, `router_control`, and listen to events.
+The `popup` webview may call: `popup_size`, `popup_close`, `navigate`, `tab_new`, `tab_list`, `zoom_in`, `zoom_out`, `zoom_reset`, `router_status`, `router_stats`, `connection_pause`, `connection_resume`, `router_control`, `console_status`, `console_detect`, `console_open`, and listen to events.
+
+## Router console
+
+eepview shows router information but never changes the router configuration. It finds the console of the router in use (Java I2P or i2pd) on loopback and gives quick links to it: Console, Tunnels, Address book, Config and Logs. The links show in the router panel, on the home page and in Settings. A link opens the router's own page in a separate `Router console` window. With no console, one line says "No router console found". Details: [Router console](router-console.md).
 
 ## How to use / run locally
 
@@ -92,3 +96,4 @@ The `popup` webview may call: `popup_size`, `popup_close`, `navigate`, `tab_new`
 - 2026-10-03 — Browser shell: tabs, navigation, bookmarks, history, find, gatekeeper, pause and resume — [#29](https://github.com/tcivie/eepview/pull/29)
 - 2026-10-03 — Site icons in tabs, bookmarks and history — [#53](https://github.com/tcivie/eepview/pull/53)
 - 2026-10-03 — Toolbar popups in their own `popup` webview; the toolbar stays 84 px — [#55](https://github.com/tcivie/eepview/pull/55)
+- 2026-10-03 — Router console quick links and the console window — [#54](https://github.com/tcivie/eepview/pull/54)

@@ -187,7 +187,7 @@ pub fn current<R: Runtime>(app: &AppHandle<R>) -> Option<VerifiedConsole>;
 pub fn close<R: Runtime>(app: &AppHandle<R>);
 ```
 
-### IPC (contract v1.4)
+### IPC (contract v1.5)
 
 - `console_status() -> ConsoleInfo`: the stored result, no probe.
 - `console_detect() -> ConsoleInfo`: probes now (R6), off the main thread, stores and answers the result.
