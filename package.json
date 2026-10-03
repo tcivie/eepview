@@ -21,6 +21,7 @@
     "@biomejs/biome": "2.5.15",
     "@taplo/cli": "0.7.0",
     "@tauri-apps/cli": "^2",
+    "happy-dom": "20.14.5",
     "typescript": "~7.0.2",
     "vite": "^8.0.16"
   },
