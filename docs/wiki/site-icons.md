@@ -5,7 +5,7 @@ SPDX-License-Identifier: MIT
 
 # Site icons
 
-Status: in progress in [#53](https://github.com/tcivie/eepview/pull/53).
+Status: shipped in [#53](https://github.com/tcivie/eepview/pull/53).
 
 Tabs, bookmark tiles, the bookmarks page and history rows show the icon of each site. When a site has no icon, they show the first letter of its host, as before.
 
