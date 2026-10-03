@@ -94,6 +94,7 @@ mod tests {
             title: title.into(),
             folder: None,
             created: 0,
+            icon: None,
         }
     }
 
@@ -104,6 +105,7 @@ mod tests {
             title: title.into(),
             visited,
             visits,
+            icon: None,
         }
     }
 

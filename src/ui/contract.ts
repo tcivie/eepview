@@ -15,6 +15,7 @@ export type TabInfo = {
   zoom: number;
   jsOn: boolean;
   bookmarked: boolean;
+  icon: string | null;
 };
 
 export type NavResult = { ok: boolean; reason?: "not-i2p" | "router-down" | "invalid" };
@@ -25,6 +26,7 @@ export type Bookmark = {
   title: string;
   folder: string | null;
   created: number;
+  icon: string | null;
 };
 
 export type HistoryEntry = {
@@ -33,6 +35,7 @@ export type HistoryEntry = {
   title: string;
   visited: number;
   visits: number;
+  icon: string | null;
 };
 
 export type Suggestion = { url: string; title: string; source: "bookmark" | "history" };
@@ -147,6 +150,7 @@ export interface Events {
   "fullscreen-changed": boolean;
   "chrome-insets-changed": ChromeInsets;
   "status-side": "left" | "right";
+  "icons-changed": null;
 }
 
 /** Events a page sends to the shell. */

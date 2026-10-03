@@ -9,6 +9,7 @@
 //! - [`failures`]: the pages whose load failed, for history.
 //! - [`gatekeeper`]: eepview's own proxy in front of the router (layer L1).
 //! - [`http`]: message heads for the gatekeeper.
+//! - [`icons`]: one site icon request through the gatekeeper.
 //! - [`rules`]: the engine request rules (layer L3).
 //! - [`stats`]: router statistics from the router helper.
 //! - `testing` (tests only): a fake router proxy, so tests outside `net/` open no socket.
@@ -17,6 +18,7 @@ pub mod failures;
 pub mod gatekeeper;
 pub mod host;
 pub mod http;
+pub mod icons;
 pub mod loopback;
 pub mod rules;
 pub mod stats;

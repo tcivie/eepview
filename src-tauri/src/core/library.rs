@@ -14,7 +14,7 @@ use crate::suggest::suggest;
 use crate::types::{Bookmark, HistoryEntry, HistoryQuery, NewBookmark, Suggestion};
 
 impl Core {
-    fn saved(result: io::Result<()>, what: &str) -> Vec<Effect> {
+    pub(super) fn saved(result: io::Result<()>, what: &str) -> Vec<Effect> {
         match result {
             Ok(()) => Vec::new(),
             Err(e) => vec![Self::toast("warn", format!("Could not save {what}: {e}"))],
@@ -60,7 +60,8 @@ impl Core {
     /// `bookmarks_list()`.
     #[must_use]
     pub fn bookmarks_list(&self) -> Vec<Bookmark> {
-        self.bookmarks.list().to_vec()
+        let list = self.bookmarks.list().iter().cloned();
+        list.map(|b| self.with_icon(b)).collect()
     }
 
     /// `bookmark_add(bookmark)`.
@@ -74,13 +75,15 @@ impl Core {
         now: u64,
     ) -> Result<(Bookmark, Vec<Effect>), String> {
         let bookmark = self.bookmarks.add(new, now)?;
-        Ok((bookmark, self.bookmarks_changed()))
+        Ok((self.with_icon(bookmark), self.bookmarks_changed()))
     }
 
     /// `bookmark_update(bookmark)`.
     pub fn bookmark_update(&mut self, bookmark: &Bookmark) -> Vec<Effect> {
         if self.bookmarks.update(bookmark) {
-            self.bookmarks_changed()
+            let mut fx = self.bookmarks_changed();
+            fx.extend(self.sweep_icons());
+            fx
         } else {
             Vec::new()
         }
@@ -89,7 +92,9 @@ impl Core {
     /// `bookmark_remove(id)`.
     pub fn bookmark_remove(&mut self, id: &str) -> Vec<Effect> {
         if self.bookmarks.remove(id) {
-            self.bookmarks_changed()
+            let mut fx = self.bookmarks_changed();
+            fx.extend(self.sweep_icons());
+            fx
         } else {
             Vec::new()
         }
@@ -98,7 +103,7 @@ impl Core {
     /// `bookmark_find(url)`.
     #[must_use]
     pub fn bookmark_find(&self, url: &str) -> Option<Bookmark> {
-        self.bookmarks.find(url).cloned()
+        self.bookmarks.find(url).cloned().map(|b| self.with_icon(b))
     }
 
     /// `bookmarks_export()`.
@@ -148,7 +153,7 @@ impl Core {
     /// `history_query(query)`.
     #[must_use]
     pub fn history_query(&self, query: &HistoryQuery) -> Vec<HistoryEntry> {
-        self.history.query(query)
+        self.with_icons(self.history.query(query))
     }
 
     /// `history_remove(id)`.
@@ -158,6 +163,7 @@ impl Core {
         }
         let mut fx = self.save_history();
         fx.push(Effect::Emit(Event::History));
+        fx.extend(self.sweep_icons());
         fx
     }
 
@@ -170,6 +176,7 @@ impl Core {
         self.history.clear(range_ms(range)?, now);
         let mut fx = self.save_history();
         fx.push(Effect::Emit(Event::History));
+        fx.extend(self.sweep_icons());
         Ok(fx)
     }
 

@@ -21,13 +21,23 @@ name = "eepview_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [dev-dependencies]
-# Property tests of the robustness suite (tests/robust_*.rs). No default features: no fork, no timeout.
+# Property tests of the robustness suite (tests/robust_*.rs) and the site icons
+# (tests/site_icons_props.rs). No default features: no fork, no timeout.
 proptest = { version = "1.11.0", default-features = false, features = ["std"] }
 # The L3 rule is a regex; the tests run the real rule against the same URLs as the guard.
 # Already in the tree through Tauri.
 regex = { version = "1", default-features = false, features = ["std"] }
 # The mock runtime (`tauri::test`) for the shell tests.
 tauri = { version = "2", default-features = false, features = ["test", "unstable", "wry"] }
+# Real PNG, ICO, GIF, JPEG, WebP and BMP bytes for the site icon tests (tests/site_icons_*.rs).
+image = { version = "0.25", default-features = false, features = [
+  "png",
+  "ico",
+  "gif",
+  "jpeg",
+  "webp",
+  "bmp",
+] }
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
@@ -47,6 +57,19 @@ tauri = { version = "2", default-features = false, features = [
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 eepview-platform = { path = "crates/eepview-platform" }
+# Site icons: decode PNG, ICO, GIF, JPEG and WebP and draw them again as new PNG files
+# (docs/wiki/site-icons.md). No default features: no rayon, no other formats.
+image = { version = "0.25", default-features = false, features = [
+  "png",
+  "ico",
+  "gif",
+  "jpeg",
+  "webp",
+] }
+# The SHA-256 file names of the icon files, so no host name reaches the disk.
+sha2 = "0.10"
+# The `data:image/png;base64,` URLs the UI gets.
+base64 = "0.22"
 
 [lints.rust]
 unsafe_code = "deny"
