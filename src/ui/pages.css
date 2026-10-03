@@ -103,8 +103,7 @@
 }
 
 .tile-add .tile-mark {
-  border-style: dashed;
-  outline: none;
+  border: 1.5px dashed var(--color-border-strong);
 }
 
 @media (max-width: 760px) {

@@ -115,8 +115,8 @@
   place-items: center;
   width: 16px;
   height: 16px;
+  border: 1px solid var(--color-border-strong);
   border-radius: 4px;
-  background: var(--color-selected);
   color: var(--color-text-muted);
   font-size: 10px;
   font-weight: var(--fw-strong);
@@ -340,6 +340,10 @@
 .suggestion:hover,
 .suggestion[aria-selected="true"] {
   background: var(--color-selected);
+}
+
+.suggestion[aria-selected="true"] {
+  box-shadow: inset 3px 0 0 var(--color-accent);
 }
 
 .suggestion-title {

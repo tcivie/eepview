@@ -15,7 +15,6 @@
 #000000
 #f6f6f6
 #ececec
-#e6e6e6
 #f6d9d8
 #f4e3c6
 #d3eadf

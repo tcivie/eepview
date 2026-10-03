@@ -478,10 +478,14 @@ a:hover {
 }
 
 .chip[data-tone="building"]::before {
-  background: var(--color-warning);
+  width: 10px;
+  height: 10px;
+  border: 2px dashed var(--color-warning);
+  background: transparent;
 }
 
 .chip[data-tone="stopped"]::before {
+  border-radius: 2px;
   background: var(--color-danger);
 }
 
@@ -540,7 +544,6 @@ a:hover {
 
 .hop[data-state="built"] + .hop[data-state="built"]::before {
   border-top-style: solid;
-  border-top-color: var(--color-border-strong);
 }
 
 .hop[data-state="building"] .hop-node {
@@ -582,7 +585,7 @@ a:hover {
 
 .facts {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 180px), 1fr));
   gap: var(--space-4) var(--space-5);
 }
 

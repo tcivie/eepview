@@ -43,7 +43,7 @@ The interface is neutral, like Safari, Chrome and Firefox. Green is only the acc
 
 - **Neutral:** page backgrounds, surfaces, sidebars, cards, the toolbar and the tab strip. Body text, borders and dividers. Selected rows and hovered items (`--color-selected`). Bookmark tiles, their letter chips and the tab icons. The lines of the hop diagram.
 - **Green (`--color-accent`):** the primary button, the marker of the active or selected item (the bar on the current sidebar link, a pressed toolbar button), the focus ring, links, the I2P badge in the address bar, the dots of the hop diagram, and the bandwidth line in charts.
-- **Status colors:** `--color-success` (the "Ready" dot), `--color-warning` and `--color-danger` mark state. A status chip is neutral, with a colored dot.
+- **Status colors:** `--color-success` (the "Ready" dot), `--color-warning` and `--color-danger` mark state. A status chip is neutral, with a dot whose shape and color give the state: a round dot for ready, a dashed ring for building, a square for stopped. The toolbar status dot uses the same shapes.
 - No green-tinted background, border or text sits on neutral content.
 
 Added in [#51](https://github.com/tcivie/eepview/pull/51).
@@ -73,8 +73,7 @@ A pure gray ramp: red, green and blue are equal, so no surface leans green.
 | white | `#FFFFFF` | Surfaces in light, text on the accent in light, highlights in shadows and in the mark |
 | gray-50 | `#F6F6F6` | Page background in light |
 | gray-100 | `#ECECEC` | Tab strip and wells in light, body text in dark |
-| gray-150 | `#E6E6E6` | Selected and hovered items in light |
-| gray-200 | `#DCDCDC` | Borders in light |
+| gray-200 | `#DCDCDC` | Borders, selected items and letter chips in light |
 | gray-400 | `#B3B3B3` | Secondary text in dark |
 | gray-450 | `#9A9A9A` | Hints in dark |
 | gray-500 | `#8C8C8C` | Control borders in light |
@@ -82,7 +81,7 @@ A pure gray ramp: red, green and blue are equal, so no surface leans green.
 | gray-650 | `#5E5E5E` | Hints in light |
 | gray-700 | `#4D4D4D` | Secondary text in light |
 | gray-800 | `#333333` | Borders in dark |
-| gray-825 | `#2E2E2E` | Selected and hovered items in dark |
+| gray-825 | `#2E2E2E` | Selected items in dark |
 | gray-850 | `#262626` | Popovers and menus in dark |
 | gray-875 | `#1E1E1E` | Surfaces in dark |
 | gray-900 | `#1C1C1C` | Body text in light, the scrim and shadows in light |
@@ -99,8 +98,8 @@ Defined in `src/ui/theme.css`. "Brand" marks a value that comes straight from th
 | `--color-bg` | `#F6F6F6` gray-50 | `#161616` gray-925 | Page background, hovered tab |
 | `--color-surface` | `#FFFFFF` white | `#1E1E1E` gray-875 | Panels, cards, the nav row |
 | `--color-surface-sunken` | `#ECECEC` gray-100 | `#111111` gray-950 | Tab strip, wells, progress tracks |
-| `--color-surface-raised` | `#FFFFFF` white | `#262626` gray-850 | Popovers, menus, dialogs |
-| `--color-selected` | `#E6E6E6` gray-150 | `#2E2E2E` gray-825 | Selected and hovered items, letter chips |
+| `--color-surface-raised` | `#FFFFFF` white | `#262626` gray-850 | Popovers, menus, dialogs. In light it is the same white as a surface, and a 1 px border plus `--shadow-float` lift it, as in browser menus |
+| `--color-selected` | `#DCDCDC` gray-200 | `#2E2E2E` gray-825 | Selected items and letter chips; a selected row or link also gets an accent bar |
 | `--color-border` | `#DCDCDC` gray-200 | `#333333` gray-800 | Hairlines and panel borders |
 | `--color-border-strong` | `#8C8C8C` gray-500 | `#6B6B6B` gray-600 | Control borders, hop lines, high-contrast borders |
 | `--color-text` | `#1C1C1C` gray-900 | `#ECECEC` gray-100 | Body text |
@@ -120,7 +119,9 @@ Defined in `src/ui/theme.css`. "Brand" marks a value that comes straight from th
 | `--shadow-float` | `#1C1C1C14`, `#1C1C1C24` | `#00000066`, `#00000080` | Popovers and menus |
 | `--shadow-inset` | `#FFFFFF99` | `#FFFFFF0A` | The top highlight on panels |
 
-Every text pair passes WCAG AA (4.5:1) in both themes. The lowest pair is `--color-text-faint` on `--color-selected` in dark, at 4.8:1.
+Every text pair passes WCAG AA (4.5:1) in both themes. The lowest pair is the accent on `--color-selected` in light, at 4.65:1.
+
+`scripts/palette-check.sh` also fails when the system dark block and the `[data-theme="dark"]` block in `theme.css` differ, so the two dark themes cannot drift apart.
 
 ## Small and mono variants
 
