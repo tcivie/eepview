@@ -50,9 +50,28 @@ const COMMANDS: &[&str] = &[
 
 fn main() {
     let manifest = tauri_build::AppManifest::new().commands(COMMANDS);
-    let attributes = tauri_build::Attributes::new().app_manifest(manifest);
+    // tauri-build would embed the Windows manifest into the app binary only; test binaries
+    // then fail to start (STATUS_ENTRYPOINT_NOT_FOUND). Embed one manifest everywhere.
+    let windows = tauri_build::WindowsAttributes::new_without_app_manifest();
+    let attributes = tauri_build::Attributes::new()
+        .app_manifest(manifest)
+        .windows_attributes(windows);
+    embed_windows_manifest();
     if let Err(error) = tauri_build::try_build(attributes) {
         eprintln!("tauri build failed: {error:#}");
         std::process::exit(1);
     }
+}
+
+/// Links `windows-app-manifest.xml` into every MSVC executable of the crate, tests included.
+fn embed_windows_manifest() {
+    let target = std::env::var("TARGET").unwrap_or_default();
+    if !target.ends_with("windows-msvc") {
+        return;
+    }
+    let dir = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_default();
+    let manifest = std::path::Path::new(&dir).join("windows-app-manifest.xml");
+    println!("cargo:rerun-if-changed=windows-app-manifest.xml");
+    println!("cargo:rustc-link-arg=/MANIFEST:EMBED");
+    println!("cargo:rustc-link-arg=/MANIFESTINPUT:{}", manifest.display());
 }
