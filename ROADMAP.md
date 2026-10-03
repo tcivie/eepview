@@ -19,7 +19,7 @@
 Goal: the web engine cannot reach anything but the local gatekeeper. The OS enforces this, even if every in-app layer fails. The browser always runs as a normal user. Admin rights are used once, at install only.
 
 - Linux: run the web engine in a network namespace whose only route is the gatekeeper. Use one AppArmor profile (admin, once) for Ubuntu 24.04.
-- Windows: an eepview-owned WebView2 Fixed Version runtime, plus a firewall rule (one UAC prompt) that blocks all outbound traffic except loopback. Under evaluation in spike S10.
+- Windows: an eepview-owned WebView2 Fixed Version runtime, plus a firewall rule (one UAC prompt) that blocks all outbound traffic except loopback. Spike S10 (branch spike/s10-windows-firewall): partial. The rules block every off-box TCP and UDP path from the engine. They do not block DNS, which goes through the Windows DNS service, so this layer adds to the engine proxy and does not replace it. Cost: about 300 MB to download, 670 MB on disk, and an update about every 4 weeks that eepview must ship, with one UAC prompt each time.
 - macOS: a Network Extension content filter for the WebKit networking process. It needs an Apple Developer ID and an entitlement. It also brings notarized builds.
 
 ## Later: other
