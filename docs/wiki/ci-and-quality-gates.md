@@ -10,6 +10,7 @@ Every change to main passes lint, complexity limits, security scans and a rulese
 - `.github/workflows/security.yml` runs cargo-deny, gitleaks and zizmor. zizmor runs with `--persona=pedantic` in CI and in lefthook, and every write permission and every non-default read permission has a comment that says why. CI pins the zizmor version (1.30.1).
 - `.github/workflows/codeql.yml` runs CodeQL (`security-extended`) for actions, javascript-typescript and rust. Each matrix entry has a fixed job name, `codeql (<language>)`.
 - `.github/workflows/scorecard.yml` runs OpenSSF Scorecard, publishes the result and uploads the SARIF to code scanning.
+- `.github/workflows/fuzz.yml` runs ClusterFuzzLite on the cargo-fuzz targets: a short run on each PR that changes the code, and a daily batch run on main. It is not a required check. See [Fuzzing](fuzzing.md).
 - `.github/workflows/dependency-review.yml` fails a PR that adds a dependency with a high severity advisory.
 - Complexity limits: cognitive and cyclomatic complexity 10 or less, 40 lines per function, 5 parameters, nesting 3.
 - No lint exclusions exist. The code is fixed instead.
