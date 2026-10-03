@@ -7,13 +7,13 @@ Working rules for any human or AI agent on this repo.
 - Start one branch per unit of work from main.
 - Commit small after each working change.
 - Write Conventional Commits.
-- Open a PR to main. Turn on squash auto-merge as soon as the PR is ready: `gh pr merge <n> --squash --auto`.
+- Open a PR to main. Turn on squash auto-merge as soon as the PR is ready: `gh pr merge <n> --squash --auto`. Spike PRs are the exception: never turn on auto-merge for them.
 - Never use `--admin`. Never bypass the ruleset. Never use `--no-verify`.
 - A PR does not need to be up to date with main. Merge main in only when the PR has a conflict (DIRTY).
-- Resolve review threads while CI runs, not after. Fix or answer each thread, then resolve it. Auto-merge does not fire while a thread is open. Zero unresolved.
-- When any check turns red, fix it at once. Do not wait for the other checks to finish.
-- If a check is red on main too, the cause is on main. Report it; do not change the gate in your PR.
-- You own your PR until it is MERGED. Do not stop while it is open: fix failing checks and resolve every review thread. Spike PRs are the exception: they close with a comment that says where the findings live.
+- Resolve review threads while CI runs, not after. Fix each thread, then resolve it. Resolve after an answer only when the reviewer agrees or the thread is a question. Never resolve a thread with a reply to avoid a fix. Auto-merge does not fire while a thread is open. Zero unresolved.
+- When any check turns red, fix it at once. Do not wait for the other checks to finish. Fix a red test in the code, or ask the test agent. Never edit the test to match the code. A push cancels the other running jobs, so they restart after it.
+- If a check is red on main too, the cause is on main. Report it in a comment on your PR and in a GitHub issue. Do not change the gate in your PR. After you report, you may stop: the PR waits for the fix on main.
+- You own your PR until it is MERGED. Do not stop while it is open: fix failing checks and resolve every review thread. Spike PRs are the exception, and so is a PR that waits on a check that is red on main. Spike PRs close with a comment that says where the findings live.
 
 ## Quality
 
