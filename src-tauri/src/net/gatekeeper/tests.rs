@@ -166,6 +166,11 @@ fn dead_router_gives_bad_gateway() {
     let (client_side, server_side) = socket_pair();
     let worker = thread::spawn(move || handle(server_side, &dead));
     let mut client = client_side;
+    // Windows retries a refused loopback connect for about 2 s, as long as the read timeout
+    // of the pair. Wait longer, so the 502 arrives before the client gives up.
+    client
+        .set_read_timeout(Some(Duration::from_secs(15)))
+        .unwrap();
     client
         .write_all(b"GET http://site.i2p/ HTTP/1.1\r\n\r\n")
         .unwrap();
