@@ -5,8 +5,6 @@
   </picture>
 </p>
 
-<h1 align="center">eepview</h1>
-
 <p align="center"><strong>Browse the I2P network. Nothing else, nothing leaks.</strong><br>That is what eepview is built to do.</p>
 
 > **Early development.** The no-leak protections are being built. Do not rely on eepview for anonymity until v0.1.
@@ -65,12 +63,17 @@ eepview has no release yet. v0.1 is the browser shell. Router detection and the 
 2. Planned: on first start, eepview looks for an I2P router on your computer.
 3. Planned: if it finds none, it offers to install one. Nothing happens until you say yes.
 
-The [wiki](https://github.com/tcivie/eepview/wiki) has the install steps.
+The [install guide](https://github.com/tcivie/eepview/wiki/Install) has the steps, and [first run](https://github.com/tcivie/eepview/wiki/First-Run) shows what happens next.
 
 ## Learn more
 
-- [User guide](https://github.com/tcivie/eepview/wiki): install, first run, using eepview, privacy and security, troubleshooting and FAQ.
-- [Developer guide](https://github.com/tcivie/eepview/wiki): build from source and how the code fits together.
+- [Install](https://github.com/tcivie/eepview/wiki/Install)
+- [First run](https://github.com/tcivie/eepview/wiki/First-Run)
+- [Using eepview](https://github.com/tcivie/eepview/wiki/Using-eepview)
+- [Privacy and security](https://github.com/tcivie/eepview/wiki/Privacy-and-Security)
+- [Troubleshooting](https://github.com/tcivie/eepview/wiki/Troubleshooting)
+- [FAQ](https://github.com/tcivie/eepview/wiki/FAQ)
+- [Developer guide](https://github.com/tcivie/eepview/wiki/Developer-Guide): build from source and how the code fits together.
 - [Contributing](https://github.com/tcivie/eepview/blob/main/CONTRIBUTING.md)
 - [Security policy](https://github.com/tcivie/eepview/blob/main/SECURITY.md)
 
