@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 The eepview contributors
 // SPDX-License-Identifier: MIT
 
-import { renderConsoleLinks, wireConsoleClicks } from "../console-nav.ts";
+import { renderConsoleLink, wireConsoleClicks } from "../console-nav.ts";
 import type { ConsoleInfo, RouterStats, RouterStatus } from "../contract.ts";
 import { all, byId } from "../dom.ts";
 import { call, on } from "../ipc.ts";
@@ -78,7 +78,7 @@ function detectConsole(): void {
 
 function renderConsole(info: ConsoleInfo): void {
   lastConsole = info;
-  renderConsoleLinks(
+  renderConsoleLink(
     {
       list: byId("rp-console-links"),
       note: byId("rp-console-note"),

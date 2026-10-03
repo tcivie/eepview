@@ -17,12 +17,20 @@ impl Core {
         }
         let id = self.tabs.active_id();
         let target = classify(input);
+        if let Target::Refused(r) = &target
+            && self.console_tab() == Some(id)
+        {
+            // A refused input leaves the console tab as it is (R26).
+            return (NavResult::refused(r.as_str()), Vec::new());
+        }
+        // A console tab becomes a normal tab first (R26).
+        let mut fx = self.leave_console(id, &Self::landing(&target, input));
         let result = match &target {
             Target::Refused(r) => NavResult::refused(r.as_str()),
             Target::Web(_) if !self.router.is_ok() => NavResult::refused("router-down"),
             _ => NavResult::ok(),
         };
-        let mut fx = self.open_target(id, &target, input);
+        fx.extend(self.open_target(id, &target, input));
         fx.extend(self.focus_plan(id, matches!(target, Target::Web(_))));
         (result, fx)
     }
@@ -127,7 +135,7 @@ impl Core {
         let Some(tab) = self.tabs.get(id) else {
             return Vec::new();
         };
-        if !is_web(&tab.url) || tab.web_js.is_some() {
+        if self.console_tab == Some(id) || !is_web(&tab.url) || tab.web_js.is_some() {
             return Vec::new();
         }
         let url = tab.url.clone();
@@ -137,6 +145,9 @@ impl Core {
     /// `go_back` / `go_forward` on the active tab.
     pub fn step(&mut self, step: Step) -> Vec<Effect> {
         let id = self.tabs.active_id();
+        if self.console_tab() == Some(id) {
+            return self.console_step(id, step);
+        }
         let Some(tab) = self.tabs.get_mut(id) else {
             return Vec::new();
         };
@@ -173,6 +184,9 @@ impl Core {
     /// `reload(hard)` on the active tab.
     pub fn reload(&mut self, hard: bool) -> Vec<Effect> {
         let id = self.tabs.active_id();
+        if self.console_tab() == Some(id) {
+            return self.console_reload(id, hard);
+        }
         let Some(tab) = self.tabs.get_mut(id) else {
             return Vec::new();
         };
@@ -197,6 +211,9 @@ impl Core {
     /// `stop()` on the active tab.
     pub fn stop(&mut self) -> Vec<Effect> {
         let id = self.tabs.active_id();
+        if self.console_tab() == Some(id) {
+            return self.console_stop(id);
+        }
         let Some(tab) = self.tabs.get_mut(id) else {
             return Vec::new();
         };

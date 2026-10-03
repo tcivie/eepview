@@ -204,6 +204,7 @@ Only the `internal` webview may call these (capability `capabilities/report.json
 ### R9 Architecture rules (`src-tauri/tests/architecture.rs`)
 
 - R9.1 `println!`, `eprintln!`, `print!`, `eprint!`, `dbg!`, `log::`, `tracing::`, `io::stdout` and `io::stderr` appear only under `src/diag/`, in `src/` and in `crates/*/src/`.
+- R9.1a The one output outside `diag::event` is the leak-test trace, `diag::trace`. It prints to stderr only when `EEPVIEW_LOG` is set, never to the log files or a report. See [Leak test](leak-test.md).
 - R9.2 `console.` appears in no `.ts` file under `src/ui/` (tests included).
 - R9.3 No call `diag::event(…)` has a string literal, `format!`, `to_string`, `to_owned` or `String` in its arguments.
 - R9.4 R8.1 to R8.4 hold.
@@ -278,3 +279,4 @@ A site can make the router answer with any status, and it can make any number of
 ## History
 
 - 2026-10-03 — Diagnostics log and report flow — [#56](https://github.com/tcivie/eepview/pull/56)
+- 2026-10-03 — The leak-test trace `diag::trace` (R9.1a) — [#71](https://github.com/tcivie/eepview/pull/71)

@@ -90,22 +90,6 @@ jobs:
           if [ "$RUNNER_OS" = Linux ]; then args+=(--xvfb --strace); fi
           if [ "$RUNNER_OS" = Windows ]; then args[1]=src-tauri/target/release/eepview.exe; fi
           "$py" tests/leak/harness.py "${args[@]}" | tee -a "$GITHUB_STEP_SUMMARY"
-      - name: TEMP repeat on macOS
-        if: always() && runner.os == 'macOS'
-        shell: bash
-        run: |
-          for i in 1 2 3 4 5 6 7 8 9 10; do
-            python3 tests/leak/harness.py --binary src-tauri/target/release/eepview --out leak-rep-$i > leak-rep-$i.txt 2>&1 || true
-          done
-          grep -l FAIL leak-rep-*.txt || true
-      - name: TEMP upload repeats
-        if: always() && runner.os == 'macOS'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: leak-repeat
-          path: |
-            leak-rep-*
-          retention-days: 3
       - name: Upload the leak logs
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

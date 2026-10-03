@@ -4,7 +4,7 @@
 import type { Suggestion, TabInfo } from "../contract.ts";
 import { byId } from "../dom.ts";
 import { call, tell } from "../ipc.ts";
-import { displayUrl, isInternal } from "../lib/address.ts";
+import { addressBadge, displayUrl } from "../lib/address.ts";
 import {
   emptySuggest,
   type KeyOutcome,
@@ -27,7 +27,14 @@ const list = (): HTMLElement => byId("suggestions");
 
 export function showUrl(tab: TabInfo | undefined): void {
   const url = tab?.url ?? "";
-  byId("address-badge").hidden = !tab || isInternal(url);
+  const badge = addressBadge(tab);
+  const el = byId("address-badge");
+  el.hidden = !badge;
+  if (badge) {
+    el.textContent = badge.text;
+    el.title = badge.title;
+    el.dataset.kind = badge.kind;
+  }
   if (!editing) input().value = displayUrl(url);
 }
 

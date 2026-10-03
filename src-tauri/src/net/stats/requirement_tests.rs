@@ -3,7 +3,7 @@
 
 //! Requirement tests for the router statistics from the console
 //! (`docs/wiki/router-console.md`, "Router statistics from the console"): the source order
-//! (R23), the new `RouterStats` fields (R31) and the bandwidth history (R32). They use only
+//! (R31), the new `RouterStats` fields (R39) and the bandwidth history (R40). They use only
 //! the public interface of `net::stats`.
 
 use std::cell::Cell;
@@ -102,19 +102,19 @@ fn times(history: &History) -> Vec<u64> {
     history.samples().iter().map(|s| s.t).collect()
 }
 
-// ---------------------------------------------------------------- R23 pick
+// ---------------------------------------------------------------- R31 pick
 
 #[test]
-fn r23_pick_takes_the_helper_stats_first() {
-    // R23: the router helper is the first source.
+fn r31_pick_takes_the_helper_stats_first() {
+    // R31: the router helper is the first source.
     let (stats, source) = pick(Some(helper_stats()), || Some(console_stats()));
     assert_eq!(stats, helper_stats());
     assert_eq!(source, StatsSource::Helper);
 }
 
 #[test]
-fn r23_pick_does_not_ask_the_console_when_the_helper_answers() {
-    // R23: "When the helper answers, eepview does not ask the console."
+fn r31_pick_does_not_ask_the_console_when_the_helper_answers() {
+    // R31: "When the helper answers, eepview does not ask the console."
     let asked = Cell::new(0);
     let _ = pick(Some(helper_stats()), || {
         asked.set(asked.get() + 1);
@@ -124,8 +124,8 @@ fn r23_pick_does_not_ask_the_console_when_the_helper_answers() {
 }
 
 #[test]
-fn r23_pick_counts_an_all_null_helper_answer_as_an_answer() {
-    // R23: the helper "answers 200 with JSON" is `Some`, even when every field is null.
+fn r31_pick_counts_an_all_null_helper_answer_as_an_answer() {
+    // R31: the helper "answers 200 with JSON" is `Some`, even when every field is null.
     let asked = Cell::new(false);
     let (stats, source) = pick(Some(RouterStats::default()), || {
         asked.set(true);
@@ -137,16 +137,16 @@ fn r23_pick_counts_an_all_null_helper_answer_as_an_answer() {
 }
 
 #[test]
-fn r23_pick_falls_back_to_the_console_when_the_helper_does_not_answer() {
-    // R23 step 2: no helper answer, the console answers.
+fn r31_pick_falls_back_to_the_console_when_the_helper_does_not_answer() {
+    // R31 step 2: no helper answer, the console answers.
     let (stats, source) = pick(None, || Some(console_stats()));
     assert_eq!(stats, console_stats());
     assert_eq!(source, StatsSource::Console);
 }
 
 #[test]
-fn r23_pick_asks_the_console_exactly_once() {
-    // R23: "calls `console` once".
+fn r31_pick_asks_the_console_exactly_once() {
+    // R31: "calls `console` once".
     let asked = Cell::new(0);
     let _ = pick(None, || {
         asked.set(asked.get() + 1);
@@ -156,8 +156,8 @@ fn r23_pick_asks_the_console_exactly_once() {
 }
 
 #[test]
-fn r23_pick_gives_all_null_stats_when_no_source_answers() {
-    // R23 step 3: "else no source: every field is `null`".
+fn r31_pick_gives_all_null_stats_when_no_source_answers() {
+    // R31 step 3: "else no source: every field is `null`".
     let asked = Cell::new(0);
     let (stats, source) = pick(None, || {
         asked.set(asked.get() + 1);
@@ -173,8 +173,8 @@ fn r23_pick_gives_all_null_stats_when_no_source_answers() {
 }
 
 #[test]
-fn r23_pick_never_mixes_fields_of_two_sources() {
-    // R23: the figures come from the first source that answers, whole.
+fn r31_pick_never_mixes_fields_of_two_sources() {
+    // R31: the figures come from the first source that answers, whole.
     let (stats, _) = pick(Some(helper_stats()), || Some(console_stats()));
     assert_eq!(
         stats.floodfills, None,
@@ -183,11 +183,11 @@ fn r23_pick_never_mixes_fields_of_two_sources() {
     assert_eq!(stats.uptime_resolution_ms, Some(1));
 }
 
-// ---------------------------------------------------------------- R31 contract shape
+// ---------------------------------------------------------------- R39 contract shape
 
 #[test]
-fn r31_default_stats_serialize_to_the_contract_v1_6_shape() {
-    // R31, IPC contract v1.6: every field null, with the new keys in camelCase.
+fn r39_default_stats_serialize_to_the_contract_v1_6_shape() {
+    // R39, IPC contract v1.7: every field null, with the new keys in camelCase.
     let value = serde_json::to_value(RouterStats::default()).unwrap();
     assert_eq!(
         value,
@@ -215,8 +215,8 @@ fn r31_default_stats_serialize_to_the_contract_v1_6_shape() {
 }
 
 #[test]
-fn r31_new_fields_serialize_with_their_values() {
-    // R31: uptimeResolutionMs, floodfills, tunnels.client, tunnels.exploratory and
+fn r39_new_fields_serialize_with_their_values() {
+    // R39: uptimeResolutionMs, floodfills, tunnels.client, tunnels.exploratory and
     // tunnelBuildSuccessPercent.total.
     let mut stats = console_stats();
     stats.tunnel_build_success_percent.total = Some(42);
@@ -228,17 +228,17 @@ fn r31_new_fields_serialize_with_their_values() {
     assert_eq!(value["tunnelBuildSuccessPercent"]["total"], json!(42));
 }
 
-// ---------------------------------------------------------------- R32 record_spaced
+// ---------------------------------------------------------------- R40 record_spaced
 
 #[test]
-fn r32_the_min_sample_gap_is_four_seconds() {
-    // R32: "less than 4 s old".
+fn r40_the_min_sample_gap_is_four_seconds() {
+    // R40: "less than 4 s old".
     assert_eq!(MIN_SAMPLE_GAP_MS, 4_000);
 }
 
 #[test]
-fn r32_record_spaced_adds_the_first_sample_to_an_empty_history() {
-    // R32: "like `record`" when there is no newest sample.
+fn r40_record_spaced_adds_the_first_sample_to_an_empty_history() {
+    // R40: "like `record`" when there is no newest sample.
     let stats = with_bandwidth(1_000, 2_000);
     let mut history = History::default();
     history.record_spaced(10_000, &stats);
@@ -246,8 +246,8 @@ fn r32_record_spaced_adds_the_first_sample_to_an_empty_history() {
 }
 
 #[test]
-fn r32_record_spaced_drops_a_sample_closer_than_the_gap() {
-    // R32: no sample when the newest one is less than MIN_SAMPLE_GAP_MS older than `now`.
+fn r40_record_spaced_drops_a_sample_closer_than_the_gap() {
+    // R40: no sample when the newest one is less than MIN_SAMPLE_GAP_MS older than `now`.
     let stats = with_bandwidth(1_000, 2_000);
     let mut history = History::default();
     history.record_spaced(10_000, &stats);
@@ -256,8 +256,8 @@ fn r32_record_spaced_drops_a_sample_closer_than_the_gap() {
 }
 
 #[test]
-fn r32_record_spaced_drops_a_sample_at_the_same_instant() {
-    // R32: the panel and the Network page asking in the same millisecond add one sample.
+fn r40_record_spaced_drops_a_sample_at_the_same_instant() {
+    // R40: the panel and the Network page asking in the same millisecond add one sample.
     let mut history = History::default();
     history.record_spaced(10_000, &with_bandwidth(1, 2));
     history.record_spaced(10_000, &with_bandwidth(3, 4));
@@ -265,8 +265,8 @@ fn r32_record_spaced_drops_a_sample_at_the_same_instant() {
 }
 
 #[test]
-fn r32_record_spaced_keeps_the_first_of_two_close_samples() {
-    // R32: the dropped sample changes nothing, so the kept one holds the first values.
+fn r40_record_spaced_keeps_the_first_of_two_close_samples() {
+    // R40: the dropped sample changes nothing, so the kept one holds the first values.
     let first = with_bandwidth(1_000, 2_000);
     let mut history = History::default();
     history.record_spaced(10_000, &first);
@@ -275,8 +275,8 @@ fn r32_record_spaced_keeps_the_first_of_two_close_samples() {
 }
 
 #[test]
-fn r32_record_spaced_adds_a_sample_at_exactly_the_gap() {
-    // R32: "less than 4 s old" drops; exactly 4 s adds.
+fn r40_record_spaced_adds_a_sample_at_exactly_the_gap() {
+    // R40: "less than 4 s old" drops; exactly 4 s adds.
     let mut history = History::default();
     history.record_spaced(10_000, &with_bandwidth(1, 2));
     history.record_spaced(10_000 + MIN_SAMPLE_GAP_MS, &with_bandwidth(3, 4));
@@ -284,8 +284,8 @@ fn r32_record_spaced_adds_a_sample_at_exactly_the_gap() {
 }
 
 #[test]
-fn r32_record_spaced_measures_the_gap_from_the_newest_kept_sample() {
-    // R32: a dropped sample does not move the reference point.
+fn r40_record_spaced_measures_the_gap_from_the_newest_kept_sample() {
+    // R40: a dropped sample does not move the reference point.
     let mut history = History::default();
     let gap = MIN_SAMPLE_GAP_MS;
     history.record_spaced(10_000, &with_bandwidth(1, 1));
@@ -300,8 +300,8 @@ fn r32_record_spaced_measures_the_gap_from_the_newest_kept_sample() {
 }
 
 #[test]
-fn r32_the_panel_and_the_network_page_together_add_one_sample_per_five_seconds() {
-    // R32: two pages ask every 5 s, offset by 1 s; the history gets one sample per 5 s.
+fn r40_the_panel_and_the_network_page_together_add_one_sample_per_five_seconds() {
+    // R40: two pages ask every 5 s, offset by 1 s; the history gets one sample per 5 s.
     let mut history = History::default();
     for tick in 0..6_u64 {
         let base = 100_000 + tick * 5_000;
@@ -313,8 +313,8 @@ fn r32_the_panel_and_the_network_page_together_add_one_sample_per_five_seconds()
 }
 
 #[test]
-fn r32_record_spaced_stores_the_same_sample_as_record() {
-    // R32: "like `record`": the sample values are the ones `record` stores.
+fn r40_record_spaced_stores_the_same_sample_as_record() {
+    // R40: "like `record`": the sample values are the ones `record` stores.
     let stats = with_bandwidth(53_910, 37_370);
     let mut history = History::default();
     history.record_spaced(50_000, &stats);

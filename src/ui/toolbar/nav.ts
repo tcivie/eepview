@@ -31,14 +31,14 @@ function renderStar(tab: TabInfo | undefined): void {
   const star = byId<HTMLButtonElement>("star");
   const saved = tab?.bookmarked ?? false;
   star.setAttribute("aria-pressed", String(saved));
-  star.disabled = !tab || tab.kind === "internal";
+  star.disabled = tab?.kind !== "web";
   setLabel(star, "star-label", saved ? "Remove bookmark" : "Bookmark this page");
 }
 
 function renderJs(tab: TabInfo | undefined): void {
   const js = byId<HTMLButtonElement>("js");
   js.setAttribute("aria-pressed", String(tab?.jsOn ?? false));
-  js.disabled = !tab || tab.kind === "internal";
+  js.disabled = tab?.kind !== "web";
   const label = jsToggleLabel(tab?.jsOn ?? false, tab ? hostOf(tab.url) : "");
   js.title = label;
   js.setAttribute("aria-label", label);

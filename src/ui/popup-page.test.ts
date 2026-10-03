@@ -17,7 +17,7 @@ const ITEMS = [
   { url: "http://c.i2p/", title: "C", source: "history" },
 ];
 const STATUS = { state: "ok", proxy: "127.0.0.1:4444", version: "2.0", detail: null };
-// The router_stats answer in the IPC contract v1.6 shape (docs/wiki/ipc-contract.md).
+// The router_stats answer in the IPC contract v1.7 shape (docs/wiki/ipc-contract.md).
 const STATS = {
   version: "2.0",
   uptimeMs: 60_000,

@@ -102,12 +102,23 @@ impl Tabs {
 
     /// Closes a tab. Closing the last tab opens `home`. Returns the closed tab.
     pub fn close(&mut self, id: u32, home: &str) -> Option<Tab> {
+        self.remove(id, home, true)
+    }
+
+    /// Like [`Tabs::close`], but "reopen closed tab" does not remember the tab.
+    pub fn close_forgotten(&mut self, id: u32, home: &str) -> Option<Tab> {
+        self.remove(id, home, false)
+    }
+
+    fn remove(&mut self, id: u32, home: &str, remember: bool) -> Option<Tab> {
         let index = self.index_of(id)?;
         let tab = self.list.remove(index);
-        self.closed.push(Closed {
-            url: tab.url.clone(),
-            index,
-        });
+        if remember {
+            self.closed.push(Closed {
+                url: tab.url.clone(),
+                index,
+            });
+        }
         if self.closed.len() > MAX_CLOSED {
             self.closed.remove(0);
         }
@@ -117,6 +128,16 @@ impl Tabs {
             self.active = self.list[index.min(self.list.len() - 1)].id;
         }
         Some(tab)
+    }
+
+    /// Puts a fresh tab showing `url` in the place of tab `id`, with the same id: a new
+    /// back/forward list and no live webview. False when it does not exist.
+    pub fn reset(&mut self, id: u32, url: &str) -> bool {
+        let Some(tab) = self.get_mut(id) else {
+            return false;
+        };
+        *tab = Tab::new(id, url);
+        true
     }
 
     /// Makes a tab active. False when it does not exist.

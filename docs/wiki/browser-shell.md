@@ -88,7 +88,7 @@ The `popup` webview may call: `popup_size`, `popup_close`, `navigate`, `tab_new`
 
 ## Router console
 
-eepview shows router information but never changes the router configuration. It finds the console of the router in use (Java I2P or i2pd) on loopback and gives quick links to it: Console, Tunnels, Address book, Config and Logs. The links show in the router panel, on the home page and in Settings. A link opens the router's own page in a separate `Router console` window. With no console, one line says "No router console found". Details: [Router console](router-console.md).
+eepview shows router information but never changes the router configuration. It finds the console of the router in use (Java I2P or i2pd) on loopback and gives one link to it, "I2P Router Console". The link shows in the router panel, on the home page and in Settings. It opens the console home page in the console tab. The console tab is a tab of its own kind in the tab strip, and it shows the `console` webview in the content area. There is at most one console tab. Back, forward, reload and stop work in it. The address bar shows the console URL with a `Router console` badge. With no console, one line says "No router console found". Details: [Router console](router-console.md).
 
 ## How to use / run locally
 
@@ -112,3 +112,4 @@ eepview shows router information but never changes the router configuration. It 
 - 2026-10-03 — Toolbar popups in their own `popup` webview; the toolbar stays 84 px — [#55](https://github.com/tcivie/eepview/pull/55)
 - 2026-10-03 — Router console quick links and the console window — [#54](https://github.com/tcivie/eepview/pull/54)
 - 2026-10-03 — The address bar refuses a dot host with a port instead of panicking; the gatekeeper refuses a bare CR or LF in a head — [#69](https://github.com/tcivie/eepview/pull/69)
+- 2026-10-03 — The router console opens in a console tab, with one console link — [#76](https://github.com/tcivie/eepview/pull/76)

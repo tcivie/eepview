@@ -1,7 +1,8 @@
 # SPDX-FileCopyrightText: 2026 The eepview contributors
 # SPDX-License-Identifier: MIT
 
-"""Unit tests for the pure parts of the leak harness: host rules and the strace parser.
+"""Unit tests for the pure parts of the leak harness: host rules, the strace parser, the
+script rows of the verdict, the WebRTC candidate rule and the frame-wait budget.
 
 Run with: python3 -m unittest discover -s tests/leak
 """
@@ -12,8 +13,15 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from servers import is_i2p, normalize_host
-from verdict import REAL_IP_CANDIDATE, is_loopback, parse_strace, strace_row
+from harness import frame_wait_ms
+from servers import EventLog, is_i2p, normalize_host
+from verdict import (
+    REAL_IP_CANDIDATE,
+    is_loopback,
+    parse_strace,
+    script_rows,
+    strace_row,
+)
 
 GATE = '1 listen(7, 1024) = 0\n1 getsockname(7, {sa_family=AF_INET, sin_port=htons(41000), sin_addr=inet_addr("127.0.0.1")}, [16]) = 0\n'
 
@@ -88,6 +96,30 @@ class Strace(unittest.TestCase):
             self.assertTrue(is_loopback(address), address)
         for address in ("10.0.0.1", "::ffff:10.0.0.1", "192.168.1.5", "fe80::1"):
             self.assertFalse(is_loopback(address), address)
+
+
+class ScriptRows(unittest.TestCase):
+    def test_the_page_must_wait_for_the_frame_signal(self) -> None:
+        def row(waited: str | None) -> tuple:
+            log = EventLog()
+            log.run = "default"
+            if waited:
+                log.add("report", host="leaktest.i2p", k="frame_wait", v=waited)
+            rows = script_rows(log, "default")
+            return next(r for r in rows if r[0].startswith("frame probes"))
+
+        self.assertEqual(row("done")[1], "pass")
+        self.assertEqual(row("timeout")[1], "FAIL")
+        self.assertEqual(row(None)[1], "FAIL")
+
+
+class FrameWait(unittest.TestCase):
+    def test_the_frame_wait_leaves_the_rest_of_the_exit_budget(self) -> None:
+        self.assertEqual(frame_wait_ms(30), 15000)
+        self.assertEqual(frame_wait_ms(60), 45000)
+
+    def test_a_short_budget_still_waits_one_second(self) -> None:
+        self.assertEqual(frame_wait_ms(5), 1000)
 
 
 class StraceFixes(unittest.TestCase):

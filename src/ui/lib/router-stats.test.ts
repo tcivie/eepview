@@ -1,8 +1,8 @@
 // SPDX-FileCopyrightText: 2026 The eepview contributors
 // SPDX-License-Identifier: MIT
 
-// Requirement tests for R33 of the router console wiki page ("The UI reads the contract
-// shape"): `statsView` turns the `RouterStats` of the IPC contract v1.6 into the view that
+// Requirement tests for R41 of the router console wiki page ("The UI reads the contract
+// shape"): `statsView` turns the `RouterStats` of the IPC contract v1.7 into the view that
 // the router panel and the Network page show.
 
 import assert from "node:assert/strict";
@@ -31,7 +31,7 @@ const NULL_VIEW: StatsView = {
   floodfills: null,
 };
 
-/** A contract v1.6 answer with every field null and no history. */
+/** A contract v1.7 answer with every field null and no history. */
 const emptyStats = (): RouterStats => ({
   version: null,
   uptimeMs: null,
@@ -87,52 +87,52 @@ const FULL_VIEW: StatsView = {
   floodfills: 812,
 };
 
-describe("[R33] statsView maps the contract shape to the view", () => {
-  it("[R33] gives every view field from its RouterStats field", () => {
+describe("[R41] statsView maps the contract shape to the view", () => {
+  it("[R41] gives every view field from its RouterStats field", () => {
     assert.deepEqual(statsView(FULL), FULL_VIEW);
   });
 
-  it("[R33] shows the shortest bandwidth window, in1s and out1s, not the 5 minute one", () => {
+  it("[R41] shows the shortest bandwidth window, in1s and out1s, not the 5 minute one", () => {
     const view = statsView(FULL);
     assert.equal(view.bandwidthInBps, 12_636);
     assert.equal(view.bandwidthOutBps, 5806);
   });
 
-  it("[R33] gives the routerKind and the javaVersion as null", () => {
+  it("[R41] gives the routerKind and the javaVersion as null", () => {
     const view = statsView(FULL);
     assert.equal(view.routerKind, null);
     assert.equal(view.javaVersion, null);
   });
 
-  it("[R33] the history step is 5 seconds", () => {
+  it("[R41] the history step is 5 seconds", () => {
     assert.equal(HISTORY_STEP_SECONDS, 5);
     assert.equal(statsView(FULL).history?.stepSeconds, 5);
   });
 });
 
-describe("[R33] statsView with a missing input", () => {
-  it("[R33] a null input gives a view with every field null", () => {
+describe("[R41] statsView with a missing input", () => {
+  it("[R41] a null input gives a view with every field null", () => {
     assert.deepEqual(statsView(null), NULL_VIEW);
   });
 
-  it("[R33] an undefined input gives a view with every field null", () => {
+  it("[R41] an undefined input gives a view with every field null", () => {
     assert.deepEqual(statsView(undefined), NULL_VIEW);
   });
 
-  it("[R33] an answer with every field null gives a view with every field null", () => {
+  it("[R41] an answer with every field null gives a view with every field null", () => {
     assert.deepEqual(statsView(emptyStats()), NULL_VIEW);
   });
 });
 
-describe("[R33] statsView uptime", () => {
-  it("[R33] uptimeSeconds is floor(uptimeMs / 1000)", () => {
+describe("[R41] statsView uptime", () => {
+  it("[R41] uptimeSeconds is floor(uptimeMs / 1000)", () => {
     assert.equal(statsView(stats({ uptimeMs: 28_800_999 })).uptimeSeconds, 28_800);
     assert.equal(statsView(stats({ uptimeMs: 999 })).uptimeSeconds, 0);
     assert.equal(statsView(stats({ uptimeMs: 0 })).uptimeSeconds, 0);
     assert.equal(statsView(stats({ uptimeMs: null })).uptimeSeconds, null);
   });
 
-  it("[R33] uptimeResolutionSeconds is max(1, floor(uptimeResolutionMs / 1000))", () => {
+  it("[R41] uptimeResolutionSeconds is max(1, floor(uptimeResolutionMs / 1000))", () => {
     const resolution = (ms: number | null): number | null =>
       statsView(stats({ uptimeResolutionMs: ms })).uptimeResolutionSeconds;
     assert.equal(resolution(3_600_000), 3600);
@@ -142,7 +142,7 @@ describe("[R33] statsView uptime", () => {
     assert.equal(resolution(1000), 1);
   });
 
-  it("[R33] a resolution under one second is at least 1 second", () => {
+  it("[R41] a resolution under one second is at least 1 second", () => {
     const resolution = (ms: number): number | null =>
       statsView(stats({ uptimeResolutionMs: ms })).uptimeResolutionSeconds;
     assert.equal(resolution(1), 1);
@@ -150,36 +150,36 @@ describe("[R33] statsView uptime", () => {
     assert.equal(resolution(0), 1);
   });
 
-  it("[R33] a null uptimeResolutionMs gives a null uptimeResolutionSeconds", () => {
+  it("[R41] a null uptimeResolutionMs gives a null uptimeResolutionSeconds", () => {
     assert.equal(statsView(stats({ uptimeResolutionMs: null })).uptimeResolutionSeconds, null);
   });
 });
 
-describe("[R33] statsView build success", () => {
+describe("[R41] statsView build success", () => {
   const rate = (build: RouterStats["tunnelBuildSuccessPercent"]): number | null =>
     statsView(stats({ tunnelBuildSuccessPercent: build })).buildSuccessRate;
 
-  it("[R33] is total / 100 when total is set", () => {
+  it("[R41] is total / 100 when total is set", () => {
     assert.equal(rate({ exploratory: 10, client: 20, total: 42 }), 0.42);
     assert.equal(rate({ exploratory: null, client: null, total: 100 }), 1);
   });
 
-  it("[R33] is exploratory / 100 when total is null", () => {
+  it("[R41] is exploratory / 100 when total is null", () => {
     assert.equal(rate({ exploratory: 87, client: 20, total: null }), 0.87);
   });
 
-  it("[R33] is null when total and exploratory are both null, even with client set", () => {
+  it("[R41] is null when total and exploratory are both null, even with client set", () => {
     assert.equal(rate({ exploratory: null, client: 50, total: null }), null);
     assert.equal(rate({ exploratory: null, client: null, total: null }), null);
   });
 
-  it("[R33] a total of 0 is a rate of 0, not a missing figure", () => {
+  it("[R41] a total of 0 is a rate of 0, not a missing figure", () => {
     assert.equal(rate({ exploratory: 90, client: 90, total: 0 }), 0);
   });
 });
 
-describe("[R33] statsView tunnels and counts", () => {
-  it("[R33] maps tunnels.in, out, participating, client and exploratory", () => {
+describe("[R41] statsView tunnels and counts", () => {
+  it("[R41] maps tunnels.in, out, participating, client and exploratory", () => {
     const view = statsView(
       stats({ tunnels: { in: 1, out: 2, participating: 3, client: 4, exploratory: 5 } }),
     );
@@ -190,7 +190,7 @@ describe("[R33] statsView tunnels and counts", () => {
     assert.equal(view.exploratoryTunnels, 5);
   });
 
-  it("[R33] keeps a null tunnel count null and a zero count zero", () => {
+  it("[R41] keeps a null tunnel count null and a zero count zero", () => {
     const view = statsView(
       stats({ tunnels: { in: null, out: 0, participating: 0, client: null, exploratory: 0 } }),
     );
@@ -202,8 +202,8 @@ describe("[R33] statsView tunnels and counts", () => {
   });
 });
 
-describe("[R33] statsView counts and status", () => {
-  it("[R33] maps networkStatus, activePeers, knownRouters, floodfills and version", () => {
+describe("[R41] statsView counts and status", () => {
+  it("[R41] maps networkStatus, activePeers, knownRouters, floodfills and version", () => {
     const view = statsView(
       stats({
         networkStatus: "FIREWALLED",
@@ -220,7 +220,7 @@ describe("[R33] statsView counts and status", () => {
     assert.equal(view.routerVersion, "2.10.0");
   });
 
-  it("[R33] keeps a zero bandwidth, which is a figure and not a missing one", () => {
+  it("[R41] keeps a zero bandwidth, which is a figure and not a missing one", () => {
     const view = statsView(
       stats({ bandwidthBytesPerSecond: { in1s: 0, out1s: 0, in5m: null, out5m: null } }),
     );
@@ -229,12 +229,12 @@ describe("[R33] statsView counts and status", () => {
   });
 });
 
-describe("[R33] statsView history", () => {
-  it("[R33] an empty history gives a null history", () => {
+describe("[R41] statsView history", () => {
+  it("[R41] an empty history gives a null history", () => {
     assert.equal(statsView(stats({ history: [] })).history, null);
   });
 
-  it("[R33] a history gives its in and out values, oldest first, in steps of 5 seconds", () => {
+  it("[R41] a history gives its in and out values, oldest first, in steps of 5 seconds", () => {
     const view = statsView(
       stats({
         history: [
@@ -246,7 +246,7 @@ describe("[R33] statsView history", () => {
     assert.deepEqual(view.history, { stepSeconds: 5, inBps: [1, 2], outBps: [9, 8] });
   });
 
-  it("[R33] a single sample is a history", () => {
+  it("[R41] a single sample is a history", () => {
     const view = statsView(stats({ history: [{ t: 1, in: 5, out: 6 }] }));
     assert.deepEqual(view.history, { stepSeconds: 5, inBps: [5], outBps: [6] });
   });
@@ -266,58 +266,58 @@ const historyOf = (times: number[]): StatsView["history"] => ({
   outBps: times.map((t) => t / 1000 + 1),
 });
 
-describe("[R33] statsView history run", () => {
-  it("[R33] a gap above 10 000 ms ends the run: only the samples after it are kept", () => {
+describe("[R41] statsView history run", () => {
+  it("[R41] a gap above 10 000 ms ends the run: only the samples after it are kept", () => {
     assert.deepEqual(runOf([0, 5000, 10_000, 20_001, 25_001]), historyOf([20_001, 25_001]));
   });
 
-  it("[R33] a gap of 10 001 ms ends the run, a gap of 10 000 ms does not", () => {
+  it("[R41] a gap of 10 001 ms ends the run, a gap of 10 000 ms does not", () => {
     assert.deepEqual(runOf([0, 10_001]), historyOf([10_001]));
     assert.deepEqual(runOf([0, 10_000]), historyOf([0, 10_000]));
   });
 
-  it("[R33] a gap of exactly 10 000 ms stays in the run", () => {
+  it("[R41] a gap of exactly 10 000 ms stays in the run", () => {
     assert.deepEqual(runOf([0, 10_000, 20_000, 30_000]), historyOf([0, 10_000, 20_000, 30_000]));
   });
 
-  it("[R33] a gap just under 10 000 ms stays in the run", () => {
+  it("[R41] a gap just under 10 000 ms stays in the run", () => {
     assert.deepEqual(runOf([0, 9999]), historyOf([0, 9999]));
   });
 
-  it("[R33] keeps only the last run when there are several gaps", () => {
+  it("[R41] keeps only the last run when there are several gaps", () => {
     const times = [0, 5000, 20_000, 25_000, 40_000, 45_000, 50_000];
     assert.deepEqual(runOf(times), historyOf([40_000, 45_000, 50_000]));
   });
 
-  it("[R33] a gap before the newest sample leaves that one sample as the run", () => {
+  it("[R41] a gap before the newest sample leaves that one sample as the run", () => {
     assert.deepEqual(runOf([0, 5000, 10_000, 30_000]), historyOf([30_000]));
   });
 });
 
-describe("[R33] statsView history run edge cases", () => {
-  it("[R33] a single sample is a run", () => {
+describe("[R41] statsView history run edge cases", () => {
+  it("[R41] a single sample is a run", () => {
     assert.deepEqual(runOf([7000]), historyOf([7000]));
   });
 
-  it("[R33] an empty history gives a null history", () => {
+  it("[R41] an empty history gives a null history", () => {
     assert.equal(runOf([]), null);
   });
 
-  it("[R33] a history with no gap is kept whole, oldest first", () => {
+  it("[R41] a history with no gap is kept whole, oldest first", () => {
     const times = [1000, 6000, 11_000, 16_000, 21_000];
     assert.deepEqual(runOf(times), historyOf(times));
   });
 });
 
-describe("[R33] statsView history run keeps samples as they are", () => {
-  it("[R33] never adds, repeats or interpolates a sample", () => {
+describe("[R41] statsView history run keeps samples as they are", () => {
+  it("[R41] never adds, repeats or interpolates a sample", () => {
     const view = runOf([0, 5000, 25_000, 30_000]);
     assert.deepEqual(view, historyOf([25_000, 30_000]));
     assert.equal(view?.inBps.length, 2);
     assert.equal(view?.outBps.length, 2);
   });
 
-  it("[R33] keeps the in and out of each kept sample unchanged", () => {
+  it("[R41] keeps the in and out of each kept sample unchanged", () => {
     const history: Sample[] = [
       { t: 0, in: 1, out: 2 },
       { t: 30_000, in: 33, out: 44 },
@@ -327,7 +327,7 @@ describe("[R33] statsView history run keeps samples as they are", () => {
     assert.deepEqual(view, { stepSeconds: 5, inBps: [33, 0], outBps: [44, 0] });
   });
 
-  it("[R33] the run rule uses the time of the samples, not their number", () => {
+  it("[R41] the run rule uses the time of the samples, not their number", () => {
     const times = [0, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10_000, 11_000];
     assert.deepEqual(runOf(times), historyOf(times));
   });

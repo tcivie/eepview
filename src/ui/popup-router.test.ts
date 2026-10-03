@@ -16,7 +16,7 @@ const history = [
   { t: 11_000, in: 250, out: 70 },
   { t: 16_000, in: 900, out: 80 },
 ];
-// The router_stats answer in the IPC contract v1.6 shape (docs/wiki/ipc-contract.md).
+// The router_stats answer in the IPC contract v1.7 shape (docs/wiki/ipc-contract.md).
 const FULL = {
   version: "2.50.1",
   uptimeMs: 3_700_000,
@@ -124,7 +124,7 @@ describe("the router panel: more figures", () => {
     assert.equal(text("rp-build"), "50.0%");
   });
 
-  it("[R35] shows client and exploratory tunnels when the router gives no in and out split", async () => {
+  it("[R43] shows client and exploratory tunnels when the router gives no in and out split", async () => {
     const tunnels = { in: null, out: null, participating: 5, client: 2, exploratory: 6 };
     await showPanel(status, { ...FULL, tunnels });
     const line = text("rp-tunnels");
@@ -134,7 +134,7 @@ describe("the router panel: more figures", () => {
     assert.ok(!line.includes(" in "), line);
   });
 
-  it('[R34] shows an uptime of 8 hours with a resolution of 1 hour as "8 h"', async () => {
+  it('[R42] shows an uptime of 8 hours with a resolution of 1 hour as "8 h"', async () => {
     await showPanel(status, { ...FULL, uptimeMs: 28_800_000, uptimeResolutionMs: 3_600_000 });
     assert.equal(text("rp-uptime"), "8 h");
   });

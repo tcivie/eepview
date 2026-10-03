@@ -7,7 +7,7 @@ export type TabInfo = {
   id: number;
   url: string;
   title: string;
-  kind: "internal" | "web";
+  kind: "internal" | "web" | "console";
   loading: boolean;
   canBack: boolean;
   canForward: boolean;
@@ -109,16 +109,14 @@ export type RouterStats = {
   };
   history: BandwidthSample[];
 };
-export type ConsolePage = "home" | "tunnels" | "addressbook" | "config" | "logs";
 export type ConsoleKind = "java" | "i2pd";
 export type ConsoleInfo = {
   found: boolean;
   kind: ConsoleKind | null;
   origin: string | null;
-  pages: ConsolePage[];
   version: string | null;
 };
-export type ConsoleOpenResult = { ok: boolean; reason?: "no-console" | "no-page" | null };
+export type ConsoleOpenResult = { ok: boolean; reason?: "no-console" | null };
 export type ClearRange = "hour" | "day" | "week" | "all";
 export type FindResult = { query: string; matches: number | null; active: number | null };
 export type Toast = { kind: string; text: string };
@@ -166,7 +164,7 @@ export interface Commands {
   router_control: { args: { action: RouterAction }; result: undefined };
   console_status: { args: Record<string, never>; result: ConsoleInfo };
   console_detect: { args: Record<string, never>; result: ConsoleInfo };
-  console_open: { args: { page: ConsolePage }; result: ConsoleOpenResult };
+  console_open: { args: Record<string, never>; result: ConsoleOpenResult };
   connection_pause: { args: Record<string, never>; result: undefined };
   connection_resume: { args: Record<string, never>; result: undefined };
   chrome_set_height: { args: { px: number }; result: undefined };

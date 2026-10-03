@@ -28,7 +28,7 @@ use super::apply::{self, with_core};
 use super::state::{lock, now_ms, shared};
 use super::webrtc::webrtc_off;
 use crate::core::{Core, Load};
-use crate::diag::{self, Code, ErrorKind, Field, OpKind};
+use crate::diag::{self, Code, ErrorKind, Field, OpKind, trace};
 use crate::layout::Rect;
 use crate::nav;
 use crate::net::gatekeeper::Gatekeeper;
@@ -120,24 +120,38 @@ fn load_after_rules<R: Runtime>(
     Box::new(move |result| match result {
         // Linux, Windows and a cached macOS rule list call this inside `with_webview`.
         Ok(()) => apply::outside(move || {
-            if let Err(e) = webview.navigate(url) {
-                diag::event(
-                    Code::EngineCallFailed,
-                    &[
-                        Field::Op(OpKind::FirstLoad),
-                        Field::Error(ErrorKind::from(&e)),
-                    ],
-                );
-            }
+            trace::load(&format!("{} navigate {url}", webview.label()));
+            let sent = webview.navigate(url);
+            first_load_sent(webview.label(), sent);
         }),
-        Err(_) => diag::event(
-            Code::EngineCallFailed,
-            &[
-                Field::Op(OpKind::EngineFilter),
-                Field::Error(ErrorKind::Platform),
-            ],
-        ),
+        Err(e) => {
+            trace::load(&format!("engine filter failed, page not loaded: {e}"));
+            diag::event(
+                Code::EngineCallFailed,
+                &[
+                    Field::Op(OpKind::EngineFilter),
+                    Field::Error(ErrorKind::Platform),
+                ],
+            );
+        }
     })
+}
+
+/// The outcome of the first load call of the tab webview `label`.
+fn first_load_sent(label: &str, sent: tauri::Result<()>) {
+    match sent {
+        Ok(()) => trace::load(&format!("{label} navigate returned")),
+        Err(e) => {
+            trace::load(&format!("{label} navigate failed: {e}"));
+            diag::event(
+                Code::EngineCallFailed,
+                &[
+                    Field::Op(OpKind::FirstLoad),
+                    Field::Error(ErrorKind::from(&e)),
+                ],
+            );
+        }
+    }
 }
 
 /// Windows: the proxy in the browser arguments, and a data folder of its own, so the

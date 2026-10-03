@@ -6,113 +6,80 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, sep } from "node:path";
 import { describe, it } from "node:test";
 import {
-  CONSOLE_PAGE_LABELS,
-  CONSOLE_PAGE_ORDER,
-  consoleLinks,
+  CONSOLE_LINK_TEXT,
+  consoleLink,
   NO_CONSOLE_TEXT,
   routerVersion,
   shouldRedetect,
 } from "./console-links.ts";
 
-type Page = "home" | "tunnels" | "addressbook" | "config" | "logs";
 interface Info {
   found: boolean;
   kind: "java" | "i2pd" | null;
   origin: string | null;
-  pages: Page[];
   version: string | null;
 }
 
-const NONE: Info = { found: false, kind: null, origin: null, pages: [], version: null };
+const NONE: Info = { found: false, kind: null, origin: null, version: null };
 const JAVA: Info = {
   found: true,
   kind: "java",
   origin: "http://127.0.0.1:7657",
-  pages: ["home", "tunnels", "addressbook", "config", "logs"],
   version: "2.13.0",
 };
 const I2PD: Info = {
   found: true,
   kind: "i2pd",
   origin: "http://127.0.0.1:7070",
-  pages: ["home", "tunnels", "config"],
   version: null,
 };
-
-const labels = (info: Info | null | undefined): string[] =>
-  consoleLinks(info).links.map((l) => l.label);
-const pages = (info: Info | null | undefined): string[] =>
-  consoleLinks(info).links.map((l) => l.page);
-
-describe("R7 page order and labels", () => {
-  it("R7: the order is Console, Tunnels, Address book, Config, Logs", () => {
-    assert.deepEqual([...CONSOLE_PAGE_ORDER], ["home", "tunnels", "addressbook", "config", "logs"]);
-  });
-
-  it("R7: the labels are the table labels", () => {
-    assert.deepEqual(CONSOLE_PAGE_LABELS, {
-      home: "Console",
-      tunnels: "Tunnels",
-      addressbook: "Address book",
-      config: "Config",
-      logs: "Logs",
-    });
-  });
-});
 
 describe("R15 no console", () => {
   it("R15: the text is 'No router console found'", () => {
     assert.equal(NO_CONSOLE_TEXT, "No router console found");
   });
 
-  it("R15: with no console no link shows and one line says so", () => {
+  it("R15: with no console the link is hidden and one line says so", () => {
     for (const info of [NONE, null, undefined]) {
-      const view = consoleLinks(info);
+      const view = consoleLink(info);
       assert.equal(view.found, false);
-      assert.deepEqual(view.links, []);
+      assert.equal(view.label, null, "no link text when there is no console");
       assert.equal(view.note, "No router console found");
       assert.equal(view.title, null);
     }
   });
-
-  it("R15: found false hides the links even when pages are listed", () => {
-    const view = consoleLinks({ ...NONE, pages: ["home", "config"] });
-    assert.deepEqual(view.links, []);
-    assert.equal(view.note, NO_CONSOLE_TEXT);
-  });
 });
 
-describe("R15 links of the detected router", () => {
-  it("R15: Java I2P shows all five links in order", () => {
-    const view = consoleLinks(JAVA);
+describe("R15 the one link of the detected router", () => {
+  it("R15: the link text is 'I2P Router Console'", () => {
+    assert.equal(CONSOLE_LINK_TEXT, "I2P Router Console");
+  });
+
+  it("R15: Java I2P shows the one link", () => {
+    const view = consoleLink(JAVA);
     assert.equal(view.found, true);
     assert.equal(view.note, null);
     assert.equal(view.title, "Java I2P console");
-    assert.deepEqual(pages(JAVA), ["home", "tunnels", "addressbook", "config", "logs"]);
-    assert.deepEqual(labels(JAVA), ["Console", "Tunnels", "Address book", "Config", "Logs"]);
+    assert.equal(view.label, CONSOLE_LINK_TEXT);
   });
 
-  it("R7: i2pd has no address book and no logs link", () => {
-    const view = consoleLinks(I2PD);
-    assert.equal(view.title, "i2pd web console");
+  it("R15: i2pd shows the same one link", () => {
+    const view = consoleLink(I2PD);
+    assert.equal(view.found, true);
     assert.equal(view.note, null);
-    assert.deepEqual(labels(I2PD), ["Console", "Tunnels", "Config"]);
+    assert.equal(view.title, "i2pd web console");
+    assert.equal(view.label, CONSOLE_LINK_TEXT);
   });
 
-  it("R15: the links follow the R7 order whatever the order of the pages", () => {
-    const shuffled: Info = { ...JAVA, pages: ["logs", "config", "home", "addressbook", "tunnels"] };
-    assert.deepEqual(pages(shuffled), ["home", "tunnels", "addressbook", "config", "logs"]);
-  });
-
-  it("R7: a page that the info does not list is not shown", () => {
-    const some: Info = { ...JAVA, pages: ["config", "home"] };
-    assert.deepEqual(labels(some), ["Console", "Config"]);
-  });
-
-  it("R15: each link carries its page key for console_open", () => {
-    for (const link of consoleLinks(JAVA).links) {
-      assert.equal(link.label, CONSOLE_PAGE_LABELS[link.page]);
+  it("R15: the view holds no per-page links", () => {
+    for (const info of [JAVA, I2PD, NONE]) {
+      const view: Record<string, unknown> = { ...consoleLink(info) };
+      assert.deepEqual(Object.keys(view).sort(), ["found", "label", "note", "title"]);
     }
+  });
+
+  it("R15: the view does not change with the version of the router", () => {
+    assert.deepEqual(consoleLink(JAVA), consoleLink({ ...JAVA, version: null }));
   });
 });
 
@@ -134,11 +101,6 @@ describe("R18 router version, display only", () => {
     assert.equal(routerVersion(null, NONE), null);
     assert.equal(routerVersion(null, null), null);
     assert.equal(routerVersion(null, undefined), null);
-  });
-
-  it("R18: the version changes nothing in the links", () => {
-    const without = consoleLinks({ ...JAVA, version: null });
-    assert.deepEqual(consoleLinks(JAVA), without);
   });
 
   it("R18: the router panel and the home page show routerVersion", () => {
@@ -237,15 +199,61 @@ describe("R15 no loopback link in any page", () => {
     }
   });
 
-  it("R15: the router panel and the home page know the console links", () => {
-    for (const name of ["home.ts", "popup/router-panel.ts"]) {
+  it("R15: the router panel, the home page and Settings show the one console link", () => {
+    for (const name of ["home.ts", "popup/router-panel.ts", "settings.ts"]) {
       assert.match(read(name), /console/i, name);
     }
+    assert.ok(
+      sources().some((f) => /consoleLink\(/.test(readFileSync(f, "utf8"))),
+      "some page renders the link from consoleLink()",
+    );
   });
 
+  it("R15: no page keeps the per-page links of the first console", () => {
+    for (const file of sources().filter((f) => !f.includes(`${sep}testing${sep}`))) {
+      const text = readFileSync(file, "utf8");
+      assert.ok(!/consoleLinks|CONSOLE_PAGE_(ORDER|LABELS)/.test(text), file);
+    }
+  });
+});
+
+describe("R12 the UI calls console_open with no argument", () => {
   it("R12: the UI calls console_open from the contract", () => {
     assert.match(read("contract.ts"), /console_open/);
     assert.ok(sources().some((f) => /console_open/.test(readFileSync(f, "utf8"))));
+  });
+
+  it("R12: the contract has no page argument and no ConsolePage type", () => {
+    const contract = read("contract.ts");
+    const line = contract.slice(contract.indexOf("console_open:"));
+    assert.ok(!/^[^\n]*page/i.test(line), "console_open takes no page");
+    assert.ok(!/ConsolePage/.test(contract), "no ConsolePage type");
+  });
+
+  it("R12: no call of console_open passes a page", () => {
+    for (const file of sources().filter((f) => !f.includes(`${sep}testing${sep}`))) {
+      const text = readFileSync(file, "utf8");
+      assert.ok(!/console_open[^;\n]{0,60}page/i.test(text), file);
+    }
+  });
+
+  it("R12: the open result has no no-page reason", () => {
+    assert.ok(!/no-page/.test(read("contract.ts")));
+    assert.match(read("contract.ts"), /no-console/);
+  });
+
+  it("R7: ConsoleInfo lists no pages", () => {
+    const contract = read("contract.ts");
+    const start = contract.indexOf("export type ConsoleInfo");
+    const info = contract.slice(start, contract.indexOf("};", start));
+    assert.ok(start >= 0 && !/pages/.test(info), info);
+  });
+
+  it("R23: TabInfo.kind includes console", () => {
+    const contract = read("contract.ts");
+    const start = contract.indexOf("export type TabInfo");
+    const tab = contract.slice(start, contract.indexOf("};", start));
+    assert.match(tab, /"console"/);
   });
 });
 
@@ -287,12 +295,12 @@ describe("R16 no router configuration in eepview", () => {
 });
 
 describe("R16 the Router section", () => {
-  it("R16: the Router section links to the console Config page", () => {
+  it("R16: the Router section has the one console link", () => {
     const html = read("settings.html");
     const router = html.slice(html.indexOf('id="router"'), html.indexOf('id="about"'));
     assert.ok(router.length > 0, "Settings has a Router section");
     assert.match(router + read("settings.ts"), /console_open|console-link|data-console/);
-    assert.match(read("settings.ts"), /config/);
+    assert.match(read("settings.ts"), /console/i);
   });
 
   it("R16: the Router updates and Restore controls stay", () => {
@@ -301,11 +309,14 @@ describe("R16 the Router section", () => {
     assert.match(html, /id="restore-btn"/);
   });
 
-  it("R16: the About list names the console probe and the console view", () => {
+  it("R16: the About list names the console probe and the console tab", () => {
     const html = read("settings.html");
     const about = html.slice(html.indexOf('id="about"'));
     const connects = about.slice(about.indexOf("Where eepview connects"));
-    assert.match(connects.slice(0, connects.indexOf("</table>")), /console/i);
+    const list = connects.slice(0, connects.indexOf("</table>"));
+    assert.match(list, /console/i, "the console probe");
+    assert.match(list, /console tab/i, "the console tab");
+    assert.ok(!/console (view|window)/i.test(list), "no separate console window or view");
   });
 
   it("R16: pause and resume of the connection stay", () => {
@@ -317,8 +328,8 @@ describe("R16 the Router section", () => {
   });
 });
 
-describe("R36 where eepview connects", () => {
-  it("R36: the About row of the console names the statistics too", () => {
+describe("R44 where eepview connects", () => {
+  it("R44: the About row of the console names the statistics too", () => {
     const html = read("settings.html");
     const about = html.slice(html.indexOf('id="about"'));
     const connects = about.slice(about.indexOf("Where eepview connects"));

@@ -3,7 +3,7 @@
 
 //! Requirement tests for the router statistics read from the console
 //! (`docs/wiki/router-console.md`, "Router statistics from the console"): the request
-//! (R24, R25) and the parsers (R27 to R30), against the two fixtures of the spec.
+//! (R32, R33) and the parsers (R35 to R38), against the two fixtures of the spec.
 
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
@@ -135,7 +135,7 @@ fn cat(groups: &[&[&'static str]]) -> Vec<&'static str> {
     groups.iter().flat_map(|g| g.iter().copied()).collect()
 }
 
-/// R27, fail closed per field: the fields in `nulls` are null; the fields in `maybe` are
+/// R35, fail closed per field: the fields in `nulls` are null; the fields in `maybe` are
 /// null or the original value; every other field keeps its original value from `base`.
 /// The history of a parse is empty.
 fn check(what: &str, got: &RouterStats, base: &RouterStats, nulls: &[&str], maybe: &[&str]) {
@@ -213,16 +213,16 @@ fn crlf(body: &str) -> String {
     body.replace('\n', "\r\n")
 }
 
-// ------------------------------------------------------------ fixtures (R28 to R30)
+// ------------------------------------------------------------ fixtures (R36 to R38)
 
 #[test]
-fn r28_the_java_fixture_gives_the_values_of_the_spec_table() {
+fn r36_the_java_fixture_gives_the_values_of_the_spec_table() {
     assert_eq!(parse_java_summary(JAVA), expected_java());
 }
 
 #[test]
-fn r28_java_never_gives_the_version_the_in_out_tunnels_or_the_build_success() {
-    // R28: always null from Java I2P.
+fn r36_java_never_gives_the_version_the_in_out_tunnels_or_the_build_success() {
+    // R36: always null from Java I2P.
     let got = parse_java_summary(JAVA);
     assert_eq!(got.version, None, "version");
     assert_eq!(got.tunnels.inbound, None, "tunnels.in");
@@ -232,13 +232,13 @@ fn r28_java_never_gives_the_version_the_in_out_tunnels_or_the_build_success() {
 }
 
 #[test]
-fn r30_the_i2pd_fixture_gives_the_values_of_the_spec_table() {
+fn r38_the_i2pd_fixture_gives_the_values_of_the_spec_table() {
     assert_eq!(parse_i2pd_main(I2PD), expected_i2pd());
 }
 
 #[test]
-fn r30_i2pd_never_gives_the_version_or_the_fields_the_main_page_lacks() {
-    // R30: always null from i2pd.
+fn r38_i2pd_never_gives_the_version_or_the_fields_the_main_page_lacks() {
+    // R38: always null from i2pd.
     let got = parse_i2pd_main(I2PD);
     assert_eq!(got.version, None, "version");
     assert_eq!(got.active_peers, None, "activePeers");
@@ -252,23 +252,23 @@ fn r30_i2pd_never_gives_the_version_or_the_fields_the_main_page_lacks() {
 }
 
 #[test]
-fn r30_i2pd_fixture_gives_no_client_tunnel_count() {
-    // R30: the `Client Tunnels` line of the fixture holds 14, and it is not read.
+fn r38_i2pd_fixture_gives_no_client_tunnel_count() {
+    // R38: the `Client Tunnels` line of the fixture holds 14, and it is not read.
     assert_eq!(parse_i2pd_main(I2PD).tunnels.client, None, "tunnels.client");
 }
 
 #[test]
-fn r30_crlf_line_ends_give_the_same_result_for_i2pd() {
+fn r38_crlf_line_ends_give_the_same_result_for_i2pd() {
     assert_eq!(parse_i2pd_main(&crlf(I2PD)), expected_i2pd());
 }
 
 #[test]
-fn r30_crlf_line_ends_give_the_same_result_for_java() {
+fn r38_crlf_line_ends_give_the_same_result_for_java() {
     assert_eq!(parse_java_summary(&crlf(JAVA)), expected_java());
 }
 
 #[test]
-fn r30_a_mix_of_lf_and_crlf_line_ends_gives_the_same_result() {
+fn r38_a_mix_of_lf_and_crlf_line_ends_gives_the_same_result() {
     let mixed: String = I2PD
         .split_inclusive('\n')
         .enumerate()
@@ -284,7 +284,7 @@ fn r30_a_mix_of_lf_and_crlf_line_ends_gives_the_same_result() {
 }
 
 #[test]
-fn r24_parse_console_stats_runs_the_parser_of_the_kind() {
+fn r32_parse_console_stats_runs_the_parser_of_the_kind() {
     assert_eq!(
         parse_console_stats(ConsoleKind::Java, JAVA),
         expected_java()
@@ -296,8 +296,8 @@ fn r24_parse_console_stats_runs_the_parser_of_the_kind() {
 }
 
 #[test]
-fn r27_a_page_of_the_other_router_gives_all_null() {
-    // R27, R28, R30: no anchor, no field.
+fn r35_a_page_of_the_other_router_gives_all_null() {
+    // R35, R36, R38: no anchor, no field.
     assert_eq!(parse_java_summary(I2PD), RouterStats::default());
     assert_eq!(parse_i2pd_main(JAVA), RouterStats::default());
     assert_eq!(
@@ -311,7 +311,7 @@ fn r27_a_page_of_the_other_router_gives_all_null() {
 }
 
 #[test]
-fn r27_an_empty_body_gives_all_null() {
+fn r35_an_empty_body_gives_all_null() {
     for kind in [ConsoleKind::Java, ConsoleKind::I2pd] {
         assert_eq!(
             parse_console_stats(kind, ""),
@@ -330,11 +330,11 @@ fn r27_an_empty_body_gives_all_null() {
     }
 }
 
-// ------------------------------------------------------------ Java: language (R28, R29)
+// ------------------------------------------------------------ Java: language (R36, R37)
 
 #[test]
-fn r28_java_reads_rows_by_position_in_every_console_language() {
-    // R28: "never reads a row label or a title, so it works in every console language".
+fn r36_java_reads_rows_by_position_in_every_console_language() {
+    // R36: "never reads a row label or a title, so it works in every console language".
     let mut body = JAVA.replace(" title=\"", " data-t=\"");
     for label in [
         "Version:",
@@ -361,8 +361,8 @@ fn r28_java_reads_rows_by_position_in_every_console_language() {
 }
 
 #[test]
-fn r29_java_uptime_with_a_translated_unit_is_null_and_the_rest_stays() {
-    // R29: "Only the English units parse"; R28: the other figures work in every language.
+fn r37_java_uptime_with_a_translated_unit_is_null_and_the_rest_stays() {
+    // R37: "Only the English units parse"; R36: the other figures work in every language.
     for unit in [
         "Stunden",
         "heures",
@@ -377,8 +377,8 @@ fn r29_java_uptime_with_a_translated_unit_is_null_and_the_rest_stays() {
 }
 
 #[test]
-fn r29_java_uptime_units_convert_to_milliseconds() {
-    // R29: unit table, and the resolution is the unit.
+fn r37_java_uptime_units_convert_to_milliseconds() {
+    // R37: unit table, and the resolution is the unit.
     let cases: [(&str, u64, u64); 10] = [
         ("500&nbsp;ms", 500, 1),
         ("1&nbsp;sec", 1_000, 1_000),
@@ -403,8 +403,8 @@ fn r29_java_uptime_units_convert_to_milliseconds() {
 }
 
 #[test]
-fn r29_java_uptime_that_is_not_n_nbsp_unit_is_null() {
-    // R27, R29: an integer, `&nbsp;`, an English unit; nothing else.
+fn r37_java_uptime_that_is_not_n_nbsp_unit_is_null() {
+    // R35, R37: an integer, `&nbsp;`, an English unit; nothing else.
     for value in [
         "8&nbsp;years",
         "8&nbsp;year",
@@ -431,8 +431,8 @@ fn r29_java_uptime_that_is_not_n_nbsp_unit_is_null() {
 }
 
 #[test]
-fn r28_java_uptime_is_row_1_of_a_table_with_2_rows() {
-    // R28: sb_general or sb_shortgeneral with 2 rows: row 1.
+fn r36_java_uptime_is_row_1_of_a_table_with_2_rows() {
+    // R36: sb_general or sb_shortgeneral with 2 rows: row 1.
     for id in ["sb_general", "sb_shortgeneral"] {
         let got = parse_java_summary(&table(id, &["5&nbsp;sec", "2&nbsp;min"]));
         let want = RouterStats {
@@ -445,7 +445,7 @@ fn r28_java_uptime_is_row_1_of_a_table_with_2_rows() {
 }
 
 #[test]
-fn r28_java_advanced_uptime_is_row_1_of_4_rows_and_row_2_of_5_rows() {
+fn r36_java_advanced_uptime_is_row_1_of_4_rows_and_row_2_of_5_rows() {
     let four = ["5&nbsp;sec", "2&nbsp;min", "3&nbsp;hours", "4&nbsp;days"];
     let five = [
         "5&nbsp;sec",
@@ -470,8 +470,8 @@ fn r28_java_advanced_uptime_is_row_1_of_4_rows_and_row_2_of_5_rows() {
 }
 
 #[test]
-fn r28_java_uptime_with_another_row_count_is_null() {
-    // R28: "When a table has another number of rows than the rule names, every field of
+fn r36_java_uptime_with_another_row_count_is_null() {
+    // R36: "When a table has another number of rows than the rule names, every field of
     // that table is null."
     let rows = [
         "1&nbsp;sec",
@@ -495,8 +495,8 @@ fn r28_java_uptime_with_another_row_count_is_null() {
 }
 
 #[test]
-fn r28_java_uptime_table_ids_win_in_the_order_general_short_advanced() {
-    // R28: "The first of the three ids in this order wins."
+fn r36_java_uptime_table_ids_win_in_the_order_general_short_advanced() {
+    // R36: "The first of the three ids in this order wins."
     let general = table("sb_general", &["x", "2&nbsp;min"]);
     let short = table("sb_shortgeneral", &["x", "1&nbsp;sec"]);
     let advanced = table("sb_advancedgeneral", &["x", "9&nbsp;days", "x", "x"]);
@@ -524,11 +524,11 @@ fn r28_java_uptime_table_ids_win_in_the_order_general_short_advanced() {
     );
 }
 
-// ------------------------------------------------------------ Java: bandwidth (R28)
+// ------------------------------------------------------------ Java: bandwidth (R36)
 
 #[test]
-fn r28_java_bandwidth_rows_are_read_by_position() {
-    // R28: row 0 is now, row 1 is 5 min; units K (x 1 000) and M (x 1 000 000).
+fn r36_java_bandwidth_rows_are_read_by_position() {
+    // R36: row 0 is now, row 1 is 5 min; units K (x 1 000) and M (x 1 000 000).
     let rows = [
         "1 / 2&nbsp;KBps",
         "3 / 4&nbsp;KBps",
@@ -550,7 +550,7 @@ fn r28_java_bandwidth_rows_are_read_by_position() {
 }
 
 #[test]
-fn r28_java_bandwidth_in_mbps_is_multiplied_by_a_million() {
+fn r36_java_bandwidth_in_mbps_is_multiplied_by_a_million() {
     let rows = ["1.5 / 0.25&nbsp;MBps", "2 / 0.5&nbsp;MBps", "x", "x"];
     let got = parse_java_summary(&java_with("sb_bandwidth", &rows));
     let bandwidth = Bandwidth {
@@ -567,8 +567,8 @@ fn r28_java_bandwidth_in_mbps_is_multiplied_by_a_million() {
 }
 
 #[test]
-fn r28_java_bandwidth_of_a_young_router_has_no_5_minute_figure() {
-    // R28: with 2 or 3 rows, row 1 is not read: the router is younger than 6 minutes.
+fn r36_java_bandwidth_of_a_young_router_has_no_5_minute_figure() {
+    // R36: with 2 or 3 rows, row 1 is not read: the router is younger than 6 minutes.
     for rows in [&BANDWIDTH[..2], &BANDWIDTH[..3]] {
         let got = parse_java_summary(&java_with("sb_bandwidth", rows));
         check("2 or 3 rows", &got, &expected_java(), &BW_5M, &[]);
@@ -576,8 +576,8 @@ fn r28_java_bandwidth_of_a_young_router_has_no_5_minute_figure() {
 }
 
 #[test]
-fn r28_java_bandwidth_with_any_other_row_count_is_null() {
-    // R28: "any row count from 2 to 4"; another count nulls the whole table.
+fn r36_java_bandwidth_with_any_other_row_count_is_null() {
+    // R36: "any row count from 2 to 4"; another count nulls the whole table.
     let five = ["1 / 2&nbsp;KBps"; 5];
     for rows in [&BANDWIDTH[..0], &BANDWIDTH[..1], &five[..]] {
         let got = parse_java_summary(&java_with("sb_bandwidth", rows));
@@ -593,8 +593,8 @@ fn r28_java_bandwidth_with_any_other_row_count_is_null() {
 }
 
 #[test]
-fn r28_java_bandwidth_with_a_bad_unit_or_form_is_null_for_the_row() {
-    // R27, R28: `A / B&nbsp;KBps` exactly; the unit is K or M with `Bps`.
+fn r36_java_bandwidth_with_a_bad_unit_or_form_is_null_for_the_row() {
+    // R35, R36: `A / B&nbsp;KBps` exactly; the unit is K or M with `Bps`.
     for value in [
         "53.91 / 37.37&nbsp;KiBps",
         "53.91 / 37.37&nbsp;kBps",
@@ -616,7 +616,7 @@ fn r28_java_bandwidth_with_a_bad_unit_or_form_is_null_for_the_row() {
     }
 }
 
-// R27: digits, then optionally `.` and digits. No sign, no group separator, no `,`.
+// R35: digits, then optionally `.` and digits. No sign, no group separator, no `,`.
 const NOT_A_DECIMAL: [&str; 16] = [
     "5e3",
     "+5",
@@ -673,7 +673,7 @@ fn check_bad_bandwidth_second_value(bad: &str) {
 }
 
 #[test]
-fn r27_java_bandwidth_value_that_is_not_a_decimal_is_null_for_that_field() {
+fn r35_java_bandwidth_value_that_is_not_a_decimal_is_null_for_that_field() {
     for bad in NOT_A_DECIMAL {
         check_bad_bandwidth_first_value(bad);
         check_bad_bandwidth_second_value(bad);
@@ -681,7 +681,7 @@ fn r27_java_bandwidth_value_that_is_not_a_decimal_is_null_for_that_field() {
 }
 
 #[test]
-fn r27_java_a_bad_5_minute_row_leaves_the_now_row_alone() {
+fn r35_java_a_bad_5_minute_row_leaves_the_now_row_alone() {
     let rows = [
         BANDWIDTH[0],
         "5e3 / 33.06&nbsp;KBps",
@@ -699,8 +699,8 @@ fn r27_java_a_bad_5_minute_row_leaves_the_now_row_alone() {
 }
 
 #[test]
-fn r27_java_conversion_is_exact_on_the_decimal_digits_and_a_half_rounds_up() {
-    // R27: 0.5 -> 1, 1.5 -> 2, 1000.5 -> 1001, 2001.5 -> 2002 (a float gives 1000, 2001).
+fn r35_java_conversion_is_exact_on_the_decimal_digits_and_a_half_rounds_up() {
+    // R35: 0.5 -> 1, 1.5 -> 2, 1000.5 -> 1001, 2001.5 -> 2002 (a float gives 1000, 2001).
     let cases: [(&str, u64, u64); 6] = [
         ("0.0005 / 0.0004&nbsp;KBps", 1, 0),
         ("0.0015 / 0.0014&nbsp;KBps", 2, 1),
@@ -719,10 +719,10 @@ fn r27_java_conversion_is_exact_on_the_decimal_digits_and_a_half_rounds_up() {
     }
 }
 
-// ------------------------------------------------------------ Java: peers (R28)
+// ------------------------------------------------------------ Java: peers (R36)
 
 #[test]
-fn r28_java_peers_with_5_rows_read_rows_0_3_and_4() {
+fn r36_java_peers_with_5_rows_read_rows_0_3_and_4() {
     let rows = ["10 / 20", "1", "2", "30", "40"];
     let got = parse_java_summary(&java_with("sb_peers", &rows));
     let base = RouterStats {
@@ -735,7 +735,7 @@ fn r28_java_peers_with_5_rows_read_rows_0_3_and_4() {
 }
 
 #[test]
-fn r28_java_peersadvanced_with_6_rows_reads_rows_0_3_and_4() {
+fn r36_java_peersadvanced_with_6_rows_reads_rows_0_3_and_4() {
     let rows = ["10 / 20", "1", "2", "30", "40", "99"];
     let body = format!(
         "{}{}",
@@ -753,8 +753,8 @@ fn r28_java_peersadvanced_with_6_rows_reads_rows_0_3_and_4() {
 }
 
 #[test]
-fn r28_java_peers_with_the_wrong_row_count_for_the_id_are_null() {
-    // R28: sb_peers needs 5 rows, sb_peersadvanced needs 6.
+fn r36_java_peers_with_the_wrong_row_count_for_the_id_are_null() {
+    // R36: sb_peers needs 5 rows, sb_peersadvanced needs 6.
     let six = ["10 / 20", "1", "2", "30", "40", "99"];
     for rows in [&PEER_ROWS[..0], &PEER_ROWS[..4], &six[..]] {
         let got = parse_java_summary(&java_with("sb_peers", rows));
@@ -779,8 +779,8 @@ fn r28_java_peers_with_the_wrong_row_count_for_the_id_are_null() {
 }
 
 #[test]
-fn r27_java_active_peers_that_is_not_a_slash_pair_is_null() {
-    // R28: `A / B`: A, a space, `/`, a space, B.
+fn r35_java_active_peers_that_is_not_a_slash_pair_is_null() {
+    // R36: `A / B`: A, a space, `/`, a space, B.
     for value in [
         "1678",
         "1678/2191",
@@ -808,7 +808,7 @@ fn r27_java_active_peers_that_is_not_a_slash_pair_is_null() {
 }
 
 #[test]
-fn r27_java_floodfills_and_known_routers_that_are_not_integers_are_null() {
+fn r35_java_floodfills_and_known_routers_that_are_not_integers_are_null() {
     for bad in [
         "15,70",
         "1570.0",
@@ -842,10 +842,10 @@ fn r27_java_floodfills_and_known_routers_that_are_not_integers_are_null() {
     }
 }
 
-// ------------------------------------------------------------ Java: tunnels (R28)
+// ------------------------------------------------------------ Java: tunnels (R36)
 
 #[test]
-fn r28_java_tunnel_rows_are_exploratory_client_participating() {
+fn r36_java_tunnel_rows_are_exploratory_client_participating() {
     let got = parse_java_summary(&java_with("sb_tunnels", &["1", "2", "3", "4"]));
     let mut base = expected_java();
     base.tunnels.exploratory = Some(1);
@@ -855,7 +855,7 @@ fn r28_java_tunnel_rows_are_exploratory_client_participating() {
 }
 
 #[test]
-fn r28_java_tunnels_with_another_row_count_are_null() {
+fn r36_java_tunnels_with_another_row_count_are_null() {
     let five = ["1", "2", "3", "4", "5"];
     for rows in [&TUNNEL_ROWS[..0], &TUNNEL_ROWS[..3], &five[..]] {
         let got = parse_java_summary(&java_with("sb_tunnels", rows));
@@ -870,7 +870,7 @@ fn r28_java_tunnels_with_another_row_count_are_null() {
 }
 
 #[test]
-fn r27_java_tunnel_counts_that_are_not_integers_are_null_one_by_one() {
+fn r35_java_tunnel_counts_that_are_not_integers_are_null_one_by_one() {
     for bad in [
         "1.0",
         "1,1",
@@ -899,15 +899,15 @@ fn r27_java_tunnel_counts_that_are_not_integers_are_null_one_by_one() {
 }
 
 #[test]
-fn r27_java_a_zero_count_is_a_number_not_a_missing_one() {
+fn r35_java_a_zero_count_is_a_number_not_a_missing_one() {
     let got = parse_java_summary(&swap(JAVA, ">398<", ">0<"));
     assert_eq!(got.tunnels.participating, Some(0));
 }
 
-// ------------------------------------------------------------ Java: network status (R28)
+// ------------------------------------------------------------ Java: network status (R36)
 
 #[test]
-fn r28_java_network_status_classes_map_to_the_contract_names() {
+fn r36_java_network_status_classes_map_to_the_contract_names() {
     for (class, name) in [
         ("running", "OK"),
         ("firewalled", "FIREWALLED"),
@@ -934,7 +934,7 @@ fn r28_java_network_status_classes_map_to_the_contract_names() {
 }
 
 #[test]
-fn r28_java_network_status_with_another_class_is_null() {
+fn r36_java_network_status_with_another_class_is_null() {
     for class in ["", "foo", "ok", "running2", "network"] {
         let from = "<span class=\"sb_netstatus running\">";
         let body = swap(
@@ -948,7 +948,7 @@ fn r28_java_network_status_with_another_class_is_null() {
 }
 
 #[test]
-fn r28_java_network_status_reads_the_first_span_only() {
+fn r36_java_network_status_reads_the_first_span_only() {
     let first = "<span class=\"sb_netstatus firewalled\">x</span>\n";
     let got = parse_java_summary(&format!("{first}{JAVA}"));
     assert_eq!(got.network_status.as_deref(), Some("FIREWALLED"));
@@ -961,8 +961,8 @@ fn r28_java_network_status_reads_the_first_span_only() {
 }
 
 #[test]
-fn r28_java_network_status_text_is_not_read() {
-    // R28: the class decides, in every language; the text next to it does not.
+fn r36_java_network_status_text_is_not_read() {
+    // R36: the class decides, in every language; the text next to it does not.
     let body = swap(JAVA, "Network: OK", "Network: Firewalled");
     check(
         "text",
@@ -976,8 +976,8 @@ fn r28_java_network_status_text_is_not_read() {
 // ------------------------------------------------------------ Java: missing and doubled
 
 #[test]
-fn r27_java_a_missing_section_nulls_its_fields_only() {
-    // R27: "A missing section gives null for its fields only."
+fn r35_java_a_missing_section_nulls_its_fields_only() {
+    // R35: "A missing section gives null for its fields only."
     let cases: [(&str, Vec<&str>); 4] = [
         ("sb_general", UPTIME.to_vec()),
         ("sb_bandwidth", cat(&[&BW_NOW, &BW_5M])),
@@ -1004,8 +1004,8 @@ fn r27_java_a_missing_section_nulls_its_fields_only() {
 }
 
 #[test]
-fn r27_java_an_anchor_that_is_in_the_body_twice_nulls_its_fields() {
-    // R27: "When an anchor ... is in the body more than once, the fields it gives are null."
+fn r35_java_an_anchor_that_is_in_the_body_twice_nulls_its_fields() {
+    // R35: "When an anchor ... is in the body more than once, the fields it gives are null."
     let cases: [(&str, &[&str], Vec<&str>); 4] = [
         ("sb_general", &GENERAL, UPTIME.to_vec()),
         ("sb_bandwidth", &BANDWIDTH, cat(&[&BW_NOW, &BW_5M])),
@@ -1029,8 +1029,8 @@ fn r27_java_an_anchor_that_is_in_the_body_twice_nulls_its_fields() {
 }
 
 #[test]
-fn r27_java_a_value_cut_at_the_end_of_the_body_is_null() {
-    // R27, R25: a cut value has no terminator; it is null, never a shorter number.
+fn r35_java_a_value_cut_at_the_end_of_the_body_is_null() {
+    // R35, R33: a cut value has no terminator; it is null, never a shorter number.
     let end = JAVA.find(">398<").unwrap() + ">39".len();
     let got = parse_java_summary(&JAVA[..end]);
     let tunnels = ["tunnels.client", "tunnels.exploratory"];
@@ -1045,7 +1045,7 @@ fn r27_java_a_value_cut_at_the_end_of_the_body_is_null() {
     assert_eq!(parse_java_summary(&JAVA[..end]), RouterStats::default());
 }
 
-// ------------------------------------------------------------ i2pd (R30)
+// ------------------------------------------------------------ i2pd (R38)
 
 fn i2pd_with(from: &str, to: &str) -> RouterStats {
     parse_i2pd_main(&swap(I2PD, from, to))
@@ -1054,8 +1054,8 @@ fn i2pd_with(from: &str, to: &str) -> RouterStats {
 const UPTIME_TEXT: &str = "1 day, 2 hours, 3 minutes, 4 seconds";
 
 #[test]
-fn r30_i2pd_uptime_forms_convert_to_milliseconds() {
-    // R30: days, hours and minutes are optional, seconds always there, the order fixed;
+fn r38_i2pd_uptime_forms_convert_to_milliseconds() {
+    // R38: days, hours and minutes are optional, seconds always there, the order fixed;
     // singular or plural; the resolution is 1 000.
     let cases: [(&str, u64); 9] = [
         ("4 seconds", 4_000),
@@ -1079,7 +1079,7 @@ fn r30_i2pd_uptime_forms_convert_to_milliseconds() {
 }
 
 #[test]
-fn r30_i2pd_uptime_that_does_not_match_the_form_is_null_for_both_fields() {
+fn r38_i2pd_uptime_that_does_not_match_the_form_is_null_for_both_fields() {
     for value in [
         "4 seconds, 3 minutes",
         "1 day, 2 hours",
@@ -1105,7 +1105,7 @@ fn r30_i2pd_uptime_that_does_not_match_the_form_is_null_for_both_fields() {
 }
 
 #[test]
-fn r30_i2pd_uptime_needs_its_br_terminator() {
+fn r38_i2pd_uptime_needs_its_br_terminator() {
     for end in ["</div>", "<br/>", "\n", " <br>"] {
         let body = swap(I2PD, "4 seconds<br>", &format!("4 seconds{end}"));
         let got = parse_i2pd_main(&body);
@@ -1114,7 +1114,7 @@ fn r30_i2pd_uptime_needs_its_br_terminator() {
 }
 
 #[test]
-fn r30_i2pd_network_status_words_are_given_in_upper_case() {
+fn r38_i2pd_network_status_words_are_given_in_upper_case() {
     for (word, name) in [
         ("OK", "OK"),
         ("Firewalled", "FIREWALLED"),
@@ -1136,7 +1136,7 @@ fn r30_i2pd_network_status_words_are_given_in_upper_case() {
 }
 
 #[test]
-fn r30_i2pd_network_status_with_a_suffix_or_another_word_is_null() {
+fn r38_i2pd_network_status_with_a_suffix_or_another_word_is_null() {
     for word in [
         "OK (Testing)",
         "Firewalled (Testing)",
@@ -1165,8 +1165,8 @@ fn r30_i2pd_network_status_with_a_suffix_or_another_word_is_null() {
 }
 
 #[test]
-fn r30_i2pd_network_status_v6_is_a_different_label() {
-    // R30: `Network status` (not `Network status v6`).
+fn r38_i2pd_network_status_v6_is_a_different_label() {
+    // R38: `Network status` (not `Network status v6`).
     let only_v6 = i2pd_with(
         "<b>Network status:</b> OK<br>",
         "<b>Network status v6:</b> OK<br>",
@@ -1191,7 +1191,7 @@ fn r30_i2pd_network_status_v6_is_a_different_label() {
 }
 
 #[test]
-fn r30_i2pd_tunnel_creation_success_rate_is_an_integer_percent() {
+fn r38_i2pd_tunnel_creation_success_rate_is_an_integer_percent() {
     for (value, percent) in [("0%", 0), ("100%", 100), ("7%", 7)] {
         let from = "<b>Tunnel creation success rate:</b> 42%<br>";
         let got = i2pd_with(
@@ -1227,8 +1227,8 @@ fn r30_i2pd_tunnel_creation_success_rate_is_an_integer_percent() {
 }
 
 #[test]
-fn r30_i2pd_total_tunnel_creation_success_rate_is_not_read() {
-    // R30: "Total tunnel creation success rate" is a different label.
+fn r38_i2pd_total_tunnel_creation_success_rate_is_not_read() {
+    // R38: "Total tunnel creation success rate" is a different label.
     let from = "<b>Tunnel creation success rate:</b> 42%<br>";
     let to = "<b>Total tunnel creation success rate:</b> 42%<br>";
     check(
@@ -1243,8 +1243,8 @@ fn r30_i2pd_total_tunnel_creation_success_rate_is_not_read() {
 }
 
 #[test]
-fn r30_i2pd_bandwidth_converts_kib_per_second_exactly() {
-    // R27, R30: X x 1 024, exact on the decimal digits, a half rounds up.
+fn r38_i2pd_bandwidth_converts_kib_per_second_exactly() {
+    // R35, R38: X x 1 024, exact on the decimal digits, a half rounds up.
     let cases: [(&str, u64); 8] = [
         ("(12.34 KiB/s)", 12_636),
         ("(0 KiB/s)", 0),
@@ -1268,7 +1268,7 @@ fn r30_i2pd_bandwidth_converts_kib_per_second_exactly() {
 }
 
 #[test]
-fn r30_i2pd_bandwidth_that_does_not_match_its_form_is_null_for_that_field() {
+fn r38_i2pd_bandwidth_that_does_not_match_its_form_is_null_for_that_field() {
     for value in [
         "(12,34 KiB/s)",
         "(12.34 KB/s)",
@@ -1301,7 +1301,7 @@ fn r30_i2pd_bandwidth_that_does_not_match_its_form_is_null_for_that_field() {
     check("sent, no br", &got, &expected_i2pd(), &["bw.out1s"], &[]);
 }
 
-// R27, R30: Routers and Floodfills end with `&nbsp;`, Transit with `<br>`.
+// R35, R38: Routers and Floodfills end with `&nbsp;`, Transit with `<br>`.
 const I2PD_COUNTS: [(&str, &str, &str, &str); 3] = [
     (
         "<b>Routers:</b> 3021",
@@ -1349,7 +1349,7 @@ fn check_i2pd_count_set_to(from: &str, end: &str, template: &str, field: &str, b
 }
 
 #[test]
-fn r30_i2pd_counts_that_are_not_integers_are_null_one_by_one() {
+fn r38_i2pd_counts_that_are_not_integers_are_null_one_by_one() {
     for (from, end, template, field) in I2PD_COUNTS {
         for bad in NOT_AN_INTEGER {
             check_i2pd_count_set_to(from, end, template, field, bad);
@@ -1365,7 +1365,7 @@ fn r30_i2pd_counts_that_are_not_integers_are_null_one_by_one() {
 }
 
 #[test]
-fn r30_i2pd_counts_need_their_own_terminator() {
+fn r38_i2pd_counts_need_their_own_terminator() {
     // Routers, Floodfills: `&nbsp;`. Transit Tunnels: `<br>`.
     let wrong = [
         ("3021&nbsp;", "3021<br>", "known_routers"),
@@ -1381,8 +1381,8 @@ fn r30_i2pd_counts_need_their_own_terminator() {
 }
 
 #[test]
-fn r30_i2pd_never_reads_the_client_tunnels_figure() {
-    // R30: the `Client Tunnels` figure of i2pd counts every inbound and outbound tunnel,
+fn r38_i2pd_never_reads_the_client_tunnels_figure() {
+    // R38: the `Client Tunnels` figure of i2pd counts every inbound and outbound tunnel,
     // exploratory ones included; `tunnels.client` is always null, whatever the line holds.
     let from = "<b>Client Tunnels:</b> 14&nbsp;";
     for line in [
@@ -1402,7 +1402,7 @@ fn r30_i2pd_never_reads_the_client_tunnels_figure() {
     assert_eq!(got.tunnels.client, None, "a doubled line");
 }
 
-// R30: `<b><label>:</b> `; a translated or changed label gives null for its field.
+// R38: `<b><label>:</b> `; a translated or changed label gives null for its field.
 const I2PD_LABEL_CASES: [(&str, &str, &[&str]); 11] = [
     ("<b>Uptime:</b> 1", "<b>Laufzeit:</b> 1", &UPTIME),
     ("<b>Uptime:</b> 1", "<b>uptime:</b> 1", &UPTIME),
@@ -1442,7 +1442,7 @@ const I2PD_LABEL_CASES: [(&str, &str, &[&str]); 11] = [
 ];
 
 #[test]
-fn r30_i2pd_a_label_is_the_exact_text_with_a_space_after_it() {
+fn r38_i2pd_a_label_is_the_exact_text_with_a_space_after_it() {
     for (from, to, nulls) in I2PD_LABEL_CASES {
         let got = i2pd_with(from, to);
         check(to, &got, &expected_i2pd(), nulls, &[]);
@@ -1450,7 +1450,7 @@ fn r30_i2pd_a_label_is_the_exact_text_with_a_space_after_it() {
 }
 
 #[test]
-fn r27_i2pd_a_label_that_is_in_the_body_twice_nulls_its_fields() {
+fn r35_i2pd_a_label_that_is_in_the_body_twice_nulls_its_fields() {
     let cases: [(&str, Vec<&str>); 9] = [
         ("<b>Uptime:</b> 5 seconds<br>\n", UPTIME.to_vec()),
         ("<b>Network status:</b> OK<br>\n", vec!["network_status"]),
@@ -1476,7 +1476,7 @@ fn r27_i2pd_a_label_that_is_in_the_body_twice_nulls_its_fields() {
 }
 
 #[test]
-fn r27_i2pd_a_missing_line_nulls_its_fields_only() {
+fn r35_i2pd_a_missing_line_nulls_its_fields_only() {
     let cases: [(&str, Vec<&str>); 3] = [
         (
             "<b>Uptime:</b> 1 day, 2 hours, 3 minutes, 4 seconds<br>\n",
@@ -1495,8 +1495,8 @@ fn r27_i2pd_a_missing_line_nulls_its_fields_only() {
 }
 
 #[test]
-fn r30_i2pd_reads_the_english_page_only() {
-    // R30: "when the body has no `<html lang="en"`, every field is null."
+fn r38_i2pd_reads_the_english_page_only() {
+    // R38: "when the body has no `<html lang="en"`, every field is null."
     for tag in [
         "<html lang=\"de\">",
         "<html lang=\"ru\">",
@@ -1512,8 +1512,8 @@ fn r30_i2pd_reads_the_english_page_only() {
 }
 
 #[test]
-fn r30_i2pd_a_value_cut_at_the_end_of_the_body_is_null() {
-    // R27, R25: a value at the end of the body has no terminator.
+fn r38_i2pd_a_value_cut_at_the_end_of_the_body_is_null() {
+    // R35, R33: a value at the end of the body has no terminator.
     let end = I2PD.find("157<br>").unwrap() + "157".len();
     let got = parse_i2pd_main(&I2PD[..end]);
     check(
@@ -1542,7 +1542,7 @@ fn never_wrong(what: &str, got: &RouterStats, base: &RouterStats) {
     check(what, got, base, &[], &names);
 }
 
-/// R25, R27: every prefix of `body` parses to null fields or the right ones.
+/// R33, R35: every prefix of `body` parses to null fields or the right ones.
 fn every_prefix_never_wrong(kind: ConsoleKind, name: &str, body: &str, base: &RouterStats) {
     for end in (0..=body.len()).filter(|end| body.is_char_boundary(*end)) {
         let got = parse_console_stats(kind, &body[..end]);
@@ -1551,8 +1551,8 @@ fn every_prefix_never_wrong(kind: ConsoleKind, name: &str, body: &str, base: &Ro
 }
 
 #[test]
-fn r27_every_prefix_of_a_fixture_parses_without_a_wrong_number() {
-    // R25, R27: a body cut anywhere gives null fields or the right ones.
+fn r35_every_prefix_of_a_fixture_parses_without_a_wrong_number() {
+    // R33, R35: a body cut anywhere gives null fields or the right ones.
     every_prefix_never_wrong(ConsoleKind::Java, "java", JAVA, &expected_java());
     every_prefix_never_wrong(ConsoleKind::I2pd, "i2pd", I2PD, &expected_i2pd());
 }
@@ -1626,7 +1626,7 @@ fn property_config() -> Config {
     }
 }
 
-/// R27: every non-null field of `got` equals its value in `base`.
+/// R35: every non-null field of `got` equals its value in `base`.
 fn only_null_or_original(
     what: &str,
     got: &RouterStats,
@@ -1644,8 +1644,8 @@ fn only_null_or_original(
 }
 
 #[test]
-fn r27_property_random_byte_edits_never_panic_and_never_give_a_wrong_number() {
-    // R27: after random non-digit byte edits of a fixture, every non-null field equals
+fn r35_property_random_byte_edits_never_panic_and_never_give_a_wrong_number() {
+    // R35: after random non-digit byte edits of a fixture, every non-null field equals
     // the original value; a parser never panics.
     let strategy = proptest::collection::vec((any::<usize>(), any::<u8>(), any::<u8>()), 1..=4);
     let mut runner = TestRunner::new(property_config());
@@ -1664,7 +1664,7 @@ fn r27_property_random_byte_edits_never_panic_and_never_give_a_wrong_number() {
 }
 
 #[test]
-fn r27_property_any_bytes_never_panic_a_parser() {
+fn r35_property_any_bytes_never_panic_a_parser() {
     let strategy = proptest::collection::vec(any::<u8>(), 0..2_000);
     let mut runner = TestRunner::new(property_config());
     let result = runner.run(&strategy, |bytes| {
@@ -1676,17 +1676,17 @@ fn r27_property_any_bytes_never_panic_a_parser() {
     result.unwrap();
 }
 
-// ------------------------------------------------------------ R24, R25: the request
+// ------------------------------------------------------------ R32, R33: the request
 
 #[test]
-fn r24_the_stats_path_is_fixed_per_router() {
+fn r32_the_stats_path_is_fixed_per_router() {
     assert_eq!(stats_path(ConsoleKind::Java), JAVA_PATH);
     assert_eq!(stats_path(ConsoleKind::I2pd), "/");
 }
 
 #[test]
-fn r24_the_stats_path_never_carries_lang_action_or_a_console_nonce() {
-    // R24: a Java I2P console saves `?lang=` in the router configuration.
+fn r32_the_stats_path_never_carries_lang_action_or_a_console_nonce() {
+    // R32: a Java I2P console saves `?lang=` in the router configuration.
     for kind in [ConsoleKind::Java, ConsoleKind::I2pd] {
         let path = stats_path(kind);
         for word in ["lang", "action", "consoleNonce"] {
@@ -1696,7 +1696,7 @@ fn r24_the_stats_path_never_carries_lang_action_or_a_console_nonce() {
 }
 
 #[test]
-fn r25_the_bounds_are_3_seconds_and_256_kib() {
+fn r33_the_bounds_are_3_seconds_and_256_kib() {
     assert_eq!(STATS_TIMEOUT, Duration::from_secs(3));
     assert_eq!(STATS_MAX_ANSWER, 256 * 1024);
 }
@@ -1782,8 +1782,8 @@ fn answer_ok(body: String) -> impl Fn(&mut TcpStream) + Send + Sync + 'static {
 }
 
 #[test]
-fn r24_fetch_sends_one_get_with_the_four_headers_of_r4_and_nothing_else() {
-    // R24: `GET <path> HTTP/1.0` in origin form; Host, User-Agent: eepview,
+fn r32_fetch_sends_one_get_with_the_four_headers_of_r4_and_nothing_else() {
+    // R32: `GET <path> HTTP/1.0` in origin form; Host, User-Agent: eepview,
     // Accept: text/html, Connection: close; no cookie, no body.
     let server = Scripted::start(answer_ok(JAVA.to_owned()));
     let got = fetch_stats(&server.console());
@@ -1814,7 +1814,7 @@ fn r24_fetch_sends_one_get_with_the_four_headers_of_r4_and_nothing_else() {
 }
 
 #[test]
-fn r24_the_request_line_has_no_lang_action_or_nonce() {
+fn r32_the_request_line_has_no_lang_action_or_nonce() {
     let server = Scripted::start(answer_ok(JAVA.to_owned()));
     let _ = fetch_stats(&server.console());
     let heads = server.stats_heads();
@@ -1826,7 +1826,7 @@ fn r24_the_request_line_has_no_lang_action_or_nonce() {
 }
 
 #[test]
-fn r24_fetch_gives_the_parsed_java_stats_with_an_empty_history() {
+fn r32_fetch_gives_the_parsed_java_stats_with_an_empty_history() {
     let fake = FakeConsole::serving(ConsoleKind::Java, JAVA_PATH, 200, JAVA);
     let console = fake.verified();
     let before = fake.requests().len();
@@ -1841,15 +1841,15 @@ fn r24_fetch_gives_the_parsed_java_stats_with_an_empty_history() {
 }
 
 #[test]
-fn r24_fetch_gives_the_parsed_i2pd_stats() {
+fn r32_fetch_gives_the_parsed_i2pd_stats() {
     let fake = FakeConsole::serving(ConsoleKind::I2pd, "/", 200, I2PD);
     let got = fetch_stats(&fake.verified());
     assert_eq!(got, Some(expected_i2pd()));
 }
 
 #[test]
-fn r25_fetch_gives_none_for_a_status_other_than_200() {
-    // R25: "a status other than 200 counts as the console does not answer".
+fn r33_fetch_gives_none_for_a_status_other_than_200() {
+    // R33: "a status other than 200 counts as the console does not answer".
     for status in [204, 301, 302, 304, 400, 401, 403, 404, 500, 503] {
         let fake = FakeConsole::serving(ConsoleKind::Java, JAVA_PATH, status, JAVA);
         let console = fake.verified();
@@ -1864,7 +1864,7 @@ fn r25_fetch_gives_none_for_a_status_other_than_200() {
 }
 
 #[test]
-fn r24_fetch_never_follows_a_redirect() {
+fn r32_fetch_never_follows_a_redirect() {
     let server = Scripted::start(|stream| {
         let _ = stream.write_all(
             format!("HTTP/1.0 302 Found\r\nLocation: {JAVA_PATH}&x=1\r\n\r\n").as_bytes(),
@@ -1880,7 +1880,7 @@ fn r24_fetch_never_follows_a_redirect() {
 }
 
 #[test]
-fn r25_fetch_gives_none_for_an_answer_that_is_not_http() {
+fn r33_fetch_gives_none_for_an_answer_that_is_not_http() {
     let server = Scripted::start(|stream| {
         let _ = stream.write_all(b"this is not http\r\n\r\n<table id=\"sb_tunnels\"></table>");
     });
@@ -1888,14 +1888,14 @@ fn r25_fetch_gives_none_for_an_answer_that_is_not_http() {
 }
 
 #[test]
-fn r25_fetch_gives_none_when_the_connection_closes_without_an_answer() {
+fn r33_fetch_gives_none_when_the_connection_closes_without_an_answer() {
     let server = Scripted::start(|_stream| {});
     assert_eq!(fetch_stats(&server.console()), None);
 }
 
 #[test]
-fn r25_fetch_gives_none_after_3_seconds_without_any_answer() {
-    // R25: "a timeout before any answer"; the server would answer after 10 s.
+fn r33_fetch_gives_none_after_3_seconds_without_any_answer() {
+    // R33: "a timeout before any answer"; the server would answer after 10 s.
     let server = Scripted::start(|stream| {
         thread::sleep(Duration::from_secs(10));
         let reply = format!("HTTP/1.0 200 OK\r\n\r\n{JAVA}");
@@ -1913,8 +1913,8 @@ fn r25_fetch_gives_none_after_3_seconds_without_any_answer() {
 }
 
 #[test]
-fn r25_a_body_cut_by_the_timeout_is_parsed_and_the_cut_value_is_null() {
-    // R25, R27: "A body cut by the size cap or by the timeout is still parsed".
+fn r33_a_body_cut_by_the_timeout_is_parsed_and_the_cut_value_is_null() {
+    // R33, R35: "A body cut by the size cap or by the timeout is still parsed".
     let end = JAVA.find(">398<").unwrap() + ">39".len();
     let prefix = JAVA[..end].to_owned();
     let server = Scripted::start(move |stream| {
@@ -1947,8 +1947,8 @@ fn capped(cut: usize, tail: &str) -> String {
 }
 
 #[test]
-fn r25_fetch_reads_exactly_the_first_256_kib() {
-    // R25: "It reads at most 256 KiB". Everything up to the cap parses; a second
+fn r33_fetch_reads_exactly_the_first_256_kib() {
+    // R33: "It reads at most 256 KiB". Everything up to the cap parses; a second
     // sb_peers table after the cap would null the peers if it were read.
     let cut = table_range(JAVA, "sb_tunnels").1;
     let tail = format!("{}{}", table("sb_peers", &PEER_ROWS), &JAVA[cut..]);
@@ -1960,8 +1960,8 @@ fn r25_fetch_reads_exactly_the_first_256_kib() {
 }
 
 #[test]
-fn r25_a_value_cut_by_the_size_cap_is_null() {
-    // R25, R27: the cap lands inside `398`; the rest of the body is never read.
+fn r33_a_value_cut_by_the_size_cap_is_null() {
+    // R33, R35: the cap lands inside `398`; the rest of the body is never read.
     let cut = JAVA.find(">398<").unwrap() + ">39".len();
     let body = capped(cut, &JAVA[cut..]);
     let fake = FakeConsole::serving(ConsoleKind::Java, JAVA_PATH, 200, &body);
@@ -1976,9 +1976,9 @@ fn r25_a_value_cut_by_the_size_cap_is_null() {
     );
 }
 
-// ------------------------------------------------------------ R38: one deadline
+// ------------------------------------------------------------ R46: one deadline
 
-/// The longest a call may last: the 3 s of R25 plus the time to close the socket.
+/// The longest a call may last: the 3 s of R33 plus the time to close the socket.
 const R38_LIMIT: Duration = Duration::from_millis(3_800);
 
 /// A gap shorter than the 3 s of one read, so a deadline that restarts at every read
@@ -2001,8 +2001,8 @@ fn drip(stream: &mut TcpStream, bytes: &[u8], hold: Duration) {
 }
 
 #[test]
-fn r38_a_peer_that_sends_slowly_past_3_seconds_ends_the_call_at_3_seconds() {
-    // R38: the head and the start of the body arrive at once; then one byte every 1.2 s.
+fn r46_a_peer_that_sends_slowly_past_3_seconds_ends_the_call_at_3_seconds() {
+    // R46: the head and the start of the body arrive at once; then one byte every 1.2 s.
     // Each read is inside 3 s, the whole request is not. The call returns at the deadline.
     let end = JAVA.find(">398<").unwrap() + ">3".len();
     let prefix = JAVA[..end].to_owned();
@@ -2019,8 +2019,8 @@ fn r38_a_peer_that_sends_slowly_past_3_seconds_ends_the_call_at_3_seconds() {
 }
 
 #[test]
-fn r38_a_value_cut_by_the_deadline_is_null() {
-    // R38, R27: `398` arrives at 2.4 s but its terminator at 3.6 s, after the deadline.
+fn r46_a_value_cut_by_the_deadline_is_null() {
+    // R46, R35: `398` arrives at 2.4 s but its terminator at 3.6 s, after the deadline.
     let end = JAVA.find(">398<").unwrap() + ">3".len();
     let prefix = JAVA[..end].to_owned();
     let server = Scripted::start(move |stream| {
@@ -2046,8 +2046,8 @@ fn r38_a_value_cut_by_the_deadline_is_null() {
 }
 
 #[test]
-fn r38_figures_that_arrived_before_the_deadline_are_kept() {
-    // R38: "gets figures from what arrived within 3 s".
+fn r46_figures_that_arrived_before_the_deadline_are_kept() {
+    // R46: "gets figures from what arrived within 3 s".
     let end = JAVA.find(">398<").unwrap() + ">3".len();
     let prefix = JAVA[..end].to_owned();
     let server = Scripted::start(move |stream| {
@@ -2062,8 +2062,8 @@ fn r38_figures_that_arrived_before_the_deadline_are_kept() {
 }
 
 #[test]
-fn r38_no_complete_head_within_3_seconds_means_the_console_does_not_answer() {
-    // R38, R25: the status line is at once, the head never ends; a header byte comes every
+fn r46_no_complete_head_within_3_seconds_means_the_console_does_not_answer() {
+    // R46, R33: the status line is at once, the head never ends; a header byte comes every
     // 1.2 s. At 3 s there is no complete head: no answer, and the call ends at 3 s.
     let server = Scripted::start(|stream| {
         let _ = stream.write_all(b"HTTP/1.0 200 OK\r\n");
@@ -2078,8 +2078,8 @@ fn r38_no_complete_head_within_3_seconds_means_the_console_does_not_answer() {
 }
 
 #[test]
-fn r38_a_head_that_completes_after_3_seconds_means_the_console_does_not_answer() {
-    // R38: the head ends at 3.6 s, with a full body behind it: too late, no answer.
+fn r46_a_head_that_completes_after_3_seconds_means_the_console_does_not_answer() {
+    // R46: the head ends at 3.6 s, with a full body behind it: too late, no answer.
     let body = JAVA.to_owned();
     let server = Scripted::start(move |stream| {
         let _ = stream.write_all(b"HTTP/1.0 200 OK\r\n");

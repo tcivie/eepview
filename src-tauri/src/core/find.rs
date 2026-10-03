@@ -22,6 +22,10 @@ pub enum Zoom {
 impl Core {
     /// `find(query, forward, matchCase)` on the active tab.
     pub fn find(&mut self, query: &str, forward: bool, match_case: bool) -> Vec<Effect> {
+        if self.console_active() {
+            // No find in the console tab (R25).
+            return Vec::new();
+        }
         self.find_open = true;
         let id = self.tabs.active_id();
         let live = self

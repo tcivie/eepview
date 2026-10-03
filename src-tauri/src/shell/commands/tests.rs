@@ -188,7 +188,7 @@ fn direct_calls_match_the_ipc_answers() {
     );
 }
 
-// ------------------------------------------------ router statistics (R23, R26, R32)
+// ------------------------------------------------ router statistics (R31, R34, R40)
 
 mod stats_from_console {
     use super::*;
@@ -220,15 +220,15 @@ mod stats_from_console {
     }
 
     #[test]
-    fn r23_with_no_helper_and_no_console_every_field_is_null() {
-        // R23 step 3: no source, every field null; the history is empty.
+    fn r31_with_no_helper_and_no_console_every_field_is_null() {
+        // R31 step 3: no source, every field null; the history is empty.
         let app = app();
         assert_eq!(current_stats(&handle(&app), None), RouterStats::default());
     }
 
     #[test]
-    fn r23_current_stats_never_runs_detection() {
-        // R23: "with no stored console it does not probe". A console that runs but was
+    fn r31_current_stats_never_runs_detection() {
+        // R31: "with no stored console it does not probe". A console that runs but was
         // never stored by detection gets no request.
         let app = app();
         let fake =
@@ -263,7 +263,7 @@ mod stats_from_console {
     }
 
     #[test]
-    fn r23_current_stats_reads_the_stored_java_console() {
+    fn r31_current_stats_reads_the_stored_java_console() {
         let app = app();
         let _fake = java_console(&app);
         let stats = current_stats(&handle(&app), None);
@@ -272,7 +272,7 @@ mod stats_from_console {
     }
 
     #[test]
-    fn r23_current_stats_reads_the_stored_i2pd_console() {
+    fn r31_current_stats_reads_the_stored_i2pd_console() {
         let app = app();
         let fake = FakeConsole::serving(ConsoleKind::I2pd, "/", 200, I2PD);
         set_console(app.handle(), Some(fake.verified()));
@@ -285,15 +285,15 @@ mod stats_from_console {
         assert_eq!(stats.floodfills, Some(812));
         assert_eq!(
             stats.tunnels.client, None,
-            "R30: i2pd gives no client count"
+            "R38: i2pd gives no client count"
         );
         assert_eq!(stats.tunnels.participating, Some(157));
         assert_eq!(stats.tunnel_build_success_percent.total, Some(42));
     }
 
     #[test]
-    fn r23_a_helper_that_does_not_answer_falls_back_to_the_console() {
-        // R23: the helper first; no answer from it, the console is next.
+    fn r31_a_helper_that_does_not_answer_falls_back_to_the_console() {
+        // R31: the helper first; no answer from it, the console is next.
         let app = app();
         let _fake = java_console(&app);
         let stats = current_stats(&handle(&app), Some((dead_addr(), "token".into())));
@@ -301,8 +301,8 @@ mod stats_from_console {
     }
 
     #[test]
-    fn r23_a_console_that_does_not_answer_200_gives_all_null_and_no_sample() {
-        // R23 step 3, R32: no source, no history sample.
+    fn r31_a_console_that_does_not_answer_200_gives_all_null_and_no_sample() {
+        // R31 step 3, R40: no source, no history sample.
         let app = app();
         let fake =
             FakeConsole::serving(ConsoleKind::Java, stats_path(ConsoleKind::Java), 503, JAVA);
@@ -311,8 +311,8 @@ mod stats_from_console {
     }
 
     #[test]
-    fn r26_each_call_makes_at_most_one_console_request() {
-        // R26: "each `router_stats()` call makes at most one console request".
+    fn r34_each_call_makes_at_most_one_console_request() {
+        // R34: "each `router_stats()` call makes at most one console request".
         let app = app();
         let fake = java_console(&app);
         let _ = current_stats(&handle(&app), None);
@@ -322,7 +322,7 @@ mod stats_from_console {
     }
 
     #[test]
-    fn r26_no_stored_console_means_no_request_at_all() {
+    fn r34_no_stored_console_means_no_request_at_all() {
         let app = app();
         let fake = java_console(&app);
         set_console(app.handle(), None);
@@ -332,8 +332,8 @@ mod stats_from_console {
     }
 
     #[test]
-    fn r32_an_answer_from_the_console_includes_its_bandwidth_sample() {
-        // R32: "The `history` of the answer includes the new sample."
+    fn r40_an_answer_from_the_console_includes_its_bandwidth_sample() {
+        // R40: "The `history` of the answer includes the new sample."
         let app = app();
         let _fake = java_console(&app);
         let stats = current_stats(&handle(&app), None);
@@ -344,8 +344,8 @@ mod stats_from_console {
     }
 
     #[test]
-    fn r32_two_answers_less_than_4_seconds_apart_add_one_sample() {
-        // R32: the panel and the Network page together still add one sample per 5 s.
+    fn r40_two_answers_less_than_4_seconds_apart_add_one_sample() {
+        // R40: the panel and the Network page together still add one sample per 5 s.
         let app = app();
         let _fake = java_console(&app);
         let first = current_stats(&handle(&app), None);
@@ -360,7 +360,7 @@ mod stats_from_console {
     }
 
     #[test]
-    fn r32_a_console_sample_is_added_again_after_the_gap() {
+    fn r40_a_console_sample_is_added_again_after_the_gap() {
         let app = app();
         let _fake = java_console(&app);
         let first = current_stats(&handle(&app), None);
@@ -401,8 +401,8 @@ mod stats_from_console {
     }
 
     #[test]
-    fn r33_the_router_stats_command_answers_the_contract_v1_6_shape() {
-        // R31, R33, IPC contract v1.6: camelCase keys, the new fields, history samples.
+    fn r41_the_router_stats_command_answers_the_contract_v1_6_shape() {
+        // R39, R41, IPC contract v1.7: camelCase keys, the new fields, history samples.
         let app = app();
         let _fake = java_console(&app);
         let value = ok(&app, "router_stats", json!({}));
@@ -412,7 +412,7 @@ mod stats_from_console {
     }
 
     #[test]
-    fn r33_the_router_stats_command_with_no_source_answers_all_null() {
+    fn r41_the_router_stats_command_with_no_source_answers_all_null() {
         let app = app();
         let value = ok(&app, "router_stats", json!({}));
         for key in [
@@ -429,7 +429,7 @@ mod stats_from_console {
         assert_eq!(value["history"], json!([]));
     }
 
-    // ------------------------------------------------ R37: no console request after stop
+    // ------------------------------------------------ R45: no console request after stop
 
     const HELPER_JSON: &str = r#"{"version":"helper-2.10.0","uptimeMs":5000}"#;
 
@@ -453,7 +453,7 @@ mod stats_from_console {
     }
 
     #[test]
-    fn r37_after_stop_current_stats_sends_no_request_to_the_console() {
+    fn r45_after_stop_current_stats_sends_no_request_to_the_console() {
         let (app, fake, seen) = stopped_app();
         let _ = current_stats(&handle(&app), None);
         let _ = current_stats(&handle(&app), None);
@@ -466,14 +466,14 @@ mod stats_from_console {
     }
 
     #[test]
-    fn r37_after_stop_with_no_helper_every_field_is_null_and_the_history_is_empty() {
+    fn r45_after_stop_with_no_helper_every_field_is_null_and_the_history_is_empty() {
         let (app, _fake, _) = stopped_app();
         let stats = current_stats(&handle(&app), None);
         assert_eq!(stats, RouterStats::default());
     }
 
     #[test]
-    fn r37_after_stop_the_router_stats_command_answers_all_null_and_asks_no_console() {
+    fn r45_after_stop_the_router_stats_command_answers_all_null_and_asks_no_console() {
         let (app, fake, seen) = stopped_app();
         let value = ok(&app, "router_stats", json!({}));
         assert_eq!(fake.requests().len(), seen);
@@ -483,7 +483,7 @@ mod stats_from_console {
     }
 
     #[test]
-    fn r37_after_stop_a_helper_that_answers_still_gives_the_figures_and_no_console_sample() {
+    fn r45_after_stop_a_helper_that_answers_still_gives_the_figures_and_no_console_sample() {
         let (app, fake, seen) = stopped_app();
         let helper = FakeHelper::serving(HELPER_JSON);
         let stats = current_stats(&handle(&app), Some((helper.addr(), "token".into())));
@@ -499,7 +499,7 @@ mod stats_from_console {
     }
 
     #[test]
-    fn r37_after_stop_a_helper_that_does_not_answer_gives_all_null_not_the_console() {
+    fn r45_after_stop_a_helper_that_does_not_answer_gives_all_null_not_the_console() {
         let (app, fake, seen) = stopped_app();
         let dead = Some((dead_addr(), "token".into()));
         let stats = current_stats(&handle(&app), dead);
@@ -508,8 +508,8 @@ mod stats_from_console {
     }
 
     #[test]
-    fn r37_after_detect_now_the_console_is_queried_again() {
-        // R37: "until `detect_now` runs again". `detect_now` probes the default ports and
+    fn r45_after_detect_now_the_console_is_queried_again() {
+        // R45: "until `detect_now` runs again". `detect_now` probes the default ports and
         // stores what it finds; the stored console is then the fake.
         let _lock = detect_lock();
         let (app, fake, _) = stopped_app();

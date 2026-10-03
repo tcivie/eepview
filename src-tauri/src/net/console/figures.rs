@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 //! Router statistics from the text of a console page (`docs/wiki/router-console.md`,
-//! R27 to R30). Each field is read alone and fails closed: a value that does not match its
+//! R35 to R38). Each field is read alone and fails closed: a value that does not match its
 //! rule exactly is `None`, never a guess.
 
 use crate::net::stats::{Bandwidth, BuildSuccess, RouterStats, Tunnels};
@@ -31,7 +31,7 @@ const I2PD_UNITS: [(&str, &str, u64); 4] = [
     ("second", "seconds", 1_000),
 ];
 
-// ------------------------------------------------------------------ numbers (R27)
+// ------------------------------------------------------------------ numbers (R35)
 
 /// One or more ASCII digits that fit in `u64`.
 fn integer(text: &str) -> Option<u64> {
@@ -60,9 +60,9 @@ fn scaled(text: &str, scale: u64) -> Option<u64> {
     u64::try_from(u128::from(whole) * scale + rounded).ok()
 }
 
-// ------------------------------------------------------------------ Java I2P (R28, R29)
+// ------------------------------------------------------------------ Java I2P (R36, R37)
 
-/// The Java I2P sidebar body (R27 to R29) to statistics.
+/// The Java I2P sidebar body (R35 to R37) to statistics.
 #[must_use]
 pub fn parse_java_summary(body: &str) -> RouterStats {
     let (uptime_ms, uptime_resolution_ms) = java_uptime(body).unzip();
@@ -218,9 +218,9 @@ fn java_network_status(body: &str) -> Option<String> {
         .map(|(_, status)| (*status).to_owned())
 }
 
-// ------------------------------------------------------------------ i2pd (R30)
+// ------------------------------------------------------------------ i2pd (R38)
 
-/// The i2pd main page body (R27, R30) to statistics. English pages only.
+/// The i2pd main page body (R35, R38) to statistics. English pages only.
 #[must_use]
 pub fn parse_i2pd_main(body: &str) -> RouterStats {
     if !body.contains("<html lang=\"en\"") {

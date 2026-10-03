@@ -66,7 +66,7 @@ pub fn outside(f: impl FnOnce() + Send + 'static) {
 pub fn apply<R: Runtime>(app: &AppHandle<R>, fx: Vec<Effect>) {
     let (mut relayout, mut focus) = (false, false);
     for effect in fx {
-        relayout |= matches!(effect, Effect::Layout | Effect::Web(_));
+        relayout |= matches!(effect, Effect::Layout | Effect::Web(_) | Effect::Console(_));
         match effect {
             Effect::Emit(event) => emit(app, &event),
             Effect::Web(op) => web(app, op),
@@ -74,6 +74,7 @@ pub fn apply<R: Runtime>(app: &AppHandle<R>, fx: Vec<Effect>) {
             Effect::FocusContent => focus = true,
             Effect::HoverLater(generation) => show_later(app, generation),
             Effect::FetchIcon(host) => fetch_icon(app, host),
+            Effect::Console(op) => super::console::run(app, &op),
             Effect::Layout => {}
         }
     }
@@ -91,6 +92,7 @@ fn focus_content<R: Runtime>(app: &AppHandle<R>) {
     let label = match lock(&shared(app).core).view() {
         View::Web(tab) => tab_webview(app, tab).map(|w| w.label().to_owned()),
         View::Internal(_) => Some("internal".to_owned()),
+        View::Console(_) => Some(super::console::CONSOLE_LABEL.to_owned()),
     };
     if let Some(webview) = label.and_then(|l| app.get_webview(&l)) {
         let _ = webview.set_focus();

@@ -60,8 +60,8 @@ describe("Network page", () => {
   });
 });
 
-describe("[R34] uptime to its resolution", () => {
-  it("[R34] with no resolution, a null one or one below 60 s, it keeps today's output", () => {
+describe("[R42] uptime to its resolution", () => {
+  it("[R42] with no resolution, a null one or one below 60 s, it keeps today's output", () => {
     for (const resolution of [undefined, null, 1, 30, 59]) {
       assert.equal(formatUptime(28_800, resolution), "8 h 0 min", `resolution ${resolution}`);
       assert.equal(formatUptime(7380, resolution), "2 h 3 min", `resolution ${resolution}`);
@@ -71,29 +71,29 @@ describe("[R34] uptime to its resolution", () => {
     assert.equal(formatUptime(28_800), "8 h 0 min");
   });
 
-  it('[R34] with a resolution of 3 600 s, 28 800 s is "8 h", not "8 h 0 min"', () => {
+  it('[R42] with a resolution of 3 600 s, 28 800 s is "8 h", not "8 h 0 min"', () => {
     assert.equal(formatUptime(28_800, 3600), "8 h");
   });
 
-  it("[R34] with a resolution of 3 600 s, a day and hours drop the minutes", () => {
+  it("[R42] with a resolution of 3 600 s, a day and hours drop the minutes", () => {
     assert.equal(formatUptime(7380, 3600), "2 h");
     assert.equal(formatUptime(93_784, 3600), "1 d 2 h");
   });
 
-  it('[R34] with a resolution of 86 400 s, 172 800 s is "2 d"', () => {
+  it('[R42] with a resolution of 86 400 s, 172 800 s is "2 d"', () => {
     assert.equal(formatUptime(172_800, 86_400), "2 d");
     assert.equal(formatUptime(93_784, 86_400), "1 d");
   });
 });
 
-describe("[R34] uptime at a resolution of 60 s or finer than the unit", () => {
-  it("[R34] with a resolution of 60 s, the minutes stay", () => {
+describe("[R42] uptime at a resolution of 60 s or finer than the unit", () => {
+  it("[R42] with a resolution of 60 s, the minutes stay", () => {
     assert.equal(formatUptime(7380, 60), "2 h 3 min");
     assert.equal(formatUptime(28_800, 60), "8 h 0 min");
     assert.equal(formatUptime(300, 60), "5 min");
   });
 
-  it("[R34] never shows a unit smaller than the resolution", () => {
+  it("[R42] never shows a unit smaller than the resolution", () => {
     for (const [seconds, resolution, unit] of [
       [93_784, 3600, "min"],
       [93_784, 86_400, "h"],
@@ -106,8 +106,8 @@ describe("[R34] uptime at a resolution of 60 s or finer than the unit", () => {
   });
 });
 
-describe("[R34] the Network page passes the resolution on", () => {
-  it('[R34] statsText shows 28 800 s with a resolution of 3 600 s as "8 h"', () => {
+describe("[R42] the Network page passes the resolution on", () => {
+  it('[R42] statsText shows 28 800 s with a resolution of 3 600 s as "8 h"', () => {
     const text = statsText({ ...STATS, uptimeSeconds: 28_800, uptimeResolutionSeconds: 3600 });
     const shown = Object.values(text).filter((value) => /\b8 h\b/.test(value));
     assert.ok(shown.length > 0, `no field shows "8 h": ${JSON.stringify(text)}`);
@@ -117,7 +117,7 @@ describe("[R34] the Network page passes the resolution on", () => {
     );
   });
 
-  it("[R34] statsText keeps today's uptime when the resolution is null", () => {
+  it("[R42] statsText keeps today's uptime when the resolution is null", () => {
     const text = statsText({ ...STATS, uptimeSeconds: 28_800, uptimeResolutionSeconds: null });
     assert.ok(Object.values(text).some((value) => String(value).includes("8 h 0 min")));
   });
