@@ -17,6 +17,7 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Remove CodeQL and Scorecard until the repo is public (#9)
 - Cut dependencies flagged by Socket (#10)
 - Add the roadmap, the project wiki, AGENTS.md and a docs-check CI job (#16)
+- Add the Rust and TypeScript coverage gate (#13)
 - Add the release pipeline: SBOM, checksums, provenance, draft release (#14)
 - Move all docs into docs/wiki and enforce it in docs-check (#22)
 - Release gates job replaces the reusable-workflow calls; the macOS app is ad-hoc signed inside the dmg (#24)
