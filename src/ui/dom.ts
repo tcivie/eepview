@@ -11,3 +11,13 @@ export function all<T extends Element>(selector: string, root: ParentNode = docu
 export function announce(region: HTMLElement, text: string): void {
   region.textContent = text;
 }
+
+export function cloneTemplate(id: string): HTMLElement {
+  const template = byId<HTMLTemplateElement>(id);
+  return template.content.firstElementChild?.cloneNode(true) as HTMLElement;
+}
+
+export function setText(root: ParentNode, selector: string, text: string): void {
+  const el = root.querySelector(selector);
+  if (el) el.textContent = text;
+}

@@ -168,7 +168,18 @@
             </div>
             <div class="field">
               <label class="field-label" for="bm-folder">Folder</label>
-              <select class="select" id="bm-folder" name="folder"></select>
+              <input
+                class="input"
+                id="bm-folder"
+                name="folder"
+                list="folder-list"
+                autocomplete="off"
+                aria-describedby="bm-folder-hint"
+              />
+              <datalist id="folder-list"></datalist>
+              <span class="field-hint" id="bm-folder-hint">
+                Pick a folder or type a new name. Leave empty for no folder.
+              </span>
             </div>
             <div class="actions">
               <button class="btn" type="button" id="editor-cancel">Cancel</button>

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { routerView } from "./router-view.ts";
+import { hopStates, routerView } from "./router-view.ts";
 
 const base = { proxy: "127.0.0.1:4444", version: null, detail: null };
 
@@ -22,5 +22,17 @@ describe("routerView", () => {
   it("prefers the detail from the core", () => {
     const view = routerView({ ...base, state: "down", detail: "Exit code 1." });
     assert.equal(view.text, "Exit code 1.");
+  });
+});
+
+describe("hopStates", () => {
+  it("builds every hop when ready", () => {
+    assert.deepEqual(hopStates("ready", 3), ["built", "built", "built"]);
+  });
+  it("shows the next hop building", () => {
+    assert.deepEqual(hopStates("building", 3), ["built", "building", null]);
+  });
+  it("shows the refused hop when stopped", () => {
+    assert.deepEqual(hopStates("stopped", 3), ["built", "refused", null]);
   });
 });

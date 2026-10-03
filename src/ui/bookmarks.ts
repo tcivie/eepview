@@ -1,73 +1,30 @@
 import "./boot.ts";
-import { announce, byId } from "./dom.ts";
+import type { Bookmark } from "./contract.ts";
+import { announce, byId, cloneTemplate, setText } from "./dom.ts";
+import { call, errorText, on } from "./ipc.ts";
+import { displayUrl, eepsiteUrl, isI2pAddress } from "./lib/address.ts";
+import { folderGroups, folderNames } from "./lib/bookmark-groups.ts";
 
-interface Bookmark {
-  id: string;
-  name: string;
-  address: string;
-  folder: string;
-}
-
-const UNFILED = "";
-const FOLDERS = ["Forums", "Reference", "Friends", UNFILED];
 const ADDRESS_HINT = "A .i2p name or a .b32.i2p address.";
-const EEPSITE_SCHEME = "http:";
-const I2P_HOST = /^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+i2p$/;
 
-let nextId = 1;
-const sample = (name: string, address: string, folder: string): Bookmark => ({
-  id: `bm-${nextId++}`,
-  name,
-  address,
-  folder,
-});
+type Draft = { url: string; title: string; folder: string | null };
 
-let bookmarks: Bookmark[] = [
-  sample("I2P Forum", "i2pforum.i2p", "Forums"),
-  sample("zzz.i2p development forum", "zzz.i2p", "Forums"),
-  sample("Ramble", "ramble.i2p", "Forums"),
-  sample("Site uptime list", "notbob.i2p", "Reference"),
-  sample("Network statistics", "stats.i2p", "Reference"),
-  sample("Planet I2P", "planet.i2p", "Reference"),
-  sample("Book club", "ukeu3k5oycgaauneqgtnvselmt4yemvoilkln7jpvamvfx7dnkdq.b32.i2p", "Friends"),
-  sample("Legwork search", "legwork.i2p", UNFILED),
-];
+let bookmarks: Bookmark[] = [];
+let editing: Bookmark | null = null;
 
-let editingId: string | null = null;
-
-const folderLabel = (folder: string): string => (folder === UNFILED ? "Not in a folder" : folder);
-const countLabel = (n: number): string => (n === 1 ? "1 site" : `${n} sites`);
 const status = (): HTMLElement => byId("bookmark-status");
-
-function hostOf(address: string): string {
-  const trimmed = address.trim().toLowerCase();
-  const withoutScheme = trimmed.replace(/^https?:/, "").replace(/^\/+/, "");
-  return withoutScheme.split(/[/?#]/)[0] ?? "";
-}
-
-export function isI2pAddress(address: string): boolean {
-  return I2P_HOST.test(hostOf(address));
-}
-
-function cloneTemplate(id: string): HTMLElement {
-  const template = byId<HTMLTemplateElement>(id);
-  return template.content.firstElementChild?.cloneNode(true) as HTMLElement;
-}
-
-function setText(root: ParentNode, selector: string, text: string): void {
-  const el = root.querySelector(selector);
-  if (el) el.textContent = text;
-}
+const countLabel = (n: number): string => (n === 1 ? "1 site" : `${n} sites`);
+const reportError = (error: unknown): void => announce(status(), errorText(error));
+const labelOf = (b: Bookmark): string => b.title || displayUrl(b.url);
 
 function fillRow(row: HTMLElement, bookmark: Bookmark): void {
-  const link = row.querySelector<HTMLAnchorElement>(".row-link");
-  link?.setAttribute("href", new URL(`${EEPSITE_SCHEME}${hostOf(bookmark.address)}`).href);
-  setText(row, ".row-name", bookmark.name);
-  setText(row, ".row-addr", hostOf(bookmark.address));
+  row.querySelector("a")?.setAttribute("href", bookmark.url);
+  setText(row, ".row-name", labelOf(bookmark));
+  setText(row, ".row-addr", displayUrl(bookmark.url));
   for (const button of row.querySelectorAll<HTMLButtonElement>("button[data-action]")) {
     const verb = button.dataset.action === "edit" ? "Edit" : "Delete";
     button.dataset.id = bookmark.id;
-    button.setAttribute("aria-label", `${verb} ${bookmark.name}`);
+    button.setAttribute("aria-label", `${verb} ${labelOf(bookmark)}`);
     button.title = verb;
   }
 }
@@ -78,139 +35,126 @@ function renderRow(bookmark: Bookmark): HTMLElement {
   return row;
 }
 
-function renderFolder(folder: string, items: Bookmark[]): HTMLElement {
+function renderFolder(name: string, label: string, items: Bookmark[]): HTMLElement {
   const section = cloneTemplate("folder-template");
-  const headingId = `folder-${folder || "unfiled"}`.toLowerCase();
+  const headingId = `folder-${name || "none"}`.toLowerCase().replace(/[^a-z0-9-]/g, "-");
   section.setAttribute("aria-labelledby", headingId);
-  const name = section.querySelector(".folder-name");
-  name?.setAttribute("id", headingId);
-  setText(section, ".folder-name", folderLabel(folder));
+  section.querySelector(".folder-name")?.setAttribute("id", headingId);
+  setText(section, ".folder-name", label);
   setText(section, ".folder-count", countLabel(items.length));
   section.querySelector(".rows")?.append(...items.map(renderRow));
   return section;
 }
 
 function render(): void {
-  const groups = FOLDERS.map((folder) => ({
-    folder,
-    items: bookmarks.filter((b) => b.folder === folder),
-  })).filter((group) => group.items.length > 0);
-  byId("folders").replaceChildren(...groups.map((g) => renderFolder(g.folder, g.items)));
+  const groups = folderGroups(bookmarks);
+  byId("folders").replaceChildren(...groups.map((g) => renderFolder(g.name, g.label, g.items)));
+  const options = folderNames(bookmarks).map((name) => new Option(name, name));
+  byId("folder-list").replaceChildren(...options);
 }
 
-function fillFolderSelect(selected: string): void {
-  const select = byId<HTMLSelectElement>("bm-folder");
-  select.replaceChildren(
-    ...FOLDERS.map((folder) => new Option(folderLabel(folder), folder, false, folder === selected)),
-  );
+function show(list: Bookmark[]): void {
+  bookmarks = list;
+  render();
+}
+
+function load(): void {
+  call("bookmarks_list", {}).then(show).catch(reportError);
 }
 
 function setAddressError(message: string | null): void {
-  const input = byId<HTMLInputElement>("bm-address");
   const hint = byId("bm-address-hint");
-  input.setAttribute("aria-invalid", message ? "true" : "false");
+  byId("bm-address").setAttribute("aria-invalid", message ? "true" : "false");
   hint.textContent = message ?? ADDRESS_HINT;
   hint.classList.toggle("field-error", message !== null);
 }
 
 function openEditor(bookmark: Bookmark | null): void {
-  editingId = bookmark?.id ?? null;
+  editing = bookmark;
   byId("editor-title").textContent = bookmark ? "Edit bookmark" : "Add bookmark";
-  byId<HTMLInputElement>("bm-name").value = bookmark?.name ?? "";
-  byId<HTMLInputElement>("bm-address").value = bookmark?.address ?? "";
-  fillFolderSelect(bookmark?.folder ?? UNFILED);
+  byId<HTMLInputElement>("bm-name").value = bookmark?.title ?? "";
+  byId<HTMLInputElement>("bm-address").value = bookmark ? displayUrl(bookmark.url) : "";
+  byId<HTMLInputElement>("bm-folder").value = bookmark?.folder ?? "";
   setAddressError(null);
   byId<HTMLDialogElement>("editor").showModal();
 }
 
-function readEditor(): Omit<Bookmark, "id"> {
-  const address = hostOf(byId<HTMLInputElement>("bm-address").value);
-  const name = byId<HTMLInputElement>("bm-name").value.trim() || address;
-  return { name, address, folder: byId<HTMLSelectElement>("bm-folder").value };
+function readEditor(): Draft {
+  const address = byId<HTMLInputElement>("bm-address").value.trim();
+  const folder = byId<HTMLInputElement>("bm-folder").value.trim();
+  const url = isI2pAddress(address) ? eepsiteUrl(address) : address;
+  const title = byId<HTMLInputElement>("bm-name").value.trim() || displayUrl(url);
+  return { url, title, folder: folder || null };
 }
 
-function saveEditor(event: SubmitEvent): void {
+async function save(draft: Draft): Promise<void> {
+  if (editing) await call("bookmark_update", { bookmark: { ...editing, ...draft } });
+  else await call("bookmark_add", { bookmark: draft });
+  byId<HTMLDialogElement>("editor").close();
+  announce(status(), `Saved ${draft.title}.`);
+  load();
+}
+
+function onSave(event: SubmitEvent): void {
   event.preventDefault();
   const draft = readEditor();
-  if (!isI2pAddress(draft.address)) {
-    setAddressError("This is not an I2P address. It must end in .i2p.");
-    byId("bm-address").focus();
+  if (isI2pAddress(draft.url)) {
+    save(draft).catch(reportError);
     return;
   }
-  const id = editingId;
-  bookmarks = id
-    ? bookmarks.map((b) => (b.id === id ? { ...draft, id } : b))
-    : [...bookmarks, { ...draft, id: `bm-${nextId++}` }];
-  byId<HTMLDialogElement>("editor").close();
-  render();
-  announce(status(), `Saved ${draft.name}.`);
+  setAddressError("This is not an I2P address. It must end in .i2p.");
+  byId("bm-address").focus();
 }
 
-function deleteBookmark(id: string): void {
+async function deleteBookmark(id: string): Promise<void> {
   const doomed = bookmarks.find((b) => b.id === id);
-  bookmarks = bookmarks.filter((b) => b.id !== id);
-  render();
-  announce(status(), doomed ? `Deleted ${doomed.name}.` : "Deleted.");
+  await call("bookmark_remove", { id });
+  announce(status(), `Deleted ${doomed ? labelOf(doomed) : "the bookmark"}.`);
+  load();
 }
 
 function onListClick(event: MouseEvent): void {
   const button = (event.target as Element).closest<HTMLButtonElement>("button[data-action]");
   const id = button?.dataset.id;
   if (!id) return;
-  if (button.dataset.action === "delete") {
-    deleteBookmark(id);
-    return;
-  }
-  openEditor(bookmarks.find((b) => b.id === id) ?? null);
+  if (button.dataset.action === "delete") deleteBookmark(id).catch(reportError);
+  else openEditor(bookmarks.find((b) => b.id === id) ?? null);
 }
 
-function exportBookmarks(): void {
-  const data = bookmarks.map(({ name, address, folder }) => ({ name, address, folder }));
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+async function exportBookmarks(): Promise<void> {
+  const json = await call("bookmarks_export", {});
   const link = document.createElement("a");
-  link.href = URL.createObjectURL(blob);
+  link.href = URL.createObjectURL(new Blob([json], { type: "application/json" }));
   link.download = "eepview-bookmarks.json";
   link.click();
   URL.revokeObjectURL(link.href);
   announce(status(), `Exported ${countLabel(bookmarks.length)}.`);
 }
 
-function toBookmark(entry: unknown): Bookmark | null {
-  const record = entry as Partial<Bookmark> | null;
-  if (typeof record?.address !== "string" || !isI2pAddress(record.address)) return null;
-  const folder = FOLDERS.includes(record.folder ?? "") ? (record.folder ?? UNFILED) : UNFILED;
-  const name = typeof record.name === "string" ? record.name : hostOf(record.address);
-  return { id: `bm-${nextId++}`, name, address: hostOf(record.address), folder };
-}
-
-async function importBookmarks(file: File): Promise<void> {
-  const parsed: unknown = JSON.parse(await file.text());
-  const entries = Array.isArray(parsed) ? parsed : [];
-  const added = entries.map(toBookmark).filter((b): b is Bookmark => b !== null);
-  bookmarks = [...bookmarks, ...added];
-  render();
-  const skipped = entries.length - added.length;
-  announce(status(), `Imported ${countLabel(added.length)}. Skipped ${skipped} that were not I2P.`);
+async function importFile(file: File): Promise<void> {
+  const added = await call("bookmarks_import", { json: await file.text() });
+  announce(status(), `Imported ${countLabel(added)}.`);
+  load();
 }
 
 function onImportChosen(event: Event): void {
   const input = event.target as HTMLInputElement;
   const file = input.files?.[0];
   input.value = "";
-  if (!file) return;
-  importBookmarks(file).catch(() => announce(status(), "That file is not a bookmarks export."));
+  if (file) importFile(file).catch(reportError);
 }
 
 function wire(): void {
   byId("folders").addEventListener("click", onListClick);
   byId("add-btn").addEventListener("click", () => openEditor(null));
-  byId("export-btn").addEventListener("click", exportBookmarks);
+  byId("export-btn").addEventListener("click", () => exportBookmarks().catch(reportError));
   byId("import-btn").addEventListener("click", () => byId("import-file").click());
   byId("import-file").addEventListener("change", onImportChosen);
-  byId<HTMLFormElement>("editor-form").addEventListener("submit", saveEditor);
+  byId<HTMLFormElement>("editor-form").addEventListener("submit", onSave);
   byId("editor-cancel").addEventListener("click", () => byId<HTMLDialogElement>("editor").close());
+  on("bookmarks-changed", load).catch(reportError);
 }
 
-render();
 wire();
+load();
 if (window.location.hash === "#add") openEditor(null);

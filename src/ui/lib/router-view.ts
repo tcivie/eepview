@@ -66,3 +66,13 @@ export function routerView(status: RouterLike): RouterView {
   if (status.version) parts.push(`I2P ${status.version} at ${status.proxy}.`);
   return { ...view, text: parts.join(" ") };
 }
+
+export type HopState = "built" | "building" | "refused" | null;
+
+export function hopStates(tone: RouterTone, count: number): HopState[] {
+  return Array.from({ length: count }, (_, i): HopState => {
+    if (tone === "ready" || i === 0) return "built";
+    if (tone === "stopped") return i === 1 ? "refused" : null;
+    return i === 1 ? "building" : null;
+  });
+}
