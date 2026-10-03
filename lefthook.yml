@@ -5,7 +5,9 @@ pre-commit:
   jobs:
     - name: rustfmt
       glob: "*.rs"
-      run: cargo fmt --manifest-path src-tauri/Cargo.toml --check
+      run: |
+        cargo fmt --manifest-path src-tauri/Cargo.toml --check
+        cargo fmt --manifest-path spike/probe/Cargo.toml --check
     - name: biome
       glob: "*.{ts,js,json,html,css}"
       run: npx biome check --no-errors-on-unmatched {staged_files}
@@ -19,7 +21,7 @@ pre-commit:
       glob: ".github/workflows/*.{yml,yaml}"
       run: actionlint {staged_files}
     - name: complexity
-      glob: "*.{rs,ts}"
+      glob: "*.{rs,ts,py}"
       run: ./scripts/complexity.sh
     - name: gitleaks
       run: gitleaks git --staged --no-banner --redact
