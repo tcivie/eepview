@@ -7,6 +7,7 @@
 //! `report_open` is the one clearnet action of eepview, and it runs only after a click: it
 //! opens a fixed GitHub URL prefix in the user's own browser. eepview itself sends nothing.
 
+use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
 use serde::Serialize;
@@ -127,10 +128,17 @@ async fn build<R: Runtime>(
         kind: ReportKind::from_param(&kind),
         description,
         info: info(facts),
-        log: diag::report_lines(&diag::recent(PREVIEW_EVENTS)),
+        log: log_lines(),
         include_log,
     })
     .await
+}
+
+/// The last [`PREVIEW_EVENTS`] events without times, then the bucketed counters.
+fn log_lines() -> Vec<String> {
+    let mut lines = diag::report_lines(&diag::recent(PREVIEW_EVENTS));
+    lines.extend(diag::counter_lines());
+    lines
 }
 
 /// `report_preview(kind, description, includeLog)`: exactly the text that goes out.
@@ -167,7 +175,7 @@ pub async fn report_open<R: Runtime>(
         .download_dir()
         .map_err(|_| failed(OpKind::WriteReport, ErrorKind::NotFound))?;
     let report = build(app.clone(), kind, description, include_log).await?;
-    blocking(move || send(&System(app), &downloads, &report, diag::now_secs())).await?
+    blocking(move || send(&System(app), &downloads, &report)).await?
 }
 
 /// Records `ReportFailed` and gives the page its error text.
@@ -182,15 +190,8 @@ fn failed(op: OpKind, kind: ErrorKind) -> String {
 ///
 /// Fails when the file cannot be written, the URL or the file is outside its allowed place,
 /// or the system cannot open them.
-pub fn send(
-    launcher: &impl Launcher,
-    downloads: &Path,
-    report: &Report,
-    now: u64,
-) -> Result<Opened, String> {
-    let file = report::file_name(now);
-    let path = downloads.join(&file);
-    std::fs::write(&path, report::text(report))
+pub fn send(launcher: &impl Launcher, downloads: &Path, report: &Report) -> Result<Opened, String> {
+    let (file, path) = write_report(downloads, &report::text(report))
         .map_err(|e| failed(OpKind::WriteReport, ErrorKind::from(&e)))?;
     let (url, trimmed) = report::issue_url(report);
     if !report::is_issue_url(&url) {
@@ -209,9 +210,28 @@ pub fn send(
     Ok(Opened { file, trimmed })
 }
 
-/// True when `path` sits directly in `folder`.
+/// Writes `text` to the first free `eepview-report.txt`, `eepview-report (2).txt`, … in
+/// `downloads`, created new (never through a link), 0600 on Unix.
+fn write_report(downloads: &Path, text: &str) -> io::Result<(String, PathBuf)> {
+    for n in 1..=99 {
+        let file = report::file_name(n);
+        let path = downloads.join(&file);
+        match diag::files::create_new(&path) {
+            Ok(mut out) => return out.write_all(text.as_bytes()).map(|()| (file, path)),
+            Err(e) if e.kind() == io::ErrorKind::AlreadyExists => {}
+            Err(e) => return Err(e),
+        }
+    }
+    Err(io::ErrorKind::AlreadyExists.into())
+}
+
+/// True when `path`, resolved, sits directly in `folder`, resolved: a link in the path or
+/// in the folder cannot move the file elsewhere (R14.3).
 fn in_folder(path: &Path, folder: &Path) -> bool {
-    path.parent() == Some(folder) && path.file_name().is_some()
+    let (Ok(path), Ok(folder)) = (path.canonicalize(), folder.canonicalize()) else {
+        return false;
+    };
+    path.parent() == Some(folder.as_path())
 }
 
 /// `diag_crash_status()`: the last run crashed and the banner was not dismissed.
@@ -290,8 +310,10 @@ mod tests {
         let app = app();
         let dir = testdir::fresh("report-send");
         let fake = Fake::default();
-        let opened = send(&fake, &dir, &sample(&app), 1_791_028_800).unwrap();
-        assert_eq!(opened.file, "eepview-report-2026-10-03T12-00-00Z.txt");
+        let opened = send(&fake, &dir, &sample(&app)).unwrap();
+        assert_eq!(opened.file, "eepview-report.txt");
+        let second = send(&fake, &dir, &sample(&app)).unwrap();
+        assert_eq!(second.file, "eepview-report (2).txt");
         let text = std::fs::read_to_string(dir.join(&opened.file)).unwrap();
         assert!(!text.contains("a.i2p") && text.contains("[removed]"));
         assert!(report::is_issue_url(&fake.opened.borrow()[0]));
@@ -306,10 +328,11 @@ mod tests {
             fail: Some(ErrorKind::Platform),
             ..Fake::default()
         };
-        assert!(send(&fake, &dir, &sample(&app), 0).is_err());
+        assert!(send(&fake, &dir, &sample(&app)).is_err());
         let missing = dir.join("missing");
-        assert!(send(&Fake::default(), &missing, &sample(&app), 0).is_err());
+        assert!(send(&Fake::default(), &missing, &sample(&app)).is_err());
         assert!(!in_folder(&dir, &missing));
+        assert!(!in_folder(&dir.join("eepview-report.txt"), &dir.join("x")));
     }
 
     #[test]

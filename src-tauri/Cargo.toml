@@ -47,6 +47,11 @@ serde_json = "1"
 eepview-platform = { path = "crates/eepview-platform" }
 tauri-plugin-opener = "2"
 
+[target.'cfg(unix)'.dependencies]
+# `O_NOFOLLOW` for the diagnostics files: a symbolic link in their place is never followed.
+# Already in the tree through Tauri.
+libc = "0.2"
+
 [lints.rust]
 unsafe_code = "deny"
 missing_docs = "warn"

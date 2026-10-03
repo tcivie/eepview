@@ -6,9 +6,8 @@
 
 use std::fmt::Write as _;
 
-use super::scrub::scrub;
+use super::scrub::scrub_report as scrub;
 use super::sysinfo::SystemInfo;
-use super::types::civil;
 
 /// The only URL eepview ever opens outside I2P.
 pub const ISSUE_PREFIX: &str = "https://github.com/tcivie/eepview/issues/new";
@@ -219,9 +218,12 @@ pub fn is_issue_url(url: &str) -> bool {
         .is_some_and(|rest| rest.is_empty() || rest.starts_with('?'))
 }
 
-/// `eepview-report-YYYY-MM-DDTHH-MM-SSZ.txt`.
+/// `eepview-report.txt` for 0 and 1, `eepview-report (<n>).txt` from 2. No date (R13.2).
 #[must_use]
-pub fn file_name(secs: u64) -> String {
-    let (y, mo, d, h, mi, s) = civil(secs);
-    format!("eepview-report-{y:04}-{mo:02}-{d:02}T{h:02}-{mi:02}-{s:02}Z.txt")
+pub fn file_name(n: u32) -> String {
+    if n < 2 {
+        "eepview-report.txt".to_owned()
+    } else {
+        format!("eepview-report ({n}).txt")
+    }
 }

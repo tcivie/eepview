@@ -19,7 +19,7 @@ use std::time::Duration;
 use super::http::{self, Head, Plan, Refusal};
 use super::loopback::LoopbackAddr;
 use super::verify::VerifiedUpstream;
-use crate::diag::{self, Code, ErrorKind, Field};
+use crate::diag::{self, Code, ErrorKind, Field, HttpStatus};
 
 /// Most connections handled at once.
 const MAX_CONNECTIONS: usize = 256;
@@ -167,7 +167,7 @@ fn accept_loop(listener: &TcpListener, shared: &Shared) {
 /// Handles one connection; a failed one records `page-load-failed` with its error kind.
 fn serve(client: TcpStream, shared: &Shared) {
     if let Err(e) = handle(client, shared) {
-        diag::event(Code::PageLoadFailed, &[Field::Error(ErrorKind::from(&e))]);
+        diag::count(Code::PageLoadFailed, Field::Error(ErrorKind::from(&e)));
     }
 }
 
@@ -196,15 +196,16 @@ fn handle(mut client: TcpStream, shared: &Shared) -> io::Result<()> {
     }
 }
 
-/// Records a refusal by its reason kind only.
+/// Counts a refusal by its reason kind only: a site can make any number of requests, so
+/// they are never recorded one by one (R12.2).
 fn refused(reason: Refusal) {
-    diag::event(Code::GatekeeperRefused, &[Field::Refuse(reason.reason())]);
+    diag::count(Code::GatekeeperRefused, Field::Refuse(reason.reason()));
 }
 
-/// Records a router error page (5xx) by its status code only.
+/// Counts a router error page (5xx) by its coarse status only (R12.1).
 fn upstream_status(head: &Head) {
-    if let Some(status) = http::status_code(&head.start).filter(|s| *s >= 500) {
-        diag::event(Code::PageLoadFailed, &[Field::Status(status)]);
+    if let Some(status) = http::status_code(&head.start).and_then(HttpStatus::from_code) {
+        diag::count(Code::PageLoadFailed, Field::Status(status));
     }
 }
 

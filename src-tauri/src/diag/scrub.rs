@@ -7,12 +7,14 @@
 use std::net::{Ipv4Addr, Ipv6Addr};
 use std::sync::OnceLock;
 
+use super::types::SOURCE_FILES;
+
 /// What a removed span becomes.
 pub const REMOVED: &str = "[removed]";
 
 /// File name endings that are not host names.
-const FILE_ENDINGS: [&str; 12] = [
-    "rs", "txt", "log", "json", "html", "ts", "js", "css", "md", "toml", "yml", "plist",
+const FILE_ENDINGS: [&str; 9] = [
+    "txt", "log", "json", "html", "js", "css", "toml", "yml", "plist",
 ];
 
 /// Characters that end a URL or a path.
@@ -76,6 +78,8 @@ pub(crate) fn no_console(_command: &mut std::process::Command) {}
 /// Replaces every private-looking span of `text` with [`REMOVED`].
 #[must_use]
 pub fn scrub_with(text: &str, user: Option<&str>, host: Option<&str>) -> String {
+    let decoded = decode_escapes(text);
+    let text = decoded.as_str();
     let bytes = text.as_bytes();
     let mut spans = urls(bytes);
     spans.extend(dotted_names(bytes));
@@ -83,11 +87,69 @@ pub fn scrub_with(text: &str, user: Option<&str>, host: Option<&str>) -> String 
     spans.extend(base64_runs(bytes));
     spans.extend(ipv6(bytes));
     spans.extend(emails(bytes));
+    spans.extend(hex_runs(bytes));
+    spans.extend(idn_hosts(text));
     spans.extend(home_paths(bytes));
+    spans.extend(unc_paths(bytes));
     for word in identity_words(user, host) {
         spans.extend(words(bytes, word.as_bytes()));
     }
     replace(text, spans)
+}
+
+/// [`scrub`], except that a `file=<name>` token with a name from [`SOURCE_FILES`] stays: it
+/// is a typed panic location from a closed list, not free text (R15.6).
+#[must_use]
+pub fn scrub_report(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut rest = text;
+    while let Some((before, token, after)) = next_source_token(rest) {
+        out.push_str(&scrub(before));
+        out.push_str(token);
+        rest = after;
+    }
+    out.push_str(&scrub(rest));
+    out
+}
+
+/// The next `file=<name>` token with a known name, set apart by white space: the text
+/// before it, the token and the text after it.
+fn next_source_token(text: &str) -> Option<(&str, &str, &str)> {
+    let mut from = 0;
+    while let Some(at) = text[from..].find("file=").map(|i| from + i) {
+        let end = text[at..]
+            .find(char::is_whitespace)
+            .map_or(text.len(), |i| at + i);
+        let name = &text[at + 5..end];
+        let apart = at == 0 || text[..at].ends_with(char::is_whitespace);
+        if apart && SOURCE_FILES.binary_search(&name).is_ok() {
+            return Some((&text[..at], &text[at..end], &text[end..]));
+        }
+        from = at + 5;
+    }
+    None
+}
+
+/// `%2E` and `%2F` (any case) as `.` and `/` (R15.1).
+fn decode_escapes(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut rest = text;
+    while let Some(at) = rest.find('%') {
+        out.push_str(&rest[..at]);
+        let code = rest.get(at + 1..at + 3).map(str::to_ascii_uppercase);
+        match code.as_deref() {
+            Some("2E") => out.push('.'),
+            Some("2F") => out.push('/'),
+            _ => {
+                out.push('%');
+                rest = &rest[at + 1..];
+                continue;
+            }
+        }
+        rest = &rest[at + 3..];
+    }
+    out.push_str(rest);
+    out
 }
 
 /// The words of the user and host names to remove: 3 characters or more.
@@ -284,32 +346,89 @@ fn emails(bytes: &[u8]) -> Vec<Span> {
     out
 }
 
-/// `/Users/<name>`, `/home/<name>` and `<drive>:\Users\<name>`.
+/// True for `/` and `\`.
+fn is_sep(b: u8) -> bool {
+    b == b'/' || b == b'\\'
+}
+
+/// A home folder name ends at a separator, a line end or a quote; spaces belong to it.
+fn is_name_byte(b: u8) -> bool {
+    !is_sep(b) && !b"\r\n\"'<>".contains(&b)
+}
+
+/// `<sep>Users<sep><name>`, `<sep>home<sep><name>` and `<sep>Documents and Settings<sep>
+/// <name>`, with either separator, and the drive letter before them (R15.4).
 fn home_paths(bytes: &[u8]) -> Vec<Span> {
     let mut out = Vec::new();
-    for prefix in [&b"/Users/"[..], b"/home/", b":\\Users\\"] {
-        out.extend(
-            find_all(bytes, prefix)
-                .into_iter()
-                .map(|at| home_span(bytes, at, prefix)),
-        );
+    for folder in [&b"Users"[..], b"home", b"Documents and Settings"] {
+        for at in find_all(bytes, folder) {
+            out.extend(home_span(bytes, at, folder.len()));
+        }
     }
     out
 }
 
-/// The span of a home folder prefix at `at` and the user name after it. The drive letter
-/// before `:\Users\` belongs to it.
-fn home_span(bytes: &[u8], at: usize, prefix: &[u8]) -> Span {
-    let name = |b: u8| !ends_span(b) && !b"/\\".contains(&b);
-    let drive = at >= 2 && bytes[at - 1] == b':' && bytes[at - 2].is_ascii_alphabetic();
-    let start = if prefix[0] == b':' {
-        at.saturating_sub(1)
-    } else if drive {
-        at - 2
-    } else {
-        at
-    };
-    (start, run_end(bytes, at + prefix.len(), name))
+/// The span of a home folder word at `at`, when separators surround it.
+fn home_span(bytes: &[u8], at: usize, len: usize) -> Option<Span> {
+    let before = at.checked_sub(1).filter(|&i| is_sep(bytes[i]))?;
+    let after = at + len;
+    if !bytes.get(after).is_some_and(|b| is_sep(*b)) {
+        return None;
+    }
+    let drive = before >= 2 && bytes[before - 1] == b':' && bytes[before - 2].is_ascii_alphabetic();
+    let start = if drive { before - 2 } else { before };
+    Some((start, run_end(bytes, after + 1, is_name_byte)))
+}
+
+/// UNC paths `\\<server>\<share>\<name>` (R15.4).
+fn unc_paths(bytes: &[u8]) -> Vec<Span> {
+    find_all(bytes, b"\\\\")
+        .into_iter()
+        .filter(|&at| at == 0 || bytes[at - 1] != b'\\')
+        .filter_map(|at| {
+            let server = run_end(bytes, at + 2, is_name_byte);
+            let share = run_end(bytes, (server + 1).min(bytes.len()), is_name_byte);
+            let name = run_end(bytes, (share + 1).min(bytes.len()), is_name_byte);
+            (server > at + 2 && share > server + 1).then_some((at, name))
+        })
+        .collect()
+}
+
+/// Runs of 32 or more hex digits (R15.3).
+fn hex_runs(bytes: &[u8]) -> Vec<Span> {
+    runs(bytes, |b| b.is_ascii_hexdigit())
+        .into_iter()
+        .filter(|(s, e)| e - s >= 32 && mixed_hex(&bytes[*s..*e]))
+        .collect()
+}
+
+/// True when a hex run holds a decimal digit and a letter, as a hash does.
+fn mixed_hex(run: &[u8]) -> bool {
+    run.iter().any(u8::is_ascii_digit) && run.iter().any(u8::is_ascii_alphabetic)
+}
+
+/// Words with a dot and a non-ASCII letter: internationalised host names (R15.2).
+fn idn_hosts(text: &str) -> Vec<Span> {
+    let word = |c: char| c.is_alphanumeric() || c == '.' || c == '-';
+    let mut out = Vec::new();
+    let mut start = None;
+    for (i, c) in text.char_indices().chain([(text.len(), ' ')]) {
+        match (word(c), start) {
+            (true, None) => start = Some(i),
+            (false, Some(s)) => {
+                out.extend(idn_span(text, s, i));
+                start = None;
+            }
+            _ => {}
+        }
+    }
+    out
+}
+
+fn idn_span(text: &str, start: usize, end: usize) -> Option<Span> {
+    let w = &text[start..end];
+    let idn = w.contains('.') && w.chars().any(|c| !c.is_ascii() && c.is_alphabetic());
+    idn.then(|| (start, run_end(text.as_bytes(), end, |b| !ends_span(b))))
 }
 
 fn is_word_byte(b: u8) -> bool {
@@ -351,10 +470,34 @@ mod tests {
         let hash = "AbCd0123456789-~AbCd0123456789-~AbCd01234567";
         assert_eq!(clean(&format!("x {hash} y")), "x [removed] y");
         assert_eq!(clean("at C:/Users/al/x"), "at [removed]/x");
+        assert_eq!(clean("at \\\\?\\C:\\Users\\al\\x"), "at [removed]\\x");
+    }
+
+    #[test]
+    fn review_rules_remove_more() {
+        assert_eq!(clean("see stats%2Ei2p%2Fx z"), "see [removed] z");
         assert_eq!(
-            clean("at \\\\?\\C:\\Users\\al\\x"),
-            "at \\\\?\\[removed]\\x"
+            clean("h 0123456789abcdef0123456789abcdef z"),
+            "h [removed] z"
         );
+        assert_eq!(clean("at bücher.example/x y"), "at [removed] y");
+        assert_eq!(
+            clean("C:\\Documents and Settings\\Jo Ann\\a"),
+            "[removed]\\a"
+        );
+        assert_eq!(clean("/home/Jo Ann/a"), "[removed]/a");
+        assert_eq!(clean("\\\\srv\\share\\bob\\a"), "[removed]\\a");
+        assert_eq!(clean("crate main.rs"), "crate [removed]");
+        assert_eq!(clean("100%25 and %zz"), "100%25 and %zz");
+    }
+
+    #[test]
+    fn report_keeps_known_source_names() {
+        let name = SOURCE_FILES[0];
+        let text = format!("file={name} line=3 file=evil.rs at http://a.i2p/");
+        let out = scrub_report(&text);
+        assert!(out.starts_with(&format!("file={name} line=3 ")), "{out}");
+        assert!(!out.contains("evil.rs") && !out.contains("a.i2p"), "{out}");
     }
 
     #[test]

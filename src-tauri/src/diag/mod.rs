@@ -12,6 +12,8 @@
 //! - [`scrub`]: the second layer, on the final report text.
 //! - [`sysinfo`] and [`report`]: what a bug report holds.
 
+pub mod counters;
+pub mod files;
 pub mod report;
 pub mod scrub;
 pub mod store;
@@ -25,11 +27,12 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, MutexGuard, OnceLock, PoisonError, TryLockError};
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
-pub use scrub::{REMOVED, scrub, scrub_with};
+pub use counters::{count, count_bucket, counter_lines, counters};
+pub use scrub::{REMOVED, scrub, scrub_report, scrub_with};
 pub use store::{LogFiles, Ring};
 pub use types::{
-    Code, ErrorKind, Field, Level, OpKind, Record, RefuseReason, RouterState, SourceFile,
-    StoreKind, TabKind, ThreadName, format_line, utc,
+    Code, ErrorKind, Field, HttpStatus, Level, OpKind, Record, RefuseReason, RouterState,
+    SOURCE_FILES, SourceFile, StoreKind, TabKind, ThreadName, format_line, utc,
 };
 
 /// The name of the crash marker file in the log folder.
@@ -64,6 +67,18 @@ fn try_state() -> Option<MutexGuard<'static, State>> {
 }
 
 static CRASHED: AtomicBool = AtomicBool::new(false);
+
+/// The log folder for the crash marker, apart from the log lock (R16).
+static MARKER_DIR: Mutex<Option<PathBuf>> = Mutex::new(None);
+
+/// The marker folder, unless the lock is busy.
+fn marker_dir() -> Option<PathBuf> {
+    match MARKER_DIR.try_lock() {
+        Ok(dir) => dir.clone(),
+        Err(TryLockError::Poisoned(p)) => p.into_inner().clone(),
+        Err(TryLockError::WouldBlock) => None,
+    }
+}
 
 /// The time of the first diagnostics call, for the uptime.
 fn started() -> Instant {
@@ -105,6 +120,7 @@ pub fn event(code: Code, fields: &[Field]) {
 pub fn init(log_dir: &Path) {
     started();
     CRASHED.store(take_crash_marker(log_dir), Ordering::SeqCst);
+    *MARKER_DIR.lock().unwrap_or_else(PoisonError::into_inner) = Some(log_dir.to_path_buf());
     let mut files = LogFiles::new(log_dir.to_path_buf());
     let backlog: Vec<String> = state()
         .ring
@@ -132,6 +148,7 @@ pub fn recent(n: usize) -> Vec<Record> {
 pub fn delete_logs() -> io::Result<()> {
     let mut state = state();
     state.ring.clear();
+    counters::clear();
     let Some(files) = state.files.as_ref() else {
         return Ok(());
     };
@@ -139,17 +156,14 @@ pub fn delete_logs() -> io::Result<()> {
     files.delete_all()
 }
 
-/// Report lines: `+<minutes>m <LEVEL> <code>` and the fields, the minutes counted from the
-/// oldest record. A report holds no clock time.
+/// Report lines: `<LEVEL> <code>` and the fields, in record order. No time at all (R13).
 #[must_use]
 pub fn report_lines(records: &[Record]) -> Vec<String> {
-    let first = records.iter().map(|r| r.at).min().unwrap_or_default();
     records
         .iter()
         .map(|record| {
             let line = format_line(record);
-            let rest = line.split_once(' ').map_or("", |(_, rest)| rest);
-            format!("+{}m {rest}", (record.at - first) / 60)
+            line.split_once(' ').map_or("", |(_, rest)| rest).to_owned()
         })
         .collect()
 }
@@ -213,8 +227,8 @@ pub fn dismiss_crash() {
 ///
 /// Fails when the folder or the file cannot be written.
 pub fn write_crash_marker(dir: &Path) -> io::Result<()> {
-    fs::create_dir_all(dir)?;
-    fs::write(dir.join(CRASH_MARKER), b"")
+    files::private_dir(dir)?;
+    files::replace(&dir.join(CRASH_MARKER)).map(drop)
 }
 
 /// Whether the crash marker was in `dir`; removes it.
@@ -243,12 +257,14 @@ fn on_panic(info: &std::panic::PanicHookInfo<'_>) {
         code: Code::Panic,
         fields,
     };
+    if let Some(dir) = marker_dir() {
+        let _ = write_crash_marker(&dir);
+    }
     let Some(mut state) = try_state() else {
         return;
     };
     if let Some(files) = state.files.as_mut() {
         let _ = files.append(&format_line(&record));
-        let _ = write_crash_marker(files.dir());
     }
     state.ring.push(record);
 }

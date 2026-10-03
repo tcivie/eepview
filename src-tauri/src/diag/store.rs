@@ -5,7 +5,7 @@
 //! the app log folder. Both stay on this computer.
 
 use std::collections::VecDeque;
-use std::fs::{self, OpenOptions};
+use std::fs;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
@@ -106,17 +106,14 @@ impl LogFiles {
     ///
     /// Fails when the folder or the file cannot be written.
     pub fn append(&mut self, line: &str) -> io::Result<()> {
-        fs::create_dir_all(&self.dir)?;
+        super::files::private_dir(&self.dir)?;
         let current = self.path(0);
         let size = fs::metadata(&current).map_or(0, |m| m.len());
         let added = line.len() as u64 + 1;
         if size > 0 && size + added > self.max_bytes {
             self.rotate()?;
         }
-        let mut file = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&current)?;
+        let mut file = super::files::append(&current)?;
         file.write_all(format!("{line}\n").as_bytes())
     }
 

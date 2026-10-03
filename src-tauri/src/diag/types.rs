@@ -372,40 +372,58 @@ impl ThreadName {
     }
 }
 
-/// Most characters of a [`SourceFile`].
-const MAX_SOURCE: usize = 64;
-
-/// A source file name with no folder, for a panic location.
+/// A panic location: one of eepview's own source file names, or `other`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SourceFile {
-    bytes: [u8; MAX_SOURCE],
-    len: usize,
-}
+pub struct SourceFile(&'static str);
 
 impl SourceFile {
-    /// The part of `path` after the last `/` or `\`, with only `A-Z a-z 0-9 _ . -`, at most
-    /// 64 characters.
+    /// The part of `path` after the last `/` or `\\` when it is in [`SOURCE_FILES`], else
+    /// `other`.
     #[must_use]
     pub fn from_path(path: &str) -> Self {
         let name = path.rsplit(['/', '\\']).next().unwrap_or_default();
-        let mut bytes = [0u8; MAX_SOURCE];
-        let mut len = 0;
-        for b in name.bytes().filter(|b| is_name_byte(*b)).take(MAX_SOURCE) {
-            bytes[len] = b;
-            len += 1;
-        }
-        Self { bytes, len }
+        let known = SOURCE_FILES.binary_search(&name).ok();
+        Self(known.map_or("other", |i| SOURCE_FILES[i]))
     }
 
-    /// The file name.
+    /// The file name, or `other`.
     #[must_use]
-    pub fn as_str(&self) -> &str {
-        std::str::from_utf8(&self.bytes[..self.len]).unwrap_or_default()
+    pub fn as_str(&self) -> &'static str {
+        self.0
     }
 }
 
-fn is_name_byte(b: u8) -> bool {
-    b.is_ascii_alphanumeric() || b"_.-".contains(&b)
+include!(concat!(env!("OUT_DIR"), "/source_files.rs"));
+
+named_enum!(
+    /// A router error status, coarse: a site chooses the exact number.
+    HttpStatus {
+        /// 500.
+        S500 => "500",
+        /// 502.
+        S502 => "502",
+        /// 503.
+        S503 => "503",
+        /// 504.
+        S504 => "504",
+        /// Any other 5xx.
+        Other5xx => "other-5xx",
+    }
+);
+
+impl HttpStatus {
+    /// The status of a 5xx code; `None` for any other code.
+    #[must_use]
+    pub fn from_code(code: u16) -> Option<Self> {
+        match code {
+            500 => Some(Self::S500),
+            502 => Some(Self::S502),
+            503 => Some(Self::S503),
+            504 => Some(Self::S504),
+            501..=599 => Some(Self::Other5xx),
+            _ => None,
+        }
+    }
 }
 
 /// One typed value of an event.
@@ -434,7 +452,7 @@ pub enum Field {
     /// `count=`.
     Count(u64),
     /// `status=`.
-    Status(u16),
+    Status(HttpStatus),
     /// `managed=`.
     Managed(bool),
     /// `js=`.
@@ -478,7 +496,7 @@ impl Field {
             Self::Source(v) => f.write_str(v.as_str()),
             Self::Line(n) => write!(f, "{n}"),
             Self::DurationMs(n) | Self::Count(n) => write!(f, "{n}"),
-            Self::Status(n) => write!(f, "{n}"),
+            Self::Status(v) => f.write_str(v.as_str()),
             Self::Managed(b) | Self::Js(b) | Self::Ok(b) => write!(f, "{b}"),
         }
     }

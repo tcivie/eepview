@@ -805,6 +805,7 @@ name = "eepview"
 version = "0.1.0"
 dependencies = [
  "eepview-platform",
+ "libc",
  "proptest",
  "serde",
  "serde_json",
