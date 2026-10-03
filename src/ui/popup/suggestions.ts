@@ -4,6 +4,8 @@
 import type { PopupShow, Suggestion, SuggestionsData } from "../contract.ts";
 import { all, byId } from "../dom.ts";
 import { call } from "../ipc.ts";
+import { insetPx } from "../lib/chrome-height.ts";
+import { setRootVar } from "../shared/runtime-vars.ts";
 import { suggestionOption } from "../suggestion-option.ts";
 import { closeCurrent } from "./frame.ts";
 
@@ -14,7 +16,7 @@ export function renderSuggestions(show: PopupShow): void {
   const data = show.data as SuggestionsData | null;
   items = data?.items ?? [];
   const index = data?.index ?? -1;
-  list().style.width = `${Math.max(0, Math.round(show.anchorWidth))}px`;
+  setRootVar("--popup-anchor-width", insetPx(show.anchorWidth));
   list().replaceChildren(...items.map((item, i) => suggestionOption(item, i, i === index)));
 }
 

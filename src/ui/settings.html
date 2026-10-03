@@ -10,6 +10,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="light dark" />
     <title>Settings</title>
+    <link rel="icon" type="image/svg+xml" href="../../assets/brand/eepview-mark-small.svg" />
     <link rel="stylesheet" href="./theme.css" />
     <link rel="stylesheet" href="./ui.css" />
     <link rel="stylesheet" href="./pages.css" />
@@ -19,15 +20,11 @@
     <div class="shell">
       <aside class="rail">
         <a class="brand" href="./home.html">
-          <svg class="mark" viewBox="0 0 28 28" aria-hidden="true">
-            <rect x="1.75" y="1.75" width="24.5" height="24.5" rx="8" />
-            <rect x="6.5" y="6.5" width="15" height="15" rx="5" />
-            <rect class="core" x="11" y="11" width="6" height="6" rx="2" />
-          </svg>
+          <img class="mark" src="../../assets/brand/eepview-mark-small.svg" alt="" width="28" height="28" />
           eepview
         </a>
         <nav class="rail-nav" aria-label="eepview pages">
-          <ul>
+          <ul class="list">
             <li>
               <a href="./home.html">
                 <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -96,10 +93,10 @@
 
         <section class="section settings-group" id="appearance" aria-labelledby="appearance-title">
           <h2 id="appearance-title">Appearance</h2>
-          <div class="panel settings-panel">
+          <div class="card settings-panel">
             <fieldset class="setting">
               <legend class="setting-label">Theme</legend>
-              <p class="setting-hint">System follows the light or dark setting of your computer.</p>
+              <p class="hint">System follows the light or dark setting of your computer.</p>
               <div class="segmented setting-control" id="theme-choice">
                 <label><input type="radio" name="theme" value="system" />System</label>
                 <label><input type="radio" name="theme" value="light" />Light</label>
@@ -108,7 +105,7 @@
             </fieldset>
             <div class="setting">
               <label class="setting-label" for="zoom-default">Default zoom</label>
-              <p class="setting-hint">eepview remembers a different zoom for each site you change.</p>
+              <p class="hint">eepview remembers a different zoom for each site you change.</p>
               <select class="select setting-control zoom-select" id="zoom-default">
                 <option value="0.8">80%</option>
                 <option value="0.9">90%</option>
@@ -125,14 +122,14 @@
 
         <section class="section settings-group" id="homepage" aria-labelledby="homepage-title">
           <h2 id="homepage-title">Homepage</h2>
-          <div class="panel settings-panel">
+          <div class="card settings-panel">
             <fieldset class="setting setting-stack">
               <legend class="setting-label">When eepview opens, show</legend>
-              <div class="radio-list">
+              <div class="choices">
                 <label class="check">
                   <input type="radio" name="homepage" value="home" checked />
                   <span class="check-text">The eepview home page</span>
-                  <span class="check-hint">Your bookmarks and the router status.</span>
+                  <span class="hint">Your bookmarks and the router status.</span>
                 </label>
                 <label class="check">
                   <input type="radio" name="homepage" value="custom" />
@@ -149,7 +146,7 @@
                   aria-describedby="homepage-hint"
                   disabled
                 />
-                <span class="field-hint" id="homepage-hint">Saved when you leave the field.</span>
+                <span class="hint" id="homepage-hint">Saved when you leave the field.</span>
               </div>
             </fieldset>
           </div>
@@ -157,10 +154,10 @@
 
         <section class="section settings-group" id="privacy" aria-labelledby="privacy-title">
           <h2 id="privacy-title">Privacy</h2>
-          <div class="panel settings-panel">
+          <div class="card settings-panel">
             <div class="setting">
               <label class="setting-label" for="js-default">Run JavaScript on eepsites</label>
-              <p class="setting-hint" id="js-default-hint">
+              <p class="hint" id="js-default-hint">
                 Off by default. Scripts can fingerprint you. Turn it on for one site from the
                 toolbar.
               </p>
@@ -173,7 +170,7 @@
             </div>
             <div class="setting">
               <label class="setting-label" for="keep-cookies">Keep cookies after I quit</label>
-              <p class="setting-hint" id="keep-cookies-hint">
+              <p class="hint" id="keep-cookies-hint">
                 Off: every session starts clean and sites forget you.
               </p>
               <input
@@ -185,7 +182,7 @@
             </div>
             <div class="setting">
               <label class="setting-label" for="history-on">Keep history</label>
-              <p class="setting-hint" id="history-on-hint">
+              <p class="hint" id="history-on-hint">
                 Off: eepview records no pages and suggests only bookmarks.
               </p>
               <input
@@ -197,7 +194,7 @@
             </div>
             <div class="setting">
               <p class="setting-label">Clear history</p>
-              <p class="setting-hint">Choose a time range and confirm on the History page.</p>
+              <p class="hint">Choose a time range and confirm on the History page.</p>
               <a class="btn setting-control" href="./history.html?clear=1">Clear history</a>
             </div>
           </div>
@@ -205,11 +202,11 @@
 
         <section class="section settings-group" id="router" aria-labelledby="router-title">
           <h2 id="router-title">Router</h2>
-          <p class="notice-inline" id="router-preview">Preview. These router controls are not connected to the router yet.</p>
-          <div class="panel settings-panel">
+          <p class="banner router-preview" data-tone="warning" id="router-preview">Preview. These router controls are not connected to the router yet.</p>
+          <div class="card settings-panel">
             <fieldset class="setting">
               <legend class="setting-label">Router updates</legend>
-              <p class="setting-hint">Updates are signed and arrive over I2P, never the clearnet.</p>
+              <p class="hint">Updates are signed and arrive over I2P, never the clearnet.</p>
               <div class="segmented setting-control">
                 <label><input type="radio" name="updates" value="auto" checked />Automatic</label>
                 <label><input type="radio" name="updates" value="ask" />Ask me</label>
@@ -218,20 +215,20 @@
             </fieldset>
             <div class="setting">
               <p class="setting-label" id="installed-label">Installed version</p>
-              <p class="setting-hint">I2P 2.10.0, installed 14 September 2026. Previous: 2.9.0.</p>
+              <p class="hint">I2P 2.10.0, installed 14 September 2026. Previous: 2.9.0.</p>
               <button class="btn setting-control" type="button" id="restore-btn">
                 Restore 2.9.0
               </button>
             </div>
             <div class="setting">
               <p class="setting-label">Router settings</p>
-              <p class="setting-hint">
+              <p class="hint">
                 The router keeps its own settings in its console. eepview shows router
                 information and does not change it.
               </p>
               <div class="setting-control">
                 <div class="console-list" id="console-links" hidden></div>
-                <p class="muted console-note" id="console-note">No router console found</p>
+                <p class="hint" id="console-note">No router console found</p>
               </div>
             </div>
           </div>
@@ -239,7 +236,7 @@
 
         <section class="section settings-group" id="about" aria-labelledby="about-title">
           <h2 id="about-title">About</h2>
-          <div class="panel settings-panel">
+          <div class="card settings-panel">
             <dl class="facts about-versions">
               <div>
                 <dt>eepview</dt>
@@ -261,8 +258,8 @@
 
             <div class="about-block">
               <h3>Where eepview connects</h3>
-              <p class="setting-hint">The complete list. Nothing else leaves this computer.</p>
-              <table class="paths">
+              <p class="hint">The complete list. Nothing else leaves this computer.</p>
+              <table class="table">
                 <thead>
                   <tr>
                     <th scope="col">What</th>
@@ -302,11 +299,11 @@
 
             <div class="about-block">
               <h3>Permissions you gave at setup</h3>
-              <ul class="grants">
+              <ul class="list grants">
                 <li class="grant">
                   <div>
                     <p class="setting-label">Update the router automatically over I2P</p>
-                    <p class="setting-hint grant-state">Allowed on 14 September 2026</p>
+                    <p class="hint grant-state">Allowed on 14 September 2026</p>
                   </div>
                   <button class="btn btn-danger btn-small" type="button" data-grant="router-updates">
                     Revoke
@@ -315,7 +312,7 @@
                 <li class="grant">
                   <div>
                     <p class="setting-label">Check for Java security updates</p>
-                    <p class="setting-hint grant-state">Allowed on 14 September 2026</p>
+                    <p class="hint grant-state">Allowed on 14 September 2026</p>
                   </div>
                   <button class="btn btn-danger btn-small" type="button" data-grant="java-check">
                     Revoke
