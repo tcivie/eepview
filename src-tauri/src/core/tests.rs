@@ -517,6 +517,7 @@ fn stores_persist_through_paths() {
         history: dir.join("history.json"),
         settings: dir.join("settings.json"),
         sites: dir.join("sites.json"),
+        icons: dir.join("icons"),
     };
     let mut c = Core::new(Some(paths.clone()), "p", 0);
     c.router_changed(ok_status());
@@ -539,7 +540,8 @@ fn save_errors_become_toasts() {
         bookmarks: blocked.clone(),
         history: blocked.clone(),
         settings: blocked.clone(),
-        sites: blocked,
+        sites: blocked.clone(),
+        icons: blocked,
     };
     let mut c = Core::new(Some(paths), "p", 0);
     let fx = c.settings_set(&json!({"theme": "light"})).unwrap().1;

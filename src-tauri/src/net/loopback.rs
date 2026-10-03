@@ -89,6 +89,22 @@ impl LoopbackAddr {
     }
 }
 
+/// A stream whose read timeout can change between reads (for a total deadline).
+pub trait ReadTimeout {
+    /// Sets the read timeout; `None` waits forever.
+    ///
+    /// # Errors
+    ///
+    /// Fails when the OS refuses the timeout.
+    fn read_timeout(&self, timeout: Option<Duration>) -> io::Result<()>;
+}
+
+impl ReadTimeout for TcpStream {
+    fn read_timeout(&self, timeout: Option<Duration>) -> io::Result<()> {
+        self.set_read_timeout(timeout)
+    }
+}
+
 impl fmt::Display for LoopbackAddr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.0.fmt(f)

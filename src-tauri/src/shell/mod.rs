@@ -128,6 +128,7 @@ fn paths<R: Runtime>(app: &App<R>) -> Option<Paths> {
         history: data.join("history.json"),
         settings: config.join("settings.json"),
         sites: config.join("sites.json"),
+        icons: data.join("icons"),
     })
 }
 
