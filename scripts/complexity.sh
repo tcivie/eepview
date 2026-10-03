@@ -6,7 +6,10 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-lizard \
+# lizard imports pygments only for its Erlang reader. scripts/lizard-stubs holds a
+# pygments stub, so pygments is not installed. The stub raises if lizard reads Erlang.
+# Set LIZARD_PYTHON to a Python that has lizard installed (default: python3).
+PYTHONPATH="scripts/lizard-stubs" "${LIZARD_PYTHON:-python3}" -m lizard \
   --CCN 10 \
   --length 40 \
   --arguments 5 \
