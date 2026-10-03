@@ -18,6 +18,7 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Move all docs into docs/wiki and enforce it in docs-check (#22)
 - Restore CodeQL and Scorecard, add dependency review and audit badges ([#26](https://github.com/tcivie/eepview/pull/26))
 - Add the design system, theme switching, browser chrome and internal pages (#19)
+- Rewrite the README for users ([#36](https://github.com/tcivie/eepview/pull/36))
 - Keep the macOS traffic lights off the first tab (#23)
 - Add the user guide and the developer guide to the wiki ([#28](https://github.com/tcivie/eepview/pull/28))
 - Polish the setup flow and add the router panel to the toolbar (#27)
