@@ -315,6 +315,248 @@ fn commands_that_take_the_app_are_async() {
     assert!(checked > 30, "found only {checked} commands");
 }
 
+// Site icons (docs/wiki/site-icons.md, R35 to R38). The implementer must not edit these.
+
+/// The `[dependencies]` section of `Cargo.toml`.
+fn dependencies() -> io::Result<String> {
+    let manifest = fs::read_to_string(root().join("Cargo.toml"))?;
+    let start = manifest.find("\n[dependencies]").unwrap_or(0);
+    let rest = &manifest[start + 1..];
+    let end = rest[1..].find("\n[").map_or(rest.len(), |i| i + 1);
+    Ok(rest[..end].to_owned())
+}
+
+#[test]
+fn r37_net_icons_connects_only_through_the_gatekeeper_it_receives() {
+    let lines = code(&root().join("src/net/icons.rs")).unwrap();
+    let text = lines.join("\n");
+    for token in [
+        "LoopbackAddr::",
+        "TcpStream",
+        "SocketAddr",
+        "ToSocketAddrs",
+        "VerifiedUpstream",
+        "verify::",
+        "UdpSocket",
+    ] {
+        assert!(
+            !text.contains(token),
+            "net/icons.rs must not use `{token}` (R37)"
+        );
+    }
+    assert!(
+        text.contains("Gatekeeper"),
+        "net/icons.rs takes a Gatekeeper (R37)"
+    );
+    for literal in literals(&lines) {
+        let lower = literal.to_ascii_lowercase();
+        for loopback in ["localhost", "127.", "::1", "0.0.0.0"] {
+            assert!(
+                !lower.contains(loopback),
+                "net/icons.rs names {loopback} in \"{literal}\""
+            );
+        }
+        // The path `/favicon.ico` is the one dotted word that is not a host.
+        let hosts: Vec<String> = foreign_hosts(&literal)
+            .into_iter()
+            .filter(|w| w != "favicon.ico")
+            .collect();
+        assert!(
+            hosts.is_empty(),
+            "net/icons.rs names {hosts:?} in \"{literal}\" (R37)"
+        );
+    }
+}
+
+#[test]
+fn r37_the_gatekeeper_address_is_crate_private() {
+    let text = code(&root().join("src/net/gatekeeper.rs"))
+        .unwrap()
+        .join("\n");
+    assert!(text.contains("pub(crate) fn addr(&self) -> LoopbackAddr"));
+    assert!(
+        !text.contains("pub fn addr"),
+        "Gatekeeper::addr must not be public (R37)"
+    );
+}
+
+#[test]
+fn r37_only_the_shell_runs_icon_fetches_and_the_core_and_sanitizer_stay_pure() {
+    for file in users("net::icons").unwrap() {
+        let allowed = file.starts_with("src/shell/") || file.starts_with("src/net/");
+        assert!(
+            allowed,
+            "{file} names net::icons; only src/shell/ and src/net/ may (R37)"
+        );
+    }
+    for file in rust_files(&root().join("src/core")).unwrap() {
+        let text = code(&file).unwrap().join("\n");
+        assert!(
+            !text.contains("Gatekeeper"),
+            "{} names the Gatekeeper (R37)",
+            rel(&file)
+        );
+    }
+    let sanitizer = code(&root().join("src/icons.rs")).unwrap().join("\n");
+    assert!(
+        !sanitizer.contains("std::net"),
+        "src/icons.rs opens no socket (R37)"
+    );
+}
+
+#[test]
+fn r37_the_icon_feature_adds_no_http_client_crate() {
+    let deps = dependencies().unwrap();
+    for name in [
+        "reqwest",
+        "hyper",
+        "ureq",
+        "isahc",
+        "curl",
+        "attohttpc",
+        "surf",
+        "minreq",
+        "tungstenite",
+    ] {
+        let used = deps.lines().any(|l| {
+            l.trim_start().starts_with(&format!("{name} "))
+                || l.trim_start().starts_with(&format!("{name}="))
+        });
+        assert!(!used, "Cargo.toml [dependencies] names {name} (R37)");
+    }
+}
+
+#[test]
+fn r38_only_the_sanitizer_decodes_images() {
+    let only = ["src/icons.rs"];
+    for token in [
+        "image::",
+        "ImageReader",
+        "load_from_memory",
+        "png::Decoder",
+        "gif::Decoder",
+        "jpeg_decoder",
+        "zune_jpeg",
+        "webp::",
+        "lodepng",
+        "resvg",
+        "usvg",
+    ] {
+        only_in(token, &only).unwrap();
+    }
+    let sanitizer = users("image::").unwrap();
+    assert_eq!(sanitizer, only, "the sanitizer decodes images (R38)");
+}
+
+#[test]
+fn r38_no_other_image_decoder_is_a_direct_dependency() {
+    let deps = dependencies().unwrap();
+    for name in [
+        "png",
+        "gif",
+        "jpeg-decoder",
+        "zune-jpeg",
+        "webp",
+        "lodepng",
+        "resvg",
+        "usvg",
+        "ico",
+        "tiff",
+    ] {
+        let used = deps.lines().any(|l| {
+            l.trim_start().starts_with(&format!("{name} "))
+                || l.trim_start().starts_with(&format!("{name}="))
+        });
+        assert!(
+            !used,
+            "Cargo.toml [dependencies] names {name}; only `image` decodes (R38)"
+        );
+    }
+}
+
+#[test]
+fn r35_the_content_security_policy_loads_images_only_from_the_bundle_and_data_urls() {
+    let conf: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(root().join("tauri.conf.json")).unwrap()).unwrap();
+    let csp = conf["app"]["security"]["csp"].as_str().unwrap_or_default();
+    let img = csp
+        .split(';')
+        .map(str::trim)
+        .find(|d| d.starts_with("img-src"))
+        .unwrap_or_else(|| panic!("the CSP has no img-src: {csp}"));
+    let sources: Vec<&str> = img.split_whitespace().skip(1).collect();
+    assert!(
+        sources.contains(&"'self'") && sources.contains(&"data:"),
+        "{img}"
+    );
+    for source in sources {
+        assert!(
+            ["'self'", "data:"].contains(&source),
+            "img-src allows {source} (R35)"
+        );
+    }
+}
+
+#[test]
+fn r36_the_icon_feature_adds_no_command_and_no_capability() {
+    for entry in fs::read_dir(root().join("capabilities")).unwrap() {
+        let text = fs::read_to_string(entry.unwrap().path())
+            .unwrap()
+            .to_ascii_lowercase();
+        assert!(!text.contains("icon"), "a capability names an icon (R36)");
+    }
+    let commands = code(&root().join("src/shell/commands.rs")).unwrap();
+    let marked = commands
+        .iter()
+        .enumerate()
+        .filter(|(_, l)| l.contains("#[tauri::command]"));
+    for (at, _) in marked {
+        let name = commands
+            .iter()
+            .skip(at)
+            .find(|l| l.contains("fn "))
+            .cloned();
+        let name = name.unwrap_or_default();
+        assert!(
+            !name.to_ascii_lowercase().contains("icon"),
+            "icon command: {name} (R36)"
+        );
+    }
+    for file in users("generate_handler").unwrap() {
+        let text = code(&root().join(&file))
+            .unwrap()
+            .join("\n")
+            .to_ascii_lowercase();
+        let open = text
+            .find("generate_handler![")
+            .map(|i| i + "generate_handler![".len());
+        let list = open.and_then(|from| text[from..].find(']').map(|len| &text[from..from + len]));
+        let list = list.unwrap_or_else(|| panic!("{file}: no handler list found"));
+        assert!(
+            !list.contains("icon"),
+            "{file}: the handler list names an icon (R36)"
+        );
+    }
+}
+
+#[test]
+fn r34_the_ipc_contract_declares_the_icons_changed_event_and_the_icon_fields() {
+    let contract = fs::read_to_string(root().join("../src/ui/contract.ts")).unwrap();
+    assert!(contract.contains("\"icons-changed\": null;"), "R34");
+    for name in ["TabInfo", "Bookmark", "HistoryEntry"] {
+        let start = contract
+            .find(&format!("export type {name} = {{"))
+            .unwrap_or_else(|| panic!("{name} is not declared"));
+        let end = contract[start..]
+            .find("\n};")
+            .map_or(contract.len(), |i| start + i);
+        assert!(
+            contract[start..end].contains("icon: string | null;"),
+            "{name} has no icon (R31)"
+        );
+    }
+}
+
 // ---------------------------------------------------------------------------------------
 // Diagnostics and bug reports (`docs/wiki/diagnostics-and-bug-reports.md`, R7 to R10).
 // ---------------------------------------------------------------------------------------

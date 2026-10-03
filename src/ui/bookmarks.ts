@@ -5,10 +5,11 @@ import "./boot.ts";
 import type { Bookmark } from "./contract.ts";
 import { announce, byId, cloneTemplate, setText } from "./dom.ts";
 import { call, errorText, on } from "./ipc.ts";
-import { displayUrl, eepsiteUrl, isI2pAddress } from "./lib/address.ts";
+import { displayUrl, eepsiteUrl, hostOf, isI2pAddress } from "./lib/address.ts";
 import { folderGroups, folderNames } from "./lib/bookmark-groups.ts";
 import { bindClicks, delegateClick, runAndAnnounce } from "./shared/events.ts";
 import { setFieldError } from "./shared/form.ts";
+import { renderSiteMark } from "./site-mark.ts";
 
 const TOAST_MS = 6000;
 const ADDRESS_HINT = "A .i2p name or a .b32.i2p address.";
@@ -23,11 +24,14 @@ let toastTimer = 0;
 const countLabel = (n: number): string => (n === 1 ? "1 site" : `${n} sites`);
 const reportError = (error: unknown): void => announce(status(), errorText(error));
 const labelOf = (b: Bookmark): string => b.title || displayUrl(b.url);
+const letterOf = (url: string): string => (hostOf(url)[0] ?? "?").toUpperCase();
 
 function fillRow(row: HTMLElement, bookmark: Bookmark): void {
   row.querySelector("a")?.setAttribute("href", bookmark.url);
   setText(row, ".row-name", labelOf(bookmark));
   setText(row, ".row-addr", displayUrl(bookmark.url));
+  const mark = row.querySelector(".site-mark");
+  if (mark) renderSiteMark(mark, bookmark.icon, letterOf(bookmark.url));
   for (const button of row.querySelectorAll<HTMLButtonElement>("button[data-action]")) {
     const verb = button.dataset.action === "edit" ? "Edit" : "Delete";
     button.dataset.id = bookmark.id;
@@ -164,6 +168,7 @@ function wireBookmarks(): void {
   byId("import-file").addEventListener("change", onImportChosen);
   byId<HTMLFormElement>("editor-form").addEventListener("submit", onSave);
   on("bookmarks-changed", load).catch(reportError);
+  on("icons-changed", load).catch(reportError);
 }
 
 wireBookmarks();

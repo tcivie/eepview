@@ -87,14 +87,16 @@ impl History {
         &self.entries
     }
 
-    /// Records a visit: moves the URL to the top and counts it.
-    pub fn visit(&mut self, url: &str, title: &str, now: u64) {
+    /// Records a visit: moves the URL to the top and counts it. Returns the oldest entry
+    /// when the cap pushed it out.
+    pub fn visit(&mut self, url: &str, title: &str, now: u64) -> Option<HistoryEntry> {
         let entry = match self.entries.iter().position(|e| e.url == url) {
             Some(i) => revisit(self.entries.remove(i), title, now),
             None => self.fresh(url, title, now),
         };
         self.entries.insert(0, entry);
-        self.entries.truncate(MAX_ENTRIES);
+        let evicted = self.entries.split_off(self.entries.len().min(MAX_ENTRIES));
+        evicted.into_iter().next()
     }
 
     fn fresh(&mut self, url: &str, title: &str, now: u64) -> HistoryEntry {
@@ -105,6 +107,7 @@ impl History {
             title: title.to_owned(),
             visited: now,
             visits: 1,
+            icon: None,
         }
     }
 
@@ -270,6 +273,7 @@ mod tests {
             title: String::new(),
             visited: i as u64,
             visits: 1,
+            icon: None,
         };
         let mut entries: Vec<HistoryEntry> = (0..12_000)
             .map(|i| entry(i, format!("http://p{i}.i2p/")))

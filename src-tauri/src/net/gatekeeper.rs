@@ -92,6 +92,11 @@ impl Gatekeeper {
         self.addr.http_url()
     }
 
+    /// The loopback address it listens on. Site icon requests (`net::icons`) go here.
+    pub(crate) fn addr(&self) -> LoopbackAddr {
+        self.addr
+    }
+
     /// Stops accepting and refuses every request still in flight.
     pub fn close(&self) {
         if self.open.swap(false, Ordering::SeqCst) {

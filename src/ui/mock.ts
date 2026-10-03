@@ -56,6 +56,7 @@ const bookmark = (url: string, title: string, folder: string | null, age: number
   title,
   folder,
   created: now - age * DAY,
+  icon: null,
 });
 
 let bookmarks: Bookmark[] = data.bookmarks.map((b) =>
@@ -67,7 +68,14 @@ function historyEntry(i: number): HistoryEntry {
   const url = eepsite(site.site);
   const title = site.title;
   const ageMinutes = i * 53 + (i % 3) * 7;
-  return { id: `h${i}`, url, title, visited: now - ageMinutes * MINUTE, visits: 1 + (i % 4) };
+  return {
+    id: `h${i}`,
+    url,
+    title,
+    visited: now - ageMinutes * MINUTE,
+    visits: 1 + (i % 4),
+    icon: null,
+  };
 }
 
 let history: HistoryEntry[] = Array.from({ length: data.historySize }, (_, i) =>
@@ -86,6 +94,7 @@ const tab = (id: number, url: string, title: string, extra: Partial<TabInfo> = {
   zoom: 1,
   jsOn: false,
   bookmarked: false,
+  icon: null,
   ...extra,
 });
 

@@ -30,8 +30,15 @@ export function pillSize(rect: PillSize): PillSize {
   return { width: Math.ceil(rect.width), height: Math.ceil(rect.height) };
 }
 
+/** The shell sends `Blocked: <host>` for a refused link. The bubble draws the prefix itself. */
+function withoutBlockedPrefix(text: string): string {
+  return text.startsWith(BLOCKED_PREFIX) ? text.slice(BLOCKED_PREFIX.length).trim() : text;
+}
+
 export function linkStatus(hover: LinkHover | null): LinkStatusView {
   const text = cleanStatusText(hover?.text ?? "");
   if (text === "") return { visible: false, prefix: null, text: "" };
-  return { visible: true, prefix: hover?.blocked ? BLOCKED_PREFIX : null, text };
+  if (hover?.blocked)
+    return { visible: true, prefix: BLOCKED_PREFIX, text: withoutBlockedPrefix(text) };
+  return { visible: true, prefix: null, text };
 }

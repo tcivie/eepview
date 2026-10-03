@@ -5,6 +5,7 @@ import type { TabInfo } from "../contract.ts";
 import { byId } from "../dom.ts";
 import { call } from "../ipc.ts";
 import { dropIndex, moveTarget, neighbour, tabMonogram, tabTitle } from "../lib/tab-strip.ts";
+import { renderSiteMark } from "../site-mark.ts";
 import { currentTabs } from "./state.ts";
 
 const MIDDLE_BUTTON = 1;
@@ -21,6 +22,15 @@ function idOf(el: HTMLElement | null): number | null {
   return el?.dataset.id ? Number(el.dataset.id) : null;
 }
 
+function fillIcon(icon: Element, tab: TabInfo): void {
+  if (!tab.loading) {
+    renderSiteMark(icon, tab.icon, tabMonogram(tab));
+    return;
+  }
+  icon.classList.remove("has-icon");
+  icon.textContent = "";
+}
+
 function fillTab(el: HTMLElement, tab: TabInfo): void {
   const title = tabTitle(tab);
   el.dataset.id = String(tab.id);
@@ -30,7 +40,7 @@ function fillTab(el: HTMLElement, tab: TabInfo): void {
   el.classList.toggle("is-loading", tab.loading);
   el.classList.toggle("is-internal", tab.kind === "internal");
   const icon = el.querySelector(".tab-icon");
-  if (icon) icon.textContent = tab.loading ? "" : tabMonogram(tab);
+  if (icon) fillIcon(icon, tab);
   const label = el.querySelector(".tab-title");
   if (label) label.textContent = title;
   el.querySelector(".tab-close")?.setAttribute("aria-label", `Close ${title}`);

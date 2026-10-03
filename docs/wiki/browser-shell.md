@@ -13,6 +13,7 @@ The Rust side of the browser, in `src-tauri/`: tabs, navigation, bookmarks, hist
 - New windows (`target=_blank`, `window.open`) open as new tabs. Downloads are refused with a toast.
 - Pause closes the gatekeeper and every web tab. Resume runs VERIFY again.
 - Stores are JSON files with a `version` field, written atomically: bookmarks, history (at most 10 000 entries, off when `history.enabled` is false), settings, and per-site zoom and JavaScript.
+- Site icons: when a web tab finishes a page on a bookmarked or visited host, the shell asks that host for `/favicon.ico` through the gatekeeper, at most once a day. The icon is decoded and drawn again as a new PNG. See [Site icons](site-icons.md).
 - Security: see [No-leak architecture](no-leak-architecture.md) and [ADR 0001](adr-0001-no-leak-architecture.md).
 
 ## Requirements (owner decisions)
@@ -41,3 +42,4 @@ The Rust side of the browser, in `src-tauri/`: tabs, navigation, bookmarks, hist
 ## History
 
 - 2026-10-03 — Browser shell: tabs, navigation, bookmarks, history, find, gatekeeper, pause and resume — [#29](https://github.com/tcivie/eepview/pull/29)
+- 2026-10-03 — Site icons in tabs, bookmarks and history — [#53](https://github.com/tcivie/eepview/pull/53)

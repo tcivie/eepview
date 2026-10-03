@@ -122,6 +122,16 @@
   font-weight: var(--fw-strong);
 }
 
+.tab-icon.has-icon {
+  background: transparent;
+}
+
+.tab-icon img {
+  display: block;
+  width: 16px;
+  height: 16px;
+}
+
 .tab.is-internal .tab-icon {
   border: 1.5px solid var(--color-border-strong);
   background: transparent;

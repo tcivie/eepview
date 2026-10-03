@@ -67,8 +67,7 @@ describe("address bar: not .i2p", () => {
   it("[ipc-contract navigation-active-tab] shows eepview://blocked?url=… for a refused address", async () => {
     await navigate("example.com");
     const shown = await activeUrl();
-    assert.ok(shown?.startsWith("eepview://blocked?url="), `${shown}`);
-    assert.match(shown ?? "", /example\.com/);
+    assert.equal(shown, "eepview://blocked?url=example.com");
   });
   it("[ipc-contract navigation-active-tab] refuses lookalike hosts like stats.i2p.evil.com", async () => {
     for (const input of [

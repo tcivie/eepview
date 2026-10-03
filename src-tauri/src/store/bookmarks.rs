@@ -125,6 +125,7 @@ impl Bookmarks {
             title,
             folder: clean_folder(new.folder.as_deref()),
             created: now,
+            icon: None,
         };
         self.items.push(bookmark.clone());
         Ok(bookmark)

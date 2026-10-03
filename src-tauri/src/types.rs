@@ -25,6 +25,8 @@ pub struct TabInfo {
     /// Selection, JavaScript and bookmark state.
     #[serde(flatten)]
     pub marks: TabMarks,
+    /// The 32 px site icon as a `data:image/png;base64,` URL; `None` for none.
+    pub icon: Option<String>,
 }
 
 /// The load and history flags of a [`TabInfo`] (flattened on the wire).
@@ -96,6 +98,10 @@ pub struct Bookmark {
     /// Creation time, Unix ms.
     #[serde(default)]
     pub created: u64,
+    /// The 64 px site icon as a `data:image/png;base64,` URL. Filled only on the way to the
+    /// UI: the store never keeps it, and input never sets it.
+    #[serde(default, skip_deserializing)]
+    pub icon: Option<String>,
 }
 
 /// The fields of a new bookmark.
@@ -124,6 +130,10 @@ pub struct HistoryEntry {
     pub visited: u64,
     /// Visit count.
     pub visits: u32,
+    /// The 32 px site icon as a `data:image/png;base64,` URL. Filled only on the way to the
+    /// UI: the store never keeps it, and input never sets it.
+    #[serde(default, skip_deserializing)]
+    pub icon: Option<String>,
 }
 
 /// The filter of `history_query`.
@@ -267,6 +277,7 @@ mod tests {
             },
             zoom: 1.0,
             marks: TabMarks::default(),
+            icon: None,
         };
         let json = serde_json::to_value(&info).unwrap();
         assert_eq!(json["canForward"], true);

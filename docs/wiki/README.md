@@ -34,6 +34,7 @@ This wiki is generated from docs/wiki in the repository. Edit it there, in a PR.
 | IPC contract | shipped | [IPC contract](ipc-contract.md) | [#29](https://github.com/tcivie/eepview/pull/29) |
 | No-leak architecture | shipped | [No-leak architecture](no-leak-architecture.md) | [#29](https://github.com/tcivie/eepview/pull/29) |
 | Diagnostics and bug reports | in progress | [Diagnostics and bug reports](diagnostics-and-bug-reports.md) | [#56](https://github.com/tcivie/eepview/pull/56) |
+| Site icons | shipped | [Site icons](site-icons.md) | [#53](https://github.com/tcivie/eepview/pull/53) |
 | Robustness tests | in progress | [Robustness tests](robustness-tests.md) | [#52](https://github.com/tcivie/eepview/pull/52) |
 | Leak test | shipped | [Leak test](leak-test.md) | [#41](https://github.com/tcivie/eepview/pull/41) |
 | Release pipeline | shipped | [Release pipeline](release-pipeline.md) | [#14](https://github.com/tcivie/eepview/pull/14) |
