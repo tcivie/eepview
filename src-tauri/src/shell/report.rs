@@ -70,6 +70,27 @@ impl<R: Runtime> Launcher for System<R> {
     }
 }
 
+/// A stand-in for the Downloads folder and the system launcher, managed only by tests, so
+/// `report_open` runs end to end without a browser.
+pub struct Target {
+    /// The folder the report file goes to.
+    pub downloads: PathBuf,
+    /// Opens the URL and shows the file.
+    pub launcher: Box<dyn Launcher + Send + Sync>,
+}
+
+/// Writes, shows and opens through the managed [`Target`], or the system ones.
+fn deliver<R: Runtime>(app: &AppHandle<R>, report: &Report) -> Result<Opened, String> {
+    if let Some(target) = app.try_state::<Target>() {
+        return send(target.launcher.as_ref(), &target.downloads, report);
+    }
+    let downloads = app
+        .path()
+        .download_dir()
+        .map_err(|_| failed(OpKind::WriteReport, ErrorKind::NotFound))?;
+    send(&System(app.clone()), &downloads, report)
+}
+
 /// What a report needs from the core.
 #[derive(Debug, Clone, Copy)]
 struct CoreFacts {
@@ -170,12 +191,8 @@ pub async fn report_open<R: Runtime>(
     description: String,
     include_log: bool,
 ) -> Result<Opened, String> {
-    let downloads = app
-        .path()
-        .download_dir()
-        .map_err(|_| failed(OpKind::WriteReport, ErrorKind::NotFound))?;
     let report = build(app.clone(), kind, description, include_log).await?;
-    blocking(move || send(&System(app), &downloads, &report)).await?
+    blocking(move || deliver(&app, &report)).await?
 }
 
 /// Records `ReportFailed` and gives the page its error text.
@@ -190,7 +207,11 @@ fn failed(op: OpKind, kind: ErrorKind) -> String {
 ///
 /// Fails when the file cannot be written, the URL or the file is outside its allowed place,
 /// or the system cannot open them.
-pub fn send(launcher: &impl Launcher, downloads: &Path, report: &Report) -> Result<Opened, String> {
+pub fn send(
+    launcher: &(impl Launcher + ?Sized),
+    downloads: &Path,
+    report: &Report,
+) -> Result<Opened, String> {
     let (file, path) = write_report(downloads, &report::text(report))
         .map_err(|e| failed(OpKind::WriteReport, ErrorKind::from(&e)))?;
     let (url, trimmed) = report::issue_url(report);
@@ -273,6 +294,7 @@ mod tests {
     use serde_json::json;
 
     use super::*;
+    use crate::diag::Ring;
     use crate::shell::testing::{app, invoke};
     use crate::store::testdir;
 
@@ -281,6 +303,21 @@ mod tests {
         opened: RefCell<Vec<String>>,
         shown: RefCell<Vec<PathBuf>>,
         fail: Option<ErrorKind>,
+    }
+
+    /// A launcher that only counts, safe to share with the app.
+    struct Quiet;
+
+    impl Launcher for Quiet {
+        fn open(&self, url: &str) -> Result<(), ErrorKind> {
+            report::is_issue_url(url)
+                .then_some(())
+                .ok_or(ErrorKind::InvalidInput)
+        }
+
+        fn reveal(&self, _path: &Path) -> Result<(), ErrorKind> {
+            Ok(())
+        }
     }
 
     impl Launcher for Fake {
@@ -333,6 +370,25 @@ mod tests {
         assert!(send(&Fake::default(), &missing, &sample(&app)).is_err());
         assert!(!in_folder(&dir, &missing));
         assert!(!in_folder(&dir.join("eepview-report.txt"), &dir.join("x")));
+    }
+
+    #[test]
+    fn report_open_runs_end_to_end_through_the_command() {
+        let app = app();
+        let dir = testdir::fresh("report-open");
+        app.manage(Target {
+            downloads: dir.clone(),
+            launcher: Box::new(Quiet),
+        });
+        let args = json!({ "kind": "crash", "description": "x", "includeLog": true });
+        let opened = invoke(&app, "report_open", args).unwrap();
+        assert_eq!(opened["file"], "eepview-report.txt");
+        assert!(dir.join("eepview-report.txt").is_file());
+        assert!(
+            diag::recent(Ring::CAPACITY)
+                .iter()
+                .any(|r| r.code == Code::ReportOpened)
+        );
     }
 
     #[test]

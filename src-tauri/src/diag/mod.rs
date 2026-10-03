@@ -187,6 +187,27 @@ const LOG_BASE_VAR: &str = "LOCALAPPDATA";
 #[cfg(not(any(target_os = "macos", windows)))]
 const LOG_BASE_VAR: &str = "XDG_DATA_HOME";
 
+/// The system family that decides where the log folder is.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LogFamily {
+    /// `$HOME/Library/Logs/<identifier>`.
+    MacOs,
+    /// `%LOCALAPPDATA%\\<identifier>\\logs`.
+    Windows,
+    /// `$XDG_DATA_HOME/<identifier>/logs`, or `$HOME/.local/share/<identifier>/logs`.
+    Linux,
+}
+
+/// The family of this system.
+#[cfg(target_os = "macos")]
+pub const LOG_FAMILY: LogFamily = LogFamily::MacOs;
+/// The family of this system.
+#[cfg(windows)]
+pub const LOG_FAMILY: LogFamily = LogFamily::Windows;
+/// The family of this system.
+#[cfg(not(any(target_os = "macos", windows)))]
+pub const LOG_FAMILY: LogFamily = LogFamily::Linux;
+
 /// [`default_log_dir`] from the home folder and the system base folder.
 #[must_use]
 pub fn log_dir_from(
@@ -194,13 +215,21 @@ pub fn log_dir_from(
     home: Option<PathBuf>,
     base: Option<PathBuf>,
 ) -> Option<PathBuf> {
-    if cfg!(target_os = "macos") {
-        return home.map(|h| h.join("Library").join("Logs").join(identifier));
-    }
-    let base = if cfg!(windows) {
-        base
-    } else {
-        base.or_else(|| home.map(|h| h.join(".local").join("share")))
+    log_dir_for(LOG_FAMILY, identifier, home, base)
+}
+
+/// The log folder of `family`.
+#[must_use]
+pub fn log_dir_for(
+    family: LogFamily,
+    identifier: &str,
+    home: Option<PathBuf>,
+    base: Option<PathBuf>,
+) -> Option<PathBuf> {
+    let base = match family {
+        LogFamily::MacOs => return home.map(|h| h.join("Library").join("Logs").join(identifier)),
+        LogFamily::Windows => base,
+        LogFamily::Linux => base.or_else(|| home.map(|h| h.join(".local").join("share"))),
     };
     base.map(|b| b.join(identifier).join("logs"))
 }
@@ -273,4 +302,27 @@ fn on_panic(info: &std::panic::PanicHookInfo<'_>) {
 /// Sets the panic hook of R3.1. It replaces the default hook, so no panic message is printed.
 pub fn install_panic_hook() {
     std::panic::set_hook(Box::new(on_panic));
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn every_family_has_its_log_folder() {
+        let (home, base) = (Some(PathBuf::from("/h")), Some(PathBuf::from("/b")));
+        let mac = log_dir_for(LogFamily::MacOs, "id", home.clone(), None);
+        assert_eq!(mac, Some(PathBuf::from("/h/Library/Logs/id")));
+        let win = log_dir_for(LogFamily::Windows, "id", home.clone(), base.clone());
+        assert_eq!(win, Some(PathBuf::from("/b/id/logs")));
+        assert_eq!(
+            log_dir_for(LogFamily::Windows, "id", home.clone(), None),
+            None
+        );
+        let xdg = log_dir_for(LogFamily::Linux, "id", home.clone(), base);
+        assert_eq!(xdg, Some(PathBuf::from("/b/id/logs")));
+        let local = log_dir_for(LogFamily::Linux, "id", home, None);
+        assert_eq!(local, Some(PathBuf::from("/h/.local/share/id/logs")));
+        assert_eq!(log_dir_for(LogFamily::MacOs, "id", None, None), None);
+    }
 }
