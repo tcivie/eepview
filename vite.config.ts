@@ -1,5 +1,24 @@
 import { defineConfig, loadEnv } from "vite";
 
+const uiPages = [
+  "index",
+  "home",
+  "history",
+  "bookmarks",
+  "stats",
+  "settings",
+  "setup",
+  "blocked",
+  "router-down",
+  "toolbar",
+  "status",
+];
+
+const input = Object.fromEntries([
+  ["main", "index.html"],
+  ...uiPages.map((page) => [`ui-${page}`, `src/ui/${page}.html`]),
+]);
+
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
   // loadEnv also reads the real process environment for keys with this prefix.
@@ -9,6 +28,11 @@ export default defineConfig(({ mode }) => {
     //
     // 1. prevent Vite from obscuring rust errors
     clearScreen: false,
+    build: {
+      rollupOptions: {
+        input,
+      },
+    },
     // 2. tauri expects a fixed port, fail if that port is not available
     server: {
       port: 1420,

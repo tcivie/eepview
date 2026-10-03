@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <script src="/theme-boot.js"></script>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <title>eepview</title>
+    <link rel="stylesheet" href="./theme.css" />
+    <link rel="stylesheet" href="./ui.css" />
+    <link rel="stylesheet" href="./chrome.css" />
+    <script type="module" src="./toolbar.ts"></script>
+  </head>
+  <body class="chrome">
+    <header class="chrome-bar" id="chrome-bar">
+      <div class="tabstrip" id="tabstrip" data-tauri-drag-region>
+        <div class="tabs" id="tabs" role="tablist" aria-label="Tabs"></div>
+        <button class="icon-btn new-tab" type="button" id="new-tab" title="New tab">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6v12M6 12h12" /></svg>
+          <span class="visually-hidden">New tab</span>
+        </button>
+        <div class="tab-drag" data-tauri-drag-region></div>
+        <p class="toast" id="toast" role="status" aria-live="polite" hidden></p>
+      </div>
+
+      <div class="navrow">
+        <div class="nav-group">
+          <button class="icon-btn" type="button" id="back" title="Back" disabled>
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6" /></svg>
+            <span class="visually-hidden">Back</span>
+          </button>
+          <button class="icon-btn" type="button" id="forward" title="Forward" disabled>
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
+            <span class="visually-hidden">Forward</span>
+          </button>
+          <button class="icon-btn" type="button" id="reload" title="Reload" data-mode="reload">
+            <svg class="icon icon-reload" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M18.5 12A6.5 6.5 0 1 1 16.6 7.4M18.5 4.5v3.5H15" />
+            </svg>
+            <svg class="icon icon-stop" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="m7 7 10 10M17 7 7 17" />
+            </svg>
+            <span class="visually-hidden" id="reload-label">Reload</span>
+          </button>
+          <button class="icon-btn" type="button" id="home" title="Home">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4.5 11 12 4.5l7.5 6.5M6.5 9.5V19h11V9.5" />
+            </svg>
+            <span class="visually-hidden">Home</span>
+          </button>
+        </div>
+
+        <form class="address" id="address-form" autocomplete="off">
+          <span class="address-badge" id="address-badge" title="Opened over I2P">I2P</span>
+          <label class="visually-hidden" for="address">Address</label>
+          <input
+            class="address-input"
+            id="address"
+            type="text"
+            role="combobox"
+            aria-autocomplete="list"
+            aria-expanded="false"
+            aria-controls="suggestions"
+            spellcheck="false"
+            autocapitalize="off"
+            placeholder="Enter an .i2p address"
+          />
+          <button class="icon-btn address-star" type="button" id="star" aria-pressed="false" title="Bookmark this page">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="m12 4.5 2.3 4.7 5.2.8-3.75 3.6.9 5.15L12 16.3l-4.65 2.45.9-5.15L4.5 10l5.2-.8z" />
+            </svg>
+            <span class="visually-hidden" id="star-label">Bookmark this page</span>
+          </button>
+          <div class="suggestions" id="suggestions" role="listbox" aria-label="Suggestions" hidden></div>
+        </form>
+
+        <div class="nav-group">
+          <button
+            class="icon-btn js-toggle"
+            type="button"
+            id="js"
+            aria-pressed="false"
+            aria-label="JavaScript for this site"
+            title="JavaScript for this site"
+          >
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+              <mask id="js-slash-cut" maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24">
+                <rect width="24" height="24" fill="#fff" />
+                <path class="js-cut" d="M4 4l16 16" stroke="#000" stroke-width="5.6" />
+              </mask>
+              <g class="js-braces" mask="url(#js-slash-cut)">
+                <path d="M8.5 4C7 4 6 4.75 6 6.25v3.5C6 10.75 5.5 12 4 12c1.5 0 2 1.25 2 2.25v3.5C6 19.25 7 20 8.5 20" />
+                <path d="M15.5 4c1.5 0 2.5.75 2.5 2.25v3.5c0 1 .5 2.25 2 2.25-1.5 0-2 1.25-2 2.25v3.5c0 1.5-1 2.25-2.5 2.25" />
+              </g>
+              <path class="js-slash" d="M4 4l16 16" />
+            </svg>
+          </button>
+          <button
+            class="status-btn"
+            type="button"
+            id="status"
+            data-tone="building"
+            aria-describedby="status-tip"
+          >
+            <span class="status-dot" aria-hidden="true"></span>
+            <span class="visually-hidden" id="status-label">Router: checking</span>
+          </button>
+          <div class="tooltip" id="status-tip" role="tooltip" hidden>
+            <p class="tooltip-title" id="status-title">Checking the router</p>
+            <p class="tooltip-text" id="status-text"></p>
+          </div>
+          <button
+            class="icon-btn"
+            type="button"
+            id="menu-btn"
+            title="Menu"
+            aria-expanded="false"
+            aria-controls="menu"
+          >
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="12" cy="6" r="1.2" />
+              <circle cx="12" cy="12" r="1.2" />
+              <circle cx="12" cy="18" r="1.2" />
+            </svg>
+            <span class="visually-hidden">Menu</span>
+          </button>
+          <div class="popover menu" id="menu" hidden>
+            <button class="menu-item" type="button" data-command="new-tab">New tab</button>
+            <button class="menu-item" type="button" data-open="eepview://bookmarks">Bookmarks</button>
+            <button class="menu-item" type="button" data-open="eepview://history">History</button>
+            <button class="menu-item" type="button" data-open="eepview://stats">Network</button>
+            <button class="menu-item" type="button" data-open="eepview://settings">Settings</button>
+            <fieldset class="menu-zoom">
+              <legend class="menu-zoom-label">Zoom</legend>
+              <button class="icon-btn" type="button" data-command="zoom-out" title="Zoom out">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12" /></svg>
+                <span class="visually-hidden">Zoom out</span>
+              </button>
+              <button class="zoom-value" type="button" data-command="zoom-reset" id="zoom-value" title="Reset zoom">100%</button>
+              <button class="icon-btn" type="button" data-command="zoom-in" title="Zoom in">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6v12M6 12h12" /></svg>
+                <span class="visually-hidden">Zoom in</span>
+              </button>
+            </fieldset>
+          </div>
+        </div>
+      </div>
+
+      <form class="findbar" id="findbar" aria-label="Find in page" hidden>
+        <label class="visually-hidden" for="find-input">Find in page</label>
+        <input class="find-input" id="find-input" type="text" placeholder="Find in page" spellcheck="false" />
+        <span class="find-count" id="find-count" role="status" aria-live="polite"></span>
+        <button class="icon-btn" type="button" id="find-prev" title="Previous match">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 15 6-6 6 6" /></svg>
+          <span class="visually-hidden">Previous match</span>
+        </button>
+        <button class="icon-btn" type="button" id="find-next" title="Next match">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+          <span class="visually-hidden">Next match</span>
+        </button>
+        <button class="icon-btn find-case" type="button" id="find-case" aria-pressed="false" title="Match case">
+          <span aria-hidden="true">Aa</span>
+          <span class="visually-hidden">Match case</span>
+        </button>
+        <button class="icon-btn" type="button" id="find-close" title="Close find bar">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17" /></svg>
+          <span class="visually-hidden">Close find bar</span>
+        </button>
+      </form>
+    </header>
+
+    <template id="tab-template">
+      <div class="tab" role="tab" aria-selected="false" tabindex="-1" draggable="true">
+        <span class="tab-icon" aria-hidden="true">E</span>
+        <span class="tab-title">Tab</span>
+        <button class="tab-close" type="button" tabindex="-1" title="Close tab">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m8 8 8 8M16 8l-8 8" /></svg>
+          <span class="visually-hidden">Close tab</span>
+        </button>
+      </div>
+    </template>
+
+    <main class="dev-stage" id="dev-stage" hidden>
+      <div class="dev-frame">
+        <p class="dev-frame-title" id="dev-frame-title">Page content</p>
+        <p class="dev-frame-text">
+          In eepview the page renders here, in its own web view. This area exists only in the
+          dev preview.
+        </p>
+      </div>
+      <fieldset class="dev-controls">
+        <legend class="visually-hidden">Dev preview controls</legend>
+        <label class="field-label" for="dev-router">Router state</label>
+        <select class="select" id="dev-router">
+          <option value="verifying">verifying</option>
+          <option value="ok">ok</option>
+          <option value="building">building</option>
+          <option value="down">down</option>
+          <option value="not-i2p">not-i2p</option>
+          <option value="outproxy">outproxy</option>
+        </select>
+        <button class="btn" type="button" id="dev-find">Open find bar</button>
+        <button class="btn" type="button" id="dev-toast">Show a toast</button>
+      </fieldset>
+    </main>
+  </body>
+</html>
