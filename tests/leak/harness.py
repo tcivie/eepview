@@ -52,7 +52,7 @@ def app_command(args, strace_log: Path | None) -> list[str]:
 
 
 def run_app(log: EventLog, ports: dict, name: str, args) -> Run:
-    env_extra, expect_js, counts = RUNS[name]
+    _env, expect_js, counts = RUNS[name]
     run = Run(
         name,
         expect_js,
