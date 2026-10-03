@@ -31,8 +31,10 @@ JavaScript is on. The layers sit below JavaScript, so they hold with it on. You 
 
 - No OS-level layer yet (L6, see the [roadmap](roadmap.md)).
 - Linux has no engine rule list yet (L3b); the page policy covers it. The console view has no page policy, so on Linux it relies on its navigation guard and the router's own pages.
+- The L3b rule list allows exactly the hosts of the one host predicate: after the `.i2p` allow rule it blocks `xn--` labels, `b32.i2p`, short `*.b32.i2p` names and port 0 again, and allows a `b32` name of 52 base32 characters or more. The WebKit regex subset has no `|`, so each form is a rule of its own, in order.
 
 ## History
 
 - 2026-10-03 — Five layers, the platform bridge and the architecture test — [#29](https://github.com/tcivie/eepview/pull/29)
 - 2026-10-03 — Router console view: not a leak path for eepsites — [#54](https://github.com/tcivie/eepview/pull/54)
+- 2026-10-03 — The L3b rule list accepts exactly what the host predicate accepts — [#69](https://github.com/tcivie/eepview/pull/69)
