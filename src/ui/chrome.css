@@ -231,12 +231,8 @@
     fill: currentColor;
   }
 
-  .suggestions {
-    position: absolute;
-    top: calc(100% + var(--space-1));
-    right: 0;
-    left: 0;
-    z-index: 10;
+  .suggestion-list {
+    width: var(--popup-anchor-width);
     padding: var(--space-1);
   }
 
@@ -287,21 +283,6 @@
     animation: chrome-spin 2.4s linear infinite;
   }
 
-  .tooltip,
-  .menu,
-  .router-panel {
-    position: absolute;
-    top: calc(100% + var(--space-1-5));
-    right: 0;
-    z-index: 10;
-  }
-
-  .tooltip {
-    width: 280px;
-    padding: var(--space-3);
-    pointer-events: none;
-  }
-
   .tooltip-title {
     font-weight: var(--fw-strong);
   }
@@ -312,6 +293,7 @@
 
   .menu {
     display: grid;
+    width: max-content;
     min-width: 220px;
     padding: var(--space-1);
   }
@@ -517,9 +499,8 @@
   .router-panel {
     display: grid;
     gap: var(--space-3);
-    width: min(340px, calc(100vw - 2 * var(--space-2)));
+    width: 340px;
     padding: var(--space-4);
-    right: calc(var(--space-1) * -1);
   }
 
   .rp-head {
@@ -596,5 +577,43 @@
   .rp-pause,
   .rp-network {
     grid-column: 1 / -1;
+  }
+
+  /* The popup webview: transparent, one card at its top left. The shell sizes the webview
+     to the card, so the card fills it and scrolls inside when the window is too small. */
+  .popup-page,
+  .popup-page body,
+  .popup-body {
+    min-height: 0;
+    height: 100vh;
+    overflow: hidden;
+    background: transparent;
+  }
+
+  .popup-body {
+    font-size: var(--fs-sm);
+  }
+
+  .popup-card {
+    position: fixed;
+    top: 0;
+    left: 0;
+    max-width: 100vw;
+    max-height: 100vh;
+    overflow: auto;
+    overscroll-behavior: contain;
+    box-shadow: none;
+  }
+
+  /* While the page measures a card it has no size limit: the shell gets its natural size. */
+  .measuring .popup-card {
+    max-width: none;
+    max-height: none;
+  }
+
+  .hint-card {
+    width: max-content;
+    max-width: 280px;
+    padding: var(--space-3);
   }
 }

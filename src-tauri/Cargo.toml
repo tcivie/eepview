@@ -21,8 +21,9 @@ name = "eepview_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [dev-dependencies]
-# Property tests of the robustness suite (tests/robust_*.rs) and the site icons
-# (tests/site_icons_props.rs). No default features: no fork, no timeout.
+# Property tests of the robustness suite (tests/robust_*.rs), the site icons
+# (tests/site_icons_props.rs) and the popup placement (tests/popups.rs). No default
+# features: no fork, no timeout.
 proptest = { version = "1.11.0", default-features = false, features = ["std"] }
 # The L3 rule is a regex; the tests run the real rule against the same URLs as the guard.
 # Already in the tree through Tauri.

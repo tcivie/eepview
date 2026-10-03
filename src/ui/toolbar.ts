@@ -8,12 +8,8 @@ import { call, devMode, on } from "./ipc.ts";
 import { focusAddress, previewSuggestions, showUrl, wireAddress } from "./toolbar/address.ts";
 import { closeFind, openFind, showFindResult, wireFind } from "./toolbar/find.ts";
 import { wireLayout } from "./toolbar/layout.ts";
-import { openMenuForReview, renderNav, renderStatus, showToast, wireNav } from "./toolbar/nav.ts";
-import {
-  openRouterPanelForReview,
-  renderPanelStatus,
-  wireRouterPanel,
-} from "./toolbar/router-panel.ts";
+import { openForReview, renderNav, renderStatus, showToast, wireNav } from "./toolbar/nav.ts";
+import { wirePopups } from "./toolbar/popups.ts";
 import { activeTab, onTabs, setTabs, updateTab } from "./toolbar/state.ts";
 import { renderTabs, wireTabs } from "./toolbar/tabs.ts";
 
@@ -35,7 +31,6 @@ function render(tabs: TabInfo[]): void {
 
 function showRouter(status: RouterStatus): void {
   renderStatus(status);
-  renderPanelStatus(status);
 }
 
 function listenToCore(): void {
@@ -67,9 +62,9 @@ function previewFind(query: string): void {
 function applyReviewParams(params: URLSearchParams): void {
   if (params.has("find")) previewFind(params.get("find") ?? "");
   if (params.has("suggest")) previewSuggestions(params.get("suggest") ?? "");
-  if (params.has("menu")) openMenuForReview();
-  if (params.has("tip")) byId("status-tip").hidden = false;
-  if (params.has("panel")) openRouterPanelForReview();
+  if (params.has("menu")) openForReview("menu");
+  if (params.has("tip")) openForReview("hint");
+  if (params.has("panel")) openForReview("router");
 }
 
 function showDevToast(): void {
@@ -93,7 +88,7 @@ wireAddress();
 wireFind();
 wireNav();
 wireLayout();
-wireRouterPanel();
+wirePopups();
 listenToCore();
 loadInitialState();
 if (devMode) wireDevStage();

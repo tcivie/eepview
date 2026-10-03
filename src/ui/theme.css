@@ -100,6 +100,7 @@
   --navrow-h: 40px;
   --findbar-h: 40px;
   --chrome-inset-left: 0px;
+  --popup-anchor-width: auto;
 
   /* Borders and shadows. Shadows only on things that float. */
   --border-width: 1px;

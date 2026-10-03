@@ -14,7 +14,7 @@ The stylesheets are split into cascade layers. A later layer always wins, so a p
 | `src/ui/ui.css` | `base` | The reset, headings, focus ring. |
 | `src/ui/ui.css` | `components` | The shared components below. |
 | `src/ui/pages.css` | `pages` | Layout that only one internal page has. |
-| `src/ui/chrome.css` | `pages` | Layout that only the toolbar and the link status bubble have. |
+| `src/ui/chrome.css` | `pages` | Layout that only the toolbar, the popup page (`popup.html`) and the link status bubble have. |
 | `src/ui/ui.css` | `state` | `[hidden]` hides an element, whatever `display` a component sets. |
 
 ## Components
@@ -53,7 +53,7 @@ The stylesheets are split into cascade layers. A later layer always wins, so a p
 
 `scripts/palette-check.sh` covers raw colors.
 
-The toolbar gets the width of the macOS window buttons at run time. `src/ui/toolbar/layout.ts` writes it to `--chrome-inset-left` in a constructed stylesheet, not in an inline style.
+Two values are known only at run time: the width of the macOS window buttons (`--chrome-inset-left`) and the width of the address bar under the suggestion popup (`--popup-anchor-width`). `src/ui/shared/runtime-vars.ts` writes each one to a custom property in a constructed stylesheet, not to an inline style. `theme.css` holds their defaults.
 
 ## Screenshots
 

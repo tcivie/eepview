@@ -32,7 +32,7 @@ Added in [#61](https://github.com/tcivie/eepview/pull/61).
 
 ## Screenshots
 
-`scripts/screenshots.sh` builds the bundled UI, serves it with `vite preview`, and takes the README and wiki screenshots under `docs/images/ui/` with headless Chrome. The review folders (`brand-review/`, `calm-review/`, `setup-review/`) are one-time before and after records of a PR, so the script does not retake them. It uses one window size (1280×800), the dev mock data, and both themes. The list of shots is `scripts/screenshots.json`. Set `CHROME` to use a Chrome binary that is not in the default place. The script never starts the eepview app.
+`scripts/screenshots.sh` builds the bundled UI, serves it with `vite preview`, and takes the README and wiki screenshots under `docs/images/ui/` with headless Chrome. The review folders (`brand-review/`, `calm-review/`, `setup-review/`) are one-time before and after records of a PR, so the script does not retake them. It uses one window size (1280×800), the dev mock data, and both themes. The list of shots is `scripts/screenshots.json`. The popups (suggestions, menu and router panel) show in their own webview, so the script shoots each card alone from `popup.html`, at 2x on a transparent background. Set `CHROME` to use a Chrome binary that is not in the default place. The script never starts the eepview app.
 
 ## Palette
 

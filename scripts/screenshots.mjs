@@ -133,7 +133,10 @@ async function clipFor(cdp, shot) {
   return { x: x - pad, y: y - pad, width: width + 2 * pad, height: height + 2 * pad, scale: 1 };
 }
 
+const CLEAR = { color: { r: 0, g: 0, b: 0, a: 0 } };
+
 async function capture(cdp, shot, theme) {
+  await cdp.send("Emulation.setDefaultBackgroundColorOverride", shot.transparent ? CLEAR : {});
   await prepare(cdp, shot, theme);
   if (shot.click) await click(cdp, shot.click);
   const clip = await clipFor(cdp, shot);

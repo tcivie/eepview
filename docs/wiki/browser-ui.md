@@ -9,7 +9,7 @@ The browser chrome and the internal pages live in `src/ui/`. They are plain HTML
 | Page | File | What it shows |
 | --- | --- | --- |
 | Toolbar | `toolbar.html` | Tabs, back, forward, reload, home, the address bar with suggestions, the find bar, the JavaScript toggle, the router status dot and the menu. |
-| Router panel | `toolbar.html` | A popover opened from the status dot. |
+| Router panel | `popup.html` | A popup opened from the status dot, in the `popup` webview. |
 | Setup | `setup.html` | The first-start flow. |
 | Home, History, Bookmarks, Network, Settings | `home.html` and the others | The internal pages. |
 | Blocked, Router stopped | `blocked.html`, `router-down.html` | Error pages. |
@@ -50,7 +50,7 @@ A click on the router status dot opens a panel under the dot. The panel shows:
 
 Restart and Stop are off for a router that eepview does not manage. Their tooltip then reads "Only for a router that eepview manages".
 
-The panel closes on Esc (focus goes back to the dot), on a click outside, and when focus leaves it. While the panel is open, it refreshes every 5 s and the toolbar calls `chrome_set_height` so the panel fits. A missing figure shows as "—".
+The panel closes on Esc (focus goes back to the dot), on a second click on the dot, on a click outside, and when focus leaves it. While the panel is open, it refreshes every 5 s. It shows in the `popup` webview, over the page: the toolbar stays 84 px, and the panel gets the height it needs up to the window bottom, then scrolls inside itself (see [Toolbar popups](browser-shell.md#toolbar-popups)). A missing figure shows as "—".
 
 Screenshots: `docs/images/ui/router-panel-{light,dark}.png`, `router-panel-unmanaged-*.png` and `router-panel-paused-*.png`.
 
@@ -94,4 +94,5 @@ Tests check these. Each one names the behavior, not the code.
 
 ## History
 
+- 2026-10-03 — The router panel, the menu, the hint and the suggestions show in the `popup` webview — [#55](https://github.com/tcivie/eepview/pull/55)
 - 2026-10-03 — Numbered PO requirements for the find bar, suggestions, history, bookmarks, tabs and stats — [#49](https://github.com/tcivie/eepview/pull/49)
