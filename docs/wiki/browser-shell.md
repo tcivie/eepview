@@ -25,6 +25,18 @@ The Rust side of the browser, in `src-tauri/`: tabs, navigation, bookmarks, hist
 - Hand-edited store files are not trusted: a settings homepage that is not an I2P site or an internal page falls back to `eepview://home`; history keeps only I2P entries, newest first, at most 10 000.
 - Gatekeeper: duplicate `Content-Length` headers are refused with 400; a request body cut short closes both sides at once.
 
+## Requirements (UX batch 1)
+
+Found in QA of the first shell build.
+
+1. After a page loads from the address bar, keyboard scrolling (Page Down, Space, the arrow keys) works on the page with no extra click. When a navigation started from the address bar commits, keyboard focus moves to the page content. A navigation that did not start in the address bar (a link, a redirect, a script) does not move focus. A navigation from the address bar to an internal page moves focus to that page at once.
+2. While a web page loads, the content area shows the theme surface colour (dark in dark mode), never white. Every web tab starts with its background set to the `--color-surface` token of the active theme, before its first paint. The theme is the saved theme setting; "system" follows the operating system. The Settings page saves the theme choice in the settings store, so the shell knows it.
+3. A page load that failed is not saved in history. That covers the I2P "Website Unreachable" page, any HTTP 5xx answer from the router proxy, and a refusal by the gatekeeper for an I2P address. The tab stops loading and shows the page, but no history entry is added. A history entry that already exists for the same address is not removed.
+4. Cmd/Ctrl+T opens a new tab, puts keyboard focus in the address bar and selects its text. The "New tab" button and the menu item do the same. A tab opened by a page (`target=_blank`) does not take focus away from the page.
+5. In Settings, "Where eepview connects" lists the router proxy that eepview really uses, the same value the Home page shows, including a value set with `EEPVIEW_PROXY`. It shows a dash while the proxy is not known yet.
+6. The Router card on the Home page never shows "Unknown". It shows `I2P <version>` when the router reports its version, and "Version not reported by the router" when it does not.
+7. After you close the last tab, Cmd/Ctrl+Shift+T opens that closed tab again, with the page it showed. The fresh Home tab that replaced it may stay or go.
+
 ## How to use / run locally
 
 - `npm run tauri dev` with an I2P router on `127.0.0.1:4444`.
