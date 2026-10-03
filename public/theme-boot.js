@@ -8,4 +8,6 @@
     pref = null;
   }
   if (forced.includes(pref)) document.documentElement.setAttribute("data-theme", pref);
+  if (/Mac/.test(window.navigator.userAgent))
+    document.documentElement.setAttribute("data-platform", "macos");
 })();

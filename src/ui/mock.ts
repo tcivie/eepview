@@ -345,6 +345,7 @@ const handlers: Record<CommandName, Handler> = {
   router_stats: () => sampleStats(),
   chrome_set_height: () => undefined,
   platform: () => platformFromParams(),
+  window_fullscreen: () => params.has("fullscreen"),
   bookmarks_export_file: () => data.exportPath,
 };
 
