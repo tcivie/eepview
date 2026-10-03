@@ -7,7 +7,8 @@ Unit-test coverage gate for Rust and TypeScript.
 ## How it works
 
 - The `coverage` job in `.github/workflows/ci.yml` runs on ubuntu-24.04 only.
-- Rust: `cargo llvm-cov --all-targets --summary-only`, then `cargo llvm-cov report --fail-under-lines <N>`. Every file counts. There are no exclusions.
+- Rust lines: `cargo llvm-cov --workspace --all-targets --summary-only`, then `cargo llvm-cov report --fail-under-lines <N>`. Every file counts. There are no exclusions.
+- Rust branches: the pinned `nightly-2026-10-01` runs the same tests with `--branch`. cargo-llvm-cov has no `--fail-under-branches`, so `jq` reads `totals.branches.percent` from the JSON summary and fails below the floor.
 - TypeScript: `npm run test:coverage` first runs `scripts/check-tested.sh`, the traceability check. Then it runs the Node built-in test runner with coverage thresholds. It adds no npm package.
 - Traceability: every numbered requirement under "Requirements" in [Browser UI](browser-ui.md), and every IPC contract section the UI depends on, must be named by at least one test title. The script fails when a requirement has no test.
   - Tag a test title with `[browser-ui N]` for requirement N on the Browser UI page.
@@ -17,7 +18,7 @@ Unit-test coverage gate for Rust and TypeScript.
 
 ## Ratchet values
 
-- Rust lines: 0. Today there are no Rust tests, so coverage is 0%. Raise the number when coverage rises. Never lower it.
+- Rust: lines 91, branches 82. CI on ubuntu-24.04 measured 91.64% lines and 82.23% branches on the nightly run after [#29](https://github.com/tcivie/eepview/pull/29). The floor is that value rounded down. Raise it when coverage rises. Never lower it.
 - TypeScript: lines 80, branches 70, functions 80. [#49](https://github.com/tcivie/eepview/pull/49) removed the tests that lock in the implementation. Coverage is below the floor until the requirement tests land in that PR.
 
 ## How to use / run locally
@@ -35,12 +36,13 @@ Unit-test coverage gate for Rust and TypeScript.
 
 ## Limits
 
-- The Rust gate checks lines only, not branches or functions.
+- The Rust gate checks lines and branches, not functions or regions.
+- Branch coverage needs a nightly compiler, so the branch number comes from one dated nightly. A nightly bump can move it a little.
 - Test files are excluded from the TypeScript report only.
 - Node counts only the files that a test loads. A module that no requirement test reaches does not count against the floor. Such a module is dead code: inline it or delete it.
-- The Rust floor is 0 because there are no Rust tests yet. The gate checks nothing until the first test lands. Raise it in that PR.
 
 ## History
 
 - 2026-10-03 — Add the coverage gate for Rust and TypeScript — [#13](https://github.com/tcivie/eepview/pull/13)
 - 2026-10-03 — State the test rule; remove UI tests that lock in the implementation — [#49](https://github.com/tcivie/eepview/pull/49)
+- 2026-10-03 — Raise the Rust gate to the measured floor: lines 91, branches 82 — [#PRNUM](https://github.com/tcivie/eepview/pull/PRNUM)
