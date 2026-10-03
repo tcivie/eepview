@@ -3,7 +3,7 @@
 
 import type { RouterStats, RouterStatus } from "../contract.ts";
 import { all, byId } from "../dom.ts";
-import { call } from "../ipc.ts";
+import { call, on } from "../ipc.ts";
 import {
   type PanelText,
   panelControls,
@@ -14,6 +14,7 @@ import {
 import { areaPath, CHART_HEIGHT, linePath, scaleMax } from "../lib/sparkline.ts";
 import { MISSING } from "../lib/stats-view.ts";
 import { delegateClick } from "../shared/events.ts";
+import { closeCurrent, report } from "./frame.ts";
 
 const REFRESH_MS = 5000;
 const EMPTY_PATH = `M0 ${CHART_HEIGHT}`;
@@ -75,49 +76,26 @@ function renderStats(stats: RouterStats): void {
   renderSpark(stats.history);
 }
 
+/** Loads the figures, then reports the new size: the panel may have grown. */
 async function refresh(): Promise<void> {
   await Promise.allSettled([
     call("router_status", {}).then(renderPanelStatus),
     call("router_stats", {}).then(renderStats),
   ]);
+  report();
 }
 
-function openPanel(): void {
-  panel().hidden = false;
-  byId("status").setAttribute("aria-expanded", "true");
-  byId("status-tip").hidden = true;
+/** The panel opened: refresh it now and every 5 s while it is open. */
+export function openPanel(): void {
   refresh().catch(quiet);
   window.clearInterval(refreshTimer);
   refreshTimer = window.setInterval(() => refresh().catch(quiet), REFRESH_MS);
   byId("rp-title").focus();
 }
 
-export function closePanel(returnFocus: boolean): void {
-  if (panel().hidden) return;
-  panel().hidden = true;
+/** The panel closed: stop the refresh. */
+export function stopPanel(): void {
   window.clearInterval(refreshTimer);
-  byId("status").setAttribute("aria-expanded", "false");
-  if (returnFocus) byId("status").focus();
-}
-
-function togglePanel(): void {
-  if (panel().hidden) openPanel();
-  else closePanel(false);
-}
-
-function closeOutside(event: MouseEvent): void {
-  const target = event.target as Node;
-  if (panel().contains(target) || byId("status").contains(target)) return;
-  closePanel(false);
-}
-
-function closeOnEscape(event: KeyboardEvent): void {
-  if (event.key === "Escape" && !panel().hidden) closePanel(true);
-}
-
-function closeOnFocusLeave(event: FocusEvent): void {
-  const next = event.relatedTarget as Node | null;
-  if (next && !panel().contains(next) && !byId("status").contains(next)) closePanel(false);
 }
 
 function afterCommand(command: Promise<unknown>): void {
@@ -138,19 +116,12 @@ function onRouterAction(button: HTMLElement): void {
 function openNetworkPage(): void {
   const input = byId("rp-network").dataset.open ?? "";
   call("navigate", { input }).catch(quiet);
-  closePanel(false);
-}
-
-export function openRouterPanelForReview(): void {
-  openPanel();
+  closeCurrent(false);
 }
 
 export function wireRouterPanel(): void {
-  byId("status").addEventListener("click", togglePanel);
-  document.addEventListener("click", closeOutside);
-  document.addEventListener("keydown", closeOnEscape);
-  panel().addEventListener("focusout", closeOnFocusLeave);
   byId("rp-pause").addEventListener("click", onPause);
   delegateClick<HTMLElement>(panel(), "[data-action]", onRouterAction);
   byId("rp-network").addEventListener("click", openNetworkPage);
+  on("router-status", renderPanelStatus).catch(quiet);
 }

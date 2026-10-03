@@ -30,7 +30,7 @@ This wiki is generated from docs/wiki in the repository. Edit it there, in a PR.
 | Supply chain | shipped | [Supply chain](supply-chain.md) | [#1](https://github.com/tcivie/eepview/pull/1) |
 | Documentation | shipped | [Documentation](documentation.md) | [#16](https://github.com/tcivie/eepview/pull/16) |
 | Browser UI | shipped | [Browser UI](browser-ui.md) | [#19](https://github.com/tcivie/eepview/pull/19) |
-| Browser shell | shipped | [Browser shell](browser-shell.md) | [#29](https://github.com/tcivie/eepview/pull/29), [#57](https://github.com/tcivie/eepview/pull/57) |
+| Browser shell | shipped | [Browser shell](browser-shell.md) | [#29](https://github.com/tcivie/eepview/pull/29), popups [#55](https://github.com/tcivie/eepview/pull/55), UX batch 1 [#57](https://github.com/tcivie/eepview/pull/57) |
 | IPC contract | shipped | [IPC contract](ipc-contract.md) | [#29](https://github.com/tcivie/eepview/pull/29) |
 | No-leak architecture | shipped | [No-leak architecture](no-leak-architecture.md) | [#29](https://github.com/tcivie/eepview/pull/29) |
 | Site icons | shipped | [Site icons](site-icons.md) | [#53](https://github.com/tcivie/eepview/pull/53) |

@@ -4,27 +4,21 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { chromeHeight, insetPx } from "./chrome-height.ts";
 
-describe("[ipc-contract window] toolbar height", () => {
-  it("[ipc-contract window] is 84 px with no find bar and no popup", () => {
-    assert.equal(chromeHeight({ findOpen: false, popupBottoms: [] }), 84);
+describe("chromeHeight", () => {
+  it("[browser-shell popups 2] is exactly 84 when the find bar is closed", () => {
+    assert.equal(chromeHeight({ findOpen: false }), 84);
   });
-  it("[ipc-contract window] is 124 px with the find bar open", () => {
-    assert.equal(chromeHeight({ findOpen: true, popupBottoms: [] }), 124);
+  it("[browser-shell popups 2] is exactly 124 while the find bar is open", () => {
+    assert.equal(chromeHeight({ findOpen: true }), 124);
   });
-  it("[ipc-contract window] grows to fit an open popup", () => {
-    const height = chromeHeight({ findOpen: false, popupBottoms: [300] });
-    assert.ok(height >= 300, `height ${height} must cover a popup that ends at 300`);
-    assert.ok(height <= 480);
+  it("[browser-shell popups 2] gives only 84 or 124 for either state", () => {
+    for (const findOpen of [false, true]) {
+      assert.ok([84, 124].includes(chromeHeight({ findOpen })), `findOpen=${findOpen}`);
+    }
   });
-  it("[ipc-contract window] grows to fit the lowest of several popups", () => {
-    const height = chromeHeight({ findOpen: false, popupBottoms: [150, 320, 200] });
-    assert.ok(height >= 320, `height ${height} must cover the lowest popup`);
-  });
-  it("[ipc-contract window] is clamped to 480 px", () => {
-    assert.equal(chromeHeight({ findOpen: false, popupBottoms: [2000] }), 480);
-  });
-  it("[ipc-contract window] never drops below 84 px for a small popup", () => {
-    assert.equal(chromeHeight({ findOpen: false, popupBottoms: [20] }), 84);
+  it("[browser-shell popups 2] gives the same height on every call", () => {
+    assert.equal(chromeHeight({ findOpen: false }), chromeHeight({ findOpen: false }));
+    assert.equal(chromeHeight({ findOpen: true }), chromeHeight({ findOpen: true }));
   });
 });
 

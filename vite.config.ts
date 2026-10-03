@@ -15,6 +15,7 @@ const uiPages = [
   "router-down",
   "toolbar",
   "status",
+  "popup",
 ];
 
 const input = Object.fromEntries([
