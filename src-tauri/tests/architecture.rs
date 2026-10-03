@@ -84,7 +84,18 @@ fn one_factory_builds_remote_webviews() {
     only_in("add_child", &factories).unwrap();
     only_in("proxy_url", &["src/shell/content.rs"]).unwrap();
     only_in("WebviewUrl::External", &["src/shell/content.rs", CONSOLE]).unwrap();
-    only_in("WebviewWindowBuilder", &[CONSOLE]).unwrap();
+    // R8: the console view is a child of the main window; it builds no window of its own.
+    let console = prod_code(CONSOLE).unwrap();
+    for token in ["WebviewWindowBuilder", "WindowBuilder"] {
+        assert!(
+            !console.contains(token),
+            "console.rs builds a window: {token}"
+        );
+    }
+    assert!(
+        console.contains("add_child"),
+        "the console is a child webview"
+    );
 }
 
 #[test]
@@ -659,12 +670,7 @@ fn r8_the_console_label_is_named_only_in_the_console_factory() {
     // R8: never a tab-* webview, never the content-webview factory.
     for file in ["src/shell/content.rs", "src/shell/chrome.rs"] {
         let text = prod_code(file).unwrap();
-        for token in [
-            "\"console\"",
-            "\"console-window\"",
-            "CONSOLE_LABEL",
-            "CONSOLE_WINDOW",
-        ] {
+        for token in ["\"console\"", "CONSOLE_LABEL"] {
             assert!(!text.contains(token), "{file} names {token}");
         }
     }
@@ -687,6 +693,63 @@ fn r8_the_console_constructor_takes_a_verified_console() {
     let text = prod_code(CONSOLE).unwrap();
     let sig = signature(&text, "open").expect("pub fn open in console.rs");
     assert!(sig.contains("&VerifiedConsole"), "{sig}");
+    // R12: no page argument any more.
+    assert!(!sig.contains("ConsolePage"), "{sig}");
+}
+
+#[test]
+fn r8_there_is_no_console_window_and_no_page_type() {
+    // R8 and R7: no `console-window`; eepview links to no console page but the home page.
+    for token in [
+        "console-window",
+        "CONSOLE_WINDOW",
+        "ConsolePage",
+        "page_path",
+    ] {
+        assert!(
+            users(token).unwrap().is_empty(),
+            "`{token}` is used in {:?}",
+            users(token).unwrap()
+        );
+    }
+}
+
+#[test]
+fn r8_the_console_view_is_built_only_from_a_verified_console() {
+    // R8 and R23: the console tab webview comes from `ConsoleWebview::open`, which takes a
+    // `&VerifiedConsole`; no file outside the console module and the commands calls it.
+    only_under(
+        "ConsoleWebview::open",
+        &[
+            "src/shell/console",
+            "src/shell/commands",
+            "src/net/console/tests.rs",
+        ],
+    )
+    .unwrap();
+}
+
+#[test]
+fn r29_the_core_never_knows_the_console_view() {
+    // R29: the core is pure: it names no verified console, no console webview and no
+    // loopback host; it only models the console tab. Test files are not production code.
+    for file in rust_files(&root().join("src/core")).unwrap() {
+        let name = rel(&file);
+        if name.ends_with("tests.rs") {
+            continue;
+        }
+        let text = code(&file).unwrap().join("\n");
+        for token in [
+            "VerifiedConsole",
+            "ConsoleWebview",
+            "net::console",
+            "shell::console",
+            "127.0.0.1:7657",
+            "CONSOLE_LABEL",
+        ] {
+            assert!(!text.contains(token), "{name} uses {token}");
+        }
+    }
 }
 
 #[test]
@@ -759,11 +822,14 @@ fn r11_the_console_view_is_hardened() {
     ] {
         assert!(text.contains(call), "console.rs must call {call}");
     }
+    // R11 and R23: the console tab webview gets no proxy and no IPC.
     for token in [
         "proxy_url",
         "disable_javascript",
         "gatekeeper",
         "Gatekeeper",
+        "windows_proxy_args",
+        "invoke_handler",
     ] {
         assert!(!text.contains(token), "console.rs must not use {token}");
     }
@@ -806,7 +872,6 @@ fn r14_tab_code_never_gets_a_loopback_url() {
         for token in [
             "VerifiedConsole",
             "ConsoleWebview",
-            "ConsolePage",
             "net::console",
             "shell::console",
         ] {
