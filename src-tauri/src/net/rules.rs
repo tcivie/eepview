@@ -15,11 +15,13 @@ use tauri::Url;
 
 use crate::nav;
 
-/// URLs that never touch the network: the blank page and inline data.
-pub const LOCAL_URL_PATTERN: &str = "^(about|data|blob):";
+/// URLs that never touch the network: the blank page and inline data. One rule each: the
+/// `WebKit` regex subset has no `|`.
+pub const LOCAL_URL_PATTERNS: [&str; 3] = ["^about:", "^data:", "^blob:"];
 
-/// The allow pattern of ADR 0001: an `http(s)` URL on a `.i2p` host.
-pub const I2P_URL_PATTERN: &str = r"^https?://([a-z0-9-]+\.)*[a-z0-9-]+\.i2p(:[0-9]+)?(/|$)";
+/// The allow pattern of ADR 0001: an `http(s)` URL on a `.i2p` host. `WebKit` hands the
+/// filter normalized URLs, so the path always starts with `/` after the host.
+pub const I2P_URL_PATTERN: &str = r"^https?://([a-z0-9-]+\.)*[a-z0-9-]+\.i2p(:[0-9]+)?/";
 
 /// Sources a page may use: I2P sites over http(s), any port.
 const I2P_SOURCES: &str = "http://*.i2p:* https://*.i2p:*";
@@ -41,20 +43,24 @@ pub fn csp_header() -> &'static str {
 }
 
 /// The rule set as `WKContentRuleList` JSON: block every URL, then ignore that rule for
-/// I2P URLs. The `WebKit` regex subset has no look-ahead, so it takes two rules.
+/// I2P and local URLs. The `WebKit` regex subset has no look-ahead and no `|`, so each
+/// allowed form is a rule of its own.
 #[must_use]
 pub fn content_rule_list() -> Value {
-    json!([
-        { "trigger": { "url-filter": ".*" }, "action": { "type": "block" } },
-        {
+    let mut rules = vec![
+        json!({ "trigger": { "url-filter": ".*" }, "action": { "type": "block" } }),
+        json!({
             "trigger": { "url-filter": I2P_URL_PATTERN, "url-filter-is-case-sensitive": true },
             "action": { "type": "ignore-previous-rules" }
-        },
-        {
-            "trigger": { "url-filter": LOCAL_URL_PATTERN },
+        }),
+    ];
+    rules.extend(LOCAL_URL_PATTERNS.iter().map(|pattern| {
+        json!({
+            "trigger": { "url-filter": pattern },
             "action": { "type": "ignore-previous-rules" }
-        }
-    ])
+        })
+    }));
+    Value::Array(rules)
 }
 
 /// True for a request URL the engine may load: an I2P URL or a local one (`about:`,
@@ -111,12 +117,20 @@ mod tests {
     fn rule_list_blocks_then_allows_i2p() {
         let rules = content_rule_list();
         let list = rules.as_array().unwrap();
-        assert_eq!(list.len(), 3);
+        assert_eq!(list.len(), 5);
         assert_eq!(list[0]["action"]["type"], "block");
         assert_eq!(list[0]["trigger"]["url-filter"], ".*");
         assert_eq!(list[1]["action"]["type"], "ignore-previous-rules");
         assert_eq!(list[1]["trigger"]["url-filter"], I2P_URL_PATTERN);
-        assert_eq!(list[2]["trigger"]["url-filter"], LOCAL_URL_PATTERN);
+        for (rule, pattern) in list[2..].iter().zip(LOCAL_URL_PATTERNS) {
+            assert_eq!(rule["action"]["type"], "ignore-previous-rules");
+            assert_eq!(rule["trigger"]["url-filter"], pattern);
+        }
+        let text = rules.to_string();
+        assert!(
+            !text.contains('|'),
+            "WebKit rule regexes have no disjunction"
+        );
     }
 
     #[test]
