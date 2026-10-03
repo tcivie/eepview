@@ -25,3 +25,4 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Release gate accepts checks that run on pull requests only (#39)
 - Sign releases with Sigstore, build the Linux binary repeatably, harden the release profile (#37)
 - Use only the brand palette, enforced by scripts/palette-check.sh (#38)
+- Take the macOS tab inset from the shell; line the first tab up with the back button

@@ -3,6 +3,7 @@
   "routerVersion": "2.10.0",
   "historySize": 160,
   "exportPath": "~/Downloads/eepview-bookmarks.json",
+  "macInsetLeft": 86,
   "stats": {
     "samples": 60,
     "stepSeconds": 10,

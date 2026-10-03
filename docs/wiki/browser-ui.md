@@ -62,6 +62,8 @@ Screenshots: `docs/images/ui/router-panel-{light,dark}.png`, `router-panel-unman
 - `RouterStats.history` (`{ stepSeconds, inBps[], outBps[] }`, which replaces `bandwidthHistory`), `activePeers`, `inboundTunnels` and `outboundTunnels`;
 - `connection_pause()`, `connection_resume()` and `router_control({ action: "restart" | "stop" })`.
 
+The toolbar also uses `chrome_insets() -> { left }` and the `chrome-insets-changed` event. `left` is the space the window controls need (about 86 px on macOS, 0 elsewhere). `theme-boot.js` sets an 86 px fallback on macOS before the first paint, so the tab strip does not jump. The first tab never sits left of the back button's edge, so the two line up on Windows and Linux.
+
 Until the shell implements them, the dev mock (`src/ui/mock.ts`) answers these commands. Add `?managed=0` or `?paused=1` to a page URL to preview those states.
 
 ## Checks
