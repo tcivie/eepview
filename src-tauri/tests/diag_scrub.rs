@@ -68,19 +68,16 @@ fn r4_2_host_name_is_removed() {
     assert_removed("peer a.zz failed", "a.zz");
 }
 
-// R4.2: a file name with a known extension is not a host name.
+// R4.2 + R15.5: a file name with a known ending is not a host name. `rs`, `md` and `ts` are no endings.
 #[test]
 fn r4_2_known_file_names_stay() {
     for name in [
-        "main.rs",
         "eepview.log",
         "notes.txt",
         "data.json",
         "page.html",
-        "app.ts",
         "app.js",
         "style.css",
-        "README.md",
         "Cargo.toml",
         "ci.yml",
         "Info.plist",
@@ -104,12 +101,28 @@ fn r4_2_base32_run_of_52_goes() {
     assert_removed(&format!("hash {longer} end"), &longer);
 }
 
-// R4.2: a run shorter than 52 stays.
+// R4.2: a run shorter than 52 stays. 51 times `a` is a hex run too, but with no digit it stays (R15.3).
 #[test]
 fn r4_2_base32_run_of_51_stays() {
     let run = "a".repeat(51);
     let text = format!("word {run} end");
     assert_eq!(plain(&text), text);
+}
+
+// R15.5: `rs`, `md` and `ts` are country domains, so in free text these names are removed.
+#[test]
+fn r15_5_rs_md_ts_names_are_host_names_in_free_text() {
+    for name in [
+        "apply.rs",
+        "main.rs",
+        "gatekeeper.rs",
+        "README.md",
+        "app.ts",
+    ] {
+        let out = plain(&format!("at {name} line 3"));
+        assert!(!out.contains(name), "`{name}` survives in `{out}`");
+        assert!(out.contains(REMOVED), "{out}");
+    }
 }
 
 // R4.2: an IPv4 address goes.

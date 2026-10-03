@@ -8,8 +8,8 @@ use std::io;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use eepview_lib::diag::{
-    self, Code, ErrorKind, Field, Level, OpKind, Record, RefuseReason, RouterState, SourceFile,
-    StoreKind, TabKind, ThreadName,
+    self, Code, ErrorKind, Field, HttpStatus, Level, OpKind, Record, RefuseReason, RouterState,
+    SOURCE_FILES, SourceFile, StoreKind, TabKind, ThreadName,
 };
 use proptest::prelude::*;
 
@@ -34,7 +34,7 @@ fn r1_1_event_records_time_code_and_fields() {
     let before = now_secs();
     diag::event(
         Code::PageLoadFailed,
-        &[Field::Count(910_001), Field::Status(502)],
+        &[Field::Count(910_001), Field::Status(HttpStatus::S502)],
     );
     let after = now_secs();
     let record = find_record("count=910001").expect("the event is in the ring");
@@ -71,8 +71,9 @@ fn payload_kind(field: &Field) -> &'static str {
         | Field::Store(_)
         | Field::Op(_)
         | Field::Thread(_)
+        | Field::Status(_)
         | Field::Source(_) => "enum",
-        Field::Line(_) | Field::DurationMs(_) | Field::Count(_) | Field::Status(_) => "number",
+        Field::Line(_) | Field::DurationMs(_) | Field::Count(_) => "number",
         Field::Managed(_) | Field::Js(_) | Field::Ok(_) => "bool",
     }
 }
@@ -91,11 +92,11 @@ fn r1_2_field_payloads_are_enums_numbers_or_bools() {
         (Field::Store(StoreKind::Sites), "enum"),
         (Field::Op(OpKind::Reload), "enum"),
         (Field::Thread(ThreadName::Main), "enum"),
-        (Field::Source(SourceFile::from_path("a.rs")), "enum"),
+        (Field::Source(SourceFile::from_path("lib.rs")), "enum"),
         (Field::Line(1), "number"),
         (Field::DurationMs(1), "number"),
         (Field::Count(1), "number"),
-        (Field::Status(200), "number"),
+        (Field::Status(HttpStatus::S500), "enum"),
         (Field::Managed(true), "bool"),
         (Field::Js(true), "bool"),
         (Field::Ok(true), "bool"),
@@ -132,7 +133,8 @@ fn r1_2_field_display_is_key_equals_value() {
         (Field::Line(42), "line=42"),
         (Field::DurationMs(1500), "ms=1500"),
         (Field::Count(7), "count=7"),
-        (Field::Status(404), "status=404"),
+        (Field::Status(HttpStatus::S503), "status=503"),
+        (Field::Status(HttpStatus::Other5xx), "status=other-5xx"),
         (Field::Managed(true), "managed=true"),
         (Field::Js(false), "js=false"),
         (Field::Ok(true), "ok=true"),
@@ -325,27 +327,140 @@ fn r1_4_platform_kind_name() {
     assert_eq!(ErrorKind::Platform.as_str(), "platform");
 }
 
-// R1.6: `SourceFile` keeps the part after the last separator and only safe characters.
+// R1.6: `SOURCE_FILES` is the sorted list of base names of eepview's own `.rs` files.
 #[test]
-fn r1_6_source_file_keeps_file_name_only() {
-    let table = [
-        ("src/shell/report.rs", "report.rs"),
-        ("C:\\proj\\src\\main.rs", "main.rs"),
-        ("a/b\\c.rs", "c.rs"),
-        ("/Users/someone/work/x.rs", "x.rs"),
-        ("weird name$%.rs", "weirdname.rs"),
-    ];
-    for (path, expected) in table {
-        assert_eq!(SourceFile::from_path(path).as_str(), expected, "{path}");
+fn r1_6_source_files_is_a_sorted_list_of_base_names() {
+    assert!(!SOURCE_FILES.is_empty());
+    assert!(SOURCE_FILES.windows(2).all(|w| w[0] <= w[1]), "sorted");
+    for name in SOURCE_FILES {
+        assert!(name.ends_with(".rs"), "{name}");
+        assert!(!name.contains('/') && !name.contains('\\'), "{name}");
     }
 }
 
-// R1.6: at most 64 characters.
+/// The base names of every `.rs` file under `dir`, recursively.
+fn base_names(dir: &std::path::Path) -> Vec<String> {
+    let mut out = Vec::new();
+    for entry in std::fs::read_dir(dir).into_iter().flatten().flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            out.extend(base_names(&path));
+        } else if path.extension().is_some_and(|e| e == "rs") {
+            out.extend(path.file_name().map(|n| n.to_string_lossy().into_owned()));
+        }
+    }
+    out
+}
+
+// R1.6: the list holds the base name of every `.rs` file of `src/` and `crates/*/src/`, and nothing else.
 #[test]
-fn r1_6_source_file_is_at_most_64_characters() {
-    let long = format!("src/{}.rs", "a".repeat(100));
-    let file = SourceFile::from_path(&long);
-    assert_eq!(file.as_str().chars().count(), 64);
+fn r1_6_source_files_matches_the_source_tree() {
+    let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let mut found = base_names(&root.join("src"));
+    for entry in std::fs::read_dir(root.join("crates"))
+        .into_iter()
+        .flatten()
+        .flatten()
+    {
+        found.extend(base_names(&entry.path().join("src")));
+    }
+    for name in &found {
+        assert!(
+            SOURCE_FILES.contains(&name.as_str()),
+            "{name} is not in SOURCE_FILES"
+        );
+    }
+    for name in SOURCE_FILES {
+        assert!(found.iter().any(|f| f == name), "{name} has no source file");
+    }
+    for known in ["lib.rs", "main.rs", "gatekeeper.rs"] {
+        assert!(SOURCE_FILES.contains(&known), "{known}");
+    }
+}
+
+// R1.6: a name in the list is kept, whatever folder is in front of it.
+#[test]
+fn r1_6_names_in_the_list_are_kept() {
+    for name in ["gatekeeper.rs", "lib.rs", "main.rs"] {
+        for path in [
+            name.to_owned(),
+            format!("src/net/{name}"),
+            format!("C:\\proj\\src\\{name}"),
+            format!("/Users/someone/work/{name}"),
+            format!("a/b\\{name}"),
+        ] {
+            assert_eq!(SourceFile::from_path(&path).as_str(), name, "{path}");
+        }
+    }
+}
+
+// R1.6: any other name becomes `other`.
+#[test]
+fn r1_6_other_names_become_other() {
+    for path in [
+        "src/zq-private-name.rs",
+        "/Users/zqalice/work/zq-secret.rs",
+        "forum.i2p",
+        "https://example.com/x.rs",
+        "weird name$%.rs",
+        "../../etc/passwd",
+        "gatekeeper.rs.bak",
+        "Gatekeeper.RS",
+        "",
+        "/",
+    ] {
+        assert_eq!(SourceFile::from_path(path).as_str(), "other", "`{path}`");
+    }
+}
+
+// R12.1: the table of the closed status enum.
+#[test]
+fn r12_1_http_status_names() {
+    let table = [
+        (HttpStatus::S500, "500"),
+        (HttpStatus::S502, "502"),
+        (HttpStatus::S503, "503"),
+        (HttpStatus::S504, "504"),
+        (HttpStatus::Other5xx, "other-5xx"),
+    ];
+    for (status, name) in table {
+        assert_eq!(status.as_str(), name);
+    }
+}
+
+// R12.1: `from_code` is `None` outside 500 to 599, and the four named codes map to their variant.
+#[test]
+fn r12_1_http_status_from_code() {
+    for code in [0, 200, 301, 404, 499, 600, 999, u16::MAX] {
+        assert!(HttpStatus::from_code(code).is_none(), "{code}");
+    }
+    for (code, name) in [(500, "500"), (502, "502"), (503, "503"), (504, "504")] {
+        assert_eq!(
+            HttpStatus::from_code(code).map(HttpStatus::as_str),
+            Some(name)
+        );
+    }
+    for code in [501, 505, 507, 511, 521, 599] {
+        assert_eq!(
+            HttpStatus::from_code(code).map(HttpStatus::as_str),
+            Some("other-5xx")
+        );
+    }
+}
+
+// R12.1: the enum is closed. The match has no wildcard, so a new variant (for example one
+// that holds a raw number) breaks this test at compile time.
+#[test]
+fn r12_1_http_status_is_closed() {
+    let status = HttpStatus::from_code(503).expect("a 5xx code");
+    let name = match status {
+        HttpStatus::S500 => "500",
+        HttpStatus::S502 => "502",
+        HttpStatus::S503 => "503",
+        HttpStatus::S504 => "504",
+        HttpStatus::Other5xx => "other-5xx",
+    };
+    assert_eq!(name, status.as_str());
 }
 
 // R1.7: the four known thread names map to their variant; anything else is `other`.
@@ -393,7 +508,11 @@ fn r1_8_format_line_without_and_with_several_fields() {
     let many = Record {
         at: 0,
         code: Code::PageLoadFailed,
-        fields: vec![Field::Status(502), Field::DurationMs(15), Field::Ok(false)],
+        fields: vec![
+            Field::Status(HttpStatus::S502),
+            Field::DurationMs(15),
+            Field::Ok(false),
+        ],
     };
     assert_eq!(
         diag::format_line(&many),
@@ -421,7 +540,9 @@ fn any_field() -> impl Strategy<Value = Field> {
         any::<u32>().prop_map(Field::Line),
         any::<u64>().prop_map(Field::DurationMs),
         any::<u64>().prop_map(Field::Count),
-        any::<u16>().prop_map(Field::Status),
+        any::<u16>()
+            .prop_filter_map("a 5xx code", HttpStatus::from_code)
+            .prop_map(Field::Status),
         any::<bool>().prop_map(Field::Managed),
         any::<bool>().prop_map(Field::Js),
         any::<bool>().prop_map(Field::Ok),
@@ -434,13 +555,32 @@ fn any_field() -> impl Strategy<Value = Field> {
 proptest! {
     #![proptest_config(ProptestConfig { failure_persistence: None, ..ProptestConfig::default() })]
 
-    // R1.6: whatever the path, the file part has only safe characters, no separator, 64 at most.
+    // R1.6: whatever the path, the result is `other` or a name of the closed list.
     #[test]
-    fn r1_6_source_file_is_always_safe(path in "\\PC{0,200}") {
+    fn r1_6_source_file_is_always_from_the_closed_list(path in "\\PC{0,200}") {
         let file = SourceFile::from_path(&path);
         let text = file.as_str();
-        prop_assert!(text.chars().count() <= 64);
-        prop_assert!(text.chars().all(|c| c.is_ascii_alphanumeric() || "_.-".contains(c)));
+        prop_assert!(text == "other" || SOURCE_FILES.contains(&text), "{}", text);
+    }
+
+    // R12.1: whatever the code, a status field shows one of five values: no raw number.
+    #[test]
+    fn r12_1_status_never_shows_a_raw_number(code in any::<u16>()) {
+        match HttpStatus::from_code(code) {
+            None => prop_assert!(!(500..=599).contains(&code)),
+            Some(status) => {
+                prop_assert!((500..=599).contains(&code));
+                let shown = Field::Status(status).to_string();
+                prop_assert!(
+                    ["status=500", "status=502", "status=503", "status=504", "status=other-5xx"]
+                        .contains(&shown.as_str()),
+                    "{}", shown
+                );
+                if ![500, 502, 503, 504].contains(&code) {
+                    prop_assert_eq!(shown, "status=other-5xx");
+                }
+            }
+        }
     }
 
     // R1: a log line is one line and has one token per field, whatever the values.

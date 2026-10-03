@@ -185,7 +185,7 @@ fn r2_7_a_line_survives_an_abort() {
 }
 
 // ---------------------------------------------------------------------------------------
-// R6.2: `report_lines` gives relative minutes and never a clock time.
+// R6.2 and R13.1: `report_lines` holds no time at all, only the order of the events.
 // ---------------------------------------------------------------------------------------
 
 const T0: u64 = 1_791_028_800; // 2026-10-03T12:00:00Z
@@ -194,15 +194,15 @@ fn record(at: u64, code: Code, fields: Vec<Field>) -> Record {
     Record { at, code, fields }
 }
 
-// R6.2: `+<minutes>m <LEVEL> <code>` and the fields, minutes counted from the oldest record.
+// R13.1: `<LEVEL> <code>` and ` key=value` per field, in record order.
 #[test]
-fn r6_2_report_lines_use_minutes_from_the_oldest_record() {
+fn r13_1_report_lines_are_level_code_and_fields() {
     let records = [
         record(T0, Code::Startup, vec![]),
         record(
             T0 + 120,
-            Code::GatekeeperRefused,
-            vec![Field::Refuse(RefuseReason::NotI2p)],
+            Code::GatekeeperStartFailed,
+            vec![Field::Refuse(RefuseReason::NotI2p), Field::Count(3)],
         ),
         record(
             T0 + 3600,
@@ -213,39 +213,30 @@ fn r6_2_report_lines_use_minutes_from_the_oldest_record() {
     assert_eq!(
         diag::report_lines(&records),
         [
-            "+0m INFO startup",
-            "+2m INFO gatekeeper-refused refuse=not-i2p",
-            "+60m WARN router-down router=down",
+            "INFO startup",
+            "ERROR gatekeeper-start-failed refuse=not-i2p count=3",
+            "WARN router-down router=down",
         ]
     );
 }
 
-// R6.2: no records, no lines. One line per record.
+// R13.1: no records, no lines. One line per record, in record order.
 #[test]
-fn r6_2_report_lines_one_per_record() {
+fn r13_1_report_lines_one_per_record_in_order() {
     assert!(diag::report_lines(&[]).is_empty());
     let records: Vec<Record> = (0..7)
-        .map(|i| record(T0 + i, Code::Startup, vec![]))
+        .map(|i| record(T0 + i, Code::Startup, vec![Field::Count(i)]))
         .collect();
-    assert_eq!(diag::report_lines(&records).len(), 7);
-}
-
-// R6.2: records in the same minute as the oldest are at +0m.
-#[test]
-fn r6_2_report_lines_start_at_zero() {
-    let records = [
-        record(T0, Code::Startup, vec![]),
-        record(T0, Code::Shutdown, vec![Field::Count(3)]),
-    ];
     let lines = diag::report_lines(&records);
-    assert!(lines[0].starts_with("+0m "), "{}", lines[0]);
-    assert!(lines[1].starts_with("+0m "), "{}", lines[1]);
-    assert!(lines[1].ends_with("shutdown count=3"), "{}", lines[1]);
+    assert_eq!(lines.len(), 7);
+    for (i, line) in lines.iter().enumerate() {
+        assert_eq!(line, &format!("INFO startup count={i}"));
+    }
 }
 
-// R6.2: a report never holds a clock time: neither the UTC text nor the Unix second.
+// R13.1: the lines hold no time and no time offset: no UTC text, no Unix second, no `+Nm`.
 #[test]
-fn r6_2_report_lines_hold_no_clock_time() {
+fn r13_1_report_lines_hold_no_time() {
     let records = [
         record(T0, Code::Startup, vec![]),
         record(T0 + 5400, Code::Shutdown, vec![]),
@@ -254,35 +245,35 @@ fn r6_2_report_lines_hold_no_clock_time() {
         assert!(!line.contains(&diag::utc(record.at)), "{line}");
         assert!(!line.contains("2026"), "{line}");
         assert!(!line.contains(&record.at.to_string()), "{line}");
-        assert!(!line.contains("12:"), "{line}");
+        assert!(!line.contains(':'), "{line}");
+        assert!(!line.starts_with('+'), "{line}");
+        assert!(!line.contains("+0m") && !line.contains("+90m"), "{line}");
     }
-}
-
-fn minutes_of(line: &str) -> Option<u64> {
-    line.strip_prefix('+')?.split_once('m')?.0.parse().ok()
 }
 
 proptest! {
     #![proptest_config(ProptestConfig { failure_persistence: None, ..ProptestConfig::default() })]
 
-    // R6.2: for any times, the lines carry no clock time, and the minutes never go down.
+    // R13.1: the lines do not depend on the times of the records at all.
     #[test]
-    fn r6_2_report_lines_never_hold_a_clock_time(
+    fn r13_1_report_lines_do_not_depend_on_time(
         start in 0u64..4_000_000_000,
+        other in 0u64..4_000_000_000,
         gaps in proptest::collection::vec(0u64..20_000, 1..30),
     ) {
-        let mut at = start;
-        let mut records = vec![record(at, Code::Startup, vec![])];
-        for gap in gaps {
-            at += gap;
-            records.push(record(at, Code::PageLoadFailed, vec![Field::Status(502)]));
-        }
-        let lines = diag::report_lines(&records);
-        prop_assert_eq!(lines.len(), records.len());
-        let minutes: Vec<Option<u64>> = lines.iter().map(|l| minutes_of(l)).collect();
-        prop_assert!(minutes.iter().all(Option::is_some), "{:?}", lines);
-        prop_assert!(minutes.windows(2).all(|w| w[0] <= w[1]), "{:?}", lines);
-        for (line, record) in lines.iter().zip(&records) {
+        let build = |base: u64| {
+            let mut at = base;
+            let mut records = vec![record(at, Code::Startup, vec![])];
+            for gap in &gaps {
+                at += gap;
+                records.push(record(at, Code::RouterUp, vec![Field::Router(RouterState::Ok)]));
+            }
+            records
+        };
+        let one = diag::report_lines(&build(start));
+        let two = diag::report_lines(&build(other));
+        prop_assert_eq!(&one, &two);
+        for (line, record) in one.iter().zip(build(start)) {
             prop_assert!(!line.contains(&diag::utc(record.at)), "{}", line);
             prop_assert!(!line.contains(&record.at.to_string()), "{}", line);
         }
@@ -358,7 +349,7 @@ fn sample_report() -> Report {
             tabs: 1,
             uptime: UptimeBucket::from_secs(30),
         },
-        log: vec!["+0m INFO startup".to_owned()],
+        log: vec!["INFO startup".to_owned()],
         include_log: true,
     }
 }

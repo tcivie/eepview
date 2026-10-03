@@ -421,9 +421,16 @@ fn r9_2_no_console_in_ui_typescript() {
 /// The argument text of every call `diag::event(…)` in `text`. A call is `diag::event(`, or
 /// a bare `event(Code::…` after `use … diag::event`.
 fn event_calls(text: &str) -> Vec<String> {
+    calls(text, "event")
+}
+
+/// The argument text of every call `diag::<name>(…)`, or a bare `<name>(Code::…` after a `use`.
+fn calls(text: &str, name: &str) -> Vec<String> {
+    let open = format!("{name}(");
     let mut out = Vec::new();
-    for (at, _) in text.match_indices("event(") {
+    for (at, _) in text.match_indices(&open) {
         let before = &text[..at];
+        let rest = &text[at + open.len()..];
         let qualified = before.ends_with("diag::");
         let bare = !qualified
             && before
@@ -431,9 +438,9 @@ fn event_calls(text: &str) -> Vec<String> {
                 .next_back()
                 .is_some_and(|c| c.is_whitespace() || c == '(' || c == '{')
             && !before.trim_end().ends_with("fn")
-            && text[at + 6..].trim_start().starts_with("Code::");
+            && rest.trim_start().starts_with("Code::");
         if qualified || bare {
-            out.push(call_args(&text[at + 6..]));
+            out.push(call_args(rest));
         }
     }
     out
@@ -761,4 +768,109 @@ fn r2_6_diag_starts_before_the_tauri_builder() {
         }
     }
     assert!(checked, "no file builds the app with tauri::Builder");
+}
+
+// R9.3 + R12.2: no call `diag::count(…)` has text in its arguments either.
+#[test]
+fn r12_2_no_text_argument_to_diag_count() {
+    for file in all_rust_sources().unwrap() {
+        let source = code(&file).unwrap().join("\n");
+        for args in calls(&source, "count") {
+            let why = text_argument(&args);
+            assert!(
+                why.is_none(),
+                "{} passes {why:?} to diag::count({args})",
+                rel(&file)
+            );
+        }
+    }
+}
+
+// R12.2: per-request results are counted, never recorded: `diag::event` is never called with
+// `GatekeeperRefused` or `PageLoadFailed`.
+#[test]
+fn r12_2_per_request_codes_are_never_events() {
+    for file in all_rust_sources().unwrap() {
+        let source = code(&file).unwrap().join("\n");
+        let bad = event_calls(&source)
+            .into_iter()
+            .find(|args| args.contains("GatekeeperRefused") || args.contains("PageLoadFailed"));
+        assert!(
+            bad.is_none(),
+            "{} records a per-request result with diag::event({bad:?}); use diag::count",
+            rel(&file)
+        );
+    }
+}
+
+// R12.2: the gatekeeper counts each refusal, each router 5xx answer and each failed forwarded request.
+#[test]
+fn r12_2_the_gatekeeper_counts_its_per_request_results() {
+    let mut source = String::new();
+    for file in rust_files(&root().join("src/net")).unwrap() {
+        source.push_str(&code(&file).unwrap().join("\n"));
+    }
+    let counted = calls(&source, "count").join("\n");
+    for (code_name, field) in [
+        ("GatekeeperRefused", "Field::Refuse"),
+        ("PageLoadFailed", "Field::Status"),
+        ("PageLoadFailed", "Field::Error"),
+    ] {
+        let found = calls(&source, "count")
+            .iter()
+            .any(|args| args.contains(code_name) && args.contains(field));
+        assert!(
+            found,
+            "src/net must call diag::count(Code::{code_name}, {field}(…)); saw: {counted}"
+        );
+    }
+}
+
+// R14.2: the report file is created with `create_new`, and `report_open` checks the Downloads
+// folder after `canonicalize` (R14.3).
+#[test]
+fn r14_report_file_is_created_new_and_checked_after_canonicalize() {
+    let report = code(&root().join("src/shell/report.rs"))
+        .unwrap()
+        .join("\n");
+    assert!(
+        report.contains("create_new"),
+        "the report file must be created with create_new"
+    );
+    assert!(
+        report.contains("canonicalize"),
+        "report_open must canonicalize both paths"
+    );
+    assert!(
+        report.contains("ReportFailed"),
+        "a path outside Downloads records ReportFailed"
+    );
+}
+
+// R14.2 (Unix): the log files and the crash marker are opened with `O_NOFOLLOW`, and
+// R14.1: the modes 0600 and 0700 are set.
+#[test]
+fn r14_diag_opens_without_following_links_and_sets_modes() {
+    let mut source = String::new();
+    for file in rust_files(&root().join("src/diag")).unwrap() {
+        source.push_str(&code(&file).unwrap().join("\n"));
+    }
+    assert!(
+        source.contains("NOFOLLOW"),
+        "src/diag must open with O_NOFOLLOW"
+    );
+    assert!(source.contains("0o600"), "files get mode 0600");
+    assert!(source.contains("0o700"), "the folder gets mode 0700");
+}
+
+// R13.2: the report file name holds no date: `report.rs` does not build one from the time.
+#[test]
+fn r13_2_report_file_name_has_no_date() {
+    let report = code(&root().join("src/shell/report.rs"))
+        .unwrap()
+        .join("\n");
+    assert!(
+        report.contains("file_name("),
+        "report_open names the file with report::file_name"
+    );
 }

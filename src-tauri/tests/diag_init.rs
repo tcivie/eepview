@@ -94,3 +94,29 @@ fn r3_4_no_marker_means_no_crash() {
     let (_turn, _dir) = setup();
     assert!(!diag::crashed_last_run());
 }
+
+// R2.4: `delete_logs` also deletes the crash marker.
+#[test]
+fn r2_4_delete_logs_deletes_the_crash_marker() {
+    let (_turn, dir) = setup();
+    diag::write_crash_marker(&dir).expect("write the marker");
+    assert!(dir.join("crashed").is_file());
+    diag::delete_logs().expect("delete");
+    assert!(!dir.join("crashed").exists(), "the marker is gone");
+}
+
+// R2.4: no file handle stays open between two lines, so the files can be deleted at once,
+// also while eepview runs (this is what makes the delete work on Windows).
+#[test]
+fn r2_4_logs_can_be_deleted_right_after_a_write() {
+    let (_turn, dir) = setup();
+    diag::event(Code::Startup, &[Field::Count(960_001)]);
+    assert!(wait_for(|| log_text(&dir).contains("count=960001")));
+    diag::delete_logs().expect("delete");
+    assert!(!dir.join("eepview.log").exists());
+    diag::event(Code::Startup, &[Field::Count(960_002)]);
+    assert!(
+        wait_for(|| log_text(&dir).contains("count=960002")),
+        "new events are written again"
+    );
+}

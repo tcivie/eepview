@@ -44,9 +44,7 @@ fn report_of(description: &str, log: Vec<String>, include_log: bool) -> Report {
 
 fn log_lines(n: usize) -> Vec<String> {
     (0..n)
-        .map(|i| {
-            format!("2026-10-03T12:00:00Z INFO gatekeeper-refused refuse=not-i2p count={i:04}")
-        })
+        .map(|i| format!("INFO gatekeeper-refused refuse=not-i2p count={i:04}"))
         .collect()
 }
 
@@ -176,8 +174,7 @@ fn r6_3_text_keeps_all_log_lines() {
 // R6.3 + R4: the text is scrubbed, in the description and in the log.
 #[test]
 fn r6_3_text_is_scrubbed() {
-    let log =
-        vec!["2026-10-03T12:00:00Z INFO x peer 192.168.1.20 http://leak.example/x".to_owned()];
+    let log = vec!["INFO x peer 192.168.1.20 http://leak.example/x".to_owned()];
     let body = text(&report_of(
         "I opened https://secret.example.com/a and bob@example.org",
         log,
@@ -387,14 +384,14 @@ fn r6_7_is_issue_url_refuses_everything_else() {
     }
 }
 
-// R6.8: the file name.
+// R6.8: the file name has no date, and a number from 2 on.
 #[test]
 fn r6_8_file_name() {
-    assert_eq!(
-        file_name(1_791_028_800),
-        "eepview-report-2026-10-03T12-00-00Z.txt"
-    );
-    assert_eq!(file_name(0), "eepview-report-1970-01-01T00-00-00Z.txt");
+    assert_eq!(file_name(0), "eepview-report.txt");
+    assert_eq!(file_name(1), "eepview-report.txt");
+    assert_eq!(file_name(2), "eepview-report (2).txt");
+    assert_eq!(file_name(3), "eepview-report (3).txt");
+    assert_eq!(file_name(99), "eepview-report (99).txt");
 }
 
 fn config() -> ProptestConfig {
@@ -436,7 +433,7 @@ proptest! {
     ) {
         let injected = format!("{before} {value} {after}");
         let rep = if in_log {
-            report_of("broke", vec![format!("2026-10-03T12:00:00Z INFO x {injected}")], true)
+            report_of("broke", vec![format!("INFO x {injected}")], true)
         } else {
             report_of(&injected, log_lines(3), true)
         };
@@ -455,13 +452,17 @@ proptest! {
         prop_assert_eq!(decode(&encoded), Some(input));
     }
 
-    // R6.8: the file name has a fixed shape for any second.
+    // R6.8: the name holds no digit but the copy number, and no separator.
     #[test]
-    fn r6_8_file_name_has_a_fixed_shape(secs in 0u64..4_000_000_000) {
-        let name = file_name(secs);
-        prop_assert!(name.starts_with("eepview-report-"));
-        prop_assert!(name.ends_with("Z.txt"));
-        prop_assert!(!name.contains('/') && !name.contains(' ') && !name.contains(':'));
+    fn r6_8_file_name_holds_no_date(n in any::<u32>()) {
+        let name = file_name(n);
+        let digits: String = name.chars().filter(char::is_ascii_digit).collect();
+        if n < 2 {
+            prop_assert_eq!(name, "eepview-report.txt");
+        } else {
+            prop_assert_eq!(digits, n.to_string());
+            prop_assert_eq!(name, format!("eepview-report ({n}).txt"));
+        }
     }
 }
 
@@ -483,6 +484,109 @@ proptest! {
         prop_assert!(url.len() <= 8000, "{} characters", url.len());
         prop_assert!(url.is_ascii());
     }
+}
+
+// R6.6: a description that is too long is cut on the raw text, at a char boundary, with `…` at the end.
+#[test]
+fn r6_6_cut_description_ends_with_an_ellipsis_and_is_a_prefix() {
+    let description = "word ".repeat(5000);
+    for include_log in [true, false] {
+        let (url, _) = issue_url(&report_of(&description, log_lines(10), include_log));
+        let what = param(&url, "what-happened").expect("what-happened");
+        assert!(
+            what.ends_with('…'),
+            "log {include_log}: ends with {:?}",
+            what.chars().last()
+        );
+        let kept = what.trim_end_matches('…');
+        assert!(!kept.is_empty() && kept.len() < description.len());
+        assert!(description.starts_with(kept), "the kept text is a prefix");
+        assert!(url.len() <= 8000);
+    }
+}
+
+// R6.6: the cut never splits a character, so the value is valid text.
+#[test]
+fn r6_6_cut_is_at_a_char_boundary() {
+    for unit in ["é", "日", "😀"] {
+        let description = unit.repeat(6000);
+        let (url, _) = issue_url(&report_of(&description, vec![], false));
+        let what =
+            param(&url, "what-happened").unwrap_or_else(|| panic!("`{unit}`: not valid UTF-8"));
+        assert!(what.ends_with('…'), "{unit}");
+        assert!(
+            what.trim_end_matches('…')
+                .chars()
+                .all(|c| unit.starts_with(c)),
+            "{unit}"
+        );
+        assert!(url.len() <= 8000, "{unit}");
+    }
+}
+
+// R6.6: the description is cut only when the URL is still too long without log lines.
+#[test]
+fn r6_6_a_short_description_is_kept_whole_while_the_log_is_trimmed() {
+    let (url, trimmed) = issue_url(&report_of("short description", log_lines(200), true));
+    assert!(trimmed);
+    assert_eq!(
+        param(&url, "what-happened").as_deref(),
+        Some("short description")
+    );
+}
+
+// R6.6: a description that fits has no ellipsis.
+#[test]
+fn r6_6_a_description_that_fits_is_not_cut() {
+    let description = "word ".repeat(100);
+    let (url, _) = issue_url(&report_of(&description, vec![], false));
+    assert_eq!(
+        param(&url, "what-happened").as_deref(),
+        Some(description.as_str())
+    );
+}
+
+// R15.6: `report::text` keeps `file=<name>` for a name of `SOURCE_FILES` and scrubs any other name.
+#[test]
+fn r15_6_report_text_keeps_known_source_names_only() {
+    let log = vec![
+        "ERROR panic file=gatekeeper.rs line=10 thread=main".to_owned(),
+        "ERROR panic file=zq-private-name.rs line=11 thread=main".to_owned(),
+    ];
+    let body = text(&report_of("it crashed", log, true));
+    assert!(
+        body.contains("file=gatekeeper.rs line=10 thread=main"),
+        "{body}"
+    );
+    assert!(!body.contains("zq-private-name"), "{body}");
+}
+
+// R15.6: every value of the issue URL does the same.
+#[test]
+fn r15_6_issue_url_keeps_known_source_names_only() {
+    let log = vec![
+        "ERROR panic file=gatekeeper.rs line=10 thread=main".to_owned(),
+        "ERROR panic file=zq-private-name.rs line=11 thread=main".to_owned(),
+    ];
+    let (url, _) = issue_url(&report_of("it crashed", log, true));
+    let diagnostics = param(&url, "diagnostics").expect("diagnostics");
+    assert!(
+        diagnostics.contains("file=gatekeeper.rs line=10"),
+        "{diagnostics}"
+    );
+    assert!(!url.contains("zq-private-name"), "{url}");
+    assert!(!diagnostics.contains("zq-private-name"), "{diagnostics}");
+}
+
+// R15.6: a source name outside a `file=` token is free text, so it is removed.
+#[test]
+fn r15_6_a_bare_source_name_in_the_description_is_removed() {
+    let body = text(&report_of(
+        "the crash was in gatekeeper.rs somewhere",
+        vec![],
+        false,
+    ));
+    assert!(!body.contains("gatekeeper.rs"), "{body}");
 }
 
 // R6: the module path of the free functions.

@@ -61,7 +61,7 @@ fn r4_2_base64_run_of_43_stays() {
     assert_eq!(plain(&text), text);
 }
 
-// R4.2: a run with one case only is not base64 by this rule: 51 `a` stay.
+// R4.2: a run with one case only is not base64 by this rule: 51 `a` stay (a hex run needs a digit and a letter, R15.3).
 #[test]
 fn r4_2_run_of_51_a_stays() {
     let text = format!("word {} end", "a".repeat(51));

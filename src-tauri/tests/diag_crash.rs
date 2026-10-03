@@ -45,6 +45,13 @@ fn r3_2_panic_fields_are_file_line_thread() {
     );
 }
 
+// R1.6 + R3.2: a source file that is not one of eepview's own is reported as `other`.
+#[test]
+fn r3_2_unknown_source_file_is_other() {
+    let fields = diag::panic_fields("/Users/zqalice/work/zq-secret.rs", 7, None);
+    assert_eq!(shown(&fields)[0], "file=other");
+}
+
 // R3.2: a panic in an unnamed or unknown thread reports the thread as `other`.
 #[test]
 fn r3_2_unknown_threads_are_other() {
