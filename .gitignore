@@ -22,3 +22,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# router-helper build output
+router-helper/out/
+*.jar
