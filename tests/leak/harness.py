@@ -40,6 +40,9 @@ def app_env(ports: dict, run: str, exit_after: int) -> dict:
     env["EEPVIEW_PROXY"] = f"127.0.0.1:{ports['upstream']}"
     env["EEPVIEW_START_URL"] = START_URL
     env["EEPVIEW_EXIT_AFTER"] = str(exit_after)
+    # Timed router, load and layout lines on stderr, kept in app.<run>.log: a run whose page
+    # never loads is then explained by the log, not guessed.
+    env["EEPVIEW_LOG"] = "1"
     return env
 
 
