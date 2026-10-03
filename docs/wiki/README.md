@@ -38,7 +38,7 @@ This wiki is generated from docs/wiki in the repository. Edit it there, in a PR.
 | Robustness tests | in progress | [Robustness tests](robustness-tests.md) | [#52](https://github.com/tcivie/eepview/pull/52) |
 | Leak test | shipped | [Leak test](leak-test.md) | [#41](https://github.com/tcivie/eepview/pull/41) |
 | Release pipeline | shipped | [Release pipeline](release-pipeline.md) | [#14](https://github.com/tcivie/eepview/pull/14) |
-| Reproducible builds | shipped | [Reproducible builds](reproducible-builds.md) | [#37](https://github.com/tcivie/eepview/pull/37) |
+| Reproducible builds | settings only | [Reproducible builds](reproducible-builds.md) | [#37](https://github.com/tcivie/eepview/pull/37) |
 | Release and support | in progress | [Release and support](release-and-support.md) | [#37](https://github.com/tcivie/eepview/pull/37) |
 | Coverage | shipped | [Coverage](coverage.md) | [#13](https://github.com/tcivie/eepview/pull/13) |
 | Score ratchet | shipped | [Score ratchet](score-ratchet.md) | [#40](https://github.com/tcivie/eepview/pull/40) |
