@@ -18,3 +18,4 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Cut dependencies flagged by Socket (#10)
 - Add the roadmap, the project wiki, AGENTS.md and a docs-check CI job (#16)
 - Move all docs into docs/wiki and enforce it in docs-check (#22)
+- Add the eepview logo and app icons (#11)

@@ -12,7 +12,7 @@ This wiki is generated from docs/wiki in the repository. Edit it there, in a PR.
 | Leak test | in progress | [Leak test](leak-test.md) | branch `test/leak-harness` |
 | Release pipeline | in progress | [Release pipeline](release-pipeline.md) | [branch ci/release](https://github.com/tcivie/eepview/tree/ci/release) |
 | Coverage | in progress | [Coverage](coverage.md) | [branch ci/coverage](https://github.com/tcivie/eepview/tree/ci/coverage) |
-| Brand | in progress | [Brand](brand.md) | [#11](https://github.com/tcivie/eepview/pull/11) |
+| Brand | shipped | [Brand](brand.md) | [#11](https://github.com/tcivie/eepview/pull/11) |
 
 ## Project
 
