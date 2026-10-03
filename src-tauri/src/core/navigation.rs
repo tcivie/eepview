@@ -17,6 +17,12 @@ impl Core {
         }
         let id = self.tabs.active_id();
         let target = classify(input);
+        if let Target::Refused(r) = &target
+            && self.console_tab() == Some(id)
+        {
+            // A refused input leaves the console tab as it is (R26).
+            return (NavResult::refused(r.as_str()), Vec::new());
+        }
         // A console tab becomes a normal tab first (R26).
         let mut fx = self.leave_console(id, &Self::landing(&target, input));
         let result = match &target {

@@ -127,7 +127,10 @@ pub fn load_after_rules<R: Runtime>(
                 .store(true, Ordering::SeqCst);
             apply::outside(move || navigate(&webview, url));
         }
-        Err(e) => log::error("console rule list, page not loaded", &e),
+        Err(e) => {
+            log::error("console rule list, page not loaded", &e);
+            with_core(webview.app_handle(), Core::console_failed);
+        }
     })
 }
 

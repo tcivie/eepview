@@ -14,6 +14,8 @@ use crate::types::{NavFlags, TabInfo, TabMarks};
 
 /// The title of the console tab until its page sends one.
 pub const CONSOLE_TITLE: &str = "Router console";
+/// The warning when the console view cannot be confined (R19).
+pub const CONSOLE_FAILED: &str = "The router console could not be opened safely";
 
 impl Core {
     /// The id of the console tab, if one is open.
@@ -78,6 +80,19 @@ impl Core {
         self.console_tab()
             .map(|id| self.tab_close(id))
             .unwrap_or_default()
+    }
+
+    /// R19: the console rule list could not be attached: the console tab closes, with a
+    /// warning.
+    pub fn console_failed(&mut self) -> Vec<Effect> {
+        let mut fx = self.console_gone();
+        fx.push(Self::toast("warn", CONSOLE_FAILED));
+        fx
+    }
+
+    /// True while the console tab is the active tab.
+    pub(super) fn console_active(&self) -> bool {
+        self.console_tab() == Some(self.tabs.active_id())
     }
 
     /// R26: before an address-bar navigation, a console tab becomes a fresh normal tab
