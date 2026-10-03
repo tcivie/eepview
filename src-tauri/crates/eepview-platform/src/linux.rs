@@ -213,9 +213,10 @@ fn pressed(
         }),
         _ => None,
     };
-    match report {
-        Some(event) if input(event) == Reply::Consume => Propagation::Stop,
-        _ => Propagation::Proceed,
+    if report.is_some_and(|event| input(event) == Reply::Consume) {
+        Propagation::Stop
+    } else {
+        Propagation::Proceed
     }
 }
 
