@@ -96,7 +96,7 @@ fn build_window<R: Runtime>(app: &AppHandle<R>, probe: &Probe) -> tauri::Result<
         builder = builder.disable_javascript();
     }
     if probe.harden {
-        builder = builder.initialization_script(WEBRTC_OFF_SCRIPT);
+        builder = builder.initialization_script_for_all_frames(WEBRTC_OFF_SCRIPT);
     }
     let harden = probe.harden;
     apply_windows_args(builder, probe)
