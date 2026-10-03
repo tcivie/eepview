@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   lint:
-    name: leak harness (ruff)
+    name: leak harness (ruff + unit tests)
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -34,6 +34,8 @@ jobs:
           "$RUNNER_TEMP/ruff-venv/bin/pip" install --quiet --no-deps --require-hashes -r tests/leak/requirements-lint.txt
           "$RUNNER_TEMP/ruff-venv/bin/ruff" check tests/leak
           "$RUNNER_TEMP/ruff-venv/bin/ruff" format --check tests/leak
+      - name: Unit tests for the harness
+        run: python3 -m unittest discover -s tests/leak -v
 
   leak-test:
     name: leak-test (${{ matrix.os }})
@@ -76,6 +78,7 @@ jobs:
       - name: Run the leak test
         shell: bash
         run: |
+          set -o pipefail
           py="$(command -v python3 || command -v python)"
           args=(--binary src-tauri/target/release/eepview --out leak-results)
           if [ "$RUNNER_OS" = Linux ]; then args+=(--xvfb --strace); fi
