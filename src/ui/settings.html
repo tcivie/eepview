@@ -224,42 +224,15 @@
               </button>
             </div>
             <div class="setting">
-              <p class="setting-label">Bandwidth limits</p>
-              <p class="setting-hint">The router never uses more than this.</p>
-              <div class="setting-control bw-limits">
-                <div class="field">
-                  <label class="field-label" for="bw-in">In, KB/s</label>
-                  <input class="input num" id="bw-in" type="number" min="16" value="256" />
-                </div>
-                <div class="field">
-                  <label class="field-label" for="bw-out">Out, KB/s</label>
-                  <input class="input num" id="bw-out" type="number" min="16" value="128" />
-                </div>
-              </div>
-            </div>
-            <div class="setting">
-              <label class="setting-label" for="share">Share with the network</label>
+              <p class="setting-label">Router settings</p>
               <p class="setting-hint">
-                The part of your bandwidth other people's tunnels can use. More sharing makes
-                your own traffic harder to pick out.
+                The router keeps its own settings in its console. eepview shows router
+                information and does not change it.
               </p>
-              <div class="setting-control share">
-                <input id="share" type="range" min="10" max="90" step="5" value="80" />
-                <output class="num" for="share" id="share-out">80%</output>
+              <div class="setting-control">
+                <div class="console-list" id="console-links" hidden></div>
+                <p class="muted console-note" id="console-note">No router console found</p>
               </div>
-            </div>
-            <div class="setting">
-              <label class="setting-label" for="transit">Relay tunnels for others</label>
-              <p class="setting-hint" id="transit-hint">
-                Recommended. A router that relays looks like every other router.
-              </p>
-              <input
-                class="switch setting-control"
-                type="checkbox"
-                id="transit"
-                aria-describedby="transit-hint"
-                checked
-              />
             </div>
           </div>
         </section>

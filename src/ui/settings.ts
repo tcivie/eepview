@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: MIT
 
 import "./boot.ts";
-import type { Settings } from "./contract.ts";
+import { renderConsoleLinks, shownInActiveTab, wireConsoleClicks } from "./console-nav.ts";
+import type { ConsoleInfo, Settings } from "./contract.ts";
 import { all, announce, byId } from "./dom.ts";
 import { call, devMode, on } from "./ipc.ts";
 import {
@@ -119,11 +120,21 @@ function wireSettings(): void {
   on("settings-changed", showSettings).catch(() => undefined);
 }
 
+function renderConsole(info: ConsoleInfo): void {
+  renderConsoleLinks({ list: byId("console-links"), note: byId("console-note") }, info, ["config"]);
+}
+
+function wireConsole(): void {
+  wireConsoleClicks(byId("console-links"));
+  shownInActiveTab("settings")
+    .catch(() => false)
+    .then((shown) => call(shown ? "console_detect" : "console_status", {}))
+    .then(renderConsole)
+    .catch(() => undefined);
+  on("console-changed", renderConsole).catch(() => undefined);
+}
+
 function wireRouterPreview(): void {
-  const range = byId<HTMLInputElement>("share");
-  range.addEventListener("input", () => {
-    byId<HTMLOutputElement>("share-out").value = `${range.value}%`;
-  });
   byId("router-preview").hidden = devMode;
   for (const button of all<HTMLButtonElement>("[data-grant], #restore-btn")) {
     button.disabled = !devMode;
@@ -133,3 +144,4 @@ function wireRouterPreview(): void {
 wireTheme();
 wireSettings();
 wireRouterPreview();
+wireConsole();

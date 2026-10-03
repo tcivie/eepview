@@ -2,16 +2,20 @@
 // SPDX-License-Identifier: MIT
 
 import "./boot.ts";
-import type { Bookmark, RouterStatus } from "./contract.ts";
+import { renderConsoleLinks, shownInActiveTab, wireConsoleClicks } from "./console-nav.ts";
+import type { Bookmark, ConsoleInfo, RouterStatus } from "./contract.ts";
 import { all, byId, cloneTemplate, setText } from "./dom.ts";
 import { call, errorText, on } from "./ipc.ts";
 import { displayUrl, hostOf } from "./lib/address.ts";
+import { routerVersion } from "./lib/console-links.ts";
 import { hopStates } from "./lib/router-view.ts";
 import { renderRouterSummary } from "./shared/router-summary.ts";
 import { renderSiteMark } from "./site-mark.ts";
 
 const MAX_TILES = 11;
 const quiet = (): undefined => undefined;
+let lastStatus: RouterStatus | null = null;
+let lastConsole: ConsoleInfo | null = null;
 
 function tile(bookmark: Bookmark): HTMLElement {
   const item = cloneTemplate("tile-template");
@@ -43,7 +47,8 @@ function renderRouter(status: RouterStatus): void {
     { chip: byId("router-chip"), text: byId("router-text"), proxy: byId("router-proxy") },
     status,
   );
-  byId("router-version").textContent = status.version ? `I2P ${status.version}` : "Unknown";
+  lastStatus = status;
+  showVersion();
   const states = hopStates(view.tone, all("#router-hops .hop").length);
   all<HTMLElement>("#router-hops .hop").forEach((hop, i) => {
     const state = states[i];
@@ -52,7 +57,28 @@ function renderRouter(status: RouterStatus): void {
   });
 }
 
+function showVersion(): void {
+  const version = routerVersion(lastStatus?.version ?? null, lastConsole);
+  byId("router-version").textContent = version ? `I2P ${version}` : "Unknown";
+}
+
+function renderConsole(info: ConsoleInfo): void {
+  lastConsole = info;
+  renderConsoleLinks(
+    { list: byId("console-links"), note: byId("console-note"), title: byId("console-title") },
+    info,
+  );
+  showVersion();
+}
+
 loadTiles();
+wireConsoleClicks(byId("console-links"));
+shownInActiveTab("home")
+  .catch(() => false)
+  .then((shown) => call(shown ? "console_detect" : "console_status", {}))
+  .then(renderConsole)
+  .catch(quiet);
+on("console-changed", renderConsole).catch(quiet);
 call("router_status", {}).then(renderRouter).catch(quiet);
 on("router-status", renderRouter).catch(quiet);
 on("bookmarks-changed", loadTiles).catch(quiet);
