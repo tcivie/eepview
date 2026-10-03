@@ -29,7 +29,7 @@ Working rules for any human or AI agent on this repo.
 
 ## Security
 
-- Read `docs/adr/0001-no-leak-architecture.md` before you touch networking or webviews.
+- Read `docs/adr/0001-no-leak-architecture.md` before you touch networking or webviews. It lands with the browser shell PR (branch `feat/browser-shell`). Until it is on main, read it on that branch.
 - The five layers are mandatory.
 - Keep the architecture test and the leak test green.
 - Add no new HTTP client crates.

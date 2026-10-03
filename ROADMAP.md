@@ -3,7 +3,7 @@
 ## Now (v0.1)
 
 - Browser shell: tabs, navigation, bookmarks, history, find in page.
-- Five-layer no-leak architecture. See [ADR 0001](docs/adr/0001-no-leak-architecture.md).
+- Five-layer no-leak architecture. See [ADR 0001](docs/adr/) (lands with the browser shell).
 - A permanent cross-OS leak test.
 - Release pipeline.
 - Coverage gate.

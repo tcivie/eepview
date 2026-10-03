@@ -99,7 +99,7 @@ jobs:
 
   docs-check:
     name: docs-check
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' && github.actor != 'dependabot[bot]'
     runs-on: ubuntu-24.04
     permissions:
       contents: read
