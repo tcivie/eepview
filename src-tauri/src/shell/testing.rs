@@ -4,7 +4,7 @@
 //! Shell test fixtures: an app on the Tauri mock runtime with the shared state, the IPC
 //! handler and the bundled webviews, plus helpers to drive it.
 
-use std::sync::{Arc, MutexGuard};
+use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::time::{Duration, Instant};
 
 use serde_json::Value;
@@ -113,4 +113,13 @@ pub fn wait_for(mut done: impl FnMut() -> bool) -> bool {
         std::thread::sleep(Duration::from_millis(20));
     }
     done()
+}
+
+/// Tests that probe the default console ports run one at a time: they listen on 7657 and
+/// 7070, and any other detection would count as a connection.
+static DETECT_LOCK: Mutex<()> = Mutex::new(());
+
+/// Holds the detection lock until the guard drops.
+pub fn detect_lock() -> MutexGuard<'static, ()> {
+    DETECT_LOCK.lock().unwrap_or_else(PoisonError::into_inner)
 }

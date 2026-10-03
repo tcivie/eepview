@@ -10,7 +10,7 @@ use tauri::async_runtime::block_on;
 
 use super::*;
 use crate::net::testing::{FakeRouter, dead_addr};
-use crate::shell::testing::{Mock, app, core, gate_open, invoke, open_gate, wait_for};
+use crate::shell::testing::{Mock, app, core, detect_lock, gate_open, invoke, open_gate, wait_for};
 
 fn handle(app: &App<Mock>) -> AppHandle<Mock> {
     app.handle().clone()
@@ -511,6 +511,7 @@ mod stats_from_console {
     fn r37_after_detect_now_the_console_is_queried_again() {
         // R37: "until `detect_now` runs again". `detect_now` probes the default ports and
         // stores what it finds; the stored console is then the fake.
+        let _lock = detect_lock();
         let (app, fake, _) = stopped_app();
         let _guard = StopOnDrop(handle(&app));
         let _ = detect_now(&handle(&app));
