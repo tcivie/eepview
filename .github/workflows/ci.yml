@@ -89,13 +89,13 @@ jobs:
       # Branch coverage needs a nightly compiler. One dated nightly is used for this
       # measurement only; everything else builds on the pinned stable toolchain.
       - name: Install the pinned nightly for branch coverage
-        run: rustup toolchain install nightly-2026-10-01 --profile minimal --component llvm-tools-preview
+        run: rustup toolchain install "$(cat scripts/nightly-toolchain.txt)" --profile minimal --component llvm-tools-preview
       # cargo-llvm-cov has no --fail-under-branches, so jq reads the workspace total from the
       # JSON summary of the same run and prints it before the check.
       - name: Rust branch coverage gate
         working-directory: src-tauri
         run: |
-          cargo +nightly-2026-10-01 llvm-cov --workspace --all-targets --branch --json --summary-only --output-path "$RUNNER_TEMP/branch.json"
+          cargo "+$(cat ../scripts/nightly-toolchain.txt)" llvm-cov --workspace --all-targets --branch --json --summary-only --output-path "$RUNNER_TEMP/branch.json"
           jq -r -e '.data[0].totals.branches.percent | "branch coverage: \(.)% (floor 82)", . >= 82' "$RUNNER_TEMP/branch.json"
       - run: npm run test:coverage
 
