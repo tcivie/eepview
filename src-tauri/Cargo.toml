@@ -71,7 +71,7 @@ image = { version = "0.25", default-features = false, features = [
 # The SHA-256 file names of the icon files, so no host name reaches the disk.
 sha2 = "0.10"
 # The `data:image/png;base64,` URLs the UI gets.
-base64 = "0.22"
+base64 = "0.23"
 # Opens the prefilled issue page in the system browser and shows the report file
 # (docs/wiki/diagnostics-and-bug-reports.md). Only the Rust report command calls it.
 tauri-plugin-opener = "2"
