@@ -27,7 +27,7 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
       - name: Install the pinned Rust toolchain
-        run: rustup show active-toolchain || rustup toolchain install
+        run: rustup toolchain install
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           workspaces: src-tauri
@@ -75,8 +75,11 @@ jobs:
           mapfile -t files < <(git ls-files '*.sh')
           if [ "${#files[@]}" -gt 0 ]; then shellcheck "${files[@]}"; fi
       - name: complexity (lizard)
+        env:
+          PIP_DISABLE_PIP_VERSION_CHECK: "1"
         run: |
-          pipx install lizard==1.24.0
-          ./scripts/complexity.sh
+          python3 -m venv "$RUNNER_TEMP/lint-venv"
+          "$RUNNER_TEMP/lint-venv/bin/pip" install --quiet --require-hashes -r scripts/requirements-lint.txt
+          PATH="$RUNNER_TEMP/lint-venv/bin:$PATH" ./scripts/complexity.sh
       - name: actionlint
         run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
