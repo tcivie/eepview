@@ -17,7 +17,20 @@
   "linter": {
     "enabled": true,
     "rules": {
-      "preset": "recommended"
+      "preset": "recommended",
+      "complexity": {
+        "noExcessiveCognitiveComplexity": {
+          "level": "error",
+          "options": { "maxAllowedComplexity": 10 }
+        },
+        "noExcessiveLinesPerFunction": {
+          "level": "error",
+          "options": { "maxLines": 40, "skipBlankLines": true }
+        }
+      },
+      "nursery": {
+        "noExcessiveNestedCallbacks": "error"
+      }
     }
   },
   "javascript": {
