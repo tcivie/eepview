@@ -23,3 +23,4 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Restore CodeQL and Scorecard, add dependency review and audit badges ([#26](https://github.com/tcivie/eepview/pull/26))
 - Add the design system, theme switching, browser chrome and internal pages (#19)
 - Keep the macOS traffic lights off the first tab (#23)
+- Polish the setup flow and add the router panel to the toolbar (#27)
