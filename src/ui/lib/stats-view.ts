@@ -11,7 +11,7 @@ export interface StatsLike {
   javaVersion: string | null;
   bandwidthInBps: number | null;
   bandwidthOutBps: number | null;
-  bandwidthHistory: { inBps: number[]; outBps: number[] } | null;
+  history: { stepSeconds: number; inBps: number[]; outBps: number[] } | null;
   clientTunnels: number | null;
   participatingTunnels: number | null;
   buildSuccessRate: number | null;

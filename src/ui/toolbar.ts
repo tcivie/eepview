@@ -2,13 +2,18 @@
 // SPDX-License-Identifier: MIT
 
 import "./boot.ts";
-import type { RouterState, TabInfo } from "./contract.ts";
+import type { RouterState, RouterStatus, TabInfo } from "./contract.ts";
 import { byId } from "./dom.ts";
 import { call, devMode, on } from "./ipc.ts";
 import { focusAddress, previewSuggestions, showUrl, wireAddress } from "./toolbar/address.ts";
 import { closeFind, openFind, showFindResult, wireFind } from "./toolbar/find.ts";
 import { wireLayout } from "./toolbar/layout.ts";
 import { openMenuForReview, renderNav, renderStatus, showToast, wireNav } from "./toolbar/nav.ts";
+import {
+  openRouterPanelForReview,
+  renderPanelStatus,
+  wireRouterPanel,
+} from "./toolbar/router-panel.ts";
 import { activeTab, onTabs, setTabs, updateTab } from "./toolbar/state.ts";
 import { renderTabs, wireTabs } from "./toolbar/tabs.ts";
 
@@ -28,23 +33,28 @@ function render(tabs: TabInfo[]): void {
   byId("dev-frame-title").textContent = tab?.url ?? "";
 }
 
+function showRouter(status: RouterStatus): void {
+  renderStatus(status);
+  renderPanelStatus(status);
+}
+
 function listenToCore(): void {
   on("tabs-changed", setTabs).catch(quiet);
   on("tab-updated", updateTab).catch(quiet);
   on("find-result", showFindResult).catch(quiet);
-  on("router-status", renderStatus).catch(quiet);
+  on("router-status", showRouter).catch(quiet);
   on("toast", showToast).catch(quiet);
   on("shortcut", ({ action }) => SHORTCUTS[action]?.()).catch(quiet);
 }
 
 function loadInitialState(): void {
   call("tab_list", {}).then(setTabs).catch(quiet);
-  call("router_status", {}).then(renderStatus).catch(quiet);
+  call("router_status", {}).then(showRouter).catch(quiet);
 }
 
 function previewRouter(state: string): void {
   call("router_status", {})
-    .then((status) => renderStatus({ ...status, state: state as RouterState }))
+    .then((status) => showRouter({ ...status, state: state as RouterState }))
     .catch(quiet);
 }
 
@@ -59,6 +69,7 @@ function applyReviewParams(params: URLSearchParams): void {
   if (params.has("suggest")) previewSuggestions(params.get("suggest") ?? "");
   if (params.has("menu")) openMenuForReview();
   if (params.has("tip")) byId("status-tip").hidden = false;
+  if (params.has("panel")) openRouterPanelForReview();
 }
 
 function showDevToast(): void {
@@ -82,6 +93,7 @@ wireAddress();
 wireFind();
 wireNav();
 wireLayout();
+wireRouterPanel();
 listenToCore();
 loadInitialState();
 if (devMode) wireDevStage();

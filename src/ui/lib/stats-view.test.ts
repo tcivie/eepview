@@ -22,7 +22,7 @@ const empty: StatsLike = {
   javaVersion: null,
   bandwidthInBps: null,
   bandwidthOutBps: null,
-  bandwidthHistory: null,
+  history: null,
   clientTunnels: null,
   participatingTunnels: null,
   buildSuccessRate: null,

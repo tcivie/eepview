@@ -5,7 +5,7 @@ import { all, byId } from "../dom.ts";
 import { call, on } from "../ipc.ts";
 import { chromeHeight } from "../lib/chrome-height.ts";
 
-const POPUPS = ".suggestions, .menu, .tooltip";
+const POPUPS = ".suggestions, .menu, .tooltip, .router-panel";
 const quiet = (): undefined => undefined;
 let lastHeight = 0;
 let pending = 0;

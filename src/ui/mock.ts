@@ -101,10 +101,23 @@ let tabs: TabInfo[] = data.tabs.map((t, i) => {
 
 function routerFromParams(): RouterStatus {
   const requested = (params.get("router") ?? "ok") as RouterState;
-  return { state: requested, proxy: data.proxy, version: data.routerVersion, detail: null };
+  return {
+    state: requested,
+    proxy: data.proxy,
+    version: data.routerVersion,
+    detail: null,
+    managed: params.get("managed") !== "0",
+    paused: params.has("paused"),
+  };
 }
 
-const router = routerFromParams();
+let router = routerFromParams();
+
+function setRouter(patch: Partial<RouterStatus>): undefined {
+  router = { ...router, ...patch };
+  emit("router-status", router);
+  return undefined;
+}
 
 function activeTab(): TabInfo | undefined {
   return tabs.find((t) => t.active);
@@ -297,7 +310,7 @@ function sampleStats(): RouterStats {
     uptimeSeconds: data.stats.fixed.uptimeSeconds + statsTick * 5,
     bandwidthInBps: inBps[inBps.length - 1] ?? null,
     bandwidthOutBps: outBps[outBps.length - 1] ?? null,
-    bandwidthHistory: { inBps, outBps },
+    history: { stepSeconds: data.stats.stepSeconds, inBps, outBps },
   };
 }
 
@@ -346,6 +359,9 @@ const handlers: Record<CommandName, Handler> = {
   settings_set: (a) => setSettings(arg(a, "patch")),
   router_status: () => router,
   router_stats: () => sampleStats(),
+  router_control: (a) => setRouter({ state: arg(a, "action") === "stop" ? "down" : "building" }),
+  connection_pause: () => setRouter({ paused: true }),
+  connection_resume: () => setRouter({ paused: false }),
   chrome_set_height: () => undefined,
   platform: () => platformFromParams(),
   window_fullscreen: () => params.has("fullscreen"),

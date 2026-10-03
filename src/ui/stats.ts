@@ -32,7 +32,7 @@ function clearChart(): void {
   byId("spark-summary").textContent = "No bandwidth figures yet.";
 }
 
-function renderChart(history: RouterStats["bandwidthHistory"]): void {
+function renderChart(history: RouterStats["history"]): void {
   if (!history || history.inBps.length < 2) {
     clearChart();
     return;
@@ -49,7 +49,7 @@ function renderStats(stats: RouterStats): void {
   const view = statsText(stats);
   for (const [id, key] of Object.entries(TEXT_TARGETS)) byId(id).textContent = String(view[key]);
   byId("build-rate-bar").setAttribute("width", String(view.buildRateBar));
-  renderChart(stats.bandwidthHistory);
+  renderChart(stats.history);
 }
 
 function renderRouter(status: RouterStatus): void {

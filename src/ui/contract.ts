@@ -44,6 +44,8 @@ export type RouterStatus = {
   proxy: string;
   version: string | null;
   detail: string | null;
+  managed: boolean;
+  paused: boolean;
 };
 
 export type Settings = {
@@ -59,6 +61,9 @@ export type HistoryCursor = { visited: number; id: string };
 export type HistoryQuery = { q?: string; before?: HistoryCursor; limit?: number };
 export type Platform = "macos" | "windows" | "linux";
 
+export type BandwidthHistory = { stepSeconds: number; inBps: number[]; outBps: number[] };
+export type RouterAction = "restart" | "stop";
+
 export type RouterStats = {
   networkStatus: string | null;
   uptimeSeconds: number | null;
@@ -67,8 +72,11 @@ export type RouterStats = {
   javaVersion: string | null;
   bandwidthInBps: number | null;
   bandwidthOutBps: number | null;
-  bandwidthHistory: { inBps: number[]; outBps: number[] } | null;
+  history: BandwidthHistory | null;
   clientTunnels: number | null;
+  inboundTunnels: number | null;
+  outboundTunnels: number | null;
+  activePeers: number | null;
   participatingTunnels: number | null;
   buildSuccessRate: number | null;
   knownRouters: number | null;
@@ -115,6 +123,9 @@ export interface Commands {
   settings_set: { args: { patch: Partial<Settings> }; result: Settings };
   router_status: { args: Record<string, never>; result: RouterStatus };
   router_stats: { args: Record<string, never>; result: RouterStats };
+  router_control: { args: { action: RouterAction }; result: undefined };
+  connection_pause: { args: Record<string, never>; result: undefined };
+  connection_resume: { args: Record<string, never>; result: undefined };
   chrome_set_height: { args: { px: number }; result: undefined };
   platform: { args: Record<string, never>; result: Platform };
   window_fullscreen: { args: Record<string, never>; result: boolean };
