@@ -8,8 +8,9 @@ This wiki is generated from docs/wiki in the repository. Edit it there, in a PR.
 | Supply chain | shipped | [Supply chain](supply-chain.md) | [#1](https://github.com/tcivie/eepview/pull/1) |
 | Documentation | shipped | [Documentation](documentation.md) | [#16](https://github.com/tcivie/eepview/pull/16) |
 | Browser UI | shipped | [Browser UI](browser-ui.md) | [#19](https://github.com/tcivie/eepview/pull/19) |
-| Browser shell | in progress | [Browser shell](browser-shell.md) | branch `feat/browser-shell` |
-| No-leak architecture | in progress | [No-leak architecture](no-leak-architecture.md) | branch `feat/browser-shell` |
+| Browser shell | shipped | [Browser shell](browser-shell.md) | [#29](https://github.com/tcivie/eepview/pull/29) |
+| IPC contract | shipped | [IPC contract](ipc-contract.md) | [#29](https://github.com/tcivie/eepview/pull/29) |
+| No-leak architecture | shipped | [No-leak architecture](no-leak-architecture.md) | [#29](https://github.com/tcivie/eepview/pull/29) |
 | Leak test | in progress | [Leak test](leak-test.md) | branch `test/leak-harness` |
 | Release pipeline | shipped | [Release pipeline](release-pipeline.md) | [#14](https://github.com/tcivie/eepview/pull/14) |
 | Coverage | shipped | [Coverage](coverage.md) | [#13](https://github.com/tcivie/eepview/pull/13) |
@@ -19,6 +20,7 @@ This wiki is generated from docs/wiki in the repository. Edit it there, in a PR.
 
 - [Roadmap](roadmap.md)
 - [Decisions](decisions.md)
+  - [ADR 0001: No-leak architecture](adr-0001-no-leak-architecture.md)
 - [Going public](going-public.md)
 
 ## Policies
