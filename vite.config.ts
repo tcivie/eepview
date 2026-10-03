@@ -16,6 +16,7 @@ const uiPages = [
   "report",
   "toolbar",
   "status",
+  "popup",
 ];
 
 const input = Object.fromEntries([

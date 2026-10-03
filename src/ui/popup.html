@@ -1,0 +1,101 @@
+<!doctype html>
+<!--
+  SPDX-FileCopyrightText: 2026 The eepview contributors
+  SPDX-License-Identifier: MIT
+-->
+<html lang="en" class="popup-page">
+  <head>
+    <script src="/theme-boot.js"></script>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <title>eepview popup</title>
+    <link rel="stylesheet" href="./theme.css" />
+    <link rel="stylesheet" href="./ui.css" />
+    <link rel="stylesheet" href="./chrome.css" />
+    <script type="module" src="./popup.ts"></script>
+  </head>
+  <body class="popup-body">
+    <div class="popup-card suggestion-list" id="suggestions" role="listbox" aria-label="Suggestions" hidden></div>
+    <div class="popup-card hint-card" id="hint" role="tooltip" hidden>
+      <p class="tooltip-title" id="hint-title"></p>
+      <p class="tooltip-text" id="hint-text"></p>
+    </div>
+    <div class="popup-card menu" id="menu" role="menu" hidden>
+      <button class="menu-item" type="button" data-command="new-tab">New tab</button>
+      <button class="menu-item" type="button" data-open="eepview://bookmarks">Bookmarks</button>
+      <button class="menu-item" type="button" data-open="eepview://history">History</button>
+      <button class="menu-item" type="button" data-open="eepview://stats">Network</button>
+      <button class="menu-item" type="button" data-open="eepview://settings">Settings</button>
+      <button class="menu-item" type="button" data-open="eepview://report">Report a problem</button>
+      <fieldset class="menu-zoom">
+        <legend class="menu-zoom-label">Zoom</legend>
+        <button class="icon-btn" type="button" data-command="zoom-out" title="Zoom out">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12" /></svg>
+          <span class="visually-hidden">Zoom out</span>
+        </button>
+        <button class="zoom-value" type="button" data-command="zoom-reset" id="zoom-value" title="Reset zoom">100%</button>
+        <button class="icon-btn" type="button" data-command="zoom-in" title="Zoom in">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6v12M6 12h12" /></svg>
+          <span class="visually-hidden">Zoom in</span>
+        </button>
+      </fieldset>
+    </div>
+    <section
+      class="popup-card router-panel"
+      id="router-panel"
+      role="dialog"
+      aria-labelledby="rp-title"
+      aria-describedby="rp-text"
+      hidden
+    >
+      <header class="rp-head" data-tone="building" id="rp-head">
+        <span class="rp-dot" aria-hidden="true"></span>
+        <h2 class="rp-title" id="rp-title" tabindex="-1">Checking the router</h2>
+      </header>
+      <p class="rp-text" id="rp-text"></p>
+      <dl class="rp-facts">
+        <div>
+          <dt>Version</dt>
+          <dd id="rp-version">—</dd>
+        </div>
+        <div>
+          <dt>Uptime</dt>
+          <dd class="num" id="rp-uptime">—</dd>
+        </div>
+        <div>
+          <dt>Active peers</dt>
+          <dd class="num" id="rp-peers">—</dd>
+        </div>
+        <div>
+          <dt>Build success</dt>
+          <dd class="num" id="rp-build">—</dd>
+        </div>
+        <div class="rp-wide">
+          <dt>Tunnels</dt>
+          <dd class="num" id="rp-tunnels">—</dd>
+        </div>
+      </dl>
+      <figure class="rp-bandwidth">
+        <figcaption class="rp-bandwidth-head">
+          <span>Bandwidth now</span>
+          <span class="num" id="rp-bandwidth">—</span>
+        </figcaption>
+        <svg class="rp-spark" viewBox="0 0 600 140" preserveAspectRatio="none" aria-hidden="true">
+          <path class="rp-spark-area" id="rp-spark-area" d="M0 140" />
+          <path class="rp-spark-line rp-spark-in" id="rp-spark-in" d="M0 140" />
+          <path class="rp-spark-line rp-spark-out" id="rp-spark-out" d="M0 140" />
+        </svg>
+        <p class="rp-spark-axis"><span>10 min ago</span><span>Now</span></p>
+      </figure>
+      <p class="rp-proxy">Proxy <span class="mono" id="rp-proxy">—</span></p>
+      <div class="rp-actions">
+        <button class="btn btn-primary rp-pause" type="button" id="rp-pause">Pause I2P browsing</button>
+        <button class="btn" type="button" id="rp-restart" data-action="restart" aria-describedby="rp-managed-note">Restart router</button>
+        <button class="btn" type="button" id="rp-stop" data-action="stop" aria-describedby="rp-managed-note">Stop router</button>
+        <button class="btn btn-quiet rp-network" type="button" id="rp-network" data-open="eepview://stats">Open Network page</button>
+      </div>
+      <p class="visually-hidden" id="rp-managed-note"></p>
+    </section>
+  </body>
+</html>

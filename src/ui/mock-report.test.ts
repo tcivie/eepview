@@ -35,7 +35,7 @@ describe("dev backend: report commands", () => {
   it("opens with a file name only, and answers the crash and delete commands", async () => {
     const b = await backend();
     const opened = (await b.invoke("report_open", {})) as { file: string; trimmed: boolean };
-    assert.match(opened.file, /^eepview-report-.*\.txt$/);
+    assert.match(opened.file, /^eepview-report( \(\d+\))?\.txt$/);
     assert.equal(await b.invoke("diag_crash_status", {}), false);
     assert.equal(await b.invoke("diag_crash_dismiss", {}), undefined);
     assert.equal(await b.invoke("diag_logs_delete", {}), undefined);

@@ -19,7 +19,7 @@ use crate::hover::SHOW_DELAY_MS;
 use crate::{icons, net};
 
 /// The webviews that receive contract events.
-const LISTENERS: [&str; 3] = ["toolbar", "internal", "status"];
+const LISTENERS: [&str; 4] = ["toolbar", "internal", "status", "popup"];
 
 /// Runs `f` on the core, then carries out its effects on the main thread.
 pub fn with_core<R: Runtime>(app: &AppHandle<R>, f: impl FnOnce(&mut Core) -> Vec<Effect>) {

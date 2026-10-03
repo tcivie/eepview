@@ -18,7 +18,7 @@ use crate::nav::internal_file;
 use crate::types::ChromeInsets;
 
 /// The main window size in logical pixels.
-fn window_size<R: Runtime>(window: &Window<R>) -> (f64, f64) {
+pub fn window_size<R: Runtime>(window: &Window<R>) -> (f64, f64) {
     let scale = window.scale_factor().unwrap_or(1.0);
     window.inner_size().map_or((1200.0, 800.0), |s| {
         let logical = s.to_logical::<f64>(scale);
@@ -32,7 +32,7 @@ fn rects<R: Runtime>(app: &AppHandle<R>) -> Option<(Rect, Rect)> {
     let state = shared(app);
     let core = lock(&state.core);
     let bar = layout::toolbar_height(core.find_open(), core.toolbar_request());
-    Some(layout::split(w, h, bar, core.find_open()))
+    Some(layout::split(w, h, bar))
 }
 
 /// The content area.
@@ -48,7 +48,8 @@ pub fn content_rect<R: Runtime>(app: &AppHandle<R>) -> Rect {
     )
 }
 
-fn place<R: Runtime>(webview: &Webview<R>, rect: Rect) {
+/// Sets the bounds of a webview, in window points.
+pub fn place<R: Runtime>(webview: &Webview<R>, rect: Rect) {
     let bounds = TauriRect {
         position: LogicalPosition::new(rect.x, rect.y).into(),
         size: LogicalSize::new(rect.w, rect.h).into(),
@@ -145,10 +146,10 @@ fn cursor<R: Runtime>(app: &AppHandle<R>) -> Option<(f64, f64)> {
     ))
 }
 
-/// Puts the toolbar and the status bubble above the tab webviews again: a new child webview
-/// lands on top, and the toolbar must overlap the content while a popup is open.
+/// Puts the status bubble and the popup above the tab webviews again: a new child webview
+/// lands on top. The popup goes last, so it is above everything.
 pub fn raise_chrome<R: Runtime>(app: &AppHandle<R>, window: &Window<R>) {
-    for label in ["toolbar", "status"] {
+    for label in ["toolbar", "status", "popup"] {
         if let Some(webview) = app.get_webview(label) {
             let _ = webview.reparent(window);
         }

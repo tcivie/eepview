@@ -4,7 +4,9 @@
 //! Everything that calls Tauri. The browser logic is in `core`; this module turns its
 //! effects into webview calls and turns engine callbacks into core calls.
 //!
-//! - [`chrome`]: the window and the bundled webviews (`toolbar`, `internal`, `status`).
+//! - [`chrome`]: the window and the bundled webviews (`toolbar`, `internal`, `status`,
+//!   `popup`).
+//! - [`popup`]: places and shows the toolbar popups.
 //! - [`content`]: the only factory of remote `tab-*` webviews (ADR 0001).
 //! - [`engine`]: back, forward, stop, find and zoom with page JavaScript off.
 //! - [`commands`]: the IPC commands.
@@ -16,6 +18,7 @@ pub mod content;
 pub mod engine;
 pub mod env;
 pub mod menu;
+pub mod popup;
 pub mod report;
 pub mod state;
 #[cfg(test)]
@@ -69,10 +72,11 @@ fn on_run_event<R: Runtime>(handle: &AppHandle<R>, event: &RunEvent) {
     }
 }
 
-/// A window resize lays the webviews out again.
+/// A window resize lays the webviews out again and closes the open popup.
 fn on_window_event<R: Runtime>(handle: &AppHandle<R>, event: &WindowEvent) {
     match event {
         WindowEvent::Resized(_) => {
+            popup::close(handle, None, false);
             view::sync(handle);
             view::check_fullscreen(handle);
             view::place_buttons(handle);
@@ -128,6 +132,9 @@ macro_rules! contract_handler {
             commands::platform,
             commands::chrome_insets,
             commands::window_fullscreen,
+            commands::popup_open,
+            commands::popup_size,
+            commands::popup_close,
             report::report_preview,
             report::report_open,
             report::diag_crash_status,

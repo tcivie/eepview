@@ -80,19 +80,23 @@ jobs:
       - uses: taiki-e/install-action@83ac0ad63c0167e6f06796fab0fce28db1bf3db0 # v2.87.22
         with:
           tool: cargo-llvm-cov
-      # Ratchet: raise this number when coverage rises. Never lower it.
+      # Ratchet: raise these numbers when coverage rises. Never lower them.
+      # See docs/wiki/coverage.md.
       - name: Rust line coverage gate
         working-directory: src-tauri
-        run: |
-          cargo llvm-cov --workspace --all-targets --summary-only
-          cargo llvm-cov report --fail-under-lines 0
+        # The gate is on the run itself: `report` has no --workspace and would gate the root crate only.
+        run: cargo llvm-cov --workspace --all-targets --summary-only --fail-under-lines 93
       # Branch coverage needs a nightly compiler. One dated nightly is used for this
       # measurement only; everything else builds on the pinned stable toolchain.
       - name: Install the pinned nightly for branch coverage
         run: rustup toolchain install nightly-2026-10-01 --profile minimal --component llvm-tools-preview
-      - name: Rust branch coverage (measured, gate follows)
+      # cargo-llvm-cov has no --fail-under-branches, so jq reads the workspace total from the
+      # JSON summary of the same run and prints it before the check.
+      - name: Rust branch coverage gate
         working-directory: src-tauri
-        run: cargo +nightly-2026-10-01 llvm-cov --workspace --all-targets --branch --summary-only
+        run: |
+          cargo +nightly-2026-10-01 llvm-cov --workspace --all-targets --branch --json --summary-only --output-path "$RUNNER_TEMP/branch.json"
+          jq -r -e '.data[0].totals.branches.percent | "branch coverage: \(.)% (floor 82)", . >= 82' "$RUNNER_TEMP/branch.json"
       - run: npm run test:coverage
 
   # Not a required check yet. See docs/wiki/reproducible-builds.md.

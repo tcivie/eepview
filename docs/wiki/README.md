@@ -30,7 +30,7 @@ This wiki is generated from docs/wiki in the repository. Edit it there, in a PR.
 | Supply chain | shipped | [Supply chain](supply-chain.md) | [#1](https://github.com/tcivie/eepview/pull/1) |
 | Documentation | shipped | [Documentation](documentation.md) | [#16](https://github.com/tcivie/eepview/pull/16) |
 | Browser UI | shipped | [Browser UI](browser-ui.md) | [#19](https://github.com/tcivie/eepview/pull/19) |
-| Browser shell | shipped | [Browser shell](browser-shell.md) | [#29](https://github.com/tcivie/eepview/pull/29) |
+| Browser shell | shipped | [Browser shell](browser-shell.md) | [#29](https://github.com/tcivie/eepview/pull/29), popups [#55](https://github.com/tcivie/eepview/pull/55) |
 | IPC contract | shipped | [IPC contract](ipc-contract.md) | [#29](https://github.com/tcivie/eepview/pull/29) |
 | No-leak architecture | shipped | [No-leak architecture](no-leak-architecture.md) | [#29](https://github.com/tcivie/eepview/pull/29) |
 | Diagnostics and bug reports | in progress | [Diagnostics and bug reports](diagnostics-and-bug-reports.md) | [#56](https://github.com/tcivie/eepview/pull/56) |

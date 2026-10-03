@@ -1,0 +1,23 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "popup",
+  "description": "The toolbar popups (suggestions, menu, router panel, router hint): only the commands those popups need. No tab-* webview is named.",
+  "webviews": ["popup"],
+  "permissions": [
+    "core:event:allow-listen",
+    "core:event:allow-unlisten",
+    "allow-popup-size",
+    "allow-popup-close",
+    "allow-navigate",
+    "allow-tab-new",
+    "allow-tab-list",
+    "allow-zoom-in",
+    "allow-zoom-out",
+    "allow-zoom-reset",
+    "allow-router-status",
+    "allow-router-stats",
+    "allow-connection-pause",
+    "allow-connection-resume",
+    "allow-router-control"
+  ]
+}

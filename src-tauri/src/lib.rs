@@ -3,8 +3,9 @@
 
 //! eepview: a browser that opens I2P sites only.
 //!
-//! Pure modules (no Tauri runtime, unit-tested): [`core`], [`icons`], [`nav`], [`net`], [`session`],
-//! [`tabs`], [`store`], [`suggest`], [`shortcuts`], [`layout`], [`hover`], [`types`].
+//! Pure modules (no Tauri runtime, unit-tested): [`core`], [`icons`], [`nav`], [`net`],
+//! [`session`], [`tabs`], [`store`], [`suggest`], [`shortcuts`], [`layout`], [`popup`], [`hover`],
+//! [`types`].
 //! Tauri glue: [`shell`].
 
 pub mod core;
@@ -14,6 +15,7 @@ pub mod icons;
 pub mod layout;
 pub mod nav;
 pub mod net;
+pub mod popup;
 pub mod session;
 pub mod shell;
 pub mod shortcuts;
