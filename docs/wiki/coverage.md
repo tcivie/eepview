@@ -39,3 +39,4 @@ Unit-test coverage gate for Rust and TypeScript.
 ## History
 
 - 2026-10-03 — Add the coverage gate for Rust and TypeScript — [#13](https://github.com/tcivie/eepview/pull/13)
+- 2026-10-03 — State the test rule; remove UI tests that lock in the implementation — [#49](https://github.com/tcivie/eepview/pull/49)
