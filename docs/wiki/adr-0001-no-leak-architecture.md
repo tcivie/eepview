@@ -37,6 +37,7 @@ Every engine runs page content in a separate, OS-sandboxed content process with 
 **Gatekeeper timing and close** (owner decision).
 
 - **Dead router.** The connect to the router proxy times out after 500 ms. When the router is gone, the client gets the 502 within 1 s on every OS. Without this bound, Windows retries a refused loopback connect for about 2 s. The read and write timeouts on an open upstream connection do not change.
+- **Connection limit.** The gatekeeper handles at most 256 connections at once. A connection over that limit gets `503 Service Unavailable` before its request is read, and closes like the other early answers below. At most 256 of these busy answers drain at once; beyond that a busy answer closes without the drain.
 - **Early answers reach the client.** The gatekeeper can answer before it has read the whole request: the busy 503, and a 403, 400 or 411 sent while request bytes are still unread. After such an answer it closes in this order:
   1. It shuts down its write side, so the client sees the end of the answer.
   2. It reads and discards the unread input, until the client closes, 1 s passes, or 64 KiB have been read, whichever comes first.
