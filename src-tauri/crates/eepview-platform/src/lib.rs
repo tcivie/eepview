@@ -17,15 +17,15 @@
 //! | [`harden`] | fraud-check call-home off | autofill, password save, `SmartScreen` off | WebRTC and media capture off |
 
 #[cfg(target_os = "linux")]
-mod linux;
+pub mod linux;
 #[cfg(target_os = "linux")]
 use linux as imp;
 #[cfg(target_os = "macos")]
-mod macos;
+pub mod macos;
 #[cfg(target_os = "macos")]
 use macos as imp;
 #[cfg(windows)]
-mod windows;
+pub mod windows;
 #[cfg(windows)]
 use windows as imp;
 

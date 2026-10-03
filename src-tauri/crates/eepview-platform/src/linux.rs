@@ -22,6 +22,10 @@ pub fn attach_rules(
 }
 
 /// The link under the mouse, from `mouse-target-changed`.
+///
+/// # Errors
+///
+/// Fails when the engine handle is missing or the engine refuses the call.
 pub fn on_hover(
     webview: &PlatformWebview,
     callback: Box<dyn Fn(Option<String>)>,
@@ -36,6 +40,10 @@ pub fn on_hover(
 }
 
 /// One step on the engine's navigation list.
+///
+/// # Errors
+///
+/// Fails when the engine handle is missing or the engine refuses the call.
 pub fn go(webview: &PlatformWebview, nav: Nav) -> Result<(), String> {
     let view = webview.inner();
     match nav {
@@ -49,6 +57,7 @@ pub fn go(webview: &PlatformWebview, nav: Nav) -> Result<(), String> {
 }
 
 /// `WebKitFindController`: a fresh search counts the matches once.
+#[must_use]
 pub fn find(
     webview: &PlatformWebview,
     request: &FindRequest,
@@ -94,6 +103,10 @@ pub fn find_clear(webview: &PlatformWebview) {
 }
 
 /// WebRTC and media capture off in the engine settings (L5).
+///
+/// # Errors
+///
+/// Fails when the engine handle is missing or the engine refuses the call.
 pub fn harden(webview: &PlatformWebview) -> Result<(), String> {
     let settings = WebViewExt::settings(&webview.inner()).ok_or("no WebKit settings")?;
     settings.set_enable_webrtc(false);
@@ -102,6 +115,7 @@ pub fn harden(webview: &PlatformWebview) -> Result<(), String> {
 }
 
 /// A native title bar: no buttons to place.
+#[must_use]
 pub fn place_window_buttons(_webview: &PlatformWebview, _center_y: f64) -> Option<WindowButtons> {
     None
 }

@@ -168,6 +168,10 @@ impl HoverHandler {
 }
 
 /// Installs the hover script in the private world, in every frame, and its message handler.
+///
+/// # Errors
+///
+/// Fails when the engine handle is missing or the engine refuses the call.
 pub fn on_hover(
     webview: &PlatformWebview,
     callback: Box<dyn Fn(Option<String>)>,
@@ -202,6 +206,10 @@ pub fn on_hover(
 }
 
 /// One step on the engine's navigation list.
+///
+/// # Errors
+///
+/// Fails when the engine handle is missing or the engine refuses the call.
 pub fn go(webview: &PlatformWebview, nav: Nav) -> Result<(), String> {
     let (view, _) = view(webview)?;
     match nav {
@@ -220,6 +228,7 @@ pub fn go(webview: &PlatformWebview, nav: Nav) -> Result<(), String> {
 }
 
 /// Native find; a fresh search also counts the matches in the private world.
+#[must_use]
 pub fn find(
     webview: &PlatformWebview,
     request: &FindRequest,
@@ -288,6 +297,10 @@ fn run_in_world(
 }
 
 /// Turns off the fraud-check lookups, which call Apple's servers with page URLs.
+///
+/// # Errors
+///
+/// Fails when the engine handle is missing or the engine refuses the call.
 pub fn harden(webview: &PlatformWebview) -> Result<(), String> {
     let (view, _) = view(webview)?;
     // SAFETY: plain getter on a live view.
@@ -315,6 +328,7 @@ fn parent(view: &NSView) -> Option<Retained<NSView>> {
 }
 
 /// Moves the traffic lights so their center is `center_y` points below the window top.
+#[must_use]
 pub fn place_window_buttons(webview: &PlatformWebview, center_y: f64) -> Option<WindowButtons> {
     let window = ns_window(webview)?;
     let kinds = [

@@ -72,14 +72,21 @@ fn menu_item<R: Runtime>(app: &AppHandle<R>, s: &Shortcut) -> tauri::Result<Menu
 }
 
 /// The macOS app menu (About, Hide, Quit); other systems have none.
-#[cfg(target_os = "macos")]
 fn app_menu<R: Runtime>(app: &AppHandle<R>, menu: &Menu<R>) -> tauri::Result<()> {
-    menu.append(&app_submenu(app)?)
+    for sub in app_submenus(app) {
+        menu.append(&sub?)?;
+    }
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+fn app_submenus<R: Runtime>(app: &AppHandle<R>) -> Vec<tauri::Result<Submenu<R>>> {
+    vec![app_submenu(app)]
 }
 
 #[cfg(not(target_os = "macos"))]
-fn app_menu<R: Runtime>(_app: &AppHandle<R>, _menu: &Menu<R>) -> tauri::Result<()> {
-    Ok(())
+fn app_submenus<R: Runtime>(_app: &AppHandle<R>) -> Vec<tauri::Result<Submenu<R>>> {
+    Vec::new()
 }
 
 #[cfg(target_os = "macos")]

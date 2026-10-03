@@ -60,6 +60,10 @@ fn filter(webview: &PlatformWebview, allow: fn(&str) -> bool) -> Result<(), Stri
 }
 
 /// The link under the mouse, from `StatusBarTextChanged`.
+///
+/// # Errors
+///
+/// Fails when the engine handle is missing or the engine refuses the call.
 pub fn on_hover(
     webview: &PlatformWebview,
     callback: Box<dyn Fn(Option<String>)>,
@@ -81,6 +85,10 @@ pub fn on_hover(
 }
 
 /// One step on the engine's navigation list.
+///
+/// # Errors
+///
+/// Fails when the engine handle is missing or the engine refuses the call.
 pub fn go(webview: &PlatformWebview, nav: Nav) -> Result<(), String> {
     let core = core(webview)?;
     let result = match nav {
@@ -109,6 +117,7 @@ fn hard_reload(core: &ICoreWebView2) -> windows_core::Result<()> {
 }
 
 /// No native find with counts: the caller falls back to a script.
+#[must_use]
 pub fn find(
     _webview: &PlatformWebview,
     _request: &FindRequest,
@@ -121,6 +130,10 @@ pub fn find(
 pub fn find_clear(_webview: &PlatformWebview) {}
 
 /// Autofill, password saving and `SmartScreen` reputation checks off.
+///
+/// # Errors
+///
+/// Fails when the engine handle is missing or the engine refuses the call.
 pub fn harden(webview: &PlatformWebview) -> Result<(), String> {
     let core = core(webview)?;
     // SAFETY: getter on a live object.
@@ -140,6 +153,7 @@ pub fn harden(webview: &PlatformWebview) -> Result<(), String> {
 }
 
 /// A native title bar: no buttons to place.
+#[must_use]
 pub fn place_window_buttons(_webview: &PlatformWebview, _center_y: f64) -> Option<WindowButtons> {
     None
 }
