@@ -184,6 +184,16 @@ pub const RETRY_FOR: Duration = Duration::from_secs(120);    // R20
 pub fn detect_now<R: Runtime>(app: &AppHandle<R>) -> ConsoleInfo;
 /// The stored detection result.
 pub fn current<R: Runtime>(app: &AppHandle<R>) -> Option<VerifiedConsole>;
+/// R10: the navigation guard of the console view; its `on_navigation` callback is a
+/// one-line call of this. True for the console origin (and the first `about:blank`). An
+/// `http(s)://*.i2p` URL answers false and opens a new normal tab through the tab guard.
+/// Anything else answers false.
+pub fn navigation<R: Runtime>(app: &AppHandle<R>, console: &VerifiedConsole, url: &Url) -> bool;
+/// R10: the new-window handler of the console view; its `on_new_window` callback is a
+/// one-line call of this. Always `Deny`: the console origin loads in the console view, an
+/// `http(s)://*.i2p` URL opens a new normal tab, anything else does nothing.
+pub fn new_window<R: Runtime>(app: &AppHandle<R>, console: &VerifiedConsole, url: &Url)
+    -> NewWindowResponse<R>;
 /// R22: ends the re-check and retry loops at their next tick.
 pub fn stop<R: Runtime>(app: &AppHandle<R>);
 /// Closes the console window, if open.
