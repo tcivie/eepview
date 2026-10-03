@@ -27,4 +27,4 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Sign releases with Sigstore, build the Linux binary repeatably, harden the release profile (#37)
 - Use only the brand palette, enforced by scripts/palette-check.sh (#38)
 - Take the macOS tab inset from the shell; line the first tab up with the back button (#43)
-- Run zizmor with the pedantic persona, document every workflow permission, add concurrency to the scorecard workflow ([#47](https://github.com/tcivie/eepview/pull/47))
+- Add the eepview logo and app icons (#11)
