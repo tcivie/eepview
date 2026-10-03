@@ -1,8 +1,11 @@
 //! eepview: a browser that opens I2P sites only.
 
+pub mod hover;
+pub mod layout;
 pub mod nav;
 pub mod net;
 pub mod session;
+pub mod shortcuts;
 pub mod store;
 pub mod suggest;
 pub mod tabs;
