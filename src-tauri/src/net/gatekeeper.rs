@@ -322,6 +322,3 @@ fn pipe(client: TcpStream, upstream: TcpStream) -> io::Result<()> {
 
 #[cfg(test)]
 mod tests;
-
-#[cfg(test)]
-mod robust;

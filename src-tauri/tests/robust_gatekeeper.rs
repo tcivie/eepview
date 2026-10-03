@@ -3,40 +3,182 @@
 
 //! Robustness tests of the gatekeeper with real loopback sockets and a fake router proxy:
 //! random and malformed request heads, CONNECT lines, huge heads, partial reads, slow and
-//! half-closed clients. Each test names the requirement it checks (`Req:`).
+//! half-closed clients, slow concurrent images. Each test names the requirement it checks
+//! (`Req:`). They use the public API only and run in their own process, so their many
+//! sockets cannot disturb the unit tests of the gatekeeper.
 //!
 //! Sources: ADR 0001 layer L1 (`docs/wiki/adr-0001-no-leak-architecture.md`) and the
 //! doc comments of the public functions.
 
+use std::io::{self, Read, Write};
+use std::net::{Shutdown, TcpListener, TcpStream};
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex};
+use std::thread;
+use std::time::{Duration, Instant};
+
+use eepview_lib::net::gatekeeper::Gatekeeper;
+use eepview_lib::net::host::is_i2p_host;
+use eepview_lib::net::http::{self, Head};
+use eepview_lib::net::loopback::LoopbackAddr;
+use eepview_lib::net::verify::{Verdict, VerifiedUpstream, verify};
 use proptest::prelude::*;
 use proptest::test_runner::{Config, TestRunner};
-use std::time::Instant;
-
 use tauri::Url;
-
-use super::*;
-use crate::net::host::is_i2p_host;
-use crate::net::testing::FakeRouter;
 
 const READ_LIMIT: Duration = Duration::from_secs(5);
 
-struct Fixture {
-    router: FakeRouter,
-    gate: Gatekeeper,
-}
+#[cfg(test)]
+mod fake {
+    use super::*;
 
-impl Fixture {
-    fn new() -> Self {
-        let router = FakeRouter::start();
-        let gate = Gatekeeper::start(&router.verified()).unwrap();
-        Self { router, gate }
+    /// A fake I2P router proxy: counts connections, records request lines, answers VERIFY, echoes
+    /// a `tls.i2p:443` tunnel, and sends `hello body=<body>` for any other request. A path of
+    /// the form `/img<n>.png` gets its first byte after `image_delay * (n + 2)` and a 50 KB
+    /// `image/png` body.
+    pub struct FakeRouter {
+        pub addr: LoopbackAddr,
+        pub connections: Arc<AtomicUsize>,
+        pub lines: Arc<Mutex<Vec<String>>>,
     }
 
-    fn connect(&self) -> TcpStream {
-        let addr = LoopbackAddr::parse(&self.gate.url()).unwrap();
-        addr.connect(Duration::from_secs(2)).unwrap()
+    impl FakeRouter {
+        pub fn start(image_delay: Duration) -> Self {
+            let (listener, addr) = LoopbackAddr::listen_any().unwrap();
+            let connections = Arc::new(AtomicUsize::new(0));
+            let lines = Arc::new(Mutex::new(Vec::new()));
+            let (count, log) = (Arc::clone(&connections), Arc::clone(&lines));
+            thread::spawn(move || serve(&listener, &count, &log, image_delay));
+            Self {
+                addr,
+                connections,
+                lines,
+            }
+        }
+
+        pub fn connections(&self) -> usize {
+            self.connections.load(Ordering::SeqCst)
+        }
+
+        pub fn lines(&self) -> Vec<String> {
+            self.lines.lock().unwrap().clone()
+        }
+
+        pub fn verified(&self) -> VerifiedUpstream {
+            match verify(self.addr) {
+                Verdict::Ok(up) => up,
+                other => panic!("the fake router failed VERIFY: {other:?}"),
+            }
+        }
+    }
+
+    fn serve(
+        listener: &TcpListener,
+        count: &Arc<AtomicUsize>,
+        log: &Arc<Mutex<Vec<String>>>,
+        image_delay: Duration,
+    ) {
+        for stream in listener.incoming().flatten() {
+            count.fetch_add(1, Ordering::SeqCst);
+            let log = Arc::clone(log);
+            thread::spawn(move || answer(stream, &log, image_delay));
+        }
+    }
+
+    fn answer(mut stream: TcpStream, log: &Mutex<Vec<String>>, image_delay: Duration) {
+        let Some((head, mut rest)) = read_head(&mut stream) else {
+            return;
+        };
+        let length = head.body_length().unwrap_or(0);
+        let missing = length.saturating_sub(rest.len() as u64);
+        let _ = (&mut stream).take(missing).read_to_end(&mut rest);
+        log.lock().unwrap().push(head.start.clone());
+        let target = head.start.split(' ').nth(1).unwrap_or("").to_owned();
+        match (target.as_str(), image_number(&target)) {
+            ("http://proxy.i2p/", _) => {
+                let _ = stream.write_all(b"HTTP/1.1 200 OK\r\n\r\nI2P HTTP proxy OK");
+            }
+            ("tls.i2p:443", _) => echo_tunnel(stream),
+            (_, Some(n)) => send_image(stream, n, image_delay),
+            _ => {
+                let body = format!("hello body={}", String::from_utf8_lossy(&rest));
+                let reply = format!("HTTP/1.1 200 OK\r\nConnection: keep-alive\r\n\r\n{body}");
+                let _ = stream.write_all(reply.as_bytes());
+            }
+        }
+    }
+
+    fn read_head(stream: &mut TcpStream) -> Option<(Head, Vec<u8>)> {
+        let mut buf = Vec::new();
+        let mut chunk = [0u8; 4096];
+        while http::head_end(&buf).is_none() {
+            let n = stream.read(&mut chunk).ok().filter(|n| *n > 0)?;
+            buf.extend_from_slice(&chunk[..n]);
+        }
+        let end = http::head_end(&buf)?;
+        let rest = buf.split_off(end);
+        Head::parse(&buf).map(|h| (h, rest))
+    }
+
+    fn echo_tunnel(mut stream: TcpStream) {
+        let _ = stream.write_all(b"HTTP/1.1 200 OK\r\n\r\n");
+        let mut buf = [0u8; 64];
+        if let Ok(n) = stream.read(&mut buf) {
+            let _ = stream.write_all(&buf[..n]);
+        }
+    }
+
+    fn image_number(target: &str) -> Option<usize> {
+        let (_, rest) = target.rsplit_once("/img")?;
+        rest.strip_suffix(".png")?.parse().ok()
+    }
+
+    /// The image of request `n`: 50 KB that differ per request, so a mix-up shows.
+    pub fn image_bytes(n: usize) -> Vec<u8> {
+        let seed = u8::try_from(n % 251).unwrap_or(0);
+        (0..50_000usize)
+            .map(|i| u8::try_from(i % 251).unwrap_or(0).wrapping_add(seed))
+            .collect()
+    }
+
+    fn send_image(mut stream: TcpStream, n: usize, delay: Duration) {
+        thread::sleep(delay * u32::try_from(n + 2).unwrap_or(2));
+        let body = image_bytes(n);
+        let head = format!(
+            "HTTP/1.1 200 OK\r\nContent-Type: image/png\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+            body.len()
+        );
+        let _ = stream.write_all(head.as_bytes());
+        let _ = stream.write_all(&body);
+    }
+
+    pub struct Fixture {
+        pub router: FakeRouter,
+        pub gate: Gatekeeper,
+    }
+
+    impl Fixture {
+        pub fn new() -> Self {
+            let router = FakeRouter::start(Duration::ZERO);
+            let gate = Gatekeeper::start(&router.verified()).unwrap();
+            Self { router, gate }
+        }
+
+        pub fn connect_with_timeouts(&self, limit: Duration) -> TcpStream {
+            let stream = self.connect();
+            stream.set_read_timeout(Some(limit)).unwrap();
+            stream.set_write_timeout(Some(limit)).unwrap();
+            stream
+        }
+
+        pub fn connect(&self) -> TcpStream {
+            let addr = LoopbackAddr::parse(&self.gate.url()).unwrap();
+            addr.connect(Duration::from_secs(2)).unwrap()
+        }
     }
 }
+
+use fake::{FakeRouter, Fixture, image_bytes};
 
 /// What came back and whether the gatekeeper stayed silent until the read timeout.
 struct Answer {
@@ -56,10 +198,8 @@ impl Answer {
 
 /// Sends `chunks` (a pause between them), half-closes, and reads to the end.
 fn exchange(fx: &Fixture, chunks: &[&[u8]], limit: Duration) -> Answer {
-    let mut stream = fx.connect();
-    stream.set_read_timeout(Some(limit)).unwrap();
     // A gatekeeper that stops reading must fail the test, not hang `write_all`.
-    stream.set_write_timeout(Some(limit)).unwrap();
+    let mut stream = fx.connect_with_timeouts(limit);
     for chunk in chunks {
         let _ = stream.write_all(chunk);
         let _ = stream.flush();
@@ -541,55 +681,6 @@ fn nothing_is_forwarded_after_close() {
     assert_eq!(fx.router.connections(), before);
 }
 
-/// The image of request `n`: 50 KB that differ per request, so a mix-up shows.
-fn image_bytes(n: usize) -> Vec<u8> {
-    let seed = u8::try_from(n % 251).unwrap_or(0);
-    (0..50_000usize)
-        .map(|i| u8::try_from(i % 251).unwrap_or(0).wrapping_add(seed))
-        .collect()
-}
-
-/// A router proxy that answers VERIFY at once and delays the first byte of every image
-/// (`/img<n>.png`) by `2 + n` seconds, then sends a 50 KB `image/png` with `Content-Length`.
-fn slow_image_router() -> LoopbackAddr {
-    let (listener, addr) = LoopbackAddr::listen_any().unwrap();
-    thread::spawn(move || {
-        for stream in listener.incoming().flatten() {
-            thread::spawn(move || serve_image(stream));
-        }
-    });
-    addr
-}
-
-fn serve_image(mut stream: TcpStream) {
-    let mut buf = Vec::new();
-    let mut chunk = [0u8; 4096];
-    while http::head_end(&buf).is_none() {
-        match stream.read(&mut chunk) {
-            Ok(n) if n > 0 => buf.extend_from_slice(&chunk[..n]),
-            _ => return,
-        }
-    }
-    let text = String::from_utf8_lossy(&buf).into_owned();
-    let target = text.split(' ').nth(1).unwrap_or("").to_owned();
-    let number = target
-        .rsplit_once("/img")
-        .and_then(|(_, rest)| rest.strip_suffix(".png"))
-        .and_then(|n| n.parse::<usize>().ok());
-    let Some(n) = number else {
-        let _ = stream.write_all(b"HTTP/1.1 200 OK\r\n\r\nI2P HTTP proxy OK");
-        return;
-    };
-    thread::sleep(Duration::from_secs(2 + n as u64));
-    let body = image_bytes(n);
-    let head = format!(
-        "HTTP/1.1 200 OK\r\nContent-Type: image/png\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
-        body.len()
-    );
-    let _ = stream.write_all(head.as_bytes());
-    let _ = stream.write_all(&body);
-}
-
 /// The body of a tunnelled answer: after `200 Connection established`, one HTTP response.
 fn tunnel_response(raw: &[u8]) -> (String, Vec<u8>) {
     let established = b"HTTP/1.1 200 Connection established\r\n\r\n";
@@ -605,12 +696,9 @@ fn tunnel_response(raw: &[u8]) -> (String, Vec<u8>) {
 // `Content-Length`. Every answer is 200 and the body is byte-identical to what the router sent.
 #[test]
 fn eight_concurrent_slow_images_arrive_complete() {
-    let router = slow_image_router();
-    let upstream = crate::net::verify::verify(router);
-    let crate::net::verify::Verdict::Ok(upstream) = upstream else {
-        panic!("the image router failed VERIFY: {upstream:?}");
-    };
-    let gate = Gatekeeper::start_with(&upstream, cfg!(windows)).unwrap();
+    // 2 s for image 0, 3 s for image 1, ... 9 s for image 7.
+    let router = FakeRouter::start(Duration::from_secs(1));
+    let gate = Gatekeeper::start(&router.verified()).unwrap();
     let addr = LoopbackAddr::parse(&gate.url()).unwrap();
     let workers: Vec<_> = (0..8usize)
         .map(|n| {
