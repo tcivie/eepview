@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1160 256">
+  <title>eepview logo, for dark backgrounds</title>
+  <defs>
+    <linearGradient id="evd-bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#30357A"/>
+      <stop offset="1" stop-color="#191C44"/>
+    </linearGradient>
+    <linearGradient id="evd-clove" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#C4B8FF"/>
+      <stop offset="1" stop-color="#8C79F4"/>
+    </linearGradient>
+  </defs>
+  <g transform="scale(.31068) translate(-100 -100)">
+    <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#evd-bg)" stroke="#FFFFFF" stroke-opacity=".12" stroke-width="4"/>
+    <rect x="200" y="240" width="624" height="544" rx="64" fill="#F6F3EC"/>
+    <rect x="240" y="344" width="544" height="400" rx="28" fill="#1C1F4A"/>
+    <g fill="#BDB6D6">
+      <circle cx="272" cy="292" r="14"/>
+      <circle cx="316" cy="292" r="14"/>
+      <circle cx="360" cy="292" r="14"/>
+    </g>
+    <path d="M512 400C506 388 508 376 520 366" fill="none" stroke="#E4DEFF" stroke-width="14" stroke-linecap="round"/>
+    <g transform="translate(512 556) scale(.84) translate(-512 -552)">
+      <path d="M548 424C640 480 728 520 728 620C728 700 668 744 584 744H578C604 620 600 500 548 424ZM476 424C384 480 296 520 296 620C296 700 356 744 440 744H446C420 620 424 500 476 424Z" fill="url(#evd-clove)"/>
+      <path d="M512 360C560 440 572 590 540 744Q512 752 484 744C452 590 464 440 512 360Z" fill="#E4DEFF"/>
+    </g>
+  </g>
+  <g transform="translate(312 184) scale(1.12)" fill="none" stroke="#EEEBFA" stroke-width="18" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M9-50H91A41 41 0 1 0 81-24"/>
+    <path d="M127-50H209A41 41 0 1 0 199-24"/>
+    <path d="M249-91V48M249-50A41 41 0 1 0 331-50A41 41 0 1 0 249-50"/>
+    <path d="M365-91L402-9L439-91"/>
+    <path d="M475-91V-9"/>
+    <path d="M513-50H595A41 41 0 1 0 585-24"/>
+    <path d="M629-91L656-9L683-91L710-9L737-91"/>
+  </g>
+  <circle cx="844" cy="40" r="12.5" fill="#A897FF"/>
+</svg>
