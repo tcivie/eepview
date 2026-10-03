@@ -1,0 +1,70 @@
+# SPDX-FileCopyrightText: 2026 The eepview contributors
+# SPDX-License-Identifier: MIT
+name: score-ratchet
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "41 6 * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: score-ratchet-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  pr:
+    name: score-ratchet (pr)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Compare the file-based Scorecard checks with the floors
+        run: scripts/score-ratchet.sh pr
+
+  published:
+    name: score-ratchet (published)
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      issues: write # open or comment on the Score dropped issue
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Compare the published scores with the floors
+        env:
+          REPORT_FILE: ${{ runner.temp }}/score-drops.md
+        run: scripts/score-ratchet.sh published
+      - name: Open or update the Score dropped issue
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          REPORT_FILE: ${{ runner.temp }}/score-drops.md
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          {
+            echo "The published scores fell below the floors in .github/score-floors.json."
+            echo
+            if [ -f "$REPORT_FILE" ]; then cat "$REPORT_FILE"; else echo "The job failed before it could compare the scores."; fi
+            echo
+            echo "Run: $RUN_URL"
+          } >body.md
+          number="$(gh issue list --state open --search 'Score dropped in:title' --json number,title \
+            --jq '[.[] | select(.title == "Score dropped")][0].number // empty')"
+          if [ -n "$number" ]; then
+            gh issue comment "$number" --body-file body.md
+          else
+            gh issue create --title "Score dropped" --body-file body.md
+          fi

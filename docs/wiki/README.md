@@ -13,6 +13,7 @@ This wiki is generated from docs/wiki in the repository. Edit it there, in a PR.
 | Leak test | in progress | [Leak test](leak-test.md) | branch `test/leak-harness` |
 | Release pipeline | shipped | [Release pipeline](release-pipeline.md) | [#14](https://github.com/tcivie/eepview/pull/14) |
 | Coverage | shipped | [Coverage](coverage.md) | [#13](https://github.com/tcivie/eepview/pull/13) |
+| Score ratchet | shipped | [Score ratchet](score-ratchet.md) | PR "ci: ratchet for the Scorecard and Best Practices scores" |
 | Brand | in progress | [Brand](brand.md) | [#11](https://github.com/tcivie/eepview/pull/11) |
 
 ## Project
