@@ -43,4 +43,4 @@ To check one binary on your machine:
 ## History
 
 - [#37](https://github.com/tcivie/eepview/pull/37): repeatable Linux builds, `reproducible` CI job, hardening check.
-- 2026-10-03, PR to be linked: removed the `reproducible` CI job and `scripts/repro-check.sh`. The deterministic settings stay.
+- 2026-10-03, [#73](https://github.com/tcivie/eepview/pull/73): removed the `reproducible` CI job and `scripts/repro-check.sh`. The deterministic settings stay.
