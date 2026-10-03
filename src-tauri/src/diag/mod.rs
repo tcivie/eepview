@@ -18,6 +18,7 @@ pub mod report;
 pub mod scrub;
 pub mod store;
 pub mod sysinfo;
+pub mod trace;
 pub mod types;
 
 use std::fs;

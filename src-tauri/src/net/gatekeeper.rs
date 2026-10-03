@@ -20,7 +20,7 @@ use super::failures::{Failures, is_server_error};
 use super::http::{self, Head, Plan, Refusal};
 use super::loopback::LoopbackAddr;
 use super::verify::VerifiedUpstream;
-use crate::diag::{self, Code, ErrorKind, Field, HttpStatus};
+use crate::diag::{self, Code, ErrorKind, Field, HttpStatus, trace};
 
 /// Most connections handled at once.
 const MAX_CONNECTIONS: usize = 256;
@@ -195,6 +195,7 @@ fn accept_loop(listener: &TcpListener, shared: &Shared) {
 /// Handles one connection; a failed one records `page-load-failed` with its error kind.
 fn serve(client: TcpStream, shared: &Shared) {
     if let Err(e) = handle(client, shared) {
+        trace::line(&format!("connection failed: {:?} {e}", e.kind()));
         diag::count(Code::PageLoadFailed, Field::Error(ErrorKind::from(&e)));
     }
 }
@@ -225,6 +226,7 @@ fn handle(mut client: TcpStream, shared: &Shared) -> io::Result<()> {
     let Some((head, rest)) = read_head(&mut client)? else {
         return refuse(&mut client, Refusal::BadRequest);
     };
+    trace::line(&format!("head {}", head.start));
     if !shared.open.load(Ordering::SeqCst) {
         return refuse(&mut client, Refusal::Upstream);
     }
@@ -259,6 +261,7 @@ fn upstream_status(head: &Head) {
 
 /// Sends a refusal and ends the connection so that the answer reaches the client.
 fn refuse(client: &mut TcpStream, reason: Refusal) -> io::Result<()> {
+    trace::line(&format!("refused {reason:?}"));
     refused(reason);
     client.write_all(&reason.response())?;
     client.flush()?;
@@ -315,8 +318,10 @@ fn terminate(client: &mut TcpStream, early: &[u8], host: &str, shared: &Shared) 
     let head = read_head(&mut source)?;
     let (unread, _) = source.into_inner();
     let Some((head, mut rest)) = head else {
+        trace::line(&format!("tunnel to {host} closed with no request"));
         return refuse(client, Refusal::BadRequest);
     };
+    trace::line(&format!("tunnel head {}", head.start));
     rest.extend_from_slice(unread);
     match http::plan_inner(&head, host) {
         Plan::Http { method, host, path } => {
@@ -377,6 +382,7 @@ fn forward(client: &mut TcpStream, rest: &[u8], req: &Request, shared: &Shared) 
     let Some((head, body)) = read_head(&mut upstream)? else {
         return refuse_page(client, req, shared, Refusal::Upstream);
     };
+    trace::line(&format!("answer {} for {}", head.start, req.url()));
     upstream_status(&head);
     shared
         .failures

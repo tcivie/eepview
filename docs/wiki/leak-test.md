@@ -14,6 +14,13 @@ of [ADR 0001](adr-0001-no-leak-architecture.md).
   serves `leaktest.i2p` and `frame.leaktest.i2p`, answers clearnet with `503 No Outproxy
   Configured`, and logs the host of every request.
 - `EEPVIEW_START_URL=http://leaktest.i2p/` and `EEPVIEW_EXIT_AFTER=30`.
+- `EEPVIEW_LOG=1`: the app prints a test trace on stderr. It has one line for each gatekeeper
+  request head, answer, refusal and failed connection, and one line for each first load of a
+  tab webview. The harness keeps it in `app.<run>.log`, in the `leak-results-<os>` artifact.
+  The trace never goes into the diagnostics log or a bug report.
+- The fake proxy listens with a backlog of 128. The page sends a burst of parallel requests.
+  With the default backlog of 5, macOS drops connects, and the gatekeeper answers 502 after its
+  500 ms connect limit.
 - Canaries: TCP on `127.0.0.1` and `::1` (one port), TCP and UDP on the LAN address, UDP on
   `127.0.0.1` for STUN.
 
@@ -34,6 +41,11 @@ The exit code is 0 only when all of these hold:
 - The fake proxy saw only hosts that end in `.i2p`.
 - The page was served and rendered, and its script reported every vector. A page that does
   not load fails.
+- JavaScript on: the cross-origin frame reported that all its probes finished
+  (`frame_wait=done`) before the page navigated away. The page pings the frame until the frame
+  answers, and both sides accept only the other's origin and window. The page waits at most
+  `EEPVIEW_EXIT_AFTER` minus 15 s (15 s for the default 30), and always at least 4 s, so the
+  vectors it does not await get time before the first navigation.
 - Linux only: `strace` shows connects only to the gatekeeper's own listening port and the fake
   proxy, and no DNS (port 53, systemd-resolved or nscd sockets).
 
@@ -62,3 +74,4 @@ python3 -m unittest discover -s tests/leak
 ## History
 
 - Added in [#41](https://github.com/tcivie/eepview/pull/41).
+- The frame done signal, the trace and the fake proxy backlog in [#71](https://github.com/tcivie/eepview/pull/71).

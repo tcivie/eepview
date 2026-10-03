@@ -15,6 +15,7 @@
     data-lan="__LAN_TCP__"
     data-udp="__UDP__"
     data-udplan="__LAN_UDP__"
+    data-frame-wait="__FRAME_WAIT__"
   >
     <h1>eepview leak test</h1>
     <img src="/report?k=loaded&amp;v=1" alt="" />
@@ -26,7 +27,7 @@
     <img src="http://localhost:__CANARY__/img-localhost" alt="" />
     <img src="http://__LAN_TCP__/img-lan" alt="" />
     <img src="/redirect" alt="" />
-    <iframe src="//frame.leaktest.i2p/frame.html" title="cross-origin frame"></iframe>
+    <iframe id="frame" src="//frame.leaktest.i2p/frame.html" title="cross-origin frame"></iframe>
     <form id="clearnet-form" action="http://form.clear.example/submit" method="post">
       <input type="hidden" name="leak" value="1" />
     </form>

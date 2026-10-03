@@ -15,6 +15,10 @@
       .then(() => report(key, "resolved"))
       .catch((error) => report(key, `rejected ${error.name}`));
 
+  // The two .i2p origins of the test site (servers.SITE_HOSTS). The done handshake between
+  // the page and the frame accepts messages only from these.
+  const origins = { site: "http://leaktest.i2p", frame: "http://frame.leaktest.i2p" };
+
   const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
   async function webrtc(prefix) {
@@ -33,5 +37,5 @@
     await report(`${prefix}rtc_candidates`, JSON.stringify(found));
   }
 
-  window.leak = { cfg, report, probe, sleep, webrtc };
+  window.leak = { cfg, origins, report, probe, sleep, webrtc };
 })();
