@@ -15,14 +15,23 @@ export interface Call {
 
 export type Answer = (args: Record<string, unknown>) => unknown;
 
-export type EventKind = "Event" | "MouseEvent" | "PointerEvent" | "KeyboardEvent";
+export type EventKind = "Event" | "MouseEvent" | "PointerEvent" | "KeyboardEvent" | "DragEvent";
+
+export interface EventInit2 extends EventInit {
+  key?: string;
+  button?: number;
+  shiftKey?: boolean;
+  ctrlKey?: boolean;
+  metaKey?: boolean;
+  dataTransfer?: unknown;
+}
 
 export interface Stub {
   window: Window;
   /** The page's document, typed as the DOM library types it. */
   doc: Document;
   /** Builds an event of the page's window. */
-  make(kind: EventKind, type: string, init?: EventInit & { key?: string }): Event;
+  make(kind: EventKind, type: string, init?: EventInit2): Event;
   /** Dispatches an event on the page's window (a focus loss, for example). */
   dispatchOnWindow(event: Event): void;
   /** Every command the page called, in order (the event plugin's own calls left out). */
@@ -143,6 +152,7 @@ export function stubShell(file: string): Stub {
     MouseEvent: win.MouseEvent,
     PointerEvent: win.PointerEvent,
     KeyboardEvent: win.KeyboardEvent,
+    DragEvent: win.DragEvent,
   };
   return {
     window: win,
