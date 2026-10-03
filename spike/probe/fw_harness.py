@@ -28,6 +28,7 @@ PHASES = {
 BARE = {"PROBE_HARDEN": "0", "PROBE_JS": "on", "PROBE_WIN_ARGS": "bare"}
 OFF_BOX = ("public_ip_http", "public_ip_https", "public_name", "link_local", "azure_host", "websocket")
 REACHED = ("resolved", "open")
+DNS_LEAK_VERDICT = {"open": "info", "l6": "LIMIT: the system resolver looks the name up"}
 PROXIED_PAGE = "http://probe.i2p/test.html?mode={phase}"
 
 
@@ -104,7 +105,7 @@ def dns_rows(phase: str, info: dict, pcap: bytes, nonce: str) -> list:
     cached = [e for e in info["dns_cache"] if probe in str(e)]
     on_wire = pcap.count(probe.encode())
     leak = "LEAK" if (cached or on_wire) else "pass"
-    wanted = leak if phase != "open" else ("info" if leak == "LEAK" else "warn")
+    wanted = DNS_LEAK_VERDICT.get(phase, "LEAK") if leak == "LEAK" else "pass"
     return [
         ("DNS: names in the system resolver cache", wanted, f"{len(cached)}: {cached[:3]}"),
         ("DNS: names in port-53 packets on the wire", wanted, f"{on_wire} hit(s) for {probe!r}"),
