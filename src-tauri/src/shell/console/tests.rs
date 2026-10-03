@@ -17,7 +17,8 @@ use tauri::{App, Listener, Manager};
 use crate::net::console::{ConsoleInfo, ConsoleKind, ConsolePage, VerifiedConsole};
 use crate::net::testing::FakeConsole;
 use crate::shell::console::{
-    CONSOLE_LABEL, CONSOLE_WINDOW, ConsoleWebview, close, current, set_console,
+    CONSOLE_LABEL, CONSOLE_WINDOW, ConsoleWebview, RETRY_EVERY, RETRY_FOR, close, current,
+    set_console,
 };
 use crate::shell::testing::{Mock, app, invoke, wait_for};
 
@@ -375,4 +376,20 @@ fn r6_storing_and_opening_a_console_probe_nothing() {
     open(&app, &found, ConsolePage::Home);
     let _ = current(app.handle());
     assert_eq!(fake.requests().len(), before);
+}
+
+// ---------------------------------------------------------------- R20, R21
+
+#[test]
+fn r20_retry_every_10_seconds_for_2_minutes() {
+    // R20: retries every 10 s for 2 minutes (12 retries).
+    assert_eq!(RETRY_EVERY, Duration::from_secs(10));
+    assert_eq!(RETRY_FOR, Duration::from_mins(2));
+    assert_eq!(RETRY_FOR.as_secs() / RETRY_EVERY.as_secs(), 12);
+}
+
+#[test]
+fn r21_the_re_check_period_is_the_same_10_seconds() {
+    // R21: a re-check runs every 10 s (RETRY_EVERY, R20 and R21).
+    assert_eq!(RETRY_EVERY.as_secs(), 10);
 }

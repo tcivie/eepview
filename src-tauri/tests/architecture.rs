@@ -670,8 +670,10 @@ fn r8_the_console_label_is_named_only_in_the_console_factory() {
         !console.contains("\"tab-"),
         "the console is not a tab webview"
     );
+    // The shared WebRTC script is the one thing it takes from content.rs (R11).
+    let rest = console.replace("content::webrtc_off;", "");
     assert!(
-        !console.contains("content::"),
+        !rest.contains("content::"),
         "the console never uses the content factory"
     );
 }
@@ -688,10 +690,17 @@ fn r8_the_console_constructor_takes_a_verified_console() {
 fn r5_only_the_detector_makes_a_verified_console() {
     // R5: private fields; no struct literal outside net/console.
     for file in users("VerifiedConsole {").unwrap() {
-        assert!(
-            file.starts_with("src/net/console"),
-            "{file} builds or declares a VerifiedConsole"
-        );
+        if file.starts_with("src/net/console") {
+            continue;
+        }
+        let text = code(&root().join(&file)).unwrap();
+        for line in text.iter().filter(|l| l.contains("VerifiedConsole {")) {
+            let signature = line.contains("->") || line.contains("fn ") || line.contains("impl ");
+            assert!(
+                signature,
+                "{file} builds or declares a VerifiedConsole: {line}"
+            );
+        }
     }
     for file in rust_files(&root().join("src/net")).unwrap() {
         if !rel(&file).starts_with("src/net/console") {
@@ -882,4 +891,49 @@ fn r6_nothing_on_the_start_up_path_detects_a_console() {
             assert!(!text.contains(token), "{file} names {token}");
         }
     }
+}
+
+#[test]
+fn r19_the_console_view_starts_blank_and_loads_after_the_rule_list() {
+    // R19: the view starts on about:blank, gets the engine rule list, and only then loads
+    // the page (fail closed: if the list cannot be attached, nothing loads).
+    let text = prod_code(CONSOLE).unwrap();
+    for call in [
+        "about:blank",
+        "rule_list()",
+        "eepview_platform::attach_rules(",
+        "engine_allows",
+        ".navigate(",
+    ] {
+        assert!(text.contains(call), "console.rs must use {call}");
+    }
+    let attach = text.find("eepview_platform::attach_rules(").unwrap();
+    let load = text.rfind(".navigate(").unwrap();
+    assert!(
+        attach < load,
+        "the rule list is attached before the page loads"
+    );
+    for line in text.lines().filter(|l| l.contains("WebviewUrl::External")) {
+        assert!(
+            line.contains("blank"),
+            "the first load is the blank page: {line}"
+        );
+    }
+}
+
+#[test]
+fn r19_the_console_rule_list_is_not_the_tab_rule_list() {
+    // R19: the console gets its own list (console origin), the tabs keep theirs (.i2p).
+    let console = prod_code(CONSOLE).unwrap();
+    assert!(!console.contains("rules::content_rule_list()"));
+    assert!(!console.contains("rules::engine_allows"));
+    let content = prod_code("src/shell/content.rs").unwrap();
+    assert!(content.contains("rules::content_rule_list()"));
+}
+
+#[test]
+fn r20_only_the_console_module_runs_the_retry_loop() {
+    // R20: retries live in the console module; nothing else names the constants.
+    only_under("RETRY_EVERY", &["src/shell/console"]).unwrap();
+    only_under("RETRY_FOR", &["src/shell/console"]).unwrap();
 }

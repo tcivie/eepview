@@ -11,6 +11,7 @@ import {
   consoleLinks,
   NO_CONSOLE_TEXT,
   routerVersion,
+  shouldRedetect,
 } from "./console-links.ts";
 
 type Page = "home" | "tunnels" | "addressbook" | "config" | "logs";
@@ -155,6 +156,56 @@ describe("R18 router version, display only", () => {
   });
 });
 
+type State = "verifying" | "ok" | "building" | "down" | "not-i2p" | "outproxy";
+const status = (state: State, paused = false) => ({
+  state,
+  proxy: "127.0.0.1:4444",
+  version: null,
+  detail: null,
+  managed: false,
+  paused,
+});
+const NOT_OK: State[] = ["verifying", "building", "down", "not-i2p", "outproxy"];
+
+describe("R20 redetect when the router turns ok", () => {
+  it("R20: an ok router that was not known triggers detection", () => {
+    assert.equal(shouldRedetect(null, status("ok")), true);
+  });
+
+  it("R20: ok after any other state triggers detection", () => {
+    for (const prev of NOT_OK) {
+      assert.equal(shouldRedetect(status(prev), status("ok")), true, prev);
+    }
+  });
+});
+
+describe("R20 redetect when the router does not turn ok", () => {
+  it("R20: ok after ok does not trigger again", () => {
+    assert.equal(shouldRedetect(status("ok"), status("ok")), false);
+  });
+
+  it("R20: a state other than ok never triggers", () => {
+    for (const next of NOT_OK) {
+      assert.equal(shouldRedetect(null, status(next)), false, next);
+      assert.equal(shouldRedetect(status("ok"), status(next)), false, next);
+    }
+  });
+
+  it("R20: a paused connection never triggers", () => {
+    assert.equal(shouldRedetect(null, status("ok", true)), false);
+    assert.equal(shouldRedetect(status("down"), status("ok", true)), false);
+  });
+
+  it("R20: prev ok but paused still counts as ok", () => {
+    assert.equal(shouldRedetect(status("ok", true), status("ok")), false);
+  });
+
+  it("R20: the UI uses shouldRedetect on router-status", () => {
+    const used = sources().some((f) => /shouldRedetect/.test(readFileSync(f, "utf8")));
+    assert.ok(used, "some page calls shouldRedetect");
+  });
+});
+
 // ------------------------------------------------------------ source checks
 
 const UI = join(import.meta.dirname, "..");
@@ -231,13 +282,28 @@ describe("R16 no router configuration in eepview", () => {
       assert.ok(!script.includes(word), `settings.ts still has ${word}`);
     }
   });
+});
 
+describe("R16 the Router section", () => {
   it("R16: the Router section links to the console Config page", () => {
     const html = read("settings.html");
     const router = html.slice(html.indexOf('id="router"'), html.indexOf('id="about"'));
     assert.ok(router.length > 0, "Settings has a Router section");
     assert.match(router + read("settings.ts"), /console_open|console-link|data-console/);
     assert.match(read("settings.ts"), /config/);
+  });
+
+  it("R16: the Router updates and Restore controls stay", () => {
+    const html = read("settings.html");
+    assert.match(html, /name="updates"/);
+    assert.match(html, /id="restore-btn"/);
+  });
+
+  it("R16: the About list names the console probe and the console view", () => {
+    const html = read("settings.html");
+    const about = html.slice(html.indexOf('id="about"'));
+    const connects = about.slice(about.indexOf("Where eepview connects"));
+    assert.match(connects.slice(0, connects.indexOf("</table>")), /console/i);
   });
 
   it("R16: pause and resume of the connection stay", () => {

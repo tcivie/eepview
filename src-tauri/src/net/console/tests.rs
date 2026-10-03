@@ -24,9 +24,9 @@ use tauri::{App, AppHandle, Listener, Manager, Url};
 use crate::core::Core;
 use crate::net::console::{
     ConsoleInfo, ConsoleKind, ConsoleNav, ConsolePage, I2PD_DEFAULT_PORT, JAVA_DEFAULT_PORT,
-    candidates, console_version, detect, detect_here, i2pd_config_files, i2pd_console_port,
-    i2pd_port_in, java_config_dirs, java_console_port, java_ports_in, judge, page_path, probe,
-    probe_path,
+    RECHECK_MISSES, after_recheck, candidates, console_version, detect, detect_here,
+    i2pd_config_files, i2pd_console_port, i2pd_port_in, java_config_dirs, java_console_port,
+    java_ports_in, judge, page_path, probe, probe_path,
 };
 use crate::net::testing::FakeConsole;
 use crate::shell::console::{ConsoleWebview, current, detect_now, set_console};
@@ -1359,8 +1359,9 @@ fn r6_detect_now_replaces_a_stored_console_and_closes_its_window() {
 }
 
 #[test]
-fn r6_a_known_console_is_checked_again_and_none_known_is_not() {
-    // R6: while a console is known it is checked every 10 s; with none known, no repeat.
+fn r21_a_known_console_survives_two_misses_and_is_cleared_by_the_third() {
+    // R6 and R21: re-check every 10 s; the console stays through 2 misses, no event; the
+    // third miss clears it with console-changed found:false.
     let _guard = detect_lock();
     let Some((java, _i2pd)) = default_spies() else {
         return;
@@ -1371,13 +1372,552 @@ fn r6_a_known_console_is_checked_again_and_none_known_is_not() {
     let after_first = java.hits();
     java.set_up(false);
     assert!(
-        wait_until(30, || current(app.handle()).is_none()),
-        "the known console is checked again within about 10 s"
+        wait_until(30, || java.hits() >= after_first + 2),
+        "two re-checks ran"
     );
-    assert!(java.hits() > after_first);
+    assert!(
+        current(app.handle()).is_some(),
+        "two misses keep the console"
+    );
+    let seen: Vec<String> = events.try_iter().collect();
+    assert!(
+        seen.iter().all(|e| !e.contains("\"found\":false")),
+        "no event yet: {seen:?}"
+    );
+    assert!(
+        wait_until(30, || current(app.handle()).is_none()),
+        "the third miss clears it"
+    );
     let last = events.try_iter().last().expect("console-changed");
     assert!(last.contains("\"found\":false"), "{last}");
-    let settled = java.hits();
-    thread::sleep(Duration::from_secs(13));
-    assert_eq!(java.hits(), settled, "with none known, no repeat");
+}
+
+#[test]
+fn r21_a_re_check_that_finds_the_console_again_resets_the_count() {
+    // R21: miss, then found, then misses again: the count restarted.
+    let _guard = detect_lock();
+    let Some((java, _i2pd)) = default_spies() else {
+        return;
+    };
+    let app = mock_app();
+    assert!(detect_now(app.handle()).found);
+    let start = java.hits();
+    java.set_up(false);
+    assert!(wait_until(30, || java.hits() >= start + 2));
+    java.set_up(true);
+    let mid = java.hits();
+    assert!(wait_until(30, || java.hits() > mid));
+    java.set_up(false);
+    let again = java.hits();
+    assert!(wait_until(30, || java.hits() >= again + 2));
+    assert!(
+        current(app.handle()).is_some(),
+        "two misses after a find keep it"
+    );
+}
+
+#[test]
+fn r20_no_console_found_retries_and_stops_at_the_first_console() {
+    // R20: a miss retries every 10 s; the first console found ends it.
+    let _guard = detect_lock();
+    let Some((java, i2pd)) = default_spies() else {
+        return;
+    };
+    java.set_up(false);
+    i2pd.set_up(false);
+    let app = mock_app();
+    let events = changes(app.handle());
+    assert!(!detect_now(app.handle()).found);
+    let first = java.hits();
+    java.set_up(true);
+    assert!(
+        wait_until(30, || current(app.handle()).is_some()),
+        "a retry found it"
+    );
+    assert!(java.hits() > first);
+    let sent = events
+        .recv_timeout(Duration::from_secs(5))
+        .expect("console-changed");
+    assert!(sent.contains("\"found\":true"), "{sent}");
+}
+
+#[test]
+fn r20_a_new_trigger_during_the_retries_starts_no_second_loop() {
+    // R20: at most one retry loop. Three triggers in a row, then 25 s: one loop adds
+    // about 2 probes per port, three loops would add about 6.
+    let _guard = detect_lock();
+    let Some((java, i2pd)) = default_spies() else {
+        return;
+    };
+    java.set_up(false);
+    i2pd.set_up(false);
+    let app = mock_app();
+    for _ in 0..3 {
+        assert!(!detect_now(app.handle()).found);
+    }
+    let after_triggers = java.hits();
+    assert!(after_triggers >= 3, "each trigger probes");
+    thread::sleep(Duration::from_secs(25));
+    let retries = java.hits() - after_triggers;
+    assert!(
+        (1..=3).contains(&retries),
+        "one loop retries 2 times in 25 s, saw {retries}"
+    );
+}
+
+// ---------------------------------------------------------------- R2 (clarified): u16 tokens
+
+fn java_args(args: &str) -> String {
+    format!("clientApp.0.main=net.i2p.router.web.RouterConsoleRunner\nclientApp.0.args={args}\n")
+}
+
+#[test]
+fn r2_java_port_is_the_first_token_that_parses_as_a_non_zero_u16() {
+    // R2: the first whitespace-separated token that parses fully as a non-zero u16.
+    assert_eq!(
+        java_console_port(&java_args("7657 ::1,127.0.0.1 ./webapps/")),
+        Some(7657)
+    );
+    assert_eq!(
+        java_console_port(&java_args("0 7658 ./webapps/")),
+        Some(7658)
+    );
+    assert_eq!(
+        java_console_port(&java_args("65536 7659 ./webapps/")),
+        Some(7659)
+    );
+    assert_eq!(java_console_port(&java_args("7660abc 7661")), Some(7661));
+    assert_eq!(
+        java_console_port(&java_args("::1,127.0.0.1 7662")),
+        Some(7662)
+    );
+}
+
+#[test]
+fn r2_java_tls_only_args_give_no_port() {
+    // R2: -s 7667 ::1,127.0.0.1 ./webapps/ gives no port: 127.0.0.1 is not a u16 token.
+    assert_eq!(
+        java_console_port(&java_args("-s 7667 ::1,127.0.0.1 ./webapps/")),
+        None
+    );
+    assert_eq!(java_console_port(&java_args("99999 ./webapps/")), None);
+    assert_eq!(java_console_port(&java_args("0 ./webapps/")), None);
+    assert_eq!(java_console_port(&java_args("")), None);
+}
+
+// ---------------------------------------------------------------- R4 (clarified)
+
+#[test]
+fn r4_probe_sends_one_http_1_0_get_in_origin_form() {
+    // R4: one `GET <path> HTTP/1.0`, origin form, so the answer is never chunked.
+    for (kind, path) in [(ConsoleKind::Java, "/home"), (ConsoleKind::I2pd, "/")] {
+        let body = if kind == ConsoleKind::Java {
+            JAVA_BODY
+        } else {
+            I2PD_BODY
+        };
+        let plain = Plain::start("200 OK", "", body);
+        assert!(probe(kind, plain.port).is_some());
+        let heads = plain.heads();
+        assert_eq!(heads.len(), 1, "one request");
+        let line = heads[0].lines().next().unwrap();
+        assert_eq!(line, format!("GET {path} HTTP/1.0"));
+    }
+}
+
+#[test]
+fn r4_the_fake_console_sees_origin_form_get_lines_only() {
+    // R4: only GET, in origin form (no absolute URL).
+    let fake = FakeConsole::start(ConsoleKind::Java);
+    let _console = fake.verified();
+    for line in fake.requests() {
+        assert!(line.starts_with("GET /"), "{line}");
+        assert!(!line.contains("http://"), "{line}");
+    }
+}
+
+#[test]
+fn r4_probe_gives_up_after_about_five_seconds_on_a_silent_server() {
+    // R4: a 5 s timeout.
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let holder = thread::spawn(move || {
+        let held = listener.accept().map(|(stream, _)| stream);
+        thread::sleep(Duration::from_secs(9));
+        drop(held);
+    });
+    let start = Instant::now();
+    assert!(probe(ConsoleKind::Java, port).is_none());
+    let took = start.elapsed();
+    assert!(took >= Duration::from_secs(4), "gave up after {took:?}");
+    assert!(took <= Duration::from_secs(8), "gave up after {took:?}");
+    holder.join().unwrap();
+}
+
+#[test]
+fn r4_wire_names_are_lower_case() {
+    // R7 and R4 interface: kinds and pages serialize in lower case.
+    let java = FakeConsole::start(ConsoleKind::Java).verified().info();
+    let value = serde_json::to_value(&java).unwrap();
+    assert_eq!(value["kind"], json!("java"));
+    assert_eq!(
+        value["pages"],
+        json!(["home", "tunnels", "addressbook", "config", "logs"])
+    );
+}
+
+// ---------------------------------------------------------------- R19: rule list
+
+const OTHER_URLS: [&str; 14] = [
+    "http://stats.i2p/",
+    "https://stats.i2p/path",
+    "http://example.com/",
+    "https://example.com/",
+    "http://localhost/",
+    "file:///etc/passwd",
+    "javascript:alert(1)",
+    "ftp://127.0.0.1/",
+    "ws://127.0.0.1:1/",
+    "http://127.0.0.2/",
+    "http://[::1]/",
+    "tauri://localhost/",
+    "chrome://version/",
+    "view-source:http://127.0.0.1/",
+];
+
+#[test]
+fn r19_engine_allows_the_console_origin() {
+    // R19: URLs on the console origin (R9) pass.
+    for (fake, console) in consoles() {
+        let base = format!("http://127.0.0.1:{}", fake.port());
+        for tail in [
+            "/",
+            "/home",
+            "/config?x=1",
+            "/?page=tunnels",
+            "/themes/console/light/console.css?2.13.0",
+            "/a/b#c",
+        ] {
+            assert!(
+                console.engine_allows(&format!("{base}{tail}")),
+                "{base}{tail}"
+            );
+        }
+    }
+}
+
+#[test]
+fn r19_engine_allows_about_data_and_blob() {
+    // R19: `about:`, `data:`, `blob:` pass.
+    for (_fake, console) in consoles() {
+        for url in [
+            "about:blank",
+            "about:srcdoc",
+            "data:text/html,<h1>x</h1>",
+            "data:image/png;base64,AAAA",
+            "blob:http://127.0.0.1:1/abc-def",
+        ] {
+            assert!(console.engine_allows(url), "{url}");
+        }
+    }
+}
+
+#[test]
+fn r19_engine_blocks_everything_else() {
+    // R19: nothing else, including .i2p and clearnet.
+    for (_fake, console) in consoles() {
+        for url in OTHER_URLS {
+            assert!(!console.engine_allows(url), "{url}");
+        }
+        assert!(!console.engine_allows(""));
+    }
+}
+
+#[test]
+fn r19_engine_blocks_other_loopback_ports_and_lookalikes() {
+    // R19: other loopback ports, port prefixes and host tricks are blocked.
+    for (fake, console) in consoles() {
+        let port = fake.port();
+        let other = if port == 80 { 81 } else { 80 };
+        let twin = if port == 7657 { 7070 } else { 7657 };
+        for url in [
+            format!("http://127.0.0.1:{other}/"),
+            format!("http://127.0.0.1:{twin}/"),
+            format!("http://127.0.0.1:{port}0/"),
+            format!("http://127.0.0.1:{port}.evil.example/"),
+            format!("http://127.0.0.1:{port}@evil.example/"),
+            format!("http://localhost:{port}/"),
+            format!("http://127.0.0.2:{port}/"),
+            format!("http://[::1]:{port}/"),
+            format!("https://127.0.0.1:{port}/"),
+            format!("http://evil.example/?u=http://127.0.0.1:{port}/"),
+            "http://127.0.0.1/".to_owned(),
+        ] {
+            assert!(!console.engine_allows(&url), "{url}");
+        }
+    }
+}
+
+fn rules_of(console: &crate::net::console::VerifiedConsole) -> Vec<serde_json::Value> {
+    console
+        .rule_list()
+        .as_array()
+        .expect("a JSON array")
+        .clone()
+}
+
+#[test]
+fn r19_rule_list_blocks_every_url_first() {
+    // R19: block every URL, then allow.
+    for (_fake, console) in consoles() {
+        let rules = rules_of(&console);
+        assert!(rules.len() >= 2, "{rules:?}");
+        assert_eq!(rules[0]["action"]["type"], json!("block"));
+        assert_eq!(rules[0]["trigger"]["url-filter"], json!(".*"));
+    }
+}
+
+#[test]
+fn r19_every_later_rule_only_ignores_the_block_for_allowed_urls() {
+    // R19: after the block, only ignore-previous-rules entries.
+    for (_fake, console) in consoles() {
+        for rule in &rules_of(&console)[1..] {
+            assert_eq!(
+                rule["action"]["type"],
+                json!("ignore-previous-rules"),
+                "{rule}"
+            );
+            assert!(rule["trigger"]["url-filter"].is_string(), "{rule}");
+        }
+    }
+}
+
+#[test]
+fn r19_rule_list_names_the_console_port_and_the_local_schemes_only() {
+    // R19: the console origin plus about:, data:, blob:; no .i2p, no other port.
+    for (fake, console) in consoles() {
+        let rules = rules_of(&console);
+        let filters: Vec<String> = rules[1..]
+            .iter()
+            .map(|r| r["trigger"]["url-filter"].as_str().unwrap().to_owned())
+            .collect();
+        let all = filters.join("\n");
+        assert!(all.contains(&fake.port().to_string()), "{all}");
+        for scheme in ["about", "data", "blob"] {
+            assert!(all.contains(scheme), "{scheme} missing in {all}");
+        }
+        assert!(!all.contains("i2p"), "{all}");
+        assert!(
+            !rules_of(&console)
+                .iter()
+                .any(|r| r.to_string().contains("example"))
+        );
+        assert!(
+            !console.rule_list().to_string().contains('|'),
+            "no | in WebKit rules"
+        );
+    }
+}
+
+#[test]
+fn r19_rule_list_differs_by_console_port() {
+    // R19: the list is for this console's origin.
+    let one = FakeConsole::start(ConsoleKind::Java);
+    let two = FakeConsole::start(ConsoleKind::Java);
+    assert_ne!(one.verified().rule_list(), two.verified().rule_list());
+    assert!(
+        !one.verified()
+            .engine_allows(&format!("http://127.0.0.1:{}/", two.port()))
+    );
+}
+
+const ENGINE_SCHEMES: [&str; 8] = [
+    "http", "https", "ws", "ftp", "file", "about", "data", "blob",
+];
+const ENGINE_HOSTS: [&str; 8] = [
+    "127.0.0.1",
+    "127.0.0.2",
+    "localhost",
+    "[::1]",
+    "0.0.0.0",
+    "foo.i2p",
+    "example.com",
+    "127.0.0.1.i2p",
+];
+
+fn engine_text(port: u16) -> impl Strategy<Value = (String, String, String, String)> {
+    let ports = prop_oneof![
+        Just(String::new()),
+        Just(format!(":{port}")),
+        (1u16..=65535).prop_map(|p| format!(":{p}")),
+    ];
+    (
+        proptest::sample::select(ENGINE_SCHEMES.to_vec()).prop_map(str::to_owned),
+        proptest::sample::select(ENGINE_HOSTS.to_vec()).prop_map(str::to_owned),
+        ports,
+        "(/[a-z0-9_.-]{0,8}){0,3}(\\?[a-z]=[0-9])?",
+    )
+}
+
+#[test]
+fn r19_property_engine_allows_only_the_origin_and_local_schemes() {
+    // R19: for random URLs, engine_allows is true only for the console origin and
+    // about:, data:, blob:.
+    let fake = FakeConsole::start(ConsoleKind::I2pd);
+    let console = fake.verified();
+    let port = console.port();
+    let mut runner = TestRunner::new(Config::with_cases(3000));
+    let result = runner.run(&engine_text(port), |(s, h, p, t)| {
+        let text = format!("{s}://{h}{p}{t}");
+        let local = matches!(s.as_str(), "about" | "data" | "blob");
+        let origin = s == "http" && h == "127.0.0.1" && p == format!(":{port}");
+        prop_assert_eq!(console.engine_allows(&text), local || origin, "{}", text);
+        Ok(())
+    });
+    result.unwrap();
+}
+
+#[test]
+fn r19_property_arbitrary_text_is_allowed_only_on_the_origin_or_local_schemes() {
+    // R19: no random text passes unless it is on the origin or a local scheme.
+    let fake = FakeConsole::start(ConsoleKind::Java);
+    let console = fake.verified();
+    let origin = console.origin();
+    let text = prop_oneof![
+        "\\PC{0,40}",
+        "[a-z]{2,10}:[ -~]{0,40}",
+        "https?://[ -~]{0,40}"
+    ];
+    let mut runner = TestRunner::new(Config::with_cases(3000));
+    let result = runner.run(&text, |text| {
+        let fine = ["about:", "data:", "blob:"]
+            .iter()
+            .any(|p| text.starts_with(p))
+            || text.starts_with(&format!("{origin}/"))
+            || text == origin;
+        prop_assert!(!console.engine_allows(&text) || fine, "{}", text);
+        Ok(())
+    });
+    result.unwrap();
+}
+
+// ---------------------------------------------------------------- R21: re-check misses
+
+fn pair(kind_a: ConsoleKind, kind_b: ConsoleKind) -> (FakeConsole, FakeConsole) {
+    (FakeConsole::start(kind_a), FakeConsole::start(kind_b))
+}
+
+#[test]
+fn r21_three_misses_in_a_row_clear_the_console() {
+    // R21: the constant, and the third miss clears it.
+    assert_eq!(RECHECK_MISSES, 3);
+    let fake = FakeConsole::start(ConsoleKind::Java);
+    let known = fake.verified();
+    let (kept, misses) = after_recheck(Some(&known), 0, None);
+    assert_eq!((kept.as_ref(), misses), (Some(&known), 1));
+    let (kept, misses) = after_recheck(kept.as_ref(), misses, None);
+    assert_eq!((kept.as_ref(), misses), (Some(&known), 2));
+    let (kept, _misses) = after_recheck(kept.as_ref(), misses, None);
+    assert_eq!(kept, None, "the third miss clears it");
+}
+
+#[test]
+fn r21_the_same_console_resets_the_count() {
+    // R21: a re-check that finds the same console resets the count.
+    let fake = FakeConsole::start(ConsoleKind::I2pd);
+    let known = fake.verified();
+    let (kept, misses) = after_recheck(Some(&known), 2, Some(fake.verified()));
+    assert_eq!((kept.as_ref(), misses), (Some(&known), 0));
+    let (kept, misses) = after_recheck(kept.as_ref(), misses, None);
+    assert_eq!(
+        (kept.as_ref(), misses),
+        (Some(&known), 1),
+        "the count restarted"
+    );
+}
+
+#[test]
+fn r21_a_different_console_replaces_at_once() {
+    // R21: another port or another type replaces it at once, with a fresh count.
+    for (a, b) in [
+        (ConsoleKind::Java, ConsoleKind::Java),
+        (ConsoleKind::Java, ConsoleKind::I2pd),
+        (ConsoleKind::I2pd, ConsoleKind::Java),
+    ] {
+        let (old, new) = pair(a, b);
+        let known = old.verified();
+        for misses in [0, 1, 2] {
+            let (kept, count) = after_recheck(Some(&known), misses, Some(new.verified()));
+            assert_eq!(
+                (kept, count),
+                (Some(new.verified()), 0),
+                "{a:?}->{b:?} at {misses}"
+            );
+        }
+    }
+}
+
+#[test]
+fn r21_with_no_console_known_a_find_is_taken_and_a_miss_stays_empty() {
+    // R21: nothing known: a find is stored, a miss keeps it empty.
+    let fake = FakeConsole::start(ConsoleKind::Java);
+    let (kept, misses) = after_recheck(None, 0, Some(fake.verified()));
+    assert_eq!((kept, misses), (Some(fake.verified()), 0));
+    let (kept, _) = after_recheck(None, 0, None);
+    assert_eq!(kept, None);
+}
+
+#[test]
+fn r21_a_miss_before_the_third_keeps_the_console_whatever_the_count_started_at() {
+    // R21: 0 and 1 prior misses keep it.
+    let fake = FakeConsole::start(ConsoleKind::Java);
+    let known = fake.verified();
+    for prior in [0, 1] {
+        let (kept, misses) = after_recheck(Some(&known), prior, None);
+        assert_eq!(kept.as_ref(), Some(&known), "prior {prior}");
+        assert_eq!(misses, prior + 1);
+    }
+}
+
+/// The console known after a re-check, by the R21 rule.
+fn expected_known(
+    found: Option<crate::net::console::VerifiedConsole>,
+    run: u32,
+    before: Option<crate::net::console::VerifiedConsole>,
+) -> Option<crate::net::console::VerifiedConsole> {
+    match found {
+        Some(console) => Some(console),
+        None if run >= 3 => None,
+        None => before,
+    }
+}
+
+/// Replays re-checks from a known `pool[0]` and checks each step against the R21 rule.
+fn replay(
+    pool: &[crate::net::console::VerifiedConsole],
+    steps: &[Option<usize>],
+) -> Result<(), TestCaseError> {
+    let mut known = Some(pool[0].clone());
+    let (mut misses, mut run) = (0, 0);
+    for step in steps {
+        let found = step.map(|i| pool[i].clone());
+        run = if found.is_some() { 0 } else { run + 1 };
+        let before = known.clone();
+        (known, misses) = after_recheck(known.as_ref(), misses, found.clone());
+        prop_assert_eq!(&known, &expected_known(found, run, before));
+    }
+    Ok(())
+}
+
+#[test]
+fn r21_property_it_clears_only_after_three_misses_in_a_row() {
+    // R21: over any sequence of re-checks, the console is cleared exactly when 3 misses
+    // came in a row, and any find replaces or confirms it at once.
+    let java = FakeConsole::start(ConsoleKind::Java);
+    let i2pd = FakeConsole::start(ConsoleKind::I2pd);
+    let pool = [java.verified(), i2pd.verified()];
+    let steps = proptest::collection::vec(proptest::option::of(0usize..2), 1..40);
+    let mut runner = TestRunner::new(Config::with_cases(500));
+    let result = runner.run(&steps, |steps| replay(&pool, &steps));
+    result.unwrap();
 }
