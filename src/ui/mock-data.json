@@ -5,6 +5,7 @@
   "exportPath": "~/Downloads/eepview-bookmarks.json",
   "stats": {
     "samples": 60,
+    "stepSeconds": 10,
     "inBps": 45000,
     "inSwing": 14000,
     "outBps": 30000,
@@ -16,6 +17,9 @@
       "routerVersion": "2.10.0",
       "javaVersion": "Temurin 21.0.8",
       "clientTunnels": 6,
+      "inboundTunnels": 3,
+      "outboundTunnels": 3,
+      "activePeers": 187,
       "participatingTunnels": 214,
       "buildSuccessRate": 0.68,
       "knownRouters": 4812,
