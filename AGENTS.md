@@ -42,6 +42,7 @@ Working rules for any human or AI agent on this repo.
 ## Documentation
 
 - A PR that adds or changes a user-visible feature or a quality gate must update its `docs/wiki` page. Create the page if it is new.
+- Edit `docs/wiki/` in the repo. The GitHub wiki is generated from it.
 - Add a History line with the PR link.
 - Update the status in `docs/wiki/README.md`.
 - Add a line to `CHANGELOG.md` under Unreleased with the PR link.
