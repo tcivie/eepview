@@ -27,9 +27,6 @@ unsafe_code = "deny"
 
 [lints.clippy]
 pedantic = { level = "warn", priority = -1 }
-module_name_repetitions = "allow"
-missing_errors_doc = "allow"
-missing_panics_doc = "allow"
 # Complexity limits; thresholds live in clippy.toml.
 cognitive_complexity = "warn"
 too_many_lines = "warn"
