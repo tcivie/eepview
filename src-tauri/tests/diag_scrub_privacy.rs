@@ -14,10 +14,18 @@ fn plain(text: &str) -> String {
 
 fn assert_gone(text: &str, secrets: &[&str]) {
     let out = plain(text);
-    for secret in secrets {
-        assert!(!out.contains(secret), "`{secret}` survives in `{out}`");
+    for (case, secret) in secrets.iter().enumerate() {
+        assert!(
+            !out.contains(secret),
+            "injected value {case} ({} bytes) survives the scrub",
+            secret.len()
+        );
     }
-    assert!(out.contains(REMOVED), "no marker in `{out}`");
+    assert!(
+        out.contains(REMOVED),
+        "no marker in the output ({} bytes)",
+        out.len()
+    );
 }
 
 // R15.1: `%2E` and `%2F` (any case) are decoded before matching, so they hide nothing.
@@ -263,17 +271,28 @@ fn r15_6_a_bare_known_name_is_still_removed() {
 // R15.6: `scrub_report` is `scrub` for everything else.
 #[test]
 fn r15_6_scrub_report_removes_what_scrub_removes() {
-    for secret in [
+    for (case, secret) in [
         "https://example.com/a",
         "forum.i2p",
         "192.168.1.20",
         "bob@example.org",
         "/Users/zqalice/x",
         "0123456789abcdef0123456789abcdef",
-    ] {
+    ]
+    .into_iter()
+    .enumerate()
+    {
         let out = scrub_report(&format!("ERROR x file=lib.rs {secret} end"));
-        assert!(!out.contains(secret), "`{secret}` survives in `{out}`");
-        assert!(out.contains("file=lib.rs"), "{out}");
+        assert!(
+            !out.contains(secret),
+            "injected value {case} ({} bytes) survives the scrub",
+            secret.len()
+        );
+        assert!(
+            out.contains("file=lib.rs"),
+            "case {case}: the source name is gone ({} bytes out)",
+            out.len()
+        );
     }
 }
 

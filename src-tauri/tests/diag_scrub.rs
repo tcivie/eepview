@@ -14,8 +14,16 @@ fn plain(text: &str) -> String {
 
 fn assert_removed(text: &str, secret: &str) {
     let out = plain(text);
-    assert!(!out.contains(secret), "`{secret}` survives in `{out}`");
-    assert!(out.contains(REMOVED), "no marker in `{out}`");
+    assert!(
+        !out.contains(secret),
+        "an injected value ({} bytes) survives the scrub",
+        secret.len()
+    );
+    assert!(
+        out.contains(REMOVED),
+        "no marker in the output ({} bytes)",
+        out.len()
+    );
 }
 
 // R4.2: the marker text.

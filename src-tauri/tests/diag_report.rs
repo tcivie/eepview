@@ -180,8 +180,13 @@ fn r6_3_text_is_scrubbed() {
         log,
         true,
     ));
-    for secret in ["secret.example.com", "bob@", "192.168.1.20", "leak.example"] {
-        assert!(!body.contains(secret), "`{secret}` in {body}");
+    let injected = ["secret.example.com", "bob@", "192.168.1.20", "leak.example"];
+    for (case, secret) in injected.into_iter().enumerate() {
+        assert!(
+            !body.contains(secret),
+            "injected value {case} ({} bytes) is in the report text",
+            secret.len()
+        );
     }
     assert!(body.contains(REMOVED));
 }
