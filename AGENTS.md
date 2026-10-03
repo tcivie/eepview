@@ -12,8 +12,8 @@ Working rules for any human or AI agent on this repo.
 - A PR does not need to be up to date with main. Merge main in only when the PR has a conflict (DIRTY).
 - Resolve review threads while CI runs, not after. Fix each thread, then resolve it. Resolve after an answer only when the reviewer agrees or the thread is a question. Never resolve a thread with a reply to avoid a fix. Auto-merge does not fire while a thread is open. Zero unresolved.
 - When any check turns red, fix it at once. Do not wait for the other checks to finish. Fix a red test in the code, or ask the test agent. Never edit the test to match the code. A push cancels the other running jobs, so they restart after it.
-- If a check is red on main too, the cause is on main. Report it in a comment on your PR and in a GitHub issue. Do not change the gate in your PR. After you report, you may stop: the PR waits for the fix on main.
-- You own your PR until it is MERGED. Do not stop while it is open: fix failing checks and resolve every review thread. Spike PRs are the exception, and so is a PR that waits on a check that is red on main. Spike PRs close with a comment that says where the findings live.
+- If a check is red on main too, the cause is on main. Look for an open issue about it first and comment there; open a new issue only if none exists. Do not change the gate in your PR. Keep watching: when main turns green, re-run the failed check on your PR.
+- You own your PR until it is MERGED. Do not stop while it is open: fix failing checks and resolve every review thread. Spike PRs are the exception: they close with a comment that says where the findings live.
 - After your PR merges, remove your worktree (`git worktree remove <path>`) and any CARGO_TARGET_DIR or scratch folder you created. Leave nothing behind.
 
 ## Quality
