@@ -12,15 +12,16 @@ use std::thread;
 use std::time::Duration;
 
 use serde_json::{Value, json};
-use tauri::{App, Listener, Manager, Webview};
+use tauri::webview::NewWindowResponse;
+use tauri::{App, Listener, Manager, Url, Webview};
 
 use crate::net::console::{ConsoleInfo, ConsoleKind, ConsolePage, VerifiedConsole};
 use crate::net::testing::FakeConsole;
 use crate::shell::console::{
     CONSOLE_LABEL, CONSOLE_WINDOW, ConsoleWebview, RETRY_EVERY, RETRY_FOR, close, current,
-    load_after_rules, set_console,
+    load_after_rules, navigation, new_window, set_console,
 };
-use crate::shell::testing::{Mock, app, invoke, wait_for};
+use crate::shell::testing::{Mock, app, core, invoke, wait_for};
 
 // ---------------------------------------------------------------- helpers
 
@@ -420,4 +421,176 @@ fn r20_retry_every_10_seconds_for_2_minutes() {
 fn r21_the_re_check_period_is_the_same_10_seconds() {
     // R21: a re-check runs every 10 s (RETRY_EVERY, R20 and R21).
     assert_eq!(RETRY_EVERY.as_secs(), 10);
+}
+
+// ---------------------------------------------------------------- R10: navigation guard
+
+/// An app with a console view that finished its first load on the Home page.
+fn armed_view(kind: ConsoleKind) -> (App<Mock>, FakeConsole, VerifiedConsole, Webview<Mock>, Url) {
+    let app = app();
+    let (fake, console) = console(kind);
+    let webview = ConsoleWebview::open(app.handle(), &console, ConsolePage::Home).unwrap();
+    first_load(&webview, &console, ConsolePage::Home);
+    let home = webview.url().unwrap();
+    (app, fake, console, webview, home)
+}
+
+fn tab_count(app: &App<Mock>) -> usize {
+    core(app).tabs().len()
+}
+
+fn url(text: &str) -> Url {
+    Url::parse(text).unwrap()
+}
+
+fn denied<R: tauri::Runtime>(response: &NewWindowResponse<R>) -> bool {
+    matches!(response, NewWindowResponse::Deny)
+}
+
+#[test]
+fn r10_the_first_about_blank_is_allowed() {
+    // R10 and R19: the view starts on about:blank, so the guard lets it through.
+    let app = app();
+    let (_fake, console) = console(ConsoleKind::Java);
+    assert!(navigation(app.handle(), &console, &url("about:blank")));
+    assert_eq!(tab_count(&app), 1);
+}
+
+#[test]
+fn r10_same_origin_navigation_stays_in_the_console_view() {
+    // R10: a navigation on the console origin is allowed and opens no tab.
+    for kind in [ConsoleKind::Java, ConsoleKind::I2pd] {
+        let (app, _fake, console, _webview, _home) = armed_view(kind);
+        let origin = console.origin();
+        let tabs = tab_count(&app);
+        for path in ["/", "/logs", "/config?x=1#top", "/?page=commands"] {
+            let target = url(&format!("{origin}{path}"));
+            assert!(
+                navigation(app.handle(), &console, &target),
+                "{kind:?} {target}"
+            );
+        }
+        thread::sleep(Duration::from_millis(300));
+        assert_eq!(
+            tab_count(&app),
+            tabs,
+            "{kind:?}: no tab for the same origin"
+        );
+    }
+}
+
+#[test]
+fn r10_a_same_origin_new_window_loads_in_the_console_view() {
+    // R10: a new-window request on the console origin answers Deny and loads the URL in
+    // the console view (through the async apply step).
+    let (app, _fake, console, webview, _home) = armed_view(ConsoleKind::Java);
+    let tabs = tab_count(&app);
+    let target = url(&format!("{}/logs", console.origin()));
+    let response = new_window(app.handle(), &console, &target);
+    assert!(denied(&response), "the engine never opens a window");
+    assert!(
+        wait_for(|| webview.url().is_ok_and(|u| u == target)),
+        "the console view loads {target}"
+    );
+    assert_eq!(tab_count(&app), tabs, "no tab for the same origin");
+}
+
+#[test]
+fn r10_an_i2p_navigation_is_cancelled_and_opens_a_new_tab() {
+    // R10: http(s)://*.i2p is cancelled in the console view and opens one new normal tab.
+    let (app, _fake, console, webview, home) = armed_view(ConsoleKind::Java);
+    for text in i2p_urls() {
+        let text = text.as_str();
+        let tabs = tab_count(&app);
+        assert!(
+            !navigation(app.handle(), &console, &url(text)),
+            "{text}: cancelled in the console view"
+        );
+        assert!(
+            wait_for(|| tab_count(&app) == tabs + 1),
+            "{text}: one new tab"
+        );
+        thread::sleep(Duration::from_millis(300));
+        assert_eq!(tab_count(&app), tabs + 1, "{text}: exactly one tab");
+        assert_eq!(webview.url().unwrap(), home, "{text}: the console stays");
+    }
+}
+
+#[test]
+fn r10_an_i2p_new_window_opens_a_new_tab_and_is_denied() {
+    // R10: a new-window request for *.i2p opens a new tab; the engine opens no window.
+    let (app, _fake, console, webview, home) = armed_view(ConsoleKind::I2pd);
+    for text in i2p_urls() {
+        let text = text.as_str();
+        let tabs = tab_count(&app);
+        let response = new_window(app.handle(), &console, &url(text));
+        assert!(denied(&response), "{text}");
+        assert!(
+            wait_for(|| tab_count(&app) == tabs + 1),
+            "{text}: one new tab"
+        );
+        thread::sleep(Duration::from_millis(300));
+        assert_eq!(tab_count(&app), tabs + 1, "{text}: exactly one tab");
+        assert_eq!(webview.url().unwrap(), home, "{text}: the console stays");
+    }
+}
+
+/// `*.i2p` URLs the tab guard accepts: a name, and a full 52 character b32 address (the
+/// guard refuses a short `.b32.i2p` label such as `y.b32.i2p`, so the table uses a valid one).
+fn i2p_urls() -> Vec<String> {
+    vec![
+        "http://x.i2p/".to_owned(),
+        format!("https://{}.b32.i2p/p", "a".repeat(52)),
+    ]
+}
+
+/// URLs the guard drops: not the console origin and not `*.i2p`.
+fn dropped_urls(console: &VerifiedConsole, other: &VerifiedConsole) -> Vec<String> {
+    let port = console.port();
+    vec![
+        format!("http://127.0.0.1:{}/", port.wrapping_add(1)),
+        format!("http://localhost:{port}/"),
+        format!("https://127.0.0.1:{port}/"),
+        format!("{}/", other.origin()),
+        "https://example.com/".to_owned(),
+        "http://x.i2p.example.com/".to_owned(),
+        "ftp://x.i2p/".to_owned(),
+        "file:///etc/hosts".to_owned(),
+        "data:text/html,hi".to_owned(),
+        "javascript:alert(1)".to_owned(),
+        "eepview://home".to_owned(),
+    ]
+}
+
+#[test]
+fn r10_anything_else_is_cancelled_and_opens_nothing() {
+    // R10: other ports and hosts on loopback, the other console, clearnet and every other
+    // scheme: cancelled, no new tab, the console view stays where it is.
+    let (app, _fake, console, webview, home) = armed_view(ConsoleKind::Java);
+    let (_other_fake, other) = self::console(ConsoleKind::I2pd);
+    let tabs = tab_count(&app);
+    for text in dropped_urls(&console, &other) {
+        assert!(
+            !navigation(app.handle(), &console, &url(&text)),
+            "{text}: navigation is cancelled"
+        );
+    }
+    thread::sleep(Duration::from_millis(500));
+    assert_eq!(tab_count(&app), tabs, "no tab opened");
+    assert_eq!(webview.url().unwrap(), home, "the console stays");
+}
+
+#[test]
+fn r10_a_new_window_for_anything_else_is_dropped() {
+    // R10: the same table for new-window requests: Deny, no tab, the console unchanged.
+    let (app, _fake, console, webview, home) = armed_view(ConsoleKind::Java);
+    let (_other_fake, other) = self::console(ConsoleKind::I2pd);
+    let tabs = tab_count(&app);
+    for text in dropped_urls(&console, &other) {
+        let response = new_window(app.handle(), &console, &url(&text));
+        assert!(denied(&response), "{text}");
+    }
+    thread::sleep(Duration::from_millis(500));
+    assert_eq!(tab_count(&app), tabs, "no tab opened");
+    assert_eq!(webview.url().unwrap(), home, "the console stays");
 }
