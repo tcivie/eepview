@@ -7,10 +7,10 @@ Status on 2026-10-03:
 | Secret scanning | Done 2026-10-03 (PO) |
 | Push protection | Done 2026-10-03 (PO) |
 | Private vulnerability reporting | Done 2026-10-03 (PO) |
-| CodeQL | Done 2026-10-03 (PR_LINK) |
-| Scorecard | Done 2026-10-03 (PR_LINK) |
-| Dependency review | Done 2026-10-03 (PR_LINK) |
-| README badges | Done 2026-10-03 (PR_LINK). Best Practices badge is not added. |
+| CodeQL | Done 2026-10-03 ([#26](https://github.com/tcivie/eepview/pull/26)) |
+| Scorecard | Done 2026-10-03 ([#26](https://github.com/tcivie/eepview/pull/26)) |
+| Dependency review | Done 2026-10-03 ([#26](https://github.com/tcivie/eepview/pull/26)) |
+| README badges | Done 2026-10-03 ([#26](https://github.com/tcivie/eepview/pull/26)). Best Practices badge is not added. |
 | `protect-main` required checks | Not done |
 | Best Practices registration | Not done. Owner action at bestpractices.dev. |
 | Release provenance check | Not done. Needs a release. |

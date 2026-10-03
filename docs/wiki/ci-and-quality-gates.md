@@ -37,4 +37,4 @@ Every change to main passes lint, complexity limits, security scans and a rulese
 - 2026-10-03 — Cut dependencies flagged by Socket — [#10](https://github.com/tcivie/eepview/pull/10)
 - 2026-10-03 — Hash-pinned CI tools and typed vite config — [#15](https://github.com/tcivie/eepview/pull/15)
 - 2026-10-03 — Add the docs-check job: code changes need a docs or changelog update — [#16](https://github.com/tcivie/eepview/pull/16)
-- 2026-10-03 — Restore CodeQL and Scorecard, add dependency review and audit badges — PR_LINK
+- 2026-10-03 — Restore CodeQL and Scorecard, add dependency review and audit badges — [#26](https://github.com/tcivie/eepview/pull/26)
