@@ -8,7 +8,7 @@ The Rust side of the browser, in `src-tauri/`: tabs, navigation, bookmarks, hist
 
 - One window holds several webviews: `toolbar`, `internal` (eepview pages), `status` (the link bubble) and one `tab-*` webview per web tab. See the [IPC contract](ipc-contract.md).
 - `core/` is a pure state machine. Each command returns effects (emit an event, load a tab, call the engine). The shell carries them out on the main thread and never holds the core lock while it calls a webview.
-- Every 5 s the router watcher runs VERIFY on the router proxy: `http://proxy.i2p/` must answer "I2P HTTP proxy OK", and `http://example.com/` must fail with a 5xx (no outproxy). Only then does the gatekeeper run and web tabs load.
+- Every 5 s the router watcher runs VERIFY on the router proxy: `http://proxy.i2p/` must answer "I2P HTTP proxy OK". Only then does the gatekeeper run and web tabs load. VERIFY never asks for a clearnet host. A router outproxy is harmless: the gatekeeper forwards only `.i2p` hosts.
 - Back, forward, stop, hard reload and find use the engine's native API, so they work with page JavaScript off. Reload and zoom use Tauri.
 - New windows (`target=_blank`, `window.open`) open as new tabs. Downloads are refused with a toast.
 - Pause closes the gatekeeper and every web tab. Resume runs VERIFY again.
@@ -17,7 +17,7 @@ The Rust side of the browser, in `src-tauri/`: tabs, navigation, bookmarks, hist
 
 ## How to use / run locally
 
-- `npm run tauri dev` with an I2P router on `127.0.0.1:4444` that has no outproxy.
+- `npm run tauri dev` with an I2P router on `127.0.0.1:4444`.
 - `EEPVIEW_PROXY=127.0.0.1:<port>` picks another router proxy. `EEPVIEW_START_URL`, `EEPVIEW_EXIT_AFTER`, `EEPVIEW_JS=off` and `EEPVIEW_LOG=1` are listed in the [IPC contract](ipc-contract.md#environment-and-command-line).
 - Tests: `cargo test --workspace` in `src-tauri`.
 

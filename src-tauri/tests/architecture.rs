@@ -215,3 +215,62 @@ fn status_bubble_gets_events_only() {
         assert!(bad.is_empty(), "{file}: status gets {bad:?}");
     }
 }
+
+/// The string literals of the code lines of a file (naive: text between double quotes).
+fn literals(lines: &[String]) -> Vec<String> {
+    let mut out = Vec::new();
+    for line in lines {
+        let parts: Vec<&str> = line.split('"').collect();
+        out.extend(parts.iter().skip(1).step_by(2).map(|p| (*p).to_owned()));
+    }
+    out
+}
+
+/// Host-like words in a literal that are neither `.i2p` names nor loopback addresses.
+fn foreign_hosts(literal: &str) -> Vec<String> {
+    let lower = literal.to_ascii_lowercase();
+    let words = lower.split(|c: char| !(c.is_ascii_alphanumeric() || c == '.' || c == '-'));
+    words
+        .map(|w| w.trim_matches('.'))
+        .filter(|w| w.contains('.'))
+        .filter(|w| is_host_like(w) && !is_i2p_or_loopback(w))
+        .map(str::to_owned)
+        .collect()
+}
+
+/// True for an `.i2p` name or a `127.x` address.
+fn is_i2p_or_loopback(word: &str) -> bool {
+    let last = word.rsplit('.').next().unwrap_or_default();
+    last == "i2p" || word.starts_with("127.")
+}
+
+/// A dotted name with an alphabetic last label, or a dotted-quad IPv4 address.
+fn is_host_like(word: &str) -> bool {
+    let labels: Vec<&str> = word.split('.').collect();
+    let last = labels.last().copied().unwrap_or_default();
+    let named = last.len() >= 2 && last.chars().all(|c| c.is_ascii_alphabetic());
+    let quad = labels.len() == 4 && labels.iter().all(|l| l.parse::<u8>().is_ok());
+    named || quad
+}
+
+#[test]
+fn verify_and_gatekeeper_name_no_clearnet_host() {
+    for file in ["src/net/verify.rs", "src/net/gatekeeper.rs"] {
+        let lines = code(&root().join(file)).unwrap();
+        for literal in literals(&lines) {
+            let hosts = foreign_hosts(&literal);
+            assert!(hosts.is_empty(), "{file} names {hosts:?} in \"{literal}\"");
+        }
+    }
+}
+
+#[test]
+fn host_scan_finds_clearnet_names() {
+    assert_eq!(
+        foreign_hosts("GET http://example.com/ HTTP/1.1"),
+        ["example.com"]
+    );
+    assert_eq!(foreign_hosts("10.0.0.1:80"), ["10.0.0.1"]);
+    assert!(foreign_hosts("http://proxy.i2p/ HTTP/1.1 127.0.0.1").is_empty());
+    assert!(foreign_hosts("I2P HTTP proxy OK, text/html").is_empty());
+}

@@ -19,7 +19,6 @@ pub fn status_of(verdict: &Verdict, proxy: &str, gate_ok: bool) -> RouterStatus 
         ),
         Verdict::Down(e) => ("down", Some(e.clone())),
         Verdict::NotI2p(e) => ("not-i2p", Some(e.clone())),
-        Verdict::Outproxy(e) => ("outproxy", Some(e.clone())),
     };
     RouterStatus {
         state,

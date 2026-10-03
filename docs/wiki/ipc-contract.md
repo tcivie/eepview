@@ -12,7 +12,7 @@ Change it in a PR that changes both sides, or keep the old form working as a shi
 
 - v1: first contract.
 - v1.1: argument names, `chrome_set_height`, `platform`, `router_stats`, `bookmarks_export_file`, history cursors, `link-hover`, `fullscreen-changed`, `toast`.
-- v1.2: `connection_pause`, `connection_resume`, `router_control`, `RouterStatus.paused` and `.managed`, `RouterStats.history`.
+- v1.2: `connection_pause`, `connection_resume`, `router_control`, `RouterStatus.paused` and `.managed`, `RouterStats.history`. The `outproxy` state is gone: VERIFY no longer asks for a clearnet host.
 - Shipped in [#29](https://github.com/tcivie/eepview/pull/29).
 
 ## Window layout
@@ -123,7 +123,7 @@ type HistoryEntry = { id: string; url: string; title: string; visited: number; v
 type Suggestion = { url: string; title: string; source: "bookmark" | "history" };
 type Settings = { homepage: string; theme: "system" | "light" | "dark"; jsDefault: boolean;
   history: { enabled: boolean }; keepCookies: boolean; zoomDefault: number };
-type RouterStatus = { state: "verifying" | "ok" | "building" | "down" | "not-i2p" | "outproxy";
+type RouterStatus = { state: "verifying" | "ok" | "building" | "down" | "not-i2p";
   proxy: string; version: string | null; detail: string | null;
   paused: boolean; managed: boolean };
 type RouterStats = { version: string | null; uptimeMs: number | null; networkStatus: string | null;

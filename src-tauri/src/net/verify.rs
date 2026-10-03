@@ -1,12 +1,14 @@
 // SPDX-FileCopyrightText: 2026 The eepview contributors
 // SPDX-License-Identifier: MIT
 
-//! VERIFY: prove that a local proxy is an I2P router proxy with no outproxy (fail closed).
+//! VERIFY: prove that a local proxy is an I2P router proxy (fail closed).
 //!
-//! Two requests, no network traffic when the proxy is what it claims:
-//! 1. `GET http://proxy.i2p/` must answer 200 with "I2P HTTP proxy OK" (Java I2P and i2pd).
-//! 2. `GET http://example.com/` must answer 5xx: Java I2P says 503 "No Outproxy Configured",
-//!    i2pd says 500 "Outproxy failure". Any other answer means a clearnet exit.
+//! One request: `GET http://proxy.i2p/` must answer 200 with "I2P HTTP proxy OK" (Java I2P
+//! and i2pd answer it locally). The watcher repeats it every 5 s.
+//!
+//! eepview never asks for a non-`.i2p` host, not even to test for an outproxy: on a router
+//! with one, that request would reach the clearnet. A router outproxy cannot be used anyway,
+//! because the gatekeeper (L1) forwards only `.i2p` hosts.
 
 use std::io::{Read, Write};
 use std::time::Duration;
@@ -19,7 +21,8 @@ const PROXY_OK: &str = "I2P HTTP proxy OK";
 /// Most bytes read from one probe answer.
 const MAX_ANSWER: u64 = 256 * 1024;
 const PROXY_TIMEOUT: Duration = Duration::from_secs(5);
-const CLEARNET_TIMEOUT: Duration = Duration::from_secs(20);
+/// The only host VERIFY asks for.
+const PROXY_HOST: &str = "proxy.i2p";
 
 /// The router proxy after VERIFY passed. Only [`verify`] builds one.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -38,43 +41,32 @@ impl VerifiedUpstream {
 /// The outcome of VERIFY.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Verdict {
-    /// An I2P proxy with no outproxy.
+    /// An I2P router proxy.
     Ok(VerifiedUpstream),
     /// Nothing answers.
     Down(String),
     /// Something answers, but not an I2P proxy.
     NotI2p(String),
-    /// An I2P proxy that reaches the clearnet, or a clearnet probe with no clear answer.
-    Outproxy(String),
 }
 
 /// One probe answer: status code and body text.
 pub type Answer = Result<(u16, String), String>;
 
-/// Runs both probes against `addr`.
+/// Asks the proxy at `addr` for its self-test page.
 #[must_use]
 pub fn verify(addr: LoopbackAddr) -> Verdict {
-    let first = probe(addr, "proxy.i2p", PROXY_TIMEOUT);
-    judge(addr, first, || probe(addr, "example.com", CLEARNET_TIMEOUT))
+    judge(addr, probe(addr, PROXY_HOST, PROXY_TIMEOUT))
 }
 
-/// Decides from the probe answers. The clearnet probe runs only when the first one passes.
-pub fn judge(addr: LoopbackAddr, proxy: Answer, clearnet: impl FnOnce() -> Answer) -> Verdict {
-    let (code, body) = match proxy {
-        Ok(answer) => answer,
-        Err(e) => return Verdict::Down(e),
-    };
-    if code != 200 || !body.contains(PROXY_OK) {
-        return Verdict::NotI2p(format!(
-            "http://proxy.i2p/ answered {code} without \"{PROXY_OK}\""
-        ));
-    }
-    match clearnet() {
-        Ok((code, _)) if (500..600).contains(&code) => Verdict::Ok(VerifiedUpstream { addr }),
-        Ok((code, _)) => Verdict::Outproxy(format!(
-            "http://example.com/ answered {code}: the proxy has a clearnet outproxy"
+/// Decides from the self-test answer.
+#[must_use]
+pub fn judge(addr: LoopbackAddr, proxy: Answer) -> Verdict {
+    match proxy {
+        Err(e) => Verdict::Down(e),
+        Ok((200, body)) if body.contains(PROXY_OK) => Verdict::Ok(VerifiedUpstream { addr }),
+        Ok((code, _)) => Verdict::NotI2p(format!(
+            "http://{PROXY_HOST}/ answered {code} without \"{PROXY_OK}\""
         )),
-        Err(e) => Verdict::Outproxy(format!("the clearnet probe gave no clear answer: {e}")),
     }
 }
 
@@ -110,6 +102,7 @@ pub fn parse_answer(raw: &[u8]) -> Option<(u16, String)> {
 mod tests {
     use super::*;
     use std::net::TcpStream;
+    use std::sync::{Arc, Mutex};
     use std::thread;
 
     fn addr() -> LoopbackAddr {
@@ -121,34 +114,18 @@ mod tests {
     }
 
     #[test]
-    fn judge_accepts_an_i2p_proxy_without_outproxy() {
-        let ok = judge(addr(), Ok(ok_body()), || {
-            Ok((503, "No Outproxy Configured".into()))
-        });
+    fn judge_accepts_the_self_test_page() {
+        let ok = judge(addr(), Ok(ok_body()));
         assert_eq!(ok, Verdict::Ok(VerifiedUpstream { addr: addr() }));
-        let i2pd = judge(addr(), Ok(ok_body()), || {
-            Ok((500, "Outproxy failure".into()))
-        });
-        assert!(matches!(i2pd, Verdict::Ok(_)));
-    }
-
-    #[test]
-    fn judge_refuses_a_clearnet_exit() {
-        let exit = judge(addr(), Ok(ok_body()), || Ok((200, "Example Domain".into())));
-        assert!(matches!(exit, Verdict::Outproxy(_)));
-        let redirect = judge(addr(), Ok(ok_body()), || Ok((301, String::new())));
-        assert!(matches!(redirect, Verdict::Outproxy(_)));
-        let hang = judge(addr(), Ok(ok_body()), || Err("timed out".into()));
-        assert!(matches!(hang, Verdict::Outproxy(_)));
     }
 
     #[test]
     fn judge_refuses_a_proxy_that_is_not_i2p() {
-        let down = judge(addr(), Err("refused".into()), || unreachable!());
+        let down = judge(addr(), Err("refused".into()));
         assert_eq!(down, Verdict::Down("refused".into()));
-        let other = judge(addr(), Ok((200, "hello".into())), || unreachable!());
+        let other = judge(addr(), Ok((200, "hello".into())));
         assert!(matches!(other, Verdict::NotI2p(_)));
-        let status = judge(addr(), Ok((404, PROXY_OK.into())), || unreachable!());
+        let status = judge(addr(), Ok((404, PROXY_OK.into())));
         assert!(matches!(status, Verdict::NotI2p(_)));
     }
 
@@ -163,47 +140,52 @@ mod tests {
         assert_eq!(parse_answer(b""), None);
     }
 
-    fn serve_one(mut stream: TcpStream, answer: fn(&str) -> &'static str) {
+    fn serve_one(mut stream: TcpStream, seen: &Mutex<Vec<String>>) {
         let mut buf = [0u8; 2048];
         let n = stream.read(&mut buf).unwrap_or(0);
         let text = String::from_utf8_lossy(&buf[..n]);
         let target = text.split_whitespace().nth(1).unwrap_or("").to_owned();
-        let _ = stream.write_all(answer(&target).as_bytes());
+        let answer = if target == "http://proxy.i2p/" {
+            "HTTP/1.1 200 OK\r\n\r\nI2P HTTP proxy OK"
+        } else {
+            "HTTP/1.1 404 Not Found\r\n\r\n"
+        };
+        seen.lock().unwrap().push(target);
+        let _ = stream.write_all(answer.as_bytes());
     }
 
-    fn serve_all(listener: &std::net::TcpListener, answer: fn(&str) -> &'static str) {
-        for stream in listener.incoming().flatten() {
-            serve_one(stream, answer);
-        }
-    }
-
-    /// A fake proxy on 127.0.0.1:0 that answers each request with `answer(target)`.
-    fn fake(answer: fn(&str) -> &'static str) -> LoopbackAddr {
+    /// A fake I2P proxy on 127.0.0.1:0 that records every request target.
+    fn fake() -> (LoopbackAddr, Arc<Mutex<Vec<String>>>) {
         let (listener, addr) = LoopbackAddr::listen_any().unwrap();
-        thread::spawn(move || serve_all(&listener, answer));
-        addr
-    }
-
-    fn i2p_answer(target: &str) -> &'static str {
-        if target.contains("proxy.i2p") {
-            return "HTTP/1.1 200 OK\r\n\r\nI2P HTTP proxy OK";
-        }
-        "HTTP/1.1 503 No Outproxy Configured\r\n\r\n"
-    }
-
-    fn exit_answer(target: &str) -> &'static str {
-        if target.contains("proxy.i2p") {
-            return "HTTP/1.1 200 OK\r\n\r\nI2P HTTP proxy OK";
-        }
-        "HTTP/1.1 200 OK\r\n\r\nExample Domain"
+        let seen = Arc::new(Mutex::new(Vec::new()));
+        let log = Arc::clone(&seen);
+        thread::spawn(move || {
+            listener
+                .incoming()
+                .flatten()
+                .for_each(|s| serve_one(s, &log));
+        });
+        (addr, seen)
     }
 
     #[test]
-    fn verify_against_fake_proxies() {
-        let i2p = fake(i2p_answer);
+    fn verify_asks_only_for_the_self_test_page() {
+        let (i2p, seen) = fake();
         assert!(matches!(verify(i2p), Verdict::Ok(v) if v.addr() == i2p));
-        assert!(matches!(verify(fake(exit_answer)), Verdict::Outproxy(_)));
-        assert!(matches!(verify(fake(|_| "garbage")), Verdict::Down(_)));
+        assert!(matches!(verify(i2p), Verdict::Ok(_)));
+        let targets = seen.lock().unwrap().clone();
+        assert_eq!(targets, vec!["http://proxy.i2p/"; 2]);
+    }
+
+    fn garbage(mut stream: TcpStream) {
+        let _ = stream.write_all(b"garbage");
+    }
+
+    #[test]
+    fn verify_refuses_garbage() {
+        let (listener, addr) = LoopbackAddr::listen_any().unwrap();
+        thread::spawn(move || listener.incoming().flatten().for_each(garbage));
+        assert!(matches!(verify(addr), Verdict::Down(_)));
     }
 
     #[test]

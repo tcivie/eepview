@@ -539,7 +539,6 @@ fn verdicts_map_to_states() {
     let cases = [
         (Verdict::Down("x".into()), true, "down"),
         (Verdict::NotI2p("x".into()), true, "not-i2p"),
-        (Verdict::Outproxy("x".into()), true, "outproxy"),
     ];
     for (verdict, gate, state) in cases {
         assert_eq!(status_of(&verdict, "p", gate).state, state);
