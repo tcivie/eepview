@@ -276,7 +276,29 @@ def evaluate(log: EventLog, mode: str) -> list[tuple[str, str, str]]:
     ]
     if m in TRAP_MODES:
         rows.insert(1, ("trap page on the LAN canary", *direct_result(log, m, f"trap-{m}", "lan")))
+        rows.insert(0, (TRAP_CONTROL, *trap_control(rows[0][1])))
     return rows
+
+
+TRAP_CONTROL = "control: page NOT via proxy"
+
+
+def trap_control(page: str) -> tuple[str, str]:
+    """A trap mode must lose the proxy. If the page loads through it, the trap no longer proves anything."""
+    if page == "pass":
+        return "FAIL", "the page loaded through the proxy, so the trap did not drop it"
+    return "pass", "expected: the proxy was dropped"
+
+
+def gate_failures(results: dict) -> list:
+    """`default` is a baseline. A trap is an expected-fail control. Every other mode must be clean."""
+    failures = []
+    for mode, rows in results.items():
+        if mode in TRAP_MODES:
+            failures += [r for r in rows if r[0] == TRAP_CONTROL and r[1] == "FAIL"]
+        elif mode != "default":
+            failures += [r for r in rows if r[1] in ("LEAK", "FAIL")]
+    return failures
 
 
 def print_table(results: dict) -> None:
@@ -312,8 +334,7 @@ def main() -> int:
     results = {mode: evaluate(log, mode) for mode in modes}
     print_table(results)
     Path(args.out).write_text(json.dumps({"platform": sys.platform, "results": results, "events": log.events}, indent=2))
-    strict = [r for mode in modes if mode != "default" for r in results[mode] if r[1] in ("LEAK", "FAIL")]
-    return 1 if strict else 0
+    return 1 if gate_failures(results) else 0
 
 
 if __name__ == "__main__":
