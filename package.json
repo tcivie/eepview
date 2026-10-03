@@ -21,5 +21,8 @@
     "typescript": "~7.0.2",
     "vite": "^8.0.16"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "allowScripts": {
+    "fsevents": false
+  }
 }
