@@ -12,6 +12,6 @@ describe("versionText", () => {
   it("[browser-shell ux1 6] says the version is not reported, never Unknown", () => {
     const text = versionText({ version: null });
     assert.equal(text, "Version not reported by the router");
-    assert.doesNotMatch(text, /unknown/i);
+    assert.ok(!/unknown/i.test(text));
   });
 });
