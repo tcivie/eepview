@@ -1,0 +1,6 @@
+# SPDX-FileCopyrightText: 2026 The eepview contributors
+# SPDX-License-Identifier: MIT
+
+# The console fixtures keep their line ends on every OS: the parser tests match text
+# with `\n`, and a Windows checkout would turn it into `\r\n`.
+src-tauri/tests/fixtures/console/* text eol=lf
