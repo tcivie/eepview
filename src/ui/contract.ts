@@ -56,6 +56,7 @@ export type Settings = {
 
 export type HistoryCursor = { visited: number; id: string };
 export type HistoryQuery = { q?: string; before?: HistoryCursor; limit?: number };
+export type ChromeInsets = { left: number };
 export type Platform = "macos" | "windows" | "linux";
 
 export type BandwidthHistory = { stepSeconds: number; inBps: number[]; outBps: number[] };
@@ -125,6 +126,7 @@ export interface Commands {
   connection_resume: { args: Record<string, never>; result: undefined };
   chrome_set_height: { args: { px: number }; result: undefined };
   platform: { args: Record<string, never>; result: Platform };
+  chrome_insets: { args: Record<string, never>; result: ChromeInsets };
   window_fullscreen: { args: Record<string, never>; result: boolean };
 }
 
@@ -140,6 +142,7 @@ export interface Events {
   toast: Toast;
   "link-hover": { text: string; blocked: boolean };
   "fullscreen-changed": boolean;
+  "chrome-insets-changed": ChromeInsets;
 }
 
 export type CommandName = keyof Commands;
