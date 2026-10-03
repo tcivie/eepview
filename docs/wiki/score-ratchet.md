@@ -41,4 +41,4 @@ The `score-ratchet (pr)` check is not yet a required check. The product owner ad
 
 ## History
 
-- Added in the PR "ci: ratchet for the Scorecard and Best Practices scores".
+- Added in [#40](https://github.com/tcivie/eepview/pull/40).
