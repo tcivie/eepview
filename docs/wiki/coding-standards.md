@@ -36,7 +36,7 @@ Nothing may switch a check off. That means no `#[allow]`, `#[expect]`, `biome-ig
 Every change goes through a pull request. A reviewer checks:
 
 - **Tests.** New code has unit tests. A bug fix has a regression test that fails before the fix. See [Testing policy](testing-policy.md).
-- **Docs.** The `docs/wiki` page is updated. `CHANGELOG.md` has a line with the PR link.
+- **Docs.** The `docs/wiki` page is updated.
 - **No-leak invariants.** The change adds no clearnet code path. All five layers stay. The architecture test and the leak test stay green. No webview gets IPC for web content.
 - **Dependencies.** No new dependency without a reason in the PR. No new HTTP client crate. The dependency passes Socket.
 - **Quality gates.** No lint exclusion, no coverage exclusion, no complexity above the limits.
