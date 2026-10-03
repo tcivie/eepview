@@ -22,10 +22,20 @@ required_checks() {
   done | sort -u
 }
 
-# Print the names of check runs that ended in success on the commit.
+# Print the SHA of the commit and the head SHA of each PR that merged it.
+# Some required checks run on pull requests only, so they exist on the PR head, not on the squash commit.
+candidate_shas() {
+  echo "$SHA"
+  gh api "repos/${REPO}/commits/${SHA}/pulls" --jq '.[].head.sha'
+}
+
+# Print the names of check runs that ended in success on the commit or on its PR heads.
 passed_checks() {
-  gh api "repos/${REPO}/commits/${SHA}/check-runs" --paginate \
-    --jq '.check_runs[] | select(.conclusion == "success") | .name' | sort -u
+  local sha
+  for sha in $(candidate_shas); do
+    gh api "repos/${REPO}/commits/${sha}/check-runs" --paginate \
+      --jq '.check_runs[] | select(.conclusion == "success") | .name'
+  done | sort -u
 }
 
 main() {
