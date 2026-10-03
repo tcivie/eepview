@@ -10,11 +10,11 @@
 
 ## What it is
 
-eepview is a browser for I2P sites (`*.i2p`). It runs on the web view of your operating system, so it is small. It sends no clearnet traffic from the page view: every page load goes through the I2P HTTP proxy.
+eepview is a browser for I2P sites (`*.i2p`). It runs on the web view of your operating system, so it is small. The design goal: no clearnet traffic from the page view, because every page load goes through the I2P HTTP proxy. This is not built yet. See Status.
 
-## Security model
+## Security model (design target, not built yet)
 
-| Path | Guard |
+| Path | Planned guard |
 |---|---|
 | Page loads | The page view exists only after the I2P proxy is verified. All loads go through that proxy. |
 | Outproxy | Not used. The managed router has an empty outproxy list, checked at every start. For an external router, eepview checks it. |
@@ -46,7 +46,7 @@ Pre-release. Phase 1 (app shell) is in progress. Do not use eepview for anything
 Requirements:
 
 - Rust 1.96 (`rust-toolchain.toml` pins it)
-- Node.js and npm
+- Node.js 22 or later, and npm
 - macOS 14 or later, Windows 10 or later with WebView2, or Linux with WebKitGTK 4.1
 
 ```sh
