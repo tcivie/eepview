@@ -22,6 +22,8 @@ pub struct Tab {
     pub web_js: Option<bool>,
     /// The URL the live `tab-*` webview shows.
     pub web_url: Option<String>,
+    /// The title of the page in the live `tab-*` webview.
+    pub web_title: String,
 }
 
 impl Tab {
@@ -34,6 +36,7 @@ impl Tab {
             session: Session::new(url),
             web_js: None,
             web_url: None,
+            web_title: String::new(),
         }
     }
 }
