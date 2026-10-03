@@ -27,3 +27,4 @@ Goal: the web engine cannot reach anything but the local gatekeeper. The OS enfo
 - Tauri 3 when it is stable.
 - Drop the glib advisory when wry moves to gtk 0.19.
 - CodeQL, Scorecard, secret scanning and badges when the repo is public. See [docs/going-public.md](docs/going-public.md).
+- **Research: WebRTC inside I2P.** WebRTC is off today. The I2P HTTP proxy carries TCP only, and the web engines send WebRTC UDP straight to IP addresses, outside any proxy. I2P itself has datagrams (SAM, `streamr`), but a browser's WebRTC stack can address only IP:port endpoints, not I2P destinations. Study a bridge that maps WebRTC ICE candidates to I2P datagram destinations, and decide whether it can keep every packet inside I2P on all three engines. Sources: https://i2p.net/en/docs/api/datagrams, https://i2p.net/en/docs/api/i2ptunnel.
