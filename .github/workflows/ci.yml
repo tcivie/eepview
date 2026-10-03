@@ -87,3 +87,33 @@ jobs:
           cargo llvm-cov --all-targets --summary-only
           cargo llvm-cov report --fail-under-lines 0
       - run: npm run test:coverage
+
+  # Not a required check yet. See docs/wiki/reproducible-builds.md.
+  reproducible:
+    name: reproducible (ubuntu-24.04)
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install WebKitGTK build dependencies and diffoscope
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev diffoscope-minimal
+      - name: Install the pinned Rust toolchain and target
+        run: |
+          rustup toolchain install
+          rustup target add x86_64-unknown-linux-gnu
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+      # Two clean builds in two directories; same overrides as the Linux leg of release.yml.
+      - name: Build twice and compare
+        env:
+          CARGO_PROFILE_RELEASE_STRIP: none
+          CARGO_PROFILE_RELEASE_SPLIT_DEBUGINFO: "off"
+        run: ./scripts/repro-check.sh "$RUNNER_TEMP/repro"

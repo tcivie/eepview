@@ -15,7 +15,7 @@ Status: shipped. Review 1 of a yearly cycle.
 | --- | --- | --- |
 | **macOS loopback leak.** `WKWebView` does not send requests to `127.0.0.1` through the proxy. An `<img>`, `<iframe>`, `fetch` or `WebSocket` to a local port went out directly. | Spike S1 | Fixed by design. The gatekeeper adds a content security policy to every response. An engine-level content rule list blocks the rest before the first load. Both ship with the browser shell PR. |
 | **The `wry` WebView2 proxy trap.** On Windows, `wry` drops the `proxy_url` setting when custom browser arguments are set. Custom arguments without a proxy would mean direct connections. | Browser shell work | Fixed by design. The Windows arguments always carry `--proxy-server` and the loopback rule. Ships with the browser shell PR. |
-| **Lint exclusion in `release.yml`.** The calls of the reusable workflows carry `zizmor: ignore[self-repository]` comments. They go against the no-exclusions rule. | This review | Open. Remove the comments or find a form that both actionlint and zizmor accept. |
+| **Lint exclusion in `release.yml`.** The calls of the reusable workflows carried `zizmor: ignore[self-repository]` comments. They went against the no-exclusions rule. | This review | Fixed in [#24](https://github.com/tcivie/eepview/pull/24). The release gates job replaced the reusable-workflow calls. |
 | **No DNS block on Windows.** The firewall rules from spike S10 block every off-box TCP and UDP path from the engine, but not DNS. | Spike S10 | Open. The engine proxy stays the main control. See the [roadmap](roadmap.md). |
 
 ## Not reviewed

@@ -51,10 +51,6 @@ Each source file starts with two SPDX lines: `SPDX-FileCopyrightText: 2026 The e
 
 A new feature needs tests. A bug fix needs a regression test that fails before the fix. Read the [testing policy](https://github.com/tcivie/eepview/wiki/testing-policy).
 
-## Good first issues
-
-New here? Pick an issue with the [good first issue](https://github.com/tcivie/eepview/labels/good%20first%20issue) label. Each one is small and says which files to touch and when it is done.
-
 ## Wanted: co-maintainer
 
 eepview has one maintainer. The project wants a second active maintainer who can review, merge and release. If you want to help, send good pull requests and open an issue. See [Governance](https://github.com/tcivie/eepview/wiki/governance) and [Access continuity](https://github.com/tcivie/eepview/wiki/access-continuity).

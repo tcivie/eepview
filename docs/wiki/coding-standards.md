@@ -29,7 +29,7 @@ This page lists the style rules, the tool that enforces each one, and what a rev
 
 ## No exclusions
 
-Nothing may switch a check off. That means no `#[allow]`, `#[expect]`, `biome-ignore`, `@ts-ignore`, `@ts-expect-error`, `noqa`, `shellcheck disable`, no config relaxation and no coverage exclusion. Fix the code instead. One known exception exists in `release.yml`. It is tracked in the [security review](security-review.md).
+Nothing may switch a check off. That means no `#[allow]`, `#[expect]`, `biome-ignore`, `@ts-ignore`, `@ts-expect-error`, `noqa`, `shellcheck disable`, no config relaxation and no coverage exclusion. Fix the code instead.
 
 ## Code review
 

@@ -51,18 +51,28 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # strip and split_debuginfo override the release profile per OS, so each OS keeps its debug symbols:
+          # MSVC writes no .pdb when cargo strips, and on Linux objcopy splits the symbols after the build.
           - os: windows-2025
             target: x86_64-pc-windows-msvc
             bundles: nsis
+            strip: none
+            split_debuginfo: packed
           - os: macos-15
             target: aarch64-apple-darwin
             bundles: app,dmg
+            strip: symbols
+            split_debuginfo: packed
           - os: macos-15
             target: x86_64-apple-darwin
             bundles: app,dmg
+            strip: symbols
+            split_debuginfo: packed
           - os: ubuntu-24.04
             target: x86_64-unknown-linux-gnu
             bundles: appimage,deb
+            strip: none
+            split_debuginfo: "off"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -85,12 +95,33 @@ jobs:
           node-version: 24
           package-manager-cache: false
       - run: npm ci --ignore-scripts
+      # SOURCE_DATE_EPOCH, CARGO_INCREMENTAL=0 and --remap-path-prefix. See docs/wiki/reproducible-builds.md.
+      - name: Set the reproducible build environment
+        shell: bash
+        run: ./scripts/repro-env.sh >> "$GITHUB_ENV"
+      - name: Build the release binary
+        shell: bash
+        env:
+          TARGET: ${{ matrix.target }}
+          CARGO_PROFILE_RELEASE_STRIP: ${{ matrix.strip }}
+          CARGO_PROFILE_RELEASE_SPLIT_DEBUGINFO: ${{ matrix.split_debuginfo }}
+        run: npx tauri build --target "$TARGET" --no-bundle -- --locked
+      - name: Split the debug symbols into a release asset
+        shell: bash
+        env:
+          TARGET: ${{ matrix.target }}
+        run: ./scripts/split-debug.sh "$TARGET" symbols
+      - name: Check PIE, RELRO and NX on the Linux binary
+        if: runner.os == 'Linux'
+        env:
+          TARGET: ${{ matrix.target }}
+        run: ./scripts/check-hardening.sh "src-tauri/target/$TARGET/release/eepview"
       - name: Build bundles
         shell: bash
         env:
           TARGET: ${{ matrix.target }}
           BUNDLES: ${{ matrix.bundles }}
-        run: npx tauri build --target "$TARGET" --bundles "$BUNDLES"
+        run: npx tauri bundle --target "$TARGET" --bundles "$BUNDLES"
       # The bundler signs the .app with the ad-hoc identity set in tauri.conf.json, before it builds the dmg.
       # A real Developer ID signature and notarization are not set up yet.
       - name: Verify the app inside the dmg is ad-hoc signed
@@ -106,6 +137,7 @@ jobs:
             src-tauri/target/${{ matrix.target }}/release/bundle/dmg/*.dmg
             src-tauri/target/${{ matrix.target }}/release/bundle/appimage/*.AppImage
             src-tauri/target/${{ matrix.target }}/release/bundle/deb/*.deb
+            symbols/*
           if-no-files-found: error
 
   sbom:
@@ -143,13 +175,14 @@ jobs:
   publish:
     name: publish
     needs: [build, sbom]
-    # A dispatch run on a branch must never create a release named after the branch.
-    if: startsWith(github.ref, 'refs/tags/v') && (github.event_name == 'push' || !inputs.dry_run)
     runs-on: ubuntu-24.04
     permissions:
       contents: write
       id-token: write
       attestations: write
+    env:
+      # A dry run, or a dispatch run on a branch, signs and verifies the files but never attests or releases.
+      RELEASE: ${{ startsWith(github.ref, 'refs/tags/v') && (github.event_name == 'push' || !inputs.dry_run) }}
     steps:
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
@@ -164,11 +197,33 @@ jobs:
           sha256sum -- * > ../SHA256SUMS
           mv ../SHA256SUMS SHA256SUMS
           cat SHA256SUMS
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+      # Keyless: the job's OIDC token gets a short-lived Fulcio certificate, and Rekor logs each signature.
+      - name: Sign every release file with Sigstore
+        working-directory: dist
+        run: |
+          for file in *; do
+            cosign sign-blob --yes --bundle "$file.sigstore.json" "$file"
+          done
+      - name: Verify every signature against this workflow
+        working-directory: dist
+        env:
+          IDENTITY: https://github.com/${{ github.workflow_ref }}
+        run: |
+          for bundle in *.sigstore.json; do
+            cosign verify-blob --bundle "$bundle" \
+              --certificate-identity "$IDENTITY" \
+              --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+              "${bundle%.sigstore.json}"
+          done
       - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
-        if: github.event.repository.visibility == 'public'
+        if: env.RELEASE == 'true'
         with:
-          subject-path: dist/*
+          subject-path: |
+            dist/*
+            !dist/*.sigstore.json
       - name: Create draft release
+        if: env.RELEASE == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}

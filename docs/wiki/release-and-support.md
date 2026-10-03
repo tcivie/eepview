@@ -1,6 +1,8 @@
+<!-- SPDX-License-Identifier: MIT -->
+
 # Release and support
 
-Status: shipped. eepview has no release yet.
+Status: in progress. eepview has no release yet.
 
 ## Versioning
 
@@ -25,14 +27,44 @@ Status: shipped. eepview has no release yet.
 - A tag starts `release.yml`. The lint, security and test jobs must pass first. See [Release pipeline](release-pipeline.md).
 - The release holds installers for four targets, two CycloneDX SBOMs and a `SHA256SUMS` file.
 - A user checks a download with `sha256sum -c SHA256SUMS`.
-- The workflow attests build provenance with Sigstore, keyless, through GitHub Actions OIDC. A user checks it with `gh attestation verify <file> --repo tcivie/eepview`. The step runs only while the repository is public.
+- Each release file has a keyless Sigstore signature, made through GitHub Actions OIDC. The workflow also attests build provenance. The commands to check both are in [Release pipeline](release-pipeline.md#verify-a-download). The attestation step runs only while the repository is public.
 - A person reads the draft release and publishes it.
+
+## Signed tags
+
+The maintainer signs each release tag with an SSH signing key. This is a practice, not a gate: `release.yml` does not check the tag signature. The release files carry their own Sigstore signatures, see [Release pipeline](release-pipeline.md#verify-a-download).
+
+One-time setup:
+
+```sh
+git config --global gpg.format ssh
+git config --global user.signingkey ~/.ssh/id_ed25519.pub
+```
+
+Add the same public key on GitHub as a **signing key** (Settings, SSH and GPG keys). GitHub then marks the tag as Verified.
+
+Cut the release from `main`:
+
+```sh
+git switch main && git pull --ff-only
+git tag -s v0.1.0 -m "eepview v0.1.0"
+git push origin v0.1.0
+```
+
+Check a tag locally. `git tag -v` needs a file that lists the keys you trust:
+
+```sh
+echo "$(git config user.email) $(cat ~/.ssh/id_ed25519.pub)" > ~/.config/git/allowed_signers
+git config --global gpg.ssh.allowedSignersFile ~/.config/git/allowed_signers
+git tag -v v0.1.0
+```
 
 ## Limits
 
-- Windows installers and the macOS `.dmg` are not signed with a platform certificate.
+- Windows installers and the macOS `.dmg` have no platform code-signing certificate. The Sigstore signature does not replace one.
 - There is no in-app update. The user installs the new version by hand.
 
 ## History
 
 - 2026-10-03 — Add the release and support policy — [#30](https://github.com/tcivie/eepview/pull/30).
+- [#37](https://github.com/tcivie/eepview/pull/37): signed tags documented.
