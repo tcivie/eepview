@@ -768,6 +768,29 @@
     font-size: var(--fs-sm);
   }
 
+  .letter-icon.has-icon {
+    border-color: transparent;
+  }
+
+  .letter-icon img {
+    display: block;
+    width: var(--size-letter-sm);
+    height: var(--size-letter-sm);
+  }
+
+  .letter-icon-lg.has-icon {
+    border-color: var(--color-border);
+  }
+
+  .letter-icon-lg img {
+    width: 24px;
+    height: 24px;
+  }
+
+  .row-link > .letter-icon {
+    align-self: center;
+  }
+
   .letter-icon-add {
     border-style: dashed;
   }

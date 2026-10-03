@@ -5,7 +5,7 @@ SPDX-License-Identifier: MIT
 
 # IPC contract
 
-Version 1.3. The Rust shell (`src-tauri/`) and the UI (`src/ui/`) build against this page.
+Version 1.4. The Rust shell (`src-tauri/`) and the UI (`src/ui/`) build against this page.
 Change it in a PR that changes both sides, or keep the old form working as a shim.
 
 ## History
@@ -13,6 +13,7 @@ Change it in a PR that changes both sides, or keep the old form working as a shi
 - v1: first contract.
 - v1.1: argument names, `chrome_set_height`, `platform`, `router_stats`, `bookmarks_export_file`, history cursors, `link-hover`, `fullscreen-changed`, `toast`.
 - v1.3: `chrome_insets`, `chrome-insets-changed`, `window_fullscreen`, `status-size`, `status-side`; the bubble shows after 100 ms and hides at once.
+- v1.4: `TabInfo.icon`, `Bookmark.icon`, `HistoryEntry.icon`, `icons-changed`. See [Site icons](site-icons.md). [#53](https://github.com/tcivie/eepview/pull/53)
 - v1.2: `connection_pause`, `connection_resume`, `router_control`, `RouterStatus.paused` and `.managed`, `RouterStats.history`. The `outproxy` state is gone: VERIFY no longer asks for a clearnet host.
 - Shipped in [#29](https://github.com/tcivie/eepview/pull/29).
 
@@ -116,6 +117,7 @@ Rust sends them to `toolbar`, `internal` and `status`.
 - `fullscreen-changed: boolean`
 - `status-side: "left" | "right"` (to `status` only): the corner the bubble sits in. It moves to the bottom right while the mouse is over the bottom-left spot.
 - `chrome-insets-changed: {left: number}`: on full screen enter and exit, and when the scale factor or the button frames change.
+- `icons-changed: null`: a site icon was stored or deleted. `tabs-changed` follows. Read the lists again for the new `icon` values.
 
 ### Events a page sends
 
@@ -126,10 +128,13 @@ Rust sends them to `toolbar`, `internal` and `status`.
 ```ts
 type TabInfo = { id: number; url: string; title: string; kind: "internal" | "web";
   loading: boolean; canBack: boolean; canForward: boolean; active: boolean;
-  zoom: number; jsOn: boolean; bookmarked: boolean };
+  zoom: number; jsOn: boolean; bookmarked: boolean;
+  icon: string | null };  // 32 px site icon, data:image/png;base64,…; null for internal tabs
 type NavResult = { ok: boolean; reason?: "not-i2p" | "router-down" | "invalid" };
-type Bookmark = { id: string; url: string; title: string; folder: string | null; created: number };
-type HistoryEntry = { id: string; url: string; title: string; visited: number; visits: number };
+type Bookmark = { id: string; url: string; title: string; folder: string | null; created: number;
+  icon: string | null };  // 64 px site icon
+type HistoryEntry = { id: string; url: string; title: string; visited: number; visits: number;
+  icon: string | null };  // 32 px site icon
 type Suggestion = { url: string; title: string; source: "bookmark" | "history" };
 type Settings = { homepage: string; theme: "system" | "light" | "dark"; jsDefault: boolean;
   history: { enabled: boolean }; keepCookies: boolean; zoomDefault: number };
@@ -144,6 +149,8 @@ type RouterStats = { version: string | null; uptimeMs: number | null; networkSta
   tunnelBuildSuccessPercent: { exploratory: number | null; client: number | null };
   history: { t: number; in: number; out: number }[] };  // last 10 min, one sample per 5 s
 ```
+
+`icon` is a `data:image/png;base64,` URL that eepview drew itself, or `null`. `bookmark_update` and `bookmarks_import` ignore an `icon` they receive, and the stores never keep one. See [Site icons](site-icons.md).
 
 `jsDefault` is `true`: JavaScript is on unless you turn it off for a site.
 

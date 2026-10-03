@@ -34,7 +34,7 @@ The stylesheets are split into cascade layers. A later layer always wins, so a p
 | Banner | `.banner`, `.banner-lg`, `data-tone="warning"` or `"danger"` | History, Settings, Setup, Blocked, Router stopped |
 | Status dot | `.dot` in a parent with `data-tone`, and `.chip::before` | Toolbar, router panel, chips |
 | Chip | `.chip` with `data-tone="ready"`, `"building"` or `"stopped"` | Home, Network, Setup, Router stopped |
-| Letter icon | `.letter-icon`, `.letter-icon-lg`, `.letter-icon-add` | Tabs, Home tiles |
+| Letter icon | `.letter-icon`, `.letter-icon-lg`, `.letter-icon-add`, `.has-icon` when it shows the site icon ([Site icons](site-icons.md)) | Tabs, Home tiles, Bookmarks and History rows |
 | Step indicator | `.hops`, `.hop`, `.hop-node`, `.hop-end`, `data-state`, `aria-current="step"`, `.step-count` | Setup, Home, Blocked, Router stopped |
 | Table | `.table` | Settings, Setup |
 | Sparkline | `.spark-area`, `.spark-line`, `.spark-in`, `.spark-out`, `.spark-axis` | Network, router panel |

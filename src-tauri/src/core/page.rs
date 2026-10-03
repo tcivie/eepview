@@ -84,9 +84,11 @@ impl Core {
         let title = tab.web_title.clone();
         let mut fx = vec![Effect::Emit(Event::TabUpdated(id))];
         if record {
-            self.history.visit(url, &title, now);
+            let evicted = self.history.visit(url, &title, now);
             fx.extend(self.save_history());
+            fx.extend(self.forget_icon_of(evicted.as_ref()));
         }
+        fx.extend(self.want_icon(url, now));
         fx.extend(self.hover_out());
         fx
     }
