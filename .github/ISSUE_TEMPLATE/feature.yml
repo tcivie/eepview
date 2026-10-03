@@ -1,0 +1,45 @@
+name: Feature request
+description: Suggest a new feature or a change.
+labels: [enhancement]
+body:
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: macOS 15, Ubuntu 24.04, Windows 11
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: eepview version
+    validations:
+      required: true
+  - type: dropdown
+    id: router
+    attributes:
+      label: Router type
+      options:
+        - Java I2P
+        - i2pd
+        - Managed
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps (how you use eepview today)
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior (what you want)
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior (what happens now)
+    validations:
+      required: true
