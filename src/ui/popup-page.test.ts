@@ -17,23 +17,19 @@ const ITEMS = [
   { url: "http://c.i2p/", title: "C", source: "history" },
 ];
 const STATUS = { state: "ok", proxy: "127.0.0.1:4444", version: "2.0", detail: null };
+// The router_stats answer in the IPC contract v1.6 shape (docs/wiki/ipc-contract.md).
 const STATS = {
+  version: "2.0",
+  uptimeMs: 60_000,
+  uptimeResolutionMs: 1,
   networkStatus: "OK",
-  uptimeSeconds: 60,
-  routerKind: "i2pd",
-  routerVersion: "2.0",
-  javaVersion: null,
-  bandwidthInBps: 1,
-  bandwidthOutBps: 1,
-  history: null,
-  clientTunnels: 1,
-  inboundTunnels: 1,
-  outboundTunnels: 1,
-  activePeers: 1,
-  participatingTunnels: 1,
-  buildSuccessRate: 0.5,
   knownRouters: 1,
   floodfills: 1,
+  activePeers: 1,
+  tunnels: { in: 1, out: 1, participating: 1, client: 1, exploratory: null },
+  bandwidthBytesPerSecond: { in1s: 1, out1s: 1, in5m: null, out5m: null },
+  tunnelBuildSuccessPercent: { exploratory: null, client: null, total: 50 },
+  history: [],
 };
 
 stub.answer("router_status", () => ({ ...STATUS, managed: true, paused: false }));

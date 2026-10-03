@@ -316,3 +316,16 @@ describe("R16 the Router section", () => {
     assert.match(text, /connection_resume/);
   });
 });
+
+describe("R36 where eepview connects", () => {
+  it("R36: the About row of the console names the statistics too", () => {
+    const html = read("settings.html");
+    const about = html.slice(html.indexOf('id="about"'));
+    const connects = about.slice(about.indexOf("Where eepview connects"));
+    const list = connects.slice(0, connects.indexOf("</table>"));
+    assert.ok(
+      list.includes("Router console check, router statistics and the console window"),
+      "the row reads: Router console check, router statistics and the console window",
+    );
+  });
+});

@@ -4,6 +4,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  formatUptime,
   type PanelStatsLike,
   type PanelStatusLike,
   panelControls,
@@ -135,5 +136,112 @@ describe("Router panel sparkline", () => {
     assert.ok((series?.inBps.length ?? 0) <= 121);
     assert.ok((series?.outBps.length ?? 0) <= 121);
     assert.equal(sparkSeries(null), null);
+  });
+});
+
+describe("[R34] the router panel shows the uptime to its resolution", () => {
+  it('[R34] 28 800 s with a resolution of 3 600 s reads "8 h"', () => {
+    const text = panelText(stats({ uptimeSeconds: 28_800, uptimeResolutionSeconds: 3600 }));
+    assert.equal(text.uptime, "8 h");
+  });
+
+  it('[R34] 172 800 s with a resolution of 86 400 s reads "2 d"', () => {
+    const text = panelText(stats({ uptimeSeconds: 172_800, uptimeResolutionSeconds: 86_400 }));
+    assert.equal(text.uptime, "2 d");
+  });
+
+  it("[R34] a null or missing resolution keeps today's output", () => {
+    const today = formatUptime(28_800);
+    assert.equal(today, "8 h 0 min");
+    assert.equal(panelText(stats({ uptimeSeconds: 28_800 })).uptime, today);
+    const nulled = panelText(stats({ uptimeSeconds: 28_800, uptimeResolutionSeconds: null }));
+    assert.equal(nulled.uptime, today);
+  });
+
+  it("[R34] formatUptime in the panel module follows the same rule", () => {
+    assert.equal(formatUptime(28_800, 3600), "8 h");
+    assert.equal(formatUptime(172_800, 86_400), "2 d");
+    assert.equal(formatUptime(7380, 30), "2 h 3 min");
+  });
+});
+
+const tunnelsLine = (patch: Partial<PanelStatsLike>): string => panelText(stats(patch)).tunnels;
+const NO_SPLIT = { inboundTunnels: null, outboundTunnels: null };
+
+describe("[R35] the tunnels line without the in and out split", () => {
+  it("[R35] shows client, exploratory and participating", () => {
+    assert.equal(
+      tunnelsLine({
+        ...NO_SPLIT,
+        clientTunnels: 2,
+        exploratoryTunnels: 11,
+        participatingTunnels: 398,
+      }),
+      "2 client · 11 exploratory · 398 participating",
+    );
+  });
+
+  it('[R35] shows "—" for a client count that is null', () => {
+    const line = tunnelsLine({ ...NO_SPLIT, exploratoryTunnels: 11, participatingTunnels: 398 });
+    assert.equal(line, "— client · 11 exploratory · 398 participating");
+  });
+
+  it('[R35] shows "—" for an exploratory count that is null', () => {
+    const line = tunnelsLine({ ...NO_SPLIT, clientTunnels: 2, participatingTunnels: 398 });
+    assert.equal(line, "2 client · — exploratory · 398 participating");
+  });
+
+  it('[R35] shows "—" for a participating count that is null', () => {
+    const line = tunnelsLine({ ...NO_SPLIT, clientTunnels: 2, exploratoryTunnels: 11 });
+    assert.equal(line, "2 client · 11 exploratory · — participating");
+  });
+
+  it("[R35] uses the client form when only one of client and exploratory is set", () => {
+    assert.match(tunnelsLine({ ...NO_SPLIT, clientTunnels: 2, participatingTunnels: 5 }), /client/);
+    const exploratory = tunnelsLine({
+      ...NO_SPLIT,
+      exploratoryTunnels: 3,
+      participatingTunnels: 5,
+    });
+    assert.match(exploratory, /exploratory/);
+  });
+});
+
+describe("[R35] the tunnels line keeps the in and out form", () => {
+  it("[R35] when in and out are set", () => {
+    assert.equal(
+      tunnelsLine({ inboundTunnels: 7, outboundTunnels: 8, participatingTunnels: 345 }),
+      "7 in · 8 out · 345 participating",
+    );
+  });
+
+  it("[R35] when in and out are set, even with client and exploratory", () => {
+    const line = tunnelsLine({
+      inboundTunnels: 7,
+      outboundTunnels: 8,
+      participatingTunnels: 345,
+      clientTunnels: 2,
+      exploratoryTunnels: 3,
+    });
+    assert.equal(line, "7 in · 8 out · 345 participating");
+  });
+
+  it("[R35] when only one of in and out is null", () => {
+    const base = { participatingTunnels: 345, clientTunnels: 2, exploratoryTunnels: 3 };
+    assert.equal(
+      tunnelsLine({ ...base, inboundTunnels: 7, outboundTunnels: null }),
+      "7 in · — out · 345 participating",
+    );
+    assert.equal(
+      tunnelsLine({ ...base, inboundTunnels: null, outboundTunnels: 8 }),
+      "— in · 8 out · 345 participating",
+    );
+  });
+
+  it("[R35] when client and exploratory are null or missing", () => {
+    const line = "— in · — out · 345 participating";
+    assert.equal(tunnelsLine({ ...NO_SPLIT, participatingTunnels: 345 }), line);
+    const nulled = { ...NO_SPLIT, clientTunnels: null, exploratoryTunnels: null };
+    assert.equal(tunnelsLine({ ...nulled, participatingTunnels: 345 }), line);
   });
 });
