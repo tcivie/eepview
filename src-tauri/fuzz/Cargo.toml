@@ -20,7 +20,11 @@ cargo-fuzz = true
 
 [dependencies]
 eepview = { path = ".." }
-libfuzzer-sys = "0.4"
+# Pinned exactly: its build script compiles libFuzzer (C++). This crate has its own workspace,
+# so libfuzzer-sys is never in the app build, the release build or src-tauri/Cargo.lock.
+libfuzzer-sys = "=0.4.13"
+# The L3b rule pattern is a regular expression; url_rules compares it with the host predicate.
+regex = "1"
 # The same `url` crate as `tauri::Url` (one lock entry), for `nav::guard`.
 url = "2"
 

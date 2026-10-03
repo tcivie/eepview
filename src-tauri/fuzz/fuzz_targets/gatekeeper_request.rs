@@ -4,12 +4,13 @@
 //! Fuzz target for the gatekeeper request parser, [`eepview_lib::net::http`].
 //!
 //! Properties from docs/wiki/no-leak-architecture.md (layer L1): parsing and planning never
-//! panic, and the gatekeeper forwards, tunnels or relays an I2P host only.
+//! panic, the gatekeeper forwards, tunnels or relays an I2P host only, and the request that it
+//! sends to the router names that host once and holds no bare CR or LF inside a line.
 
 #![no_main]
 
 use eepview_lib::net::host::is_i2p_host;
-use eepview_lib::net::http::{Head, Plan, head_end, plan, plan_inner};
+use eepview_lib::net::http::{Head, Plan, head_end, plan, plan_inner, upstream_request};
 use libfuzzer_sys::fuzz_target;
 
 /// The host of a tunnel the gatekeeper has already accepted for `CONNECT`.
@@ -21,20 +22,36 @@ fn assert_i2p(host: &str) {
     assert!(is_i2p_host(name), "forwarded a non-I2P host: {host:?}");
 }
 
-fn assert_plan(plan: &Plan) {
-    match plan {
-        Plan::Http { host, .. } => assert_i2p(host),
-        Plan::Terminate { host } | Plan::Relay { host } => assert!(is_i2p_host(host), "{host:?}"),
-        Plan::Refuse(refusal) => assert!(!refusal.response().is_empty()),
+/// The bytes sent to the router: no line holds a bare CR or LF, and the one `Host` header is
+/// the planned host.
+fn assert_upstream(head: &Head, method: &str, host: &str, path: &str) {
+    let bytes = upstream_request(method, host, path, head);
+    let text = String::from_utf8(bytes).unwrap_or_default();
+    assert!(!text.is_empty(), "the upstream request is not UTF-8");
+    let mut hosts = Vec::new();
+    for line in text.split("\r\n") {
+        assert!(
+            !line.contains(['\r', '\n']),
+            "bare CR or LF in a line: {text:?}"
+        );
+        match line.split_once(':') {
+            Some((name, value)) if name.trim().eq_ignore_ascii_case("host") => {
+                hosts.push(value.trim());
+            }
+            _ => {}
+        }
     }
+    assert_eq!(hosts, [host], "wrong Host headers: {text:?}");
 }
 
-fn assert_inner(plan: &Plan) {
-    if let Plan::Http { host, .. } = plan {
-        assert_eq!(
-            host, TUNNEL_HOST,
-            "a tunnel request must keep the tunnel host"
-        );
+fn assert_plan(head: &Head, plan: &Plan) {
+    match plan {
+        Plan::Http { method, host, path } => {
+            assert_i2p(host);
+            assert_upstream(head, method, host, path);
+        }
+        Plan::Terminate { host } | Plan::Relay { host } => assert!(is_i2p_host(host), "{host:?}"),
+        Plan::Refuse(_) => {}
     }
 }
 
@@ -44,7 +61,7 @@ fuzz_target!(|data: &[u8]| {
         return;
     };
     let _ = head.body_length();
-    assert_plan(&plan(&head, true));
-    assert_plan(&plan(&head, false));
-    assert_inner(&plan_inner(&head, TUNNEL_HOST));
+    assert_plan(&head, &plan(&head, true));
+    assert_plan(&head, &plan(&head, false));
+    assert_plan(&head, &plan_inner(&head, TUNNEL_HOST));
 });

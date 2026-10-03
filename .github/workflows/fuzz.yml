@@ -38,6 +38,11 @@ jobs:
       # Total time for all four targets: 5 minutes each on a pull request, 15 each in the batch.
       FUZZ_SECONDS: ${{ github.event_name == 'pull_request' && '1200' || '3600' }}
     steps:
+      # The workspace must hold the repository: ClusterFuzzLite reads .clusterfuzzlite/project.yaml
+      # from it to pick the Ubuntu 24.04 build and run images.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Build the fuzz targets
         id: build
         uses: google/clusterfuzzlite/actions/build_fuzzers@884713a6c30a92e5e8544c39945cd7cb630abcd1 # v1

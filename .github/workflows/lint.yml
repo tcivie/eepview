@@ -43,7 +43,10 @@ jobs:
       - run: cargo fmt --manifest-path src-tauri/Cargo.toml --check
       - run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --locked -- -D warnings
       - run: cargo fmt --manifest-path src-tauri/fuzz/Cargo.toml --check
-      - run: cargo clippy --manifest-path src-tauri/fuzz/Cargo.toml --target-dir src-tauri/target --all-targets -- -D warnings
+      - name: clippy (fuzz crate, on the lock file of the app)
+        run: |
+          cp src-tauri/Cargo.lock src-tauri/fuzz/Cargo.lock
+          cargo clippy --manifest-path src-tauri/fuzz/Cargo.toml --target-dir src-tauri/target --all-targets -- -D warnings
 
   web:
     name: biome + tsc
