@@ -10,7 +10,7 @@
     </filter>
   </defs>
   <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#ev-body)" stroke="#FFFFFF" stroke-opacity=".12" stroke-width="4"/>
-  <ellipse cx="500" cy="770" rx="220" ry="22" fill="#000" opacity=".35" filter="url(#ev-soft)"/>
+  <ellipse cx="500" cy="770" rx="220" ry="22" fill="#000000" opacity=".35" filter="url(#ev-soft)"/>
   <g transform="translate(524 478) rotate(18) scale(1.420) translate(-512 -563)">
     <g fill="none" stroke="#A9845A" stroke-width="2.4" stroke-linecap="round">
       <path d="M470 720q-16 19 -24 38M481 720q-14 22 -20 45M492 720q-11 26 -17 52M503 720q-9 20 -13 41M514 720q-7 24 -10 48M525 720q-5 27 -7 55M536 720q-3 22 -5 44M547 720q-2 25 -2 51M474 720q0 20 0 40M485 720q1 23 2 47M496 720q3 27 4 54M507 720q4 21 7 43M518 720q6 25 10 50M529 720q8 19 13 39M540 720q11 23 16 46M551 720q13 26 20 53M478 720q16 21 24 42M489 720q-12 24 -18 49M500 720q-8 19 -11 38M511 720q-2 22 -3 45M522 720q2 26 3 52M533 720q7 20 11 41M544 720q12 24 18 48M471 720q-10 27 -14 55M482 720q4 22 6 44M493 720q10 25 15 51"/>
