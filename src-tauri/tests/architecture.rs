@@ -739,3 +739,26 @@ fn r10_events_sit_where_the_table_puts_them() {
         "the gatekeeper must record Code::GatekeeperRefused"
     );
 }
+
+// R2.6: `run()` installs the panic hook and calls `diag::init` with `default_log_dir`
+// before the Tauri builder, so `StartFailed` and an early panic reach the disk.
+#[test]
+fn r2_6_diag_starts_before_the_tauri_builder() {
+    let mut checked = false;
+    for file in rust_files(&root().join("src")).unwrap() {
+        let source = code(&file).unwrap().join("\n");
+        let Some(builder) = source.find("tauri::Builder") else {
+            continue;
+        };
+        checked = true;
+        for call in ["install_panic_hook", "default_log_dir", "diag::init("] {
+            let at = source.find(call);
+            assert!(
+                at.is_some_and(|at| at < builder),
+                "{}: `{call}` must come before tauri::Builder",
+                rel(&file)
+            );
+        }
+    }
+    assert!(checked, "no file builds the app with tauri::Builder");
+}
