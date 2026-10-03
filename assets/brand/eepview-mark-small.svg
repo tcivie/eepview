@@ -1,9 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
   <title>eepview mark, small sizes</title>
-  <!-- Every edge sits on a 64-unit grid, so it lands on whole pixels at 16 and 32 px. -->
-  <rect width="1024" height="1024" rx="224" fill="#262A66"/>
+  <!-- Every coordinate is a multiple of 64, so each edge lands on a whole pixel at 16 px (and 32 px). -->
+  <rect width="1024" height="1024" rx="192" fill="#262A66"/>
   <rect x="128" y="192" width="768" height="640" rx="64" fill="#F6F3EC"/>
-  <rect x="192" y="320" width="640" height="448" rx="32" fill="#1C1F4A"/>
-  <path d="M576 432C640 472 704 528 704 624C704 704 656 752 600 752H576ZM448 432C384 472 320 528 320 624C320 704 368 752 424 752H448Z" fill="#A897FF"/>
-  <path d="M512 352C540 400 544 480 544 560V728Q544 752 512 752Q480 752 480 728V560C480 480 484 400 512 352Z" fill="#E4DEFF"/>
+  <rect x="192" y="320" width="640" height="448" rx="64" fill="#1C1F4A"/>
+  <path d="M640 448C704 512 768 576 768 640C768 704 704 704 704 704H640ZM384 448C320 512 256 576 256 640C256 704 320 704 320 704H384Z" fill="#A897FF"/>
+  <path d="M512 384C576 448 576 512 576 576V704H448V576C448 512 448 448 512 384Z" fill="#E4DEFF"/>
 </svg>
