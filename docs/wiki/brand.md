@@ -21,6 +21,19 @@ All files are in `assets/brand/`.
 
 Open a preview page with `#light` or `#dark` to force a theme.
 
+## In the app
+
+- The brand slot is the one place the logo appears on a screen. It holds `eepview-mark-small.svg` at 28 px next to the word "eepview", in the sidebar of every internal page and in the setup header. No page adds a second logo.
+- Every internal page uses `eepview-mark-small.svg` as its favicon.
+- The pages load `assets/brand/eepview-mark-small.svg` itself. There is no copy to keep in sync.
+- In dark mode a 1 px ring (`--color-mark-ring`, white at 12%) separates the green body from the dark surface. In light mode the ring is transparent.
+
+Added in [#61](https://github.com/tcivie/eepview/pull/61).
+
+## Screenshots
+
+`scripts/screenshots.sh` builds the bundled UI, serves it with `vite preview`, and takes the README and wiki screenshots under `docs/images/ui/` with headless Chrome. The review folders (`brand-review/`, `calm-review/`, `setup-review/`) are one-time before and after records of a PR, so the script does not retake them. It uses one window size (1280×800), the dev mock data, and both themes. The list of shots is `scripts/screenshots.json`. The popups (suggestions, menu and router panel) show in their own webview, so the script shoots each card alone from `popup.html`, at 2x on a transparent background. Set `CHROME` to use a Chrome binary that is not in the default place. The script never starts the eepview app.
+
 ## Palette
 
 | Token | Hex | Use |
@@ -57,7 +70,7 @@ eepview uses only the colors on this page.
 - **One check.** `scripts/palette-check.sh` fails on:
   - a raw color in `src/` outside `theme.css` (hex, `rgb()`, `hsl()`, `oklch()`, `color-mix()`, a named color, or a color set from TS);
   - a `theme.css` value that is not in the list;
-  - an SVG fill, stroke or stop color in `assets/brand/` or `src/ui/assets/` that is not in the list.
+  - an SVG fill, stroke or stop color in `assets/brand/` that is not in the list.
 
   lefthook runs it before each commit, and the `biome + tsc` CI job runs it on each PR.
 - **Alpha.** A token may add an alpha byte to a listed hex. For example, `#1c1c1c6b` is `gray-900` at 42% for the dialog scrim. The check compares only the first six digits.
@@ -115,6 +128,7 @@ Defined in `src/ui/theme.css`. "Brand" marks a value that comes straight from th
 | `--color-danger` | `#A1252B` brick-700 | `#F2918B` brick-300 | Stopped, refused, errors |
 | `--color-danger-soft` | `#F6D9D8` brick-100 | `#3D1C1C` brick-900 | Error boxes |
 | `--color-focus` | `#2A6A56` pine-700 (brand) | `#6CCFA5` accent dark (brand) | Focus ring |
+| `--color-mark-ring` | `#FFFFFF00` white at 0% | `#FFFFFF1F` white at 12% | The ring around the mark in the brand slot |
 | `--color-scrim` | `#1C1C1C6B` gray-900 at 42% | `#00000099` black at 60% | Behind dialogs |
 | `--shadow-float` | `#1C1C1C14`, `#1C1C1C24` | `#00000066`, `#00000080` | Popovers and menus |
 | `--shadow-inset` | `#FFFFFF99` | `#FFFFFF0A` | The top highlight on panels |
@@ -149,3 +163,4 @@ All variants are the same artwork. None is redrawn.
 - 2026-10-03 — Add the logo, the app icons and the brand assets — [#11](https://github.com/tcivie/eepview/pull/11)
 - 2026-10-03 — One color source, the palette check — [#38](https://github.com/tcivie/eepview/pull/38)
 - 2026-10-03 — Neutral surfaces, green only as the accent — [#51](https://github.com/tcivie/eepview/pull/51)
+- 2026-10-03 — The bulb mark in the brand slot and the favicon; scripts/screenshots.sh — [#61](https://github.com/tcivie/eepview/pull/61)

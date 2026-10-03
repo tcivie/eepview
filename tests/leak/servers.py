@@ -63,7 +63,7 @@ def is_i2p(host: str) -> bool:
 def render(name: str, ports: dict) -> bytes:
     text = (PAGES_DIR / name).read_text(encoding="utf-8")
     if name.endswith(".html"):
-        for key in ("canary", "lan_tcp", "udp", "lan_udp"):
+        for key in ("canary", "lan_tcp", "udp", "lan_udp", "frame_wait"):
             text = text.replace(f"__{key.upper()}__", str(ports.get(key, "")))
     return text.encode()
 
@@ -72,6 +72,12 @@ class LeakHTTPServer(ThreadingHTTPServer):
     """The fake upstream. It carries the event log and the ports the pages point at."""
 
     daemon_threads = True
+    # The page fires a burst of parallel requests, and the gatekeeper opens one upstream
+    # connection for each. The socketserver default backlog is 5. On macOS a full listen
+    # queue drops the SYN, the client retries after about 1 s, and the gatekeeper gives up
+    # its UPSTREAM_CONNECT wait after 500 ms: it answers 502 and the request is lost. A real
+    # I2P router proxy has a large backlog, so the fake one must have one too.
+    request_queue_size = 128
 
     def __init__(self, log: EventLog, ports: dict) -> None:
         super().__init__(("127.0.0.1", 0), UpstreamHandler)

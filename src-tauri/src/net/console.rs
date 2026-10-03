@@ -5,7 +5,7 @@
 //! (`docs/wiki/router-console.md`).
 //!
 //! eepview shows router information but never changes the router configuration. It gives
-//! quick links to the router's own console pages instead. This module finds the console:
+//! one link to the router's own console instead. This module finds the console:
 //! the candidate ports come from the router configuration files and the defaults, and a
 //! candidate counts only when one loopback `GET` answers with that console's marker.
 //! Only [`probe`] and [`detect`] make a [`VerifiedConsole`].
@@ -43,20 +43,6 @@ pub const RECHECK_MISSES: u32 = 3;
 /// Most bytes read from one probe answer.
 const MAX_ANSWER: u64 = 512 * 1024;
 
-/// The page paths of each router type, in the quick-link order.
-const JAVA_PAGES: [(ConsolePage, &str); 5] = [
-    (ConsolePage::Home, "/home"),
-    (ConsolePage::Tunnels, "/tunnels"),
-    (ConsolePage::AddressBook, "/dns"),
-    (ConsolePage::Config, "/config"),
-    (ConsolePage::Logs, "/logs"),
-];
-const I2PD_PAGES: [(ConsolePage, &str); 3] = [
-    (ConsolePage::Home, "/"),
-    (ConsolePage::Tunnels, "/?page=tunnels"),
-    (ConsolePage::Config, "/?page=commands"),
-];
-
 /// Where each router keeps its configuration on this OS: an environment variable (empty
 /// for an absolute path) and the path under it.
 #[cfg(target_os = "macos")]
@@ -82,68 +68,7 @@ pub enum ConsoleKind {
     I2pd,
 }
 
-/// A console page that eepview links to.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "lowercase")]
-pub enum ConsolePage {
-    /// The console start page.
-    Home,
-    /// The tunnels of this router.
-    Tunnels,
-    /// The address book.
-    AddressBook,
-    /// The router settings.
-    Config,
-    /// The router logs.
-    Logs,
-}
-
-impl ConsolePage {
-    /// Every page, in the quick-link order.
-    pub const ALL: [Self; 5] = [
-        Self::Home,
-        Self::Tunnels,
-        Self::AddressBook,
-        Self::Config,
-        Self::Logs,
-    ];
-
-    /// The page of a page key (`home`, `tunnels`, `addressbook`, `config`, `logs`).
-    #[must_use]
-    pub fn parse(key: &str) -> Option<Self> {
-        Self::ALL.into_iter().find(|page| page.key() == key)
-    }
-
-    /// The page key, as the IPC contract spells it.
-    #[must_use]
-    pub const fn key(self) -> &'static str {
-        match self {
-            Self::Home => "home",
-            Self::Tunnels => "tunnels",
-            Self::AddressBook => "addressbook",
-            Self::Config => "config",
-            Self::Logs => "logs",
-        }
-    }
-}
-
-/// The path of `page` on a console of type `kind`. `None` when that router has no such page.
-#[must_use]
-pub fn page_path(kind: ConsoleKind, page: ConsolePage) -> Option<&'static str> {
-    pages_of(kind)
-        .iter()
-        .find(|(p, _)| *p == page)
-        .map(|(_, path)| *path)
-}
-
-fn pages_of(kind: ConsoleKind) -> &'static [(ConsolePage, &'static str)] {
-    match kind {
-        ConsoleKind::Java => &JAVA_PAGES,
-        ConsoleKind::I2pd => &I2PD_PAGES,
-    }
-}
-
-/// The path the probe asks for.
+/// The path the probe asks for. It is also the console home page that eepview opens (R7).
 #[must_use]
 pub const fn probe_path(kind: ConsoleKind) -> &'static str {
     match kind {
@@ -328,10 +253,12 @@ pub fn probe(kind: ConsoleKind, port: u16) -> Option<VerifiedConsole> {
     let version = answer
         .ok()
         .and_then(|(_, body)| console_version(kind, &body));
+    let home = Url::parse(&format!("http://127.0.0.1:{port}{}", probe_path(kind))).ok()?;
     Some(VerifiedConsole {
         kind,
         port,
         version,
+        home,
     })
 }
 
@@ -411,6 +338,7 @@ pub struct VerifiedConsole {
     kind: ConsoleKind,
     port: u16,
     version: Option<String>,
+    home: Url,
 }
 
 impl VerifiedConsole {
@@ -438,17 +366,10 @@ impl VerifiedConsole {
         format!("http://127.0.0.1:{}", self.port)
     }
 
-    /// The URL of `page`. `None` when this router has no such page.
+    /// The console home page: the origin plus the probe path (R7).
     #[must_use]
-    pub fn url(&self, page: ConsolePage) -> Option<Url> {
-        let path = page_path(self.kind, page)?;
-        Url::parse(&format!("{}{path}", self.origin())).ok()
-    }
-
-    /// The pages this router has, in the quick-link order.
-    #[must_use]
-    pub fn pages(&self) -> Vec<ConsolePage> {
-        pages_of(self.kind).iter().map(|(page, _)| *page).collect()
+    pub fn home(&self) -> Url {
+        self.home.clone()
     }
 
     /// True for a URL on the console origin: `http`, `127.0.0.1`, the console port.
@@ -507,7 +428,6 @@ impl VerifiedConsole {
             found: true,
             kind: Some(self.kind),
             origin: Some(self.origin()),
-            pages: self.pages(),
             version: self.version.clone(),
         }
     }
@@ -539,8 +459,6 @@ pub struct ConsoleInfo {
     pub kind: Option<ConsoleKind>,
     /// `http://127.0.0.1:<port>`, for display only.
     pub origin: Option<String>,
-    /// The pages it has, in the quick-link order.
-    pub pages: Vec<ConsolePage>,
     /// The router version read from the console, display only.
     pub version: Option<String>,
 }
@@ -553,7 +471,6 @@ impl ConsoleInfo {
             found: false,
             kind: None,
             origin: None,
-            pages: Vec::new(),
             version: None,
         }
     }

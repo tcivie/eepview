@@ -3,7 +3,7 @@
 
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { eepsiteUrl, internalPageOf, isI2pAddress, isInternal } from "./address.ts";
+import { addressBadge, eepsiteUrl, internalPageOf, isI2pAddress, isInternal } from "./address.ts";
 
 describe("isI2pAddress", () => {
   it("accepts .i2p and .b32.i2p hosts", () => {
@@ -56,5 +56,37 @@ describe("[ipc-contract window-layout] eepview:// pages", () => {
     assert.equal(isInternal("eepview://settings"), true);
     assert.equal(isInternal("http://notbob.i2p/"), false);
     assert.equal(internalPageOf("http://notbob.i2p/"), null);
+  });
+});
+
+describe("[router-console R26] the badge before the address", () => {
+  it("[router-console R26] a web tab shows the I2P badge, titled 'Opened over I2P'", () => {
+    const badge = addressBadge({ kind: "web", url: "http://notbob.i2p/" });
+    assert.deepEqual(badge, { text: "I2P", title: "Opened over I2P", kind: "i2p" });
+  });
+
+  it("[router-console R26] the console tab shows the Router console badge in place of I2P", () => {
+    const badge = addressBadge({ kind: "console", url: "http://127.0.0.1:7657/home" });
+    assert.deepEqual(badge, {
+      text: "Router console",
+      title: "The router's own console on this computer",
+      kind: "console",
+    });
+  });
+
+  it("[router-console R26] the console badge does not depend on the console page", () => {
+    for (const url of ["http://127.0.0.1:7657/home", "http://127.0.0.1:7070/", "about:blank"]) {
+      assert.equal(addressBadge({ kind: "console", url })?.kind, "console", url);
+    }
+  });
+
+  it("[router-console R26] an internal page shows no badge", () => {
+    assert.equal(addressBadge({ kind: "internal", url: "eepview://settings" }), null);
+    assert.equal(addressBadge({ kind: "internal", url: "eepview://home" }), null);
+  });
+
+  it("[router-console R26] no tab shows no badge", () => {
+    assert.equal(addressBadge(null), null);
+    assert.equal(addressBadge(undefined), null);
   });
 });

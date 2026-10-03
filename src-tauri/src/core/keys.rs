@@ -36,6 +36,8 @@ impl Core {
                 self.focus_on_commit = None;
                 ui("focus-address")
             }
+            // No find bar in the console tab (R25).
+            Action::Find if self.console_active() => Vec::new(),
             Action::Find => {
                 self.find_open = true;
                 let mut fx = ui("open-find");

@@ -4,6 +4,7 @@
 //! The browser state machine. Pure: commands and engine events go in, [`Effect`]s come out,
 //! and the shell (`shell/`) carries them out. No Tauri runtime here, so all of it is tested.
 
+mod console_tab;
 pub mod find;
 mod keys;
 mod library;
@@ -62,6 +63,25 @@ pub enum Effect {
     HoverLater(u64),
     /// Ask this host for its icon through the gatekeeper, then call [`Core::icon_fetched`].
     FetchIcon(String),
+    /// Act on the `console` webview of the console tab.
+    Console(ConsoleOp),
+}
+
+/// An operation on the `console` webview (`docs/wiki/router-console.md`, R27, R28).
+#[derive(Debug, Clone, PartialEq)]
+pub enum ConsoleOp {
+    /// One step back in the console tab.
+    Back,
+    /// One step forward in the console tab.
+    Forward,
+    /// Reload the console page.
+    Reload,
+    /// Reload the console page, bypassing the cache.
+    HardReload,
+    /// Stop loading the console page.
+    Stop,
+    /// Destroy the webview.
+    Close,
 }
 
 /// An event of the contract.
@@ -161,6 +181,8 @@ pub enum View {
     Internal(String),
     /// The `tab-<id>` webview.
     Web(u32),
+    /// The `console` webview of the console tab with this id.
+    Console(u32),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -196,6 +218,9 @@ pub struct Core {
     focus_on_commit: Option<u32>,
     /// The run of link tabs (L8): the opener and the last tab it opened. A tab change ends it.
     link_run: Option<(u32, u32)>,
+    /// The router console tab: it shows the `console` webview, never a `tab-*` one. At most
+    /// one (R24), and the only place that says which tab it is.
+    console_tab: Option<u32>,
 }
 
 impl Core {
@@ -233,6 +258,7 @@ impl Core {
             pointed: None,
             focus_on_commit: None,
             link_run: None,
+            console_tab: None,
         };
         // Effects are dropped: no UI listens yet, and a save error shows on the next save.
         let _ = core.sweep_icons();
@@ -289,6 +315,9 @@ impl Core {
         let Some(tab) = self.tabs.active() else {
             return View::Internal("eepview://home".into());
         };
+        if self.console_tab == Some(tab.id) {
+            return View::Console(tab.id);
+        }
         if !is_web(&tab.url) {
             return View::Internal(tab.url.clone());
         }
@@ -315,6 +344,9 @@ impl Core {
     }
 
     fn info_of(&self, tab: &Tab) -> TabInfo {
+        if self.console_tab == Some(tab.id) {
+            return self.console_info(tab);
+        }
         let web = is_web(&tab.url);
         let host = host_of(&tab.url);
         TabInfo {

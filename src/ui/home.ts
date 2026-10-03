@@ -2,12 +2,13 @@
 // SPDX-License-Identifier: MIT
 
 import "./boot.ts";
-import { renderConsoleLinks, shownInActiveTab, wireConsoleClicks } from "./console-nav.ts";
+import { renderConsoleLink, shownInActiveTab, wireConsoleClicks } from "./console-nav.ts";
 import type { Bookmark, ConsoleInfo, RouterStatus } from "./contract.ts";
 import { all, byId, cloneTemplate, setText } from "./dom.ts";
 import { call, errorText, on } from "./ipc.ts";
 import { displayUrl, hostOf } from "./lib/address.ts";
 import { routerVersion, shouldRedetect } from "./lib/console-links.ts";
+import { CRASH_TEXT, reportHref } from "./lib/report-page.ts";
 import { hopStates, versionText } from "./lib/router-view.ts";
 import { renderRouterSummary } from "./shared/router-summary.ts";
 import { renderSiteMark } from "./site-mark.ts";
@@ -72,13 +73,30 @@ function showVersion(): void {
 
 function renderConsole(info: ConsoleInfo): void {
   lastConsole = info;
-  renderConsoleLinks(
+  renderConsoleLink(
     { list: byId("console-links"), note: byId("console-note"), title: byId("console-title") },
     info,
   );
   showVersion();
 }
 
+function hideCrashBanner(): Promise<void> {
+  byId("crash-banner").hidden = true;
+  return call("diag_crash_dismiss", {}).catch(quiet);
+}
+
+function showCrashBanner(crashed: boolean): void {
+  byId("crash-text").textContent = CRASH_TEXT;
+  byId("crash-banner").hidden = !crashed;
+}
+
+byId("crash-dismiss").addEventListener("click", () => {
+  hideCrashBanner().catch(quiet);
+});
+byId("crash-report").addEventListener("click", () => {
+  hideCrashBanner().then(() => window.location.assign(reportHref("crash")));
+});
+call("diag_crash_status", {}).then(showCrashBanner).catch(quiet);
 loadTiles();
 wireConsoleClicks(byId("console-links"));
 shownInActiveTab("home")

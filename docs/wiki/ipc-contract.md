@@ -15,9 +15,11 @@ Change it in a PR that changes both sides, or keep the old form working as a shi
 - v1.3: `chrome_insets`, `chrome-insets-changed`, `window_fullscreen`, `status-size`, `status-side`; the bubble shows after 100 ms and hides at once.
 - v1.4: `TabInfo.icon`, `Bookmark.icon`, `HistoryEntry.icon`, `icons-changed`. See [Site icons](site-icons.md). [#53](https://github.com/tcivie/eepview/pull/53)
 - v1.2: `connection_pause`, `connection_resume`, `router_control`, `RouterStatus.paused` and `.managed`, `RouterStats.history`. The `outproxy` state is gone: VERIFY no longer asks for a clearnet host.
+- v1.3: `report_preview`, `report_open`, `diag_crash_status`, `diag_crash_dismiss`, `diag_logs_delete` (internal webview only); the `eepview://report` page; `EEPVIEW_LOG` is gone. See [Diagnostics and bug reports](diagnostics-and-bug-reports.md). Added in [#56](https://github.com/tcivie/eepview/pull/56).
 - Shipped in [#29](https://github.com/tcivie/eepview/pull/29).
 - v1.4: the `popup` webview, `popup_open`, `popup_size`, `popup_close`, `popup-show`, `popup-closed`, `popup-select`. `chrome_set_height` reports the find bar only; the toolbar never grows for a popup — [#55](https://github.com/tcivie/eepview/pull/55).
 - v1.5: `console_status`, `console_detect`, `console_open`, `console-changed`, `ConsoleInfo`, the `console` webview ([#54](https://github.com/tcivie/eepview/pull/54)).
+- v1.6: the console tab. `TabInfo.kind` adds `"console"`. `console_open()` takes no argument and opens the console home page in the console tab. `ConsoleInfo.pages`, `ConsolePage` and the `no-page` reason are gone ([#76](https://github.com/tcivie/eepview/pull/76)).
 
 ## Window layout
 
@@ -30,7 +32,7 @@ One OS window with several webviews (Tauri `unstable` multi-webview).
 | `status` | `src/ui/status.html` (bundled) | events only | The link-hover bubble, bottom left, over the content. |
 | `popup` | `src/ui/popup.html` (bundled) | popup commands | The toolbar popups (suggestions, menu, router panel, router hint). Transparent, hidden until a popup opens, then sized and placed to the popup's own rectangle, on top of every other webview. |
 | `tab-<id>-<n>` | remote `http(s)://*.i2p/` | NO | One per web tab. Only the active one is visible. |
-| `console` | the router console, `http://127.0.0.1:<port>` | NO | In its own window, `console-window`. Built only from a verified console. See [Router console](router-console.md). |
+| `console` | the router console, `http://127.0.0.1:<port>` | NO | Shown when the active tab is the console tab. There is at most one. Built only from a verified console. See [Router console](router-console.md). |
 
 On macOS the window has an overlay title bar with a hidden title. The traffic lights sit in the tab row. Windows and Linux keep the native decorations.
 
@@ -105,7 +107,7 @@ eepview shows router information and never changes the router configuration; the
 
 - `console_status() -> ConsoleInfo`: the stored detection result. It never probes.
 - `console_detect() -> ConsoleInfo`: probes now, off the main thread. The UI calls it when the router panel opens, when the home page or Settings loads as the active tab, and when `router-status` turns `ok` while such a page shows.
-- `console_open({page}) -> {ok: boolean, reason?: "no-console" | "no-page"}`: opens the page in the `console` window. `page` is a page key; an unknown key is an error.
+- `console_open() -> {ok: boolean, reason?: "no-console"}`: opens the console home page in the console tab. It selects the console tab if one is open, and makes one if none is.
 
 ### Window
 
@@ -116,6 +118,16 @@ eepview shows router information and never changes the router configuration; the
 - `platform() -> "macos" | "windows" | "linux"`
 - `window_fullscreen() -> boolean`
 - `chrome_insets() -> {left: number}`: the space the tab strip leaves on the left for the macOS window buttons. The shell centers the buttons on the tab row (y = 22), measures their frames, and answers their right edge plus their left margin, so the gap after the buttons equals the margin before them. 0 in full screen, and 0 on Windows and Linux (native title bar; the UI picks its own margin).
+
+### Diagnostics and reports
+
+Only the `internal` webview may call these (`capabilities/report.json`). `toolbar`, `status` and `tab-*` cannot.
+
+- `report_preview({kind, description, includeLog}) -> string`: exactly the text that goes out, scrubbed.
+- `report_open({kind, description, includeLog}) -> {file: string, trimmed: boolean}`: saves the report in Downloads, shows it in the file manager, and opens the prefilled GitHub issue in the system browser. `file` is the file name, no folder.
+- `diag_crash_status() -> boolean`: the last run crashed and the banner was not dismissed.
+- `diag_crash_dismiss()`
+- `diag_logs_delete()`: deletes the diagnostics log and the crash marker.
 
 ## Events
 
@@ -146,10 +158,10 @@ Rust sends them to `toolbar`, `internal`, `status` and `popup`.
 ## Types
 
 ```ts
-type TabInfo = { id: number; url: string; title: string; kind: "internal" | "web";
+type TabInfo = { id: number; url: string; title: string; kind: "internal" | "web" | "console";
   loading: boolean; canBack: boolean; canForward: boolean; active: boolean;
   zoom: number; jsOn: boolean; bookmarked: boolean;
-  icon: string | null };  // 32 px site icon, data:image/png;base64,…; null for internal tabs
+  icon: string | null };  // 32 px site icon, data:image/png;base64,…; null for internal and console tabs
 type NavResult = { ok: boolean; reason?: "not-i2p" | "router-down" | "invalid" };
 type Bookmark = { id: string; url: string; title: string; folder: string | null; created: number;
   icon: string | null };  // 64 px site icon
@@ -168,9 +180,8 @@ type RouterStats = { version: string | null; uptimeMs: number | null; networkSta
     in5m: number | null; out5m: number | null };
   tunnelBuildSuccessPercent: { exploratory: number | null; client: number | null };
   history: { t: number; in: number; out: number }[] };  // last 10 min, one sample per 5 s
-type ConsolePage = "home" | "tunnels" | "addressbook" | "config" | "logs";
 type ConsoleInfo = { found: boolean; kind: "java" | "i2pd" | null; origin: string | null;
-  pages: ConsolePage[]; version: string | null };  // origin and version: display only
+  version: string | null };  // origin and version: display only
 ```
 
 `icon` is a `data:image/png;base64,` URL that eepview drew itself, or `null`. `bookmark_update` and `bookmarks_import` ignore an `icon` they receive, and the stores never keep one. See [Site icons](site-icons.md).
@@ -187,7 +198,7 @@ New tab T, new window N (a new tab), close tab W, reopen closed tab Shift+T, nex
 
 See [ADR 0001](adr-0001-no-leak-architecture.md).
 
-- The `console` webview gets no IPC, no proxy and an engine rule list for its one origin. An `.i2p` link in it opens a normal tab.
+- The `console` webview gets no IPC, no proxy and an engine rule list for its one origin. An `.i2p` link in it opens a new normal tab. A console URL never loads in a `tab-*` webview.
 - `tab-*` webviews get no IPC, use the gatekeeper as proxy, run incognito unless `keepCookies`, and have WebRTC off.
 - No `tab-*` webview exists before VERIFY passes. When the router goes down, or you pause, every `tab-*` is destroyed.
 - New-window requests open as a new tab through the same guard. Downloads are refused with a toast.
@@ -201,7 +212,6 @@ See [ADR 0001](adr-0001-no-leak-architecture.md).
 | `EEPVIEW_EXIT_AFTER` | Quits with exit code 0 after this many seconds. |
 | `EEPVIEW_JS` | `off` turns page JavaScript off for every site. |
 | `EEPVIEW_ROUTER_STATUS`, `EEPVIEW_ROUTER_STATUS_TOKEN` | The router helper address and the file with its token, for `router_stats`. |
-| `EEPVIEW_LOG` | `1` prints load timings and router changes to stderr. |
 
 They exist in the release binary, for the leak test. None of them can weaken a layer.
 

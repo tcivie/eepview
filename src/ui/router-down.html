@@ -10,6 +10,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="light dark" />
     <title>The router stopped</title>
+    <link rel="icon" type="image/svg+xml" href="../../assets/brand/eepview-mark-small.svg" />
     <link rel="stylesheet" href="./theme.css" />
     <link rel="stylesheet" href="./ui.css" />
     <link rel="stylesheet" href="./pages.css" />
@@ -23,18 +24,18 @@
         <li class="hop"><span class="hop-node"></span>Hop</li>
         <li class="hop hop-end"><span class="hop-node"></span>Site</li>
       </ol>
-      <h1>The router stopped</h1>
-      <p class="notice-lede">
+      <h1 class="display">The router stopped</h1>
+      <p class="lede">
         eepview cannot reach eepsites while the I2P router is not running. It did not try any
         other route.
       </p>
 
-      <div class="notice-box retry" id="retry" data-phase="waiting">
+      <div class="banner banner-lg retry" data-tone="danger" id="retry" data-phase="waiting">
         <p class="retry-line">
           <span class="chip" data-tone="stopped" id="retry-chip">Stopped</span>
           <span id="retry-text">Restarting the router in 12 s.</span>
         </p>
-        <p class="notice-hint">Attempt <span class="num" id="retry-attempt">2</span> of 5. The router stopped at 14:02 with exit code 1.</p>
+        <p class="hint">Attempt <span class="num" id="retry-attempt">2</span> of 5. The router stopped at 14:02 with exit code 1.</p>
       </div>
 
       <p class="visually-hidden" id="retry-status" role="status" aria-live="polite"></p>
@@ -43,6 +44,7 @@
         <button class="btn btn-primary" type="button" id="retry-now">Restart now</button>
         <a class="btn" href="./stats.html">Router details</a>
       </div>
+      <p class="notice-hint"><a class="report-link" id="report-link" href="./report.html">Report this problem</a></p>
 
       <details class="log">
         <summary>Last lines of the router log</summary>

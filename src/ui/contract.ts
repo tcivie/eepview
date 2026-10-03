@@ -7,7 +7,7 @@ export type TabInfo = {
   id: number;
   url: string;
   title: string;
-  kind: "internal" | "web";
+  kind: "internal" | "web" | "console";
   loading: boolean;
   canBack: boolean;
   canForward: boolean;
@@ -97,19 +97,20 @@ export type RouterStats = {
   knownRouters: number | null;
   floodfills: number | null;
 };
-export type ConsolePage = "home" | "tunnels" | "addressbook" | "config" | "logs";
 export type ConsoleKind = "java" | "i2pd";
 export type ConsoleInfo = {
   found: boolean;
   kind: ConsoleKind | null;
   origin: string | null;
-  pages: ConsolePage[];
   version: string | null;
 };
-export type ConsoleOpenResult = { ok: boolean; reason?: "no-console" | "no-page" | null };
+export type ConsoleOpenResult = { ok: boolean; reason?: "no-console" | null };
 export type ClearRange = "hour" | "day" | "week" | "all";
 export type FindResult = { query: string; matches: number | null; active: number | null };
 export type Toast = { kind: string; text: string };
+
+export type ReportArgs = { kind: string; description: string; includeLog: boolean };
+export type ReportOpened = { file: string; trimmed: boolean };
 
 export interface Commands {
   tab_new: { args: { url?: string }; result: TabInfo };
@@ -151,7 +152,7 @@ export interface Commands {
   router_control: { args: { action: RouterAction }; result: undefined };
   console_status: { args: Record<string, never>; result: ConsoleInfo };
   console_detect: { args: Record<string, never>; result: ConsoleInfo };
-  console_open: { args: { page: ConsolePage }; result: ConsoleOpenResult };
+  console_open: { args: Record<string, never>; result: ConsoleOpenResult };
   connection_pause: { args: Record<string, never>; result: undefined };
   connection_resume: { args: Record<string, never>; result: undefined };
   chrome_set_height: { args: { px: number }; result: undefined };
@@ -164,6 +165,11 @@ export interface Commands {
   };
   popup_size: { args: { id: number; width: number; height: number }; result: undefined };
   popup_close: { args: { id: number; refocus?: boolean }; result: undefined };
+  report_preview: { args: ReportArgs; result: string };
+  report_open: { args: ReportArgs; result: ReportOpened };
+  diag_crash_status: { args: Record<string, never>; result: boolean };
+  diag_crash_dismiss: { args: Record<string, never>; result: undefined };
+  diag_logs_delete: { args: Record<string, never>; result: undefined };
 }
 
 export interface Events {

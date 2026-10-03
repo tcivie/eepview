@@ -20,6 +20,12 @@ The router console view is not a leak path for eepsites:
 |---|---|
 | `console` (router console) | It loads only the detected console origin, `http://127.0.0.1:<port>`, after an engine rule list that allows only that origin (macOS, Windows). An eepsite can never load in it: an `.i2p` link opens in a normal tab through L4, and anything else is cancelled. No `tab-*` webview can reach it, because the tabs keep L1–L5 and loopback stays blocked for them. It has no IPC, WebRTC is off, and no probe runs at start. See [Router console](router-console.md) and [ADR 0001](adr-0001-no-leak-architecture.md#router-console-exception). |
 
+### The one clearnet action: Report a problem
+
+| Path | Why it is not a leak |
+|---|---|
+| "Open a GitHub issue" on `eepview://report` | It runs only after the user's click. eepview opens no socket: the system browser opens the page, outside eepview and outside I2P. The URL always starts with the fixed prefix `https://github.com/tcivie/eepview/issues/new`, and its text is the scrubbed preview the user just read. Only the `internal` webview may call it, and JavaScript gets no opener permission. See [Diagnostics and bug reports](diagnostics-and-bug-reports.md). |
+
 JavaScript is on. The layers sit below JavaScript, so they hold with it on. You can turn it off per site.
 
 ## How to use / run locally
@@ -31,8 +37,11 @@ JavaScript is on. The layers sit below JavaScript, so they hold with it on. You 
 
 - No OS-level layer yet (L6, see the [roadmap](roadmap.md)).
 - Linux has no engine rule list yet (L3b); the page policy covers it. The console view has no page policy, so on Linux it relies on its navigation guard and the router's own pages.
+- The L3b rule list allows exactly the hosts of the one host predicate: after the `.i2p` allow rule it blocks `xn--` labels, `b32.i2p`, short `*.b32.i2p` names and port 0 again, and allows a `b32` name of 52 base32 characters or more. The WebKit regex subset has no `|`, so each form is a rule of its own, in order.
 
 ## History
 
+- 2026-10-03 — The report path, the only clearnet action, after a click — [#56](https://github.com/tcivie/eepview/pull/56)
 - 2026-10-03 — Five layers, the platform bridge and the architecture test — [#29](https://github.com/tcivie/eepview/pull/29)
 - 2026-10-03 — Router console view: not a leak path for eepsites — [#54](https://github.com/tcivie/eepview/pull/54)
+- 2026-10-03 — The L3b rule list accepts exactly what the host predicate accepts — [#69](https://github.com/tcivie/eepview/pull/69)

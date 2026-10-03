@@ -10,6 +10,7 @@
 
 pub mod context_menu;
 pub mod core;
+pub mod diag;
 pub mod hover;
 pub mod icons;
 pub mod input;

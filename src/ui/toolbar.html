@@ -24,7 +24,7 @@
           <span class="visually-hidden">New tab</span>
         </button>
         <div class="tab-drag" data-tauri-drag-region></div>
-        <p class="toast" id="toast" role="status" aria-live="polite" hidden></p>
+        <p class="popover toast" id="toast" role="status" aria-live="polite" hidden></p>
       </div>
 
       <div class="navrow">
@@ -69,7 +69,7 @@
             autocapitalize="off"
             placeholder="Enter an .i2p address"
           />
-          <button class="icon-btn address-star" type="button" id="star" aria-pressed="false" title="Bookmark this page">
+          <button class="icon-btn icon-btn-sm address-star" type="button" id="star" aria-pressed="false" title="Bookmark this page">
             <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
               <path d="m12 4.5 2.3 4.7 5.2.8-3.75 3.6.9 5.15L12 16.3l-4.65 2.45.9-5.15L4.5 10l5.2-.8z" />
             </svg>
@@ -100,7 +100,7 @@
           </button>
           <span class="status-anchor">
             <button
-              class="status-btn"
+              class="icon-btn status-btn"
               type="button"
               id="status"
               data-tone="building"
@@ -108,7 +108,7 @@
               aria-haspopup="dialog"
               aria-expanded="false"
             >
-              <span class="status-dot" aria-hidden="true"></span>
+              <span class="dot" aria-hidden="true"></span>
               <span class="visually-hidden" id="status-label">Router: checking</span>
             </button>
             <div class="visually-hidden" id="status-tip">
@@ -136,8 +136,8 @@
 
       <form class="findbar" id="findbar" aria-label="Find in page" hidden>
         <label class="visually-hidden" for="find-input">Find in page</label>
-        <input class="find-input" id="find-input" type="text" placeholder="Find in page" spellcheck="false" />
-        <span class="find-count" id="find-count" role="status" aria-live="polite"></span>
+        <input class="input input-sm find-input" id="find-input" type="text" placeholder="Find in page" spellcheck="false" />
+        <span class="caption num find-count" id="find-count" role="status" aria-live="polite"></span>
         <button class="icon-btn" type="button" id="find-prev" title="Previous match">
           <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 15 6-6 6 6" /></svg>
           <span class="visually-hidden">Previous match</span>
@@ -146,7 +146,7 @@
           <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
           <span class="visually-hidden">Next match</span>
         </button>
-        <button class="icon-btn find-case" type="button" id="find-case" aria-pressed="false" title="Match case">
+        <button class="icon-btn icon-btn-text find-case" type="button" id="find-case" aria-pressed="false" title="Match case">
           <span aria-hidden="true">Aa</span>
           <span class="visually-hidden">Match case</span>
         </button>
@@ -159,9 +159,9 @@
 
     <template id="tab-template">
       <div class="tab" role="tab" aria-selected="false" tabindex="-1" draggable="true">
-        <span class="tab-icon" aria-hidden="true">E</span>
+        <span class="letter-icon tab-icon" aria-hidden="true">E</span>
         <span class="tab-title">Tab</span>
-        <button class="tab-close" type="button" tabindex="-1" title="Close tab">
+        <button class="icon-btn icon-btn-sm tab-close" type="button" tabindex="-1" title="Close tab">
           <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m8 8 8 8M16 8l-8 8" /></svg>
           <span class="visually-hidden">Close tab</span>
         </button>

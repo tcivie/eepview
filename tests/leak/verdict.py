@@ -112,8 +112,14 @@ def page_rows(log: EventLog, run: Run) -> list[tuple]:
 def script_rows(log: EventLog, run: str) -> list[tuple]:
     done, frame = report(log, run, "done"), report(log, run, "frame_js")
     form, location = report(log, run, "nav_form"), report(log, run, "nav_location")
+    waited = report(log, run, "frame_wait")
     return [
         ("script fired every vector", "pass" if done else "FAIL", f"done={done}"),
+        (
+            "frame probes finished before the page left",
+            "pass" if waited == "done" else "FAIL",
+            f"frame_wait={waited}",
+        ),
         (
             "form submit vector fired",
             "pass" if form else "FAIL",

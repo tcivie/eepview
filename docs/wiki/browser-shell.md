@@ -24,7 +24,7 @@ The Rust side of the browser, in `src-tauri/`: tabs, navigation, bookmarks, hist
 - Back and forward follow the standard per-tab session history: a new navigation clears the forward list, and back and forward never leave the tab's own history.
 - `bookmark_add` refuses a non-I2P URL with `not-i2p`.
 - Hand-edited store files are not trusted: a settings homepage that is not an I2P site or an internal page falls back to `eepview://home`; history keeps only I2P entries, newest first, at most 10 000.
-- Gatekeeper: duplicate `Content-Length` headers are refused with 400; a request body cut short closes both sides at once.
+- Gatekeeper: a bare CR in the request line or a header, and a bare LF in a header value, get 400 and nothing goes upstream (RFC 9112), also inside a `CONNECT` tunnel; duplicate `Content-Length` headers are refused with 400; a request body cut short closes both sides at once.
 
 ## Requirements (UX batch 1)
 
@@ -88,12 +88,12 @@ The `popup` webview may call: `popup_size`, `popup_close`, `navigate`, `tab_new`
 
 ## Router console
 
-eepview shows router information but never changes the router configuration. It finds the console of the router in use (Java I2P or i2pd) on loopback and gives quick links to it: Console, Tunnels, Address book, Config and Logs. The links show in the router panel, on the home page and in Settings. A link opens the router's own page in a separate `Router console` window. With no console, one line says "No router console found". Details: [Router console](router-console.md).
+eepview shows router information but never changes the router configuration. It finds the console of the router in use (Java I2P or i2pd) on loopback and gives one link to it, "I2P Router Console". The link shows in the router panel, on the home page and in Settings. It opens the console home page in the console tab. The console tab is a tab of its own kind in the tab strip, and it shows the `console` webview in the content area. There is at most one console tab. Back, forward, reload and stop work in it. The address bar shows the console URL with a `Router console` badge. With no console, one line says "No router console found". Details: [Router console](router-console.md).
 
 ## How to use / run locally
 
 - `npm run tauri dev` with an I2P router on `127.0.0.1:4444`.
-- `EEPVIEW_PROXY=127.0.0.1:<port>` picks another router proxy. `EEPVIEW_START_URL`, `EEPVIEW_EXIT_AFTER`, `EEPVIEW_JS=off` and `EEPVIEW_LOG=1` are listed in the [IPC contract](ipc-contract.md#environment-and-command-line).
+- `EEPVIEW_PROXY=127.0.0.1:<port>` picks another router proxy. `EEPVIEW_START_URL`, `EEPVIEW_EXIT_AFTER`, and `EEPVIEW_JS=off` are listed in the [IPC contract](ipc-contract.md#environment-and-command-line).
 - Tests: `cargo test --workspace` in `src-tauri`.
 
 ## Limits
@@ -111,3 +111,5 @@ eepview shows router information but never changes the router configuration. It 
 - 2026-10-03 — Site icons in tabs, bookmarks and history — [#53](https://github.com/tcivie/eepview/pull/53)
 - 2026-10-03 — Toolbar popups in their own `popup` webview; the toolbar stays 84 px — [#55](https://github.com/tcivie/eepview/pull/55)
 - 2026-10-03 — Router console quick links and the console window — [#54](https://github.com/tcivie/eepview/pull/54)
+- 2026-10-03 — The address bar refuses a dot host with a port instead of panicking; the gatekeeper refuses a bare CR or LF in a head — [#69](https://github.com/tcivie/eepview/pull/69)
+- 2026-10-03 — The router console opens in a console tab, with one console link — [#76](https://github.com/tcivie/eepview/pull/76)

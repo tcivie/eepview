@@ -15,7 +15,7 @@ pub struct TabInfo {
     pub url: String,
     /// Page title.
     pub title: String,
-    /// `"internal"` or `"web"`.
+    /// `"internal"`, `"web"` or `"console"` (the router console tab).
     pub kind: &'static str,
     /// Load and history state.
     #[serde(flatten)]
@@ -220,8 +220,8 @@ impl RouterStatus {
 pub struct ControlResult {
     /// True when the router did what was asked.
     pub ok: bool,
-    /// Why not: `external` while eepview does not run the router; `no-console` or `no-page`
-    /// for `console_open`.
+    /// Why not: `external` while eepview does not run the router; `no-console` for
+    /// `console_open`.
     pub reason: Option<&'static str>,
 }
 

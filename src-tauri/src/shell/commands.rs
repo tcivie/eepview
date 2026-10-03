@@ -14,7 +14,7 @@ use super::popup::Anchor;
 use super::state::{lock, now_ms, shared};
 use crate::core::find::Zoom;
 use crate::core::{Core, Effect};
-use crate::net::console::{ConsoleInfo, ConsolePage};
+use crate::net::console::ConsoleInfo;
 use crate::net::loopback::LoopbackAddr;
 use crate::net::stats::RouterStats;
 use crate::popup::Kind;
@@ -32,7 +32,7 @@ type Res<T> = Result<T, String>;
 /// Runs blocking work on a worker thread. Every command that takes the app is `async` and
 /// does its work here: a plain `fn` command runs on the main thread, and core calls may write
 /// a store file, wait on a lock or reach the router.
-async fn blocking<T: Send + 'static>(f: impl FnOnce() -> T + Send + 'static) -> Res<T> {
+pub(super) async fn blocking<T: Send + 'static>(f: impl FnOnce() -> T + Send + 'static) -> Res<T> {
     tauri::async_runtime::spawn_blocking(f)
         .await
         .map_err(|e| e.to_string())
@@ -58,7 +58,13 @@ fn queue<R: Runtime>(app: AppHandle<R>, fx: Vec<Effect>) {
     }
     let runner = app.clone();
     if let Err(e) = runner.run_on_main_thread(move || apply(&app, fx)) {
-        super::log::error("main thread", &e.to_string());
+        crate::diag::event(
+            crate::diag::Code::ThreadFailed,
+            &[
+                crate::diag::Field::Op(crate::diag::OpKind::MainThread),
+                crate::diag::Field::Error((&e).into()),
+            ],
+        );
     }
 }
 
@@ -71,7 +77,7 @@ async fn act<R: Runtime>(
 }
 
 /// Reads from the core.
-async fn read<T: Send + 'static, R: Runtime>(
+pub(super) async fn read<T: Send + 'static, R: Runtime>(
     app: AppHandle<R>,
     f: impl FnOnce(&Core) -> T + Send + 'static,
 ) -> Res<T> {
@@ -509,36 +515,30 @@ pub async fn console_detect<R: Runtime>(app: AppHandle<R>) -> ConsoleInfo {
     detect.await.unwrap_or_else(|_| ConsoleInfo::none())
 }
 
-/// `console_open({page})`: opens a page of the detected router console in the console
-/// window. Async, so the window is never built inside a main-thread command.
+/// `console_open()`: opens the home page of the detected router console in the console
+/// tab (R12, R24). Async, so the webview is never built inside a main-thread command.
 ///
 /// # Errors
 ///
-/// Fails for an unknown page key, or when the window cannot be built.
+/// Fails when the console webview cannot be built.
 #[tauri::command]
-pub async fn console_open<R: Runtime>(app: AppHandle<R>, page: String) -> Res<ControlResult> {
-    let page = ConsolePage::parse(&page).ok_or_else(|| format!("unknown console page: {page}"))?;
-    open_console(&app, page)
+pub async fn console_open<R: Runtime>(app: AppHandle<R>) -> Res<ControlResult> {
+    open_console(&app)
 }
 
-/// Opens `page` of the stored console: `no-console` without one, `no-page` when this
-/// router has no such page.
+/// Opens the stored console in the console tab: `no-console` without one.
 ///
 /// # Errors
 ///
-/// Fails when the window cannot be built.
-pub fn open_console<R: Runtime>(app: &AppHandle<R>, page: ConsolePage) -> Res<ControlResult> {
-    let refused = |reason| ControlResult {
-        ok: false,
-        reason: Some(reason),
-    };
+/// Fails when the console webview cannot be built.
+pub fn open_console<R: Runtime>(app: &AppHandle<R>) -> Res<ControlResult> {
     let Some(console) = super::console::current(app) else {
-        return Ok(refused("no-console"));
+        return Ok(ControlResult {
+            ok: false,
+            reason: Some("no-console"),
+        });
     };
-    if console.url(page).is_none() {
-        return Ok(refused("no-page"));
-    }
-    super::console::ConsoleWebview::open(app, &console, page).map_err(|e| e.to_string())?;
+    super::console::ConsoleWebview::open(app, &console).map_err(|e| e.to_string())?;
     Ok(ControlResult {
         ok: true,
         reason: None,
