@@ -15,6 +15,9 @@ use std::path::{Path, PathBuf};
 
 type Res<T> = Result<T, Box<dyn Error>>;
 
+/// The one factory of the router console view (R8).
+const CONSOLE: &str = "src/shell/console.rs";
+
 /// The crate root (`src-tauri/`).
 fn root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -74,13 +77,14 @@ fn only_in(token: &str, allowed: &[&str]) -> io::Result<()> {
 
 #[test]
 fn one_factory_builds_remote_webviews() {
-    let factories = ["src/shell/content.rs", "src/shell/chrome.rs"];
+    // Tabs: content.rs. The router console view (R8): console.rs, and nothing else.
+    let factories = ["src/shell/content.rs", "src/shell/chrome.rs", CONSOLE];
     only_in("WebviewBuilder::new", &factories).unwrap();
     only_in("on_navigation", &factories).unwrap();
     only_in("add_child", &factories).unwrap();
     only_in("proxy_url", &["src/shell/content.rs"]).unwrap();
-    only_in("WebviewUrl::External", &["src/shell/content.rs"]).unwrap();
-    only_in("WebviewWindowBuilder", &[]).unwrap();
+    only_in("WebviewUrl::External", &["src/shell/content.rs", CONSOLE]).unwrap();
+    only_in("WebviewWindowBuilder", &[CONSOLE]).unwrap();
 }
 
 #[test]
@@ -614,5 +618,268 @@ fn r34_the_ipc_contract_declares_the_icons_changed_event_and_the_icon_fields() {
             contract[start..end].contains("icon: string | null;"),
             "{name} has no icon (R31)"
         );
+    }
+}
+
+// ---------------------------------------------------------------- router console
+
+/// The code of a file as one string, up to its test module.
+fn prod_code(file: &str) -> Res<String> {
+    let lines = code(&root().join(file))?;
+    let end = lines
+        .windows(2)
+        .position(|w| w[0].trim() == "#[cfg(test)]" && w[1].trim_start().starts_with("mod tests"))
+        .unwrap_or(lines.len());
+    Ok(lines[..end].join("\n"))
+}
+
+/// The signature text of `pub fn <name>`: from the name to the opening brace.
+fn signature(text: &str, name: &str) -> Option<String> {
+    let start = text.find(&format!("pub fn {name}"))?;
+    let rest = &text[start..];
+    Some(rest[..rest.find('{')?].to_owned())
+}
+
+/// Fails when `token` is used in any app file whose path starts with none of `prefixes`.
+fn only_under(token: &str, prefixes: &[&str]) -> io::Result<()> {
+    for file in users(token)? {
+        assert!(
+            prefixes.iter().any(|p| file.starts_with(p)),
+            "`{token}` is used in {file}; only {prefixes:?} may use it"
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn r8_the_console_label_is_named_only_in_the_console_factory() {
+    // R8: never a tab-* webview, never the content-webview factory.
+    for file in ["src/shell/content.rs", "src/shell/chrome.rs"] {
+        let text = prod_code(file).unwrap();
+        for token in [
+            "\"console\"",
+            "\"console-window\"",
+            "CONSOLE_LABEL",
+            "CONSOLE_WINDOW",
+        ] {
+            assert!(!text.contains(token), "{file} names {token}");
+        }
+    }
+    let console = prod_code(CONSOLE).unwrap();
+    assert!(
+        !console.contains("\"tab-"),
+        "the console is not a tab webview"
+    );
+    assert!(
+        !console.contains("content::"),
+        "the console never uses the content factory"
+    );
+}
+
+#[test]
+fn r8_the_console_constructor_takes_a_verified_console() {
+    // R8: its constructor takes a `&VerifiedConsole`.
+    let text = prod_code(CONSOLE).unwrap();
+    let sig = signature(&text, "open").expect("pub fn open in console.rs");
+    assert!(sig.contains("&VerifiedConsole"), "{sig}");
+}
+
+#[test]
+fn r5_only_the_detector_makes_a_verified_console() {
+    // R5: private fields; no struct literal outside net/console.
+    for file in users("VerifiedConsole {").unwrap() {
+        assert!(
+            file.starts_with("src/net/console"),
+            "{file} builds or declares a VerifiedConsole"
+        );
+    }
+    for file in rust_files(&root().join("src/net")).unwrap() {
+        if !rel(&file).starts_with("src/net/console") {
+            continue;
+        }
+        let text = code(&file).unwrap().join("\n");
+        if let Some(at) = text.find("pub struct VerifiedConsole") {
+            let decl = &text[at + "pub struct VerifiedConsole".len()..];
+            let end = decl.find(['}', ';']).unwrap_or(decl.len());
+            assert!(
+                !decl[..end].contains("pub "),
+                "VerifiedConsole has a public field"
+            );
+        }
+    }
+}
+
+#[test]
+fn r4_the_probe_lives_in_net_and_connects_through_loopback_addr() {
+    // R4: only through LoopbackAddr to 127.0.0.1; ADR 0001 rule 2.
+    let text = prod_code("src/net/console.rs").unwrap();
+    assert!(
+        text.contains("LoopbackAddr"),
+        "the probe must use LoopbackAddr"
+    );
+    for token in [
+        "TcpStream::connect",
+        "connect_timeout",
+        "UdpSocket",
+        "localhost",
+    ] {
+        assert!(!text.contains(token), "src/net/console.rs uses {token}");
+    }
+    let shell = prod_code(CONSOLE).unwrap();
+    for token in ["TcpStream", "LoopbackAddr::connect", "TcpListener"] {
+        assert!(!shell.contains(token), "the shell console uses {token}");
+    }
+}
+
+#[test]
+fn r11_the_console_view_is_hardened() {
+    // R11: no proxy_url, WebRTC off in every frame, downloads refused, JavaScript on,
+    // incognito. R10: navigations and new windows go through the route.
+    let text = prod_code(CONSOLE).unwrap();
+    for call in [
+        ".incognito(true)",
+        ".initialization_script_for_all_frames(webrtc_off())",
+        ".on_download(",
+        ".on_navigation(",
+        ".on_new_window(",
+        ".route(",
+        "NewWindowResponse::Deny",
+    ] {
+        assert!(text.contains(call), "console.rs must call {call}");
+    }
+    for token in [
+        "proxy_url",
+        "disable_javascript",
+        "gatekeeper",
+        "Gatekeeper",
+    ] {
+        assert!(!text.contains(token), "console.rs must not use {token}");
+    }
+}
+
+/// The webview labels a capability names, as one lower-case string.
+fn label_text(cap: &serde_json::Value) -> String {
+    labels(cap).join(" ").to_ascii_lowercase()
+}
+
+#[test]
+fn r11_no_capability_grants_anything_to_the_console() {
+    // R11 and R14: no IPC capability, no capability names the console webview or window.
+    for (file, cap) in capabilities().unwrap() {
+        assert!(
+            !label_text(&cap).contains("console"),
+            "{file} names the console"
+        );
+        for label in labels(&cap) {
+            assert!(!label.contains('*'), "{file} grants by glob {label}");
+        }
+        assert!(cap.get("windows").is_none(), "{file} grants by window");
+        assert!(cap.get("remote").is_none(), "{file} grants remote URLs");
+    }
+}
+
+#[test]
+fn r14_proxy_url_stays_only_in_content_rs() {
+    // R14: the tab layers do not change, and the console adds no second proxy path.
+    only_in("proxy_url", &["src/shell/content.rs"]).unwrap();
+    only_in("windows_proxy_args(", &["src/shell/content.rs"]).unwrap();
+}
+
+#[test]
+fn r14_tab_code_never_gets_a_loopback_url() {
+    // R14: a tab-* webview never receives a loopback URL: the tab code does not know the
+    // console, and it names no loopback page.
+    for file in ["src/shell/content.rs", "src/nav.rs", "src/tabs.rs"] {
+        let text = prod_code(file).unwrap();
+        for token in [
+            "VerifiedConsole",
+            "ConsoleWebview",
+            "ConsolePage",
+            "net::console",
+            "shell::console",
+        ] {
+            assert!(!text.contains(token), "{file} uses {token}");
+        }
+        for token in ["127.0.0.1", "localhost", "[::1]"] {
+            assert!(
+                !text.contains(token),
+                "{file} names the loopback host {token}"
+            );
+        }
+    }
+}
+
+#[test]
+fn r14_the_gatekeeper_never_sees_the_console() {
+    // The console view never uses the gatekeeper, and the gatekeeper never knows it.
+    for file in rust_files(&root().join("src/net")).unwrap() {
+        let name = rel(&file);
+        if name.starts_with("src/net/gatekeeper") {
+            let text = code(&file).unwrap().join("\n");
+            assert!(!text.contains("console"), "{name} names the console");
+        }
+    }
+}
+
+/// The text of every file under `src/shell/commands` and `src/shell/commands.rs`.
+fn commands_text() -> Res<String> {
+    let mut out = String::new();
+    for file in rust_files(&root().join("src/shell"))? {
+        if rel(&file).starts_with("src/shell/commands") {
+            out.push_str(&code(&file)?.join("\n"));
+        }
+    }
+    Ok(out)
+}
+
+#[test]
+fn r6_the_console_commands_are_in_the_contract() {
+    // R12, R13, R6: console_open, console_status and console_detect are IPC commands.
+    let module = prod_code("src/shell/mod.rs").unwrap();
+    for command in ["console_open", "console_status", "console_detect"] {
+        assert!(
+            module.contains(&format!("commands::{command}")),
+            "{command} not in the handler"
+        );
+    }
+}
+
+#[test]
+fn r6_console_detect_runs_off_the_main_thread() {
+    // R6: `console_detect()` probes off the main thread.
+    let text = commands_text().unwrap();
+    let at = text
+        .find("fn console_detect")
+        .expect("console_detect command");
+    let before = &text[at.saturating_sub(12)..at];
+    let after = &text[at..(at + 800).min(text.len())];
+    assert!(
+        before.contains("async") || after.contains("spawn"),
+        "console_detect must be async or spawn a thread"
+    );
+}
+
+#[test]
+fn r6_nothing_on_the_start_up_path_detects_a_console() {
+    // R6: eepview never probes at start. Detection is called only from the console module
+    // and the commands; the start-up files never name it.
+    for token in ["detect_here(", "detect_now("] {
+        only_under(
+            token,
+            &["src/net/console", "src/shell/console", "src/shell/commands"],
+        )
+        .unwrap();
+    }
+    for file in [
+        "src/shell/mod.rs",
+        "src/shell/watch.rs",
+        "src/shell/chrome.rs",
+        "src/shell/view.rs",
+        "src/shell/apply.rs",
+    ] {
+        let text = prod_code(file).unwrap();
+        for token in ["detect_here", "detect_now", "console::detect"] {
+            assert!(!text.contains(token), "{file} names {token}");
+        }
     }
 }
