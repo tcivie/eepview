@@ -74,6 +74,10 @@ export function setThemeStore(next: ThemeStore): void {
   applyTheme(reviewOverride() ?? store.get());
 }
 
+export function adoptPref(pref: ThemePref): void {
+  if (reviewOverride() === null) applyTheme(pref);
+}
+
 export function onThemeChange(listener: (p: ThemePref) => void): () => void {
   listeners.add(listener);
   return () => listeners.delete(listener);

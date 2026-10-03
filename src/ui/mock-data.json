@@ -1,0 +1,62 @@
+{
+  "proxy": "127.0.0.1:4444",
+  "routerVersion": "2.10.0",
+  "historySize": 160,
+  "bookmarks": [
+    { "site": "stats.i2p/", "title": "Network statistics", "folder": null, "ageDays": 30 },
+    { "site": "i2p-projekt.i2p/", "title": "The I2P project", "folder": null, "ageDays": 30 },
+    { "site": "reg.i2p/", "title": "Address registry", "folder": null, "ageDays": 30 },
+    { "site": "notbob.i2p/", "title": "Site uptime list", "folder": null, "ageDays": 30 },
+    { "site": "i2pforum.i2p/", "title": "I2P Forum", "folder": "Forums", "ageDays": 12 },
+    { "site": "zzz.i2p/", "title": "zzz.i2p development forum", "folder": "Forums", "ageDays": 9 },
+    { "site": "ramble.i2p/", "title": "Ramble", "folder": "Forums", "ageDays": 4 },
+    { "site": "planet.i2p/", "title": "Planet I2P", "folder": "Reading", "ageDays": 3 },
+    {
+      "site": "ukeu3k5oycgaauneqgtnvselmt4yemvoilkln7jpvamvfx7dnkdq.b32.i2p/",
+      "title": "Book club",
+      "folder": "Reading",
+      "ageDays": 2
+    }
+  ],
+  "history": [
+    { "site": "notbob.i2p/uptime", "title": "Site uptime list" },
+    { "site": "zzz.i2p/topics/3561", "title": "zzz.i2p: Proposal 168, tunnel bandwidth" },
+    { "site": "stats.i2p/cgi-bin/newhosts.txt", "title": "New hosts" },
+    { "site": "ramble.i2p/f/privacy", "title": "Ramble: privacy" },
+    { "site": "i2pforum.i2p/viewforum.php?f=8", "title": "I2P Forum: general discussion" },
+    { "site": "planet.i2p/", "title": "Planet I2P" },
+    { "site": "i2p-projekt.i2p/en/docs/how/tunnel-routing", "title": "Tunnel routing" },
+    { "site": "reg.i2p/hosts", "title": "Address registry: recent hosts" },
+    { "site": "legwork.i2p/search?q=gardening", "title": "Legwork search: gardening" }
+  ],
+  "tabs": [
+    {
+      "url": "eepview://home",
+      "title": "Home",
+      "active": false,
+      "loading": false,
+      "bookmarked": false
+    },
+    {
+      "site": "notbob.i2p/uptime",
+      "title": "Site uptime list",
+      "active": true,
+      "loading": false,
+      "bookmarked": true
+    },
+    {
+      "site": "zzz.i2p/topics/3561",
+      "title": "zzz.i2p: Proposal 168, tunnel bandwidth",
+      "active": false,
+      "loading": true,
+      "bookmarked": false
+    },
+    {
+      "url": "eepview://history",
+      "title": "History",
+      "active": false,
+      "loading": false,
+      "bookmarked": false
+    }
+  ]
+}
