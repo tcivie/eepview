@@ -21,5 +21,8 @@ pre-commit:
     - name: complexity
       glob: "*.{rs,ts}"
       run: ./scripts/complexity.sh
+    - name: palette
+      glob: "*.{css,html,ts,svg,md,txt}"
+      run: ./scripts/palette-check.sh
     - name: gitleaks
       run: gitleaks git --staged --no-banner --redact
