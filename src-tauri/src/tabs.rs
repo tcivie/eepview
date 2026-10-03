@@ -29,6 +29,8 @@ pub struct Tab {
     pub web_title: String,
     /// The page of the current load failed (an error page): it is not saved in history.
     pub failed: bool,
+    /// The router console tab: it shows the `console` webview, never a `tab-*` one.
+    pub console: bool,
 }
 
 impl Tab {
@@ -43,6 +45,7 @@ impl Tab {
             web_url: None,
             web_title: String::new(),
             failed: false,
+            console: false,
         }
     }
 }
@@ -104,10 +107,13 @@ impl Tabs {
     pub fn close(&mut self, id: u32, home: &str) -> Option<Tab> {
         let index = self.index_of(id)?;
         let tab = self.list.remove(index);
-        self.closed.push(Closed {
-            url: tab.url.clone(),
-            index,
-        });
+        // The console tab is never reopened: only `console_open` makes one.
+        if !tab.console {
+            self.closed.push(Closed {
+                url: tab.url.clone(),
+                index,
+            });
+        }
         if self.closed.len() > MAX_CLOSED {
             self.closed.remove(0);
         }
@@ -117,6 +123,16 @@ impl Tabs {
             self.active = self.list[index.min(self.list.len() - 1)].id;
         }
         Some(tab)
+    }
+
+    /// Puts a fresh tab showing `url` in the place of tab `id`, with the same id: a new
+    /// back/forward list and no live webview. False when it does not exist.
+    pub fn reset(&mut self, id: u32, url: &str) -> bool {
+        let Some(tab) = self.get_mut(id) else {
+            return false;
+        };
+        *tab = Tab::new(id, url);
+        true
     }
 
     /// Makes a tab active. False when it does not exist.

@@ -39,6 +39,7 @@ function fillTab(el: HTMLElement, tab: TabInfo): void {
   el.title = title;
   el.classList.toggle("is-loading", tab.loading);
   el.classList.toggle("is-internal", tab.kind === "internal");
+  el.classList.toggle("is-console", tab.kind === "console");
   const icon = el.querySelector(".tab-icon");
   if (icon) fillIcon(icon, tab);
   const label = el.querySelector(".tab-title");

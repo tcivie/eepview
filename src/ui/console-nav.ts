@@ -1,11 +1,11 @@
 // SPDX-FileCopyrightText: 2026 The eepview contributors
 // SPDX-License-Identifier: MIT
 
-// Router console quick links: buttons that call console_open. No page holds a link to the
-// console address itself.
-import type { ConsoleInfo, ConsolePage } from "./contract.ts";
+// The router console link: one button that calls console_open, which opens the console
+// home page in the console tab. No page holds a link to the console address itself.
+import type { ConsoleInfo } from "./contract.ts";
 import { call } from "./ipc.ts";
-import { type ConsoleLinkView, consoleLinks } from "./lib/console-links.ts";
+import { consoleLink } from "./lib/console-links.ts";
 
 export interface ConsoleSlots {
   list: HTMLElement;
@@ -15,24 +15,19 @@ export interface ConsoleSlots {
 
 const quiet = (): undefined => undefined;
 
-function linkButton(link: ConsoleLinkView): HTMLButtonElement {
+function linkButton(label: string): HTMLButtonElement {
   const button = document.createElement("button");
   button.type = "button";
   button.className = "btn console-link";
-  button.dataset.consolePage = link.page;
-  button.textContent = link.label;
+  button.dataset.consoleOpen = "";
+  button.textContent = label;
   return button;
 }
 
-export function renderConsoleLinks(
-  slots: ConsoleSlots,
-  info: ConsoleInfo | null,
-  only?: readonly ConsolePage[],
-): void {
-  const view = consoleLinks(info);
-  const links = only ? view.links.filter((link) => only.includes(link.page)) : view.links;
-  slots.list.replaceChildren(...links.map(linkButton));
-  slots.list.hidden = links.length === 0;
+export function renderConsoleLink(slots: ConsoleSlots, info: ConsoleInfo | null): void {
+  const view = consoleLink(info);
+  slots.list.replaceChildren(...(view.label ? [linkButton(view.label)] : []));
+  slots.list.hidden = !view.found;
   slots.note.textContent = view.note ?? "";
   slots.note.hidden = view.found;
   if (slots.title) slots.title.textContent = view.title ?? "Router console";
@@ -40,10 +35,8 @@ export function renderConsoleLinks(
 
 export function wireConsoleClicks(root: HTMLElement, after?: () => void): void {
   root.addEventListener("click", (event) => {
-    const target = (event.target as Element).closest<HTMLElement>("[data-console-page]");
-    const page = target?.dataset.consolePage as ConsolePage | undefined;
-    if (!page) return;
-    call("console_open", { page }).catch(quiet);
+    if (!(event.target as Element).closest("[data-console-open]")) return;
+    call("console_open", {}).catch(quiet);
     after?.();
   });
 }

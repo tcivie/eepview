@@ -182,7 +182,9 @@ impl Core {
     }
 
     fn shows_web(&self, id: u32) -> bool {
-        self.tabs.get(id).is_some_and(|t| is_web(&t.url))
+        self.tabs
+            .get(id)
+            .is_some_and(|t| !t.console && is_web(&t.url))
     }
 
     /// The mouse moved over a link (`Some`) or off it (`None`) in tab `id`.

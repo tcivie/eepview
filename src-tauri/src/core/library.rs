@@ -133,7 +133,7 @@ impl Core {
 
     /// Bookmarks the active page, or removes its bookmark (Cmd+D).
     pub fn bookmark_toggle(&mut self, now: u64) -> Vec<Effect> {
-        let Some(tab) = self.tabs.active() else {
+        let Some(tab) = self.tabs.active().filter(|t| !t.console) else {
             return Vec::new();
         };
         let (url, title) = (tab.url.clone(), tab.title.clone());

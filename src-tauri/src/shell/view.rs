@@ -10,6 +10,7 @@ use tauri::{
 
 use std::sync::atomic::Ordering;
 
+use super::console::CONSOLE_LABEL;
 use super::state::{lock, shared};
 use crate::core::View;
 use crate::hover::HoverText;
@@ -68,17 +69,21 @@ pub fn sync<R: Runtime>(app: &AppHandle<R>) {
     let view = lock(&shared(app).core).view();
     let active = match &view {
         View::Web(tab) => lock(&shared(app).labels).get(tab).cloned(),
-        View::Internal(_) => None,
+        View::Internal(_) | View::Console(_) => None,
     };
     let labels: Vec<String> = lock(&shared(app).labels).values().cloned().collect();
     for label in labels.iter().filter(|l| Some(*l) != active.as_ref()) {
         hide(app, label);
+    }
+    if !matches!(view, View::Console(_)) {
+        hide(app, CONSOLE_LABEL);
     }
     super::log::view(&format!("{view:?} active={active:?} labels={labels:?}"));
     match (view, active) {
         (View::Web(_), Some(label)) => show(app, &label, content),
         (View::Internal(page), _) => show_internal(app, &page, content),
         (View::Web(_), None) => hide(app, "internal"),
+        (View::Console(_), _) => show(app, CONSOLE_LABEL, content),
     }
     sync_stop_item(app);
 }

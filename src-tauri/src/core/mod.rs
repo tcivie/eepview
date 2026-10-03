@@ -4,6 +4,7 @@
 //! The browser state machine. Pure: commands and engine events go in, [`Effect`]s come out,
 //! and the shell (`shell/`) carries them out. No Tauri runtime here, so all of it is tested.
 
+mod console_tab;
 pub mod find;
 mod keys;
 mod library;
@@ -62,6 +63,17 @@ pub enum Effect {
     HoverLater(u64),
     /// Ask this host for its icon through the gatekeeper, then call [`Core::icon_fetched`].
     FetchIcon(String),
+    /// Act on the `console` webview of the console tab.
+    Console(ConsoleOp),
+}
+
+/// An operation on the `console` webview (`docs/wiki/router-console.md`, R27, R28).
+#[derive(Debug, Clone, PartialEq)]
+pub enum ConsoleOp {
+    /// An engine call: back, forward, reload, hard reload or stop.
+    Engine(EngineOp),
+    /// Destroy the webview.
+    Close,
 }
 
 /// An event of the contract.
@@ -161,6 +173,8 @@ pub enum View {
     Internal(String),
     /// The `tab-<id>` webview.
     Web(u32),
+    /// The `console` webview of the console tab with this id.
+    Console(u32),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -286,6 +300,9 @@ impl Core {
         let Some(tab) = self.tabs.active() else {
             return View::Internal("eepview://home".into());
         };
+        if tab.console {
+            return View::Console(tab.id);
+        }
         if !is_web(&tab.url) {
             return View::Internal(tab.url.clone());
         }
@@ -312,6 +329,9 @@ impl Core {
     }
 
     fn info_of(&self, tab: &Tab) -> TabInfo {
+        if tab.console {
+            return self.console_info(tab);
+        }
         let web = is_web(&tab.url);
         let host = host_of(&tab.url);
         TabInfo {

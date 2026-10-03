@@ -4,13 +4,14 @@
 //! The only factory of the `console` webview: the router's own console pages
 //! (`docs/wiki/router-console.md`).
 //!
-//! It is not a web tab. It is built only from a [`VerifiedConsole`], in a window of its own,
-//! and loads only that console origin (`http://127.0.0.1:<port>`):
+//! It is not a web tab webview. It is built only from a [`VerifiedConsole`], as a child of
+//! the main window that the console tab shows, and loads only that console origin
+//! (`http://127.0.0.1:<port>`):
 //! - no `proxy_url`: the console is on loopback, and the gatekeeper never sees it;
 //! - no IPC: no capability names the `console` webview;
 //! - an engine rule list that allows only the console origin, attached before the first
 //!   load: the view starts on `about:blank` and stays there if the list cannot be attached;
-//! - a navigation guard: the console origin stays, an I2P link opens in a normal tab
+//! - a navigation guard: the console origin stays, an I2P link opens in a new normal tab
 //!   through the tab guard, anything else is cancelled;
 //! - WebRTC off in every frame, downloads refused, incognito.
 //!
@@ -21,29 +22,21 @@ use std::thread;
 use std::time::Duration;
 
 use eepview_platform::Rules;
-use tauri::webview::NewWindowResponse;
-use tauri::window::WindowBuilder;
+use tauri::webview::{NewWindowResponse, PageLoadEvent};
 use tauri::{
     AppHandle, Emitter, EventTarget, LogicalPosition, LogicalSize, Manager, Runtime, Url, Webview,
     WebviewBuilder, WebviewUrl,
 };
 
 use super::apply::{self, LISTENERS, with_core};
-use super::log;
 use super::state::{lock, shared};
 use super::webrtc::webrtc_off;
-use crate::net::console::{
-    ConsoleInfo, ConsoleNav, ConsolePage, VerifiedConsole, after_recheck, detect_here,
-};
+use super::{engine, log, view};
+use crate::core::{ConsoleOp, Core};
+use crate::net::console::{ConsoleInfo, ConsoleNav, VerifiedConsole, after_recheck, detect_here};
 
 /// The label of the console webview.
 pub const CONSOLE_LABEL: &str = "console";
-/// The label of the window that holds it.
-pub const CONSOLE_WINDOW: &str = "console-window";
-/// The window title.
-const TITLE: &str = "Router console";
-/// The first window size.
-const SIZE: (f64, f64) = (1100.0, 760.0);
 /// The first document of the console view, until the rule list is on.
 const BLANK: &str = "about:blank";
 /// How often a known console is checked again, and how often a miss is retried.
@@ -55,63 +48,52 @@ pub const RETRY_FOR: Duration = Duration::from_mins(2);
 pub struct ConsoleWebview;
 
 impl ConsoleWebview {
-    /// Opens the console window, or reuses the open one, and loads `page` of `console`.
+    /// Builds the console webview in the main window, or reuses it, loads the home page of
+    /// `console`, and opens or selects the console tab (R8, R24).
     ///
     /// # Errors
     ///
-    /// Fails when this router has no such page, or the window or webview cannot be built.
+    /// Fails when there is no main window or the webview cannot be built.
     pub fn open<R: Runtime>(
         app: &AppHandle<R>,
         console: &VerifiedConsole,
-        page: ConsolePage,
     ) -> tauri::Result<Webview<R>> {
-        let url = console
-            .url(page)
-            .ok_or(tauri::Error::InvalidWebviewUrl("no such console page"))?;
-        if let Some(webview) = app.get_webview(CONSOLE_LABEL) {
-            reload(app, &webview, console, url)?;
-            focus(app);
-            return Ok(webview);
+        let url = console.home();
+        let live = app.get_webview(CONSOLE_LABEL);
+        let webview = match live {
+            Some(webview) => webview,
+            None => build(app, console)?,
+        };
+        let fx = lock(&shared(app).core).console_open(url.as_str());
+        apply::later(app, fx);
+        if shared(app).console_armed.load(Ordering::SeqCst) {
+            webview.navigate(url)?;
+        } else {
+            arm(&webview, console, url)?;
         }
-        let webview = build(app, console)?;
-        arm(&webview, console, url)?;
-        focus(app);
         Ok(webview)
     }
 }
 
-/// Loads `url` in the open view: directly once the rule list is on, else after it.
-fn reload<R: Runtime>(
-    app: &AppHandle<R>,
-    webview: &Webview<R>,
-    console: &VerifiedConsole,
-    url: Url,
-) -> tauri::Result<()> {
-    if shared(app).console_armed.load(Ordering::SeqCst) {
-        webview.navigate(url)
-    } else {
-        arm(webview, console, url)
-    }
-}
-
-/// Builds the console window and its one webview.
+/// Builds the console webview, hidden, in the main window at the content rect.
 fn build<R: Runtime>(app: &AppHandle<R>, console: &VerifiedConsole) -> tauri::Result<Webview<R>> {
     shared(app).console_armed.store(false, Ordering::SeqCst);
+    let window = app.get_window("main").ok_or(tauri::Error::WindowNotFound)?;
     let blank = Url::parse(BLANK).map_err(|_| tauri::Error::InvalidWebviewUrl(BLANK))?;
-    let window = WindowBuilder::new(app, CONSOLE_WINDOW)
-        .title(TITLE)
-        .inner_size(SIZE.0, SIZE.1)
-        .build()?;
     let builder = WebviewBuilder::new(CONSOLE_LABEL, WebviewUrl::External(blank))
         .incognito(true)
-        .auto_resize()
+        .background_color(super::surface::color(app))
         .initialization_script_for_all_frames(webrtc_off());
     let builder = hooks(builder, app, console);
-    window.add_child(
+    let rect = view::content_rect(app);
+    let webview = window.add_child(
         builder,
-        LogicalPosition::new(0.0, 0.0),
-        LogicalSize::new(SIZE.0, SIZE.1),
-    )
+        LogicalPosition::new(rect.x, rect.y),
+        LogicalSize::new(rect.w, rect.h),
+    )?;
+    let _ = webview.hide();
+    view::raise_chrome(app, &window);
+    Ok(webview)
 }
 
 /// Attaches the console rule list, then loads `url`. When the list cannot be attached, the
@@ -149,22 +131,32 @@ pub fn load_after_rules<R: Runtime>(
     })
 }
 
-/// The engine callbacks: navigation guard, new windows, downloads.
+/// The engine callbacks: navigation guard, new windows, downloads, loads, titles.
 fn hooks<R: Runtime>(
     builder: WebviewBuilder<R>,
     app: &AppHandle<R>,
     console: &VerifiedConsole,
 ) -> WebviewBuilder<R> {
     let (nav_app, win_app) = (app.clone(), app.clone());
-    let (nav_console, win_console) = (console.clone(), console.clone());
+    let (nav_console, win_console, load_console) =
+        (console.clone(), console.clone(), console.clone());
     builder
         .on_navigation(move |url| navigation(&nav_app, &nav_console, url))
         .on_new_window(move |url, _features| new_window(&win_app, &win_console, &url))
         .on_download(|_webview, _event| false)
+        .on_page_load(move |webview, payload| {
+            page_load(
+                webview.app_handle(),
+                &load_console,
+                payload.event(),
+                payload.url(),
+            );
+        })
+        .on_document_title_changed(|webview, title| title_changed(webview.app_handle(), &title))
 }
 
 /// R10: a navigation of the console view. The console origin (and the first
-/// `about:blank`) stays; an I2P site opens in a normal tab instead; anything else is
+/// `about:blank`) stays; an I2P site opens in a new normal tab instead; anything else is
 /// cancelled.
 pub fn navigation<R: Runtime>(app: &AppHandle<R>, console: &VerifiedConsole, url: &Url) -> bool {
     if url.as_str() == BLANK {
@@ -181,7 +173,8 @@ pub fn navigation<R: Runtime>(app: &AppHandle<R>, console: &VerifiedConsole, url
 }
 
 /// R10: a console page asked for a new window. Never an engine window: the console origin
-/// loads in the console view, an I2P site opens in a normal tab, anything else is dropped.
+/// loads in the console view, an I2P site opens in a new normal tab, anything else is
+/// dropped.
 pub fn new_window<R: Runtime>(
     app: &AppHandle<R>,
     console: &VerifiedConsole,
@@ -193,6 +186,42 @@ pub fn new_window<R: Runtime>(
         ConsoleNav::Cancel => {}
     }
     NewWindowResponse::Deny
+}
+
+/// R25: a main-frame load of the console view. Only a URL on the console origin reaches
+/// the core.
+pub fn page_load<R: Runtime>(
+    app: &AppHandle<R>,
+    console: &VerifiedConsole,
+    event: PageLoadEvent,
+    url: &Url,
+) {
+    if console.route(url) != ConsoleNav::Stay {
+        return;
+    }
+    let url = url.to_string();
+    match event {
+        PageLoadEvent::Started => with_core(app, |core| core.console_started(&url)),
+        PageLoadEvent::Finished => with_core(app, |core| core.console_finished(&url)),
+    }
+}
+
+/// R25: the document title of the console page changed.
+pub fn title_changed<R: Runtime>(app: &AppHandle<R>, title: &str) {
+    with_core(app, |core| core.console_title(title));
+}
+
+/// R27, R28: carries out a [`ConsoleOp`] on the console webview, when one exists.
+pub fn run<R: Runtime>(app: &AppHandle<R>, op: &ConsoleOp) {
+    match op {
+        ConsoleOp::Engine(op) => {
+            let tab = lock(&shared(app).core).console_tab().unwrap_or_default();
+            if let Some(webview) = app.get_webview(CONSOLE_LABEL) {
+                engine::run(&webview, tab, op);
+            }
+        }
+        ConsoleOp::Close => close_webview(app),
+    }
 }
 
 /// Loads a console URL in the console view, off the engine callback.
@@ -211,29 +240,22 @@ fn navigate<R: Runtime>(webview: &Webview<R>, url: Url) {
 /// Opens an I2P URL in a new normal tab, through the tab guard of the core.
 fn open_tab<R: Runtime>(app: &AppHandle<R>, url: &Url) {
     with_core(app, |core| core.new_window(url));
-    if let Some(main) = app.get_window("main") {
-        let _ = main.set_focus();
-    }
 }
 
-fn focus<R: Runtime>(app: &AppHandle<R>) {
-    if let Some(window) = app.get_window(CONSOLE_WINDOW) {
-        let _ = window.set_focus();
-    }
-}
-
-/// Closes the console webview and its window, if open.
-pub fn close<R: Runtime>(app: &AppHandle<R>) {
+/// Destroys the console webview, if any.
+fn close_webview<R: Runtime>(app: &AppHandle<R>) {
+    shared(app).console_armed.store(false, Ordering::SeqCst);
     if let Some(webview) = app.get_webview(CONSOLE_LABEL)
         && let Err(e) = webview.close()
     {
         log::error("console close", &e.to_string());
     }
-    if let Some(window) = app.get_window(CONSOLE_WINDOW)
-        && let Err(e) = window.destroy()
-    {
-        log::error("console close", &e.to_string());
-    }
+}
+
+/// R30: closes the console tab, if open, and destroys the console webview, if any.
+pub fn close<R: Runtime>(app: &AppHandle<R>) {
+    with_core(app, Core::console_gone);
+    close_webview(app);
 }
 
 /// The stored detection result.
@@ -249,7 +271,7 @@ pub fn info_of(console: Option<&VerifiedConsole>) -> ConsoleInfo {
 }
 
 /// Stores a detection result. A change emits `console-changed`; a console that went away
-/// or moved closes the console window.
+/// or moved closes the console tab (R30).
 pub fn set_console<R: Runtime>(app: &AppHandle<R>, console: Option<VerifiedConsole>) {
     let info = info_of(console.as_ref());
     let previous = std::mem::replace(&mut *lock(&shared(app).console), console);

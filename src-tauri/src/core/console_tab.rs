@@ -1,0 +1,183 @@
+// SPDX-FileCopyrightText: 2026 The eepview contributors
+// SPDX-License-Identifier: MIT
+
+//! The router console tab (`docs/wiki/router-console.md`, R23–R30).
+//!
+//! The console tab shows the `console` webview, which the shell builds only from a verified
+//! console. The core never makes a [`WebOp`](super::WebOp) for it: its engine calls go out
+//! as [`ConsoleOp`], so a console URL never reaches a `tab-*` webview.
+
+use super::{ConsoleOp, Core, Effect, EngineOp, Event};
+use crate::session::{Step, Traverse};
+use crate::tabs::{Place, Tab};
+use crate::types::{NavFlags, TabInfo, TabMarks};
+
+/// The title of the console tab until its page sends one.
+pub const CONSOLE_TITLE: &str = "Router console";
+
+impl Core {
+    /// The id of the console tab, if one is open.
+    #[must_use]
+    pub fn console_tab(&self) -> Option<u32> {
+        self.tabs.iter().find(|t| t.console).map(|t| t.id)
+    }
+
+    /// R24: selects the console tab, or makes one right after the active tab and selects
+    /// it, showing `url`. The shell has already started the load.
+    pub fn console_open(&mut self, url: &str) -> Vec<Effect> {
+        let known = self.console_tab();
+        let mut fx = if known == Some(self.tabs.active_id()) {
+            Vec::new()
+        } else {
+            self.leave_tab()
+        };
+        let id = known.unwrap_or_else(|| self.tabs.open(url, Place::AfterActive, true));
+        self.tabs.select(id);
+        if let Some(tab) = self.tabs.get_mut(id) {
+            mark_console(tab, url);
+        }
+        fx.extend([
+            Effect::Emit(Event::TabsChanged),
+            Effect::Layout,
+            Effect::FocusContent,
+        ]);
+        fx
+    }
+
+    /// R25: the `console` webview started a main-frame load of `url`.
+    pub fn console_started(&mut self, url: &str) -> Vec<Effect> {
+        self.console_commit(url, true)
+    }
+
+    /// R25: the `console` webview finished a main-frame load of `url`.
+    pub fn console_finished(&mut self, url: &str) -> Vec<Effect> {
+        self.console_commit(url, false)
+    }
+
+    fn console_commit(&mut self, url: &str, loading: bool) -> Vec<Effect> {
+        let Some(tab) = self.console_mut() else {
+            return Vec::new();
+        };
+        url.clone_into(&mut tab.url);
+        tab.loading = loading;
+        tab.session.commit_web(url);
+        vec![Effect::Emit(Event::TabUpdated(tab.id))]
+    }
+
+    /// R25: the document title of the console page changed.
+    pub fn console_title(&mut self, title: &str) -> Vec<Effect> {
+        let Some(tab) = self.console_mut().filter(|_| !title.trim().is_empty()) else {
+            return Vec::new();
+        };
+        title.clone_into(&mut tab.title);
+        vec![Effect::Emit(Event::TabUpdated(tab.id))]
+    }
+
+    /// R30: the console went away: closes the console tab, if open.
+    pub fn console_gone(&mut self) -> Vec<Effect> {
+        self.console_tab()
+            .map(|id| self.tab_close(id))
+            .unwrap_or_default()
+    }
+
+    /// R26: before an address-bar navigation, a console tab becomes a fresh normal tab
+    /// showing `landing`, and its `console` webview goes.
+    pub(super) fn leave_console(&mut self, id: u32, landing: &str) -> Vec<Effect> {
+        if self.console_tab() != Some(id) || !self.tabs.reset(id, landing) {
+            return Vec::new();
+        }
+        vec![Effect::Console(ConsoleOp::Close)]
+    }
+
+    /// R27: back or forward in the console tab, through the `console` webview.
+    pub(super) fn console_step(&mut self, id: u32, step: Step) -> Vec<Effect> {
+        let Some(tab) = self.tabs.get_mut(id) else {
+            return Vec::new();
+        };
+        let live = tab.url.clone();
+        if !matches!(
+            tab.session.step(step, Some(&live)),
+            Some(Traverse::Engine(_))
+        ) {
+            return Vec::new();
+        }
+        let op = match step {
+            Step::Back => EngineOp::Back,
+            Step::Forward => EngineOp::Forward,
+        };
+        Self::console_engine(tab, op)
+    }
+
+    /// R27: reload of the console tab.
+    pub(super) fn console_reload(&mut self, id: u32, hard: bool) -> Vec<Effect> {
+        let op = if hard {
+            EngineOp::HardReload
+        } else {
+            EngineOp::Reload
+        };
+        self.tabs
+            .get_mut(id)
+            .map(|tab| Self::console_engine(tab, op))
+            .unwrap_or_default()
+    }
+
+    /// R27: stop of the console tab, while it loads.
+    pub(super) fn console_stop(&mut self, id: u32) -> Vec<Effect> {
+        let Some(tab) = self.tabs.get_mut(id).filter(|t| t.loading) else {
+            return Vec::new();
+        };
+        tab.loading = false;
+        vec![
+            Effect::Console(ConsoleOp::Engine(EngineOp::Stop)),
+            Effect::Emit(Event::TabUpdated(id)),
+        ]
+    }
+
+    fn console_engine(tab: &mut Tab, op: EngineOp) -> Vec<Effect> {
+        tab.loading = true;
+        vec![
+            Effect::Console(ConsoleOp::Engine(op)),
+            Effect::Emit(Event::TabUpdated(tab.id)),
+        ]
+    }
+
+    fn console_mut(&mut self) -> Option<&mut Tab> {
+        self.tabs.iter_mut().find(|t| t.console)
+    }
+
+    /// R23, R25: the `TabInfo` of the console tab.
+    pub(super) fn console_info(&self, tab: &Tab) -> TabInfo {
+        TabInfo {
+            id: tab.id,
+            url: tab.url.clone(),
+            title: tab.title.clone(),
+            kind: "console",
+            nav: NavFlags {
+                loading: tab.loading,
+                can_back: tab.session.can_back(),
+                can_forward: tab.session.can_forward(),
+            },
+            zoom: 1.0,
+            marks: TabMarks {
+                active: tab.id == self.tabs.active_id(),
+                js_on: true,
+                bookmarked: false,
+            },
+            icon: None,
+        }
+    }
+}
+
+/// Makes `tab` the console tab, loading `url`. A new console tab is titled
+/// [`CONSOLE_TITLE`] until its page sends a title.
+fn mark_console(tab: &mut Tab, url: &str) {
+    if !tab.console {
+        tab.console = true;
+        CONSOLE_TITLE.clone_into(&mut tab.title);
+    }
+    url.clone_into(&mut tab.url);
+    tab.loading = true;
+}
+
+#[cfg(test)]
+mod tests;

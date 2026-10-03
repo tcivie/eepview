@@ -5,7 +5,7 @@ SPDX-License-Identifier: MIT
 
 # Router console
 
-Status: shipped in [#54](https://github.com/tcivie/eepview/pull/54). The console tab and the one link (R7, R12, R15, R23–R30): in progress on `feat/console-tab`.
+Status: shipped in [#54](https://github.com/tcivie/eepview/pull/54). The console tab and the one link (R7, R12, R15, R23–R30): in progress in [#76](https://github.com/tcivie/eepview/pull/76).
 
 eepview shows router information. It does not change the router configuration. All router configuration goes through the router's own console pages. eepview finds the console of the router in use and gives one link to it, "I2P Router Console". The user reaches every other console page from the console itself.
 
@@ -305,3 +305,4 @@ The `I2P` badge keeps its title, "Opened over I2P". The console badge title is "
 ## History
 
 - 2026-10-03 — Router console detection, quick links and the console view — [#54](https://github.com/tcivie/eepview/pull/54)
+- 2026-10-03 — The console opens in a console tab; one "I2P Router Console" link replaces the five page links — [#76](https://github.com/tcivie/eepview/pull/76)

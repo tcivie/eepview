@@ -7,7 +7,6 @@ import type {
   CommandName,
   ConsoleInfo,
   ConsoleOpenResult,
-  ConsolePage,
   EventName,
   HistoryEntry,
   HistoryQuery,
@@ -381,18 +380,16 @@ const MOCK_CONSOLE_ADDR = "127.0.0.1:7657";
 
 // `?console=none` previews the pages with no router console found.
 const consoleInfo: ConsoleInfo = params.has("console")
-  ? { found: false, kind: null, origin: null, pages: [], version: null }
+  ? { found: false, kind: null, origin: null, version: null }
   : {
       found: true,
       kind: "java",
       origin: ["http:", "", MOCK_CONSOLE_ADDR].join("/"),
-      pages: ["home", "tunnels", "addressbook", "config", "logs"],
       version: "2.13.0",
     };
 
-function openConsole(page: ConsolePage): ConsoleOpenResult {
-  if (!consoleInfo.found) return { ok: false, reason: "no-console" };
-  return consoleInfo.pages.includes(page) ? { ok: true } : { ok: false, reason: "no-page" };
+function openConsole(): ConsoleOpenResult {
+  return consoleInfo.found ? { ok: true } : { ok: false, reason: "no-console" };
 }
 
 type Handler = (args: Record<string, unknown>) => unknown;
@@ -443,7 +440,7 @@ const handlers: Record<CommandName, Handler> = {
   router_control: (a) => setRouter({ state: arg(a, "action") === "stop" ? "down" : "building" }),
   console_status: () => consoleInfo,
   console_detect: () => consoleInfo,
-  console_open: (a) => openConsole(arg(a, "page")),
+  console_open: () => openConsole(),
   connection_pause: () => {
     setRouter({ paused: true });
     navigate("eepview://router-down?reason=paused");
