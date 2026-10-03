@@ -1,0 +1,211 @@
+.router-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: var(--space-4) var(--space-6);
+  align-items: center;
+  padding: var(--space-5);
+}
+
+.router-card-state {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
+  font-size: var(--fs-sm);
+}
+
+.hops-compact {
+  max-width: 360px;
+}
+
+.router-card-facts {
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+}
+
+.router-card-link {
+  grid-column: 1 / -1;
+  justify-self: start;
+  font-size: var(--fs-sm);
+}
+
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(196px, 1fr));
+  gap: var(--space-3);
+  padding: 0;
+  list-style: none;
+}
+
+.tile {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  column-gap: var(--space-3);
+  align-items: center;
+  height: 100%;
+  padding: var(--space-3);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  text-decoration: none;
+}
+
+.tile:hover {
+  border-color: var(--color-accent-line);
+  color: var(--color-text);
+  text-decoration: none;
+}
+
+.tile-mark {
+  grid-row: 1 / span 2;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 1.5px solid var(--color-accent-line);
+  border-radius: 12px;
+  outline: 4px solid var(--color-accent-soft);
+  outline-offset: -8px;
+  color: var(--color-accent);
+  font-weight: var(--fw-strong);
+  font-size: var(--fs-sm);
+}
+
+.tile-name {
+  overflow: hidden;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.tile-addr {
+  overflow: hidden;
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.tile-add {
+  border-style: dashed;
+  background: transparent;
+}
+
+.tile-add .tile-mark {
+  border-style: dashed;
+  outline: none;
+}
+
+@media (max-width: 760px) {
+  .router-card {
+    grid-template-columns: 1fr;
+  }
+}
+
+.folders {
+  display: grid;
+  gap: var(--space-5);
+}
+
+.folder {
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  overflow: hidden;
+}
+
+.folder-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: var(--border-width) solid var(--color-border);
+  background: var(--color-surface-sunken);
+  color: var(--color-text-muted);
+}
+
+.folder-name {
+  font-size: var(--fs-sm);
+  color: var(--color-text);
+}
+
+.folder-count {
+  margin-left: auto;
+  font-size: var(--fs-xs);
+}
+
+.rows {
+  padding: 0;
+  list-style: none;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-1) var(--space-2) var(--space-1) var(--space-4);
+}
+
+.row + .row {
+  border-top: var(--border-width) solid var(--color-border);
+}
+
+.row-link {
+  display: grid;
+  grid-template-columns: minmax(10rem, 16rem) minmax(0, 1fr);
+  gap: var(--space-4);
+  flex: 1;
+  min-width: 0;
+  padding: var(--space-2) 0;
+  color: var(--color-text);
+  text-decoration: none;
+}
+
+.row-name {
+  font-weight: var(--fw-medium);
+  font-size: var(--fs-sm);
+}
+
+.row-link:hover .row-name {
+  color: var(--color-accent);
+  text-decoration: underline;
+}
+
+.row-addr {
+  overflow: hidden;
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  line-height: 1.9;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.row-actions {
+  display: flex;
+  gap: 2px;
+}
+
+.icon-btn-danger:hover {
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+}
+
+.field-error {
+  color: var(--color-danger);
+}
+
+.input[aria-invalid="true"] {
+  border-color: var(--color-danger);
+}
+
+@media (max-width: 760px) {
+  .row-link {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+}

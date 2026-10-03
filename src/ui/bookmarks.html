@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Bookmarks</title>
+    <link rel="stylesheet" href="./theme.css" />
+    <link rel="stylesheet" href="./ui.css" />
+    <link rel="stylesheet" href="./pages.css" />
+    <script type="module" src="./bookmarks.ts" blocking="render"></script>
+  </head>
+  <body>
+    <div class="shell">
+      <aside class="rail">
+        <a class="brand" href="./home.html">
+          <svg class="mark" viewBox="0 0 28 28" aria-hidden="true">
+            <rect x="1.75" y="1.75" width="24.5" height="24.5" rx="8" />
+            <rect x="6.5" y="6.5" width="15" height="15" rx="5" />
+            <rect class="core" x="11" y="11" width="6" height="6" rx="2" />
+          </svg>
+          eepview
+        </a>
+        <nav class="rail-nav" aria-label="eepview pages">
+          <ul>
+            <li>
+              <a href="./home.html">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M4.5 11 12 4.5l7.5 6.5M6.5 9.5V19h11V9.5" />
+                </svg>
+                Home
+              </a>
+            </li>
+            <li>
+              <a href="./bookmarks.html" aria-current="page">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M7 4.5h10v15l-5-3.5-5 3.5z" />
+                </svg>
+                Bookmarks
+              </a>
+            </li>
+            <li>
+              <a href="./stats.html">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M3.5 12h4l2-5 4 10 2-5h5" />
+                </svg>
+                Network
+              </a>
+            </li>
+            <li>
+              <a href="./settings.html">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M4 7h10m4 0h2M4 17h4m4 0h8" />
+                  <circle cx="16" cy="7" r="2" />
+                  <circle cx="10" cy="17" r="2" />
+                </svg>
+                Settings
+              </a>
+            </li>
+          </ul>
+        </nav>
+        <p class="rail-foot">These pages live inside eepview. Opening them sends nothing.</p>
+      </aside>
+
+      <main class="content" id="main">
+        <header class="page-head">
+          <div>
+            <h1>Bookmarks</h1>
+            <p>Stored on this computer only. Folders keep the list short; they do not nest.</p>
+          </div>
+          <div class="actions">
+            <button class="btn" type="button" id="import-btn">
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 15V4m-5 6 5 5 5-5M5 20h14" />
+              </svg>
+              Import
+            </button>
+            <button class="btn" type="button" id="export-btn">
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 4v11M7 9l5-5 5 5M5 20h14" />
+              </svg>
+              Export
+            </button>
+            <button class="btn btn-primary" type="button" id="add-btn">
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+              Add bookmark
+            </button>
+            <input
+              class="visually-hidden"
+              type="file"
+              id="import-file"
+              accept="application/json,.json"
+              tabindex="-1"
+              aria-hidden="true"
+            />
+          </div>
+        </header>
+
+        <p class="visually-hidden" id="bookmark-status" role="status" aria-live="polite"></p>
+        <div class="folders" id="folders"></div>
+
+        <template id="folder-template">
+          <section class="folder">
+            <header class="folder-head">
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"
+                />
+              </svg>
+              <h2 class="folder-name">Folder</h2>
+              <span class="folder-count muted"></span>
+            </header>
+            <ul class="rows"></ul>
+          </section>
+        </template>
+
+        <template id="row-template">
+          <li class="row">
+            <a class="row-link" href="./bookmarks.html">
+              <span class="row-name">Name</span>
+              <span class="row-addr">address.i2p</span>
+            </a>
+            <span class="row-actions">
+              <button class="icon-btn" type="button" data-action="edit" aria-label="Edit">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="m5 19 1-4L16 5l3 3L9 18zM14 7l3 3" />
+                </svg>
+              </button>
+              <button class="icon-btn icon-btn-danger" type="button" data-action="delete" aria-label="Delete">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M5 7h14M10 7V5h4v2M7 7l1 12h8l1-12" />
+                </svg>
+              </button>
+            </span>
+          </li>
+        </template>
+
+        <dialog class="dialog" id="editor" aria-labelledby="editor-title">
+          <form method="dialog" id="editor-form" novalidate>
+            <h2 id="editor-title">Add bookmark</h2>
+            <div class="field">
+              <label class="field-label" for="bm-name">Name</label>
+              <input class="input" id="bm-name" name="name" required autocomplete="off" />
+            </div>
+            <div class="field">
+              <label class="field-label" for="bm-address">Address</label>
+              <input
+                class="input mono"
+                id="bm-address"
+                name="address"
+                required
+                autocomplete="off"
+                spellcheck="false"
+                aria-describedby="bm-address-hint"
+              />
+              <span class="field-hint" id="bm-address-hint">A .i2p name or a .b32.i2p address.</span>
+            </div>
+            <div class="field">
+              <label class="field-label" for="bm-folder">Folder</label>
+              <select class="select" id="bm-folder" name="folder"></select>
+            </div>
+            <div class="actions">
+              <button class="btn" type="button" id="editor-cancel">Cancel</button>
+              <button class="btn btn-primary" type="submit" id="editor-save">Save bookmark</button>
+            </div>
+          </form>
+        </dialog>
+      </main>
+    </div>
+  </body>
+</html>

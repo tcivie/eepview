@@ -1,4 +1,35 @@
-import { defineConfig, loadEnv } from "vite";
+import { defineConfig, loadEnv, type Plugin } from "vite";
+
+const uiPages = [
+  "index",
+  "home",
+  "history",
+  "bookmarks",
+  "stats",
+  "settings",
+  "setup",
+  "blocked",
+  "router-down",
+  "toolbar",
+  "status",
+];
+
+const input = Object.fromEntries([
+  ["main", "index.html"],
+  ...uiPages.map((page) => [`ui-${page}`, `src/ui/${page}.html`]),
+]);
+
+const renderBlockingEntry: Plugin = {
+  name: "eepview-render-blocking-entry",
+  transformIndexHtml: {
+    order: "post",
+    handler: (html) =>
+      html.replaceAll(
+        '<script type="module" crossorigin',
+        '<script type="module" blocking="render" crossorigin',
+      ),
+  },
+};
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
@@ -9,6 +40,12 @@ export default defineConfig(({ mode }) => {
     //
     // 1. prevent Vite from obscuring rust errors
     clearScreen: false,
+    plugins: [renderBlockingEntry],
+    build: {
+      rollupOptions: {
+        input,
+      },
+    },
     // 2. tauri expects a fixed port, fail if that port is not available
     server: {
       port: 1420,
