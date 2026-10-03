@@ -9,6 +9,9 @@ edition = "2024"
 rust-version = "1.96"
 publish = false
 
+[workspace]
+members = ["crates/eepview-platform"]
+
 [lib]
 # The `_lib` suffix keeps the lib name apart from the bin name (cargo#8519 on Windows).
 name = "eepview_lib"
@@ -31,6 +34,7 @@ tauri = { version = "2", default-features = false, features = [
 ] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+eepview-platform = { path = "crates/eepview-platform" }
 
 # Already in the tree through wry; named here for the safe WebKitGTK engine calls.
 [target.'cfg(target_os = "linux")'.dependencies]
