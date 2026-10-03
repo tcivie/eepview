@@ -17,7 +17,10 @@ case "$target" in
     objcopy --strip-all --add-gnu-debuglink="$out/eepview-$target.debug" "$release/eepview"
     ;;
   *-apple-*)
-    ditto -c -k --keepParent "$release/eepview.dSYM" "$out/eepview-$target.dSYM.zip"
+    # cargo uplifts eepview.dSYM as a relative symlink into deps/. Resolve it, so the zip holds the DWARF bundle.
+    dsym="$(cd "$release/eepview.dSYM" && pwd -P)"
+    ditto -c -k --keepParent "$dsym" "$out/eepview-$target.dSYM.zip"
+    unzip -l "$out/eepview-$target.dSYM.zip" | grep "Contents/Resources/DWARF/eepview" >/dev/null
     ;;
   *-windows-*)
     cp "$release/eepview.pdb" "$out/eepview-$target.pdb"

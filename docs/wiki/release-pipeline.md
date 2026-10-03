@@ -7,7 +7,7 @@ A `v*` tag builds installers for four targets, adds SBOMs, debug symbols and che
 ## How it works
 
 - A push of a tag that matches `v*` starts `release.yml`. A manual run (`workflow_dispatch`) does the same, with the `dry_run` input.
-- The `gates` job runs `scripts/release-gates.sh`. It reads the required checks from the active ruleset of the default branch. It fails when the tagged commit is not on `main`, or when a required check has no `success` run on that commit. The `build` job needs `gates`. The release no longer calls `lint.yml`, `security.yml` or `ci.yml`.
+- The `gates` job runs `scripts/release-gates.sh`. It reads the required checks from the active ruleset of the default branch. It fails when the tagged commit is not on `main`, or when a required check has no `success` run on that commit or on the head of the pull request that merged it. Some required checks, such as `docs-check`, run on pull requests only. The `build` job needs `gates`. The release no longer calls `lint.yml`, `security.yml` or `ci.yml`.
 - The `build` job has four legs. Each uses the Tauri CLI with no third-party release action:
   1. `scripts/repro-env.sh` sets `SOURCE_DATE_EPOCH`, `CARGO_INCREMENTAL=0` and `--remap-path-prefix`. See [Reproducible builds](reproducible-builds.md).
   2. `npx tauri build --no-bundle -- --locked` builds the release binary.
@@ -90,3 +90,4 @@ sha256sum --check --ignore-missing SHA256SUMS
 - [#14](https://github.com/tcivie/eepview/pull/14): release pipeline with SBOM, checksums and provenance.
 - [#24](https://github.com/tcivie/eepview/pull/24): release gates job without lint exclusions; the macOS app is signed inside the dmg.
 - [#37](https://github.com/tcivie/eepview/pull/37): Sigstore signatures for every release file, provenance without the private-repo guard, separate debug symbols, repeatable build environment.
+- [#39](https://github.com/tcivie/eepview/pull/39): the gate also reads the checks of the merged PR head.
