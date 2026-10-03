@@ -7,7 +7,7 @@ A `v*` tag builds installers for four targets, adds SBOMs and checksums, and mak
 ## How it works
 
 - A push of a tag that matches `v*` starts `release.yml`. A manual run (`workflow_dispatch`) does the same, with the `dry_run` input.
-- The `lint`, `security` and `ci` jobs call the reusable workflows `lint.yml`, `security.yml` and `ci.yml`. The `build` job needs all three.
+- The `gates` job runs `scripts/release-gates.sh`. It reads the required checks from the active ruleset of the default branch. It fails when the tagged commit is not on `main`, or when a required check has no `success` run on that commit. The `build` job needs `gates`. The release no longer calls `lint.yml`, `security.yml` or `ci.yml`.
 - The `build` job has four legs. Each runs `npx tauri build` with no third-party release action.
   - `x86_64-pc-windows-msvc` on `windows-2025`: NSIS installer.
   - `aarch64-apple-darwin` on `macos-15`: `.dmg`.
@@ -33,11 +33,13 @@ A `v*` tag builds installers for four targets, adds SBOMs and checksums, and mak
 ## Limits
 
 - `publish` runs only for a `refs/tags/v*` ref. A manual run on a branch never makes a release.
-- The macOS release ships only the `.dmg`. The build ad-hoc signs the `.app`, but the `.dmg` is not rebuilt, so the app inside the `.dmg` is unsigned. There is no Developer ID signature and no notarization.
+- The macOS release ships only the `.dmg`. `bundle.macOS.signingIdentity` is `-` in `src-tauri/tauri.conf.json`, so the Tauri bundler ad-hoc signs the `.app` before it builds the `.dmg`. A build step mounts the `.dmg` and runs `codesign --verify --deep --strict` and `codesign -dv` on the app. It fails unless the report says `Signature=adhoc`. There is no Developer ID signature and no notarization.
 - Windows installers are not signed.
 - Provenance is skipped while the repo is private. See [going-public.md](going-public.md).
-- `release.yml` calls the reusable workflows with `./`. zizmor asks for `$/`, and actionlint rejects it, so one inline zizmor ignore stays.
+- The `gates` job skips its check on a branch dry run, so a pipeline change can be tested before merge. It needs a green `main` at the tagged commit. A dry run on `main` fails while the checks of `main` HEAD are red or still running.
+- The pipeline has no lint exclusion. actionlint and `zizmor --offline` report nothing.
 
 ## History
 
 - [#14](https://github.com/tcivie/eepview/pull/14): release pipeline with SBOM, checksums and provenance.
+- [#24](https://github.com/tcivie/eepview/pull/24): release gates job without lint exclusions; the macOS app is signed inside the dmg.
