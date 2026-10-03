@@ -3,6 +3,7 @@ All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
+- Cover theme preference validation with unit tests ([#42](https://github.com/tcivie/eepview/pull/42))
 - Repo bootstrap: skeleton, linters, security scans, CI (#1)
 - Bump typescript from 6.0.3 to 7.0.2 (#2)
 - Remove the warnings from the CI logs (#3)
