@@ -261,7 +261,7 @@ A site can make the router answer with any status, and it can make any number of
 
 - R15.1 Before matching, `%2E` and `%2F` (any case) become `.` and `/`.
 - R15.2 A word with a dot and a non-ASCII letter is a host name (an internationalised name). The word is the run of letters, digits, `.` and `-`, with any port or path after it.
-- R15.3 A run of 32 or more hex digits (`0-9 a-f A-F`) is removed.
+- R15.3 A run of 32 or more hex digits (`0-9 a-f A-F`) that holds at least one decimal digit and at least one letter is removed. (A run of one letter, such as 51 times `a`, stays, as R4.2 says.)
 - R15.4 Home folders: `Users` or `home` between two separators, where each separator is `/` or `\`, and the name after it up to the next separator, line end or quote (spaces are part of the name). Also `<drive>:\Documents and Settings\<name>` (either separator) and a UNC path `\<server>\<share>\<name>`, the server, share and name included.
 - R15.5 `rs`, `md` and `ts` are not file endings any more (they are country domains): in free text, `apply.rs` is removed like a host name. The file endings are `txt`, `log`, `json`, `html`, `js`, `css`, `toml`, `yml` and `plist`.
 - R15.6 Typed fields do not go through the free-text scrubber. `diag::scrub_report(text: &str) -> String` is `scrub`, except that a `file=<name>` token whose name is in `SOURCE_FILES` stays as it is. `report::text` and every value of `report::issue_url` use `scrub_report`. So a crash report still says where the panic happened, and the name can only be one of eepview's own source files.
