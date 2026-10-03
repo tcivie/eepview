@@ -1,0 +1,25 @@
+{
+  "name": "eepview",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "tauri": "tauri",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write ."
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.15",
+    "@tauri-apps/cli": "^2",
+    "typescript": "~6.0.3",
+    "vite": "^8.0.16"
+  },
+  "license": "MIT"
+}

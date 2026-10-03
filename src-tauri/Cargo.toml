@@ -1,0 +1,45 @@
+[package]
+name = "eepview"
+version = "0.1.0"
+description = "A small browser that opens I2P sites only"
+authors = ["Gleb Tcivie"]
+license = "MIT"
+repository = "https://github.com/tcivie/eepview"
+edition = "2024"
+rust-version = "1.96"
+publish = false
+
+[lib]
+# The `_lib` suffix keeps the lib name apart from the bin name (cargo#8519 on Windows).
+name = "eepview_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[lints.rust]
+unsafe_code = "deny"
+
+[lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+module_name_repetitions = "allow"
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+# Complexity limits; thresholds live in clippy.toml.
+cognitive_complexity = "warn"
+too_many_lines = "warn"
+too_many_arguments = "warn"
+excessive_nesting = "warn"
+fn_params_excessive_bools = "warn"
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = 3
+panic = "abort"
+strip = true

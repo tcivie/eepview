@@ -1,0 +1,16 @@
+# cargo-deny policy. CI runs `cargo deny check bans sources` and fails on any error.
+# Socket.dev covers advisories and licenses, so those sections are not here.
+
+[graph]
+all-features = true
+
+[bans]
+multiple-versions = "allow"
+wildcards = "deny"
+allow-wildcard-paths = true
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []
