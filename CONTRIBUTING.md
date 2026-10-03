@@ -21,6 +21,8 @@ npm run tauri dev
 
 ## Workflow
 
+See the [roadmap](ROADMAP.md) for what comes next.
+
 1. Branch from `main`. Use a prefix: `feat/`, `fix/`, `docs/`, `ci/`, or `chore/`.
 2. Make small commits. Write each message in the Conventional Commits format, for example `fix: reject a loopback address`.
 3. Open one pull request for each change.
