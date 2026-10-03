@@ -2,6 +2,7 @@
 # Keep docs on track.
 # 1. A PR that changes code, dependencies, permissions, scripts or workflows must also change CHANGELOG.md or docs/wiki.
 # 2. Every docs/wiki page except README.md must be linked from docs/wiki/README.md.
+# 3. Docs live in docs/wiki/. A tracked doc file outside the allowlist fails the check.
 # Usage: BASE_REF=main scripts/docs-check.sh
 set -euo pipefail
 
@@ -35,6 +36,40 @@ check_index() {
   return "$status"
 }
 
+ALLOWED_DOCS=(
+  '^README\.md$'
+  '^LICENSE(-[^/]*)?$'
+  '^SECURITY\.md$'
+  '^CONTRIBUTING\.md$'
+  '^CODE_OF_CONDUCT\.md$'
+  '^CHANGELOG\.md$'
+  '^AGENTS\.md$'
+  '^CLAUDE\.md$'
+  '^\.github/'
+  '^docs/wiki/'
+  '(^|/)requirements[^/]*\.txt$'
+)
+
+check_placement() {
+  local status=0 file pattern allowed
+  while IFS= read -r file; do
+    allowed=0
+    for pattern in "${ALLOWED_DOCS[@]}"; do
+      if [[ "$file" =~ $pattern ]]; then
+        allowed=1
+        break
+      fi
+    done
+    if [ "$allowed" -eq 0 ]; then
+      echo "error: $file"
+      echo "Docs live in docs/wiki/. Move this file there." >&2
+      status=1
+    fi
+  done < <(git ls-files '*.md' '*.mdx' '*.rst' '*.txt')
+  return "$status"
+}
+
 : "${BASE_REF:?BASE_REF must be set}"
 check_changes
 check_index
+check_placement
