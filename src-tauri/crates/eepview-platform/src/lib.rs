@@ -222,6 +222,33 @@ mod tests {
     }
 
     #[test]
+    fn js_string_keeps_plain_text_and_escapes_every_separator() {
+        assert_eq!(js_string(""), r#""""#);
+        assert_eq!(js_string("a.i2p/é"), r#""a.i2p/é""#);
+        assert_eq!(js_string("\t\u{2029}\u{7f}"), r#""\u0009\u2029\u007f""#);
+    }
+
+    #[test]
+    fn count_script_folds_case_on_both_sides() {
+        let s = count_script("A", false);
+        assert_eq!(s.matches(".toLowerCase()").count(), 2);
+        assert!(count_script("", true).contains(r#"const q = "";"#));
+    }
+
+    #[test]
+    fn clear_selection_script_removes_ranges() {
+        assert!(CLEAR_SELECTION_SCRIPT.contains("removeAllRanges"));
+    }
+
+    #[test]
+    fn hover_targets_are_trimmed() {
+        assert_eq!(
+            hover_target(" http://a.i2p/ \n").as_deref(),
+            Some("http://a.i2p/")
+        );
+    }
+
+    #[test]
     fn hover_script_uses_the_channel() {
         assert!(HOVER_SCRIPT.contains(HOVER_CHANNEL));
         assert!(HOVER_SCRIPT.contains("mouseover"));
