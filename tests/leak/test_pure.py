@@ -12,8 +12,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from servers import is_i2p, normalize_host
-from servers import EventLog
+from servers import EventLog, is_i2p, normalize_host
 from verdict import (
     REAL_IP_CANDIDATE,
     is_loopback,
