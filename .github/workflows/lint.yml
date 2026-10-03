@@ -107,19 +107,3 @@ jobs:
           echo "$ACTIONLINT_SHA256  $RUNNER_TEMP/actionlint.tar.gz" | sha256sum -c -
           tar -xzf "$RUNNER_TEMP/actionlint.tar.gz" -C "$RUNNER_TEMP" actionlint
           "$RUNNER_TEMP/actionlint"
-
-  docs-check:
-    name: docs-check
-    if: github.event_name == 'pull_request' && github.actor != 'dependabot[bot]'
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-      - name: docs or changelog updated, wiki pages indexed, docs placed in docs/wiki
-        env:
-          BASE_REF: ${{ github.base_ref }}
-        run: ./scripts/docs-check.sh

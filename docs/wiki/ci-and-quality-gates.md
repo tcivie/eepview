@@ -14,7 +14,7 @@ Every change to main passes lint, complexity limits, security scans and a rulese
 - Complexity limits: cognitive and cyclomatic complexity 10 or less, 40 lines per function, 5 parameters, nesting 3.
 - No lint exclusions exist. The code is fixed instead.
 - Socket reviews every dependency change.
-- The `docs-check` job (`scripts/docs-check.sh`) fails a PR that changes code or workflows without a CHANGELOG or docs/wiki update. It also checks that every wiki page is indexed.
+- The `docs-check` job (`scripts/docs-check.sh`) fails a `feat` PR that changes no page under `docs/wiki/`, and any PR that edits `CHANGELOG.md`. It also checks that every wiki page is indexed. `scripts/docs-check.test.sh` tests the check. The job lives in `.github/workflows/docs-check.yml` and runs again when the PR title changes.
 - A repository ruleset blocks direct pushes to main. A pull request needs green required checks.
 
 ## How to use / run locally
@@ -43,3 +43,4 @@ Every change to main passes lint, complexity limits, security scans and a rulese
 - 2026-10-03 — Restore CodeQL and Scorecard, add dependency review and audit badges — [#26](https://github.com/tcivie/eepview/pull/26)
 - 2026-10-03 — Add `reuse lint` and the DCO check — [#30](https://github.com/tcivie/eepview/pull/30)
 - 2026-10-03 — Run zizmor with the pedantic persona; document every workflow permission — [#47](https://github.com/tcivie/eepview/pull/47)
+- 2026-10-03 — docs-check: a feat PR needs a wiki change, and CHANGELOG.md is generated, not edited — [#50](https://github.com/tcivie/eepview/pull/50)

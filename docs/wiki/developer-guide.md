@@ -92,8 +92,9 @@ The full list is in [AGENTS.md](https://github.com/tcivie/eepview/blob/main/AGEN
 4. UI: call the command from `src/ui/`. Add the page or control. Check light and dark.
 5. Tests: unit tests for every pure module. Coverage only goes up. Run the architecture and leak tests if you touched networking.
 6. Wiki: add or update the feature page in `docs/wiki/`, link it from `docs/wiki/README.md`, and add a History line with the PR link.
-7. Add a line to `CHANGELOG.md`, open the PR, and run `gh pr merge --auto --squash`.
+7. Open the PR with a clear Conventional Commit title, and run `gh pr merge --auto --squash`. Do not edit `CHANGELOG.md`. The release job generates it from the PR titles.
 
 ## History
 
 - 2026-10-03 — Write the page — [#28](https://github.com/tcivie/eepview/pull/28)
+- 2026-10-03 — Do not edit CHANGELOG.md in a PR; the release job generates it — [#50](https://github.com/tcivie/eepview/pull/50)
