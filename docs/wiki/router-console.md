@@ -80,6 +80,10 @@ The console view is not a web tab. It is built in `src-tauri/src/shell/console.r
 - **R16 No router configuration in eepview.** No eepview page changes router configuration. The Settings page has no bandwidth, share, relay (transit) or subscription control. Its Router section links to the console Config page instead. Pause and resume of the connection stay.
 - **R17 Leak test.** The leak test passes unchanged.
 
+### Router version
+
+- **R18 Version, display only.** `ConsoleInfo.version` is the router version read from the probe page, or `null` when it is not found. It costs no extra request. Java I2P: the version in the console stylesheet link, `console.css?<version>`. i2pd: the first `:</b> <version><br>` value, where `<version>` is digits and dots (the label before it is translated). The router panel and the home page show it when `RouterStatus.version` is `null`. It changes nothing else.
+
 ## Interface
 
 ### Rust, `eepview_lib::net::console` (`src-tauri/src/net/console.rs`)
@@ -125,19 +129,23 @@ impl VerifiedConsole {
     pub fn url(&self, page: ConsolePage) -> Option<Url>;  // origin + page_path
     pub fn pages(&self) -> Vec<ConsolePage>;              // the pages this router has, R7 order
     pub fn route(&self, url: &Url) -> ConsoleNav;         // R10
+    pub fn version(&self) -> Option<&str>;               // R18
     pub fn info(&self) -> ConsoleInfo;
 }
+
+pub fn console_version(kind: ConsoleKind, body: &str) -> Option<String>;          // R18
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ConsoleNav { Stay, OpenTab, Cancel }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]   // camelCase on the wire
 pub struct ConsoleInfo { pub found: bool, pub kind: Option<ConsoleKind>,
-                         pub origin: Option<String>, pub pages: Vec<ConsolePage> }
-impl ConsoleInfo { pub fn none() -> ConsoleInfo; }  // found false, kind and origin null, no pages
+                         pub origin: Option<String>, pub pages: Vec<ConsolePage>,
+                         pub version: Option<String> }
+impl ConsoleInfo { pub fn none() -> ConsoleInfo; }  // found false, kind, origin and version null, no pages
 ```
 
-Test helper, `crate::net::testing` (tests only): `FakeConsole::start(kind: ConsoleKind) -> FakeConsole` serves a page with that console's marker on a free loopback port. `FakeConsole::port(&self) -> u16`. `FakeConsole::verified(&self) -> VerifiedConsole`. `FakeConsole::requests(&self) -> Vec<String>` gives the request lines received.
+Test helper, `crate::net::testing` (tests only): `FakeConsole::start(kind: ConsoleKind) -> FakeConsole` serves a page with that console's marker and the version `2.13.0` (Java: `console.css?2.13.0`; i2pd: `<b>Version:</b> 2.13.0<br>`) on a free loopback port. `FakeConsole::port(&self) -> u16`. `FakeConsole::verified(&self) -> VerifiedConsole`. `FakeConsole::requests(&self) -> Vec<String>` gives the request lines received.
 
 ### Rust, `eepview_lib::shell::console` (`src-tauri/src/shell/console.rs`)
 
@@ -172,7 +180,7 @@ pub fn close<R: Runtime>(app: &AppHandle<R>);
 ```ts
 type ConsolePage = "home" | "tunnels" | "addressbook" | "config" | "logs";
 type ConsoleInfo = { found: boolean; kind: "java" | "i2pd" | null; origin: string | null;
-  pages: ConsolePage[] };
+  pages: ConsolePage[]; version: string | null };
 ```
 
 ### TypeScript, `src/ui/lib/console-links.ts` (pure)
@@ -189,14 +197,16 @@ export interface ConsoleLinksView {
   links: ConsoleLinkView[];   // only the pages in info.pages, in R7 order; [] when not found
 }
 export function consoleLinks(info: ConsoleInfo | null | undefined): ConsoleLinksView;
+/** R18: the version to show. statusVersion first; else the console version; else null. */
+export function routerVersion(statusVersion: string | null, info: ConsoleInfo | null | undefined): string | null;
 ```
 
 ### Where the requirement tests live
 
-- `src-tauri/src/net/console/tests.rs` (R1–R7, R9, R10)
+- `src-tauri/src/net/console/tests.rs` (R1–R7, R9, R10, R18)
 - `src-tauri/src/shell/console/tests.rs` (R6, R8, R10–R13; the mock runtime fixtures in `crate::shell::testing`)
 - `src-tauri/tests/architecture.rs` (R4, R8, R11, R14)
-- `src/ui/lib/console-links.test.ts` (R15)
+- `src/ui/lib/console-links.test.ts` (R15, R18)
 
 ## Limits
 
