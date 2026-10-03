@@ -545,9 +545,14 @@ fn any_field() -> impl Strategy<Value = Field> {
         any::<u32>().prop_map(Field::Line),
         any::<u64>().prop_map(Field::DurationMs),
         any::<u64>().prop_map(Field::Count),
-        any::<u16>()
-            .prop_filter_map("a 5xx code", HttpStatus::from_code)
-            .prop_map(Field::Status),
+        proptest::sample::select(vec![
+            HttpStatus::S500,
+            HttpStatus::S502,
+            HttpStatus::S503,
+            HttpStatus::S504,
+            HttpStatus::Other5xx,
+        ])
+        .prop_map(Field::Status),
         any::<bool>().prop_map(Field::Managed),
         any::<bool>().prop_map(Field::Js),
         any::<bool>().prop_map(Field::Ok),
