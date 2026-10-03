@@ -20,7 +20,7 @@ describe("[ipc-contract events] link-hover bubble", () => {
     assert.equal(view.visible, true);
     const shown = `${view.prefix ?? ""} ${view.text}`;
     assert.match(shown, /Blocked/);
-    assert.equal(shown.split(/\s+/).at(-1), "evil.com");
+    assert.equal(shown.split(/\s+/).pop(), "evil.com");
   });
   it("[ipc-contract events] a link that is not blocked does not show as blocked", () => {
     const view = linkStatus({ text: "http://notbob.i2p/", blocked: false });
