@@ -43,7 +43,7 @@ jobs:
       - run: cargo fmt --manifest-path src-tauri/Cargo.toml --check
       - run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --locked -- -D warnings
       - run: cargo fmt --manifest-path src-tauri/fuzz/Cargo.toml --check
-      - run: cargo clippy --manifest-path src-tauri/fuzz/Cargo.toml --target-dir src-tauri/target --all-targets --locked -- -D warnings
+      - run: cargo clippy --manifest-path src-tauri/fuzz/Cargo.toml --target-dir src-tauri/target --all-targets -- -D warnings
 
   web:
     name: biome + tsc

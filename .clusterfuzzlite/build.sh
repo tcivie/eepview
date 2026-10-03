@@ -14,6 +14,8 @@ cd "$SRC/eepview/src-tauri"
 mkdir -p ../dist
 
 rustup toolchain install "$NIGHTLY" --profile minimal
+# The image does not ship cargo-fuzz. Build it without the sanitizer flags of the image.
+env -u RUSTFLAGS cargo "+$NIGHTLY" install cargo-fuzz --version 0.13.2 --locked
 cargo "+$NIGHTLY" fuzz build -O --sanitizer="$SANITIZER" --target-dir "$SRC/target"
 
 for dict in fuzz/dictionaries/*.dict; do
