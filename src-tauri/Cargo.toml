@@ -18,7 +18,9 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-# Tauri default features without `compression` (brotli) and `dbus` (Linux theme portal).
+# Tauri default features without `compression` (brotli for the embedded assets), `dbus`
+# (Linux theme portal) and `dynamic-acl` (capabilities added at runtime; eepview only
+# uses the static capabilities in capabilities/).
 tauri = { version = "2", default-features = false, features = ["common-controls-v6", "wry", "x11"] }
 
 [lints.rust]
