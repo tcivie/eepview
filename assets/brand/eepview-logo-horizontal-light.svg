@@ -6,39 +6,17 @@
       <stop offset="0" stop-color="#2A6A56"/>
       <stop offset="1" stop-color="#0F3529"/>
     </linearGradient>
-    <radialGradient id="evl-view" cx="512" cy="590" r="330" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#1A4A3E"/>
-      <stop offset="1" stop-color="#0A231C"/>
-    </radialGradient>
-    <linearGradient id="evl-inset" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#000" stop-opacity=".45"/>
-      <stop offset=".14" stop-color="#000" stop-opacity="0"/>
-    </linearGradient>
-    <filter id="evl-grain" x="0" y="0" width="1" height="1">
-      <feTurbulence type="fractalNoise" baseFrequency=".85" numOctaves="2" stitchTiles="stitch"/>
-      <feColorMatrix values="0 0 0 0 .42 0 0 0 0 .34 0 0 0 0 .22 0 0 0 .22 0"/>
-      <feComposite in2="SourceGraphic" operator="in"/>
-    </filter>
     <filter id="evl-soft" x="-.5" y="-.5" width="2" height="2">
       <feGaussianBlur stdDeviation="8"/>
     </filter>
   </defs>
   <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#evl-body)" stroke="#FFFFFF" stroke-opacity=".12" stroke-width="4"/>
-  <rect x="200" y="240" width="624" height="544" rx="64" fill="#F3EDE0"/>
-  <rect x="200" y="240" width="624" height="544" rx="64" filter="url(#evl-grain)"/>
-  <g fill="#D2C6AC">
-    <circle cx="272" cy="292" r="14"/>
-    <circle cx="316" cy="292" r="14"/>
-    <circle cx="360" cy="292" r="14"/>
-  </g>
-  <rect x="240" y="344" width="544" height="400" rx="28" fill="url(#evl-view)"/>
-  <rect x="240" y="344" width="544" height="400" rx="28" fill="url(#evl-inset)"/>
-  <ellipse cx="500" cy="702" rx="170" ry="14" fill="#000" opacity=".4" filter="url(#evl-soft)"/>
-  <g transform="translate(0 -40) rotate(18 512 590) translate(512 590) scale(0.9) translate(-512 -590)">
-    <g fill="none" stroke="#A9845A" stroke-width="3.5" stroke-linecap="round">
-      <path d="M474 734q-15 13 -22 26M481 734q-12 15 -18 31M488 734q-10 18 -14 36M495 734q-7 20 -10 41M502 734q-5 15 -7 30M509 734q-3 17 -4 35M516 734q-1 20 -1 40M523 734q1 14 1 29M530 734q2 17 4 34M537 734q4 19 7 39M544 734q7 14 10 28M475 734q9 16 14 33M482 734q12 19 18 38M489 734q15 13 22 27M496 734q-11 16 -16 32M503 734q-6 18 -8 37M510 734q0 13 0 26M517 734q5 15 8 31M524 734q11 18 16 36M531 734q-8 20 -12 41M538 734q3 15 5 30"/>
+  <ellipse cx="500" cy="770" rx="220" ry="22" fill="#000" opacity=".35" filter="url(#evl-soft)"/>
+  <g transform="translate(524 478) rotate(18) scale(1.42) translate(-512 -563)">
+    <g fill="none" stroke="#A9845A" stroke-width="2.4" stroke-linecap="round">
+      <path d="M470 720q-16 19 -24 38M481 720q-14 22 -20 45M492 720q-11 26 -17 52M503 720q-9 20 -13 41M514 720q-7 24 -10 48M525 720q-5 27 -7 55M536 720q-3 22 -5 44M547 720q-2 25 -2 51M474 720q0 20 0 40M485 720q1 23 2 47M496 720q3 27 4 54M507 720q4 21 7 43M518 720q6 25 10 50M529 720q8 19 13 39M540 720q11 23 16 46M551 720q13 26 20 53M478 720q16 21 24 42M489 720q-12 24 -18 49M500 720q-8 19 -11 38M511 720q-2 22 -3 45M522 720q2 26 3 52M533 720q7 20 11 41M544 720q12 24 18 48M471 720q-10 27 -14 55M482 720q4 22 6 44M493 720q10 25 15 51"/>
     </g>
-    <path d="M462 726Q512 742 562 726L556 738Q512 750 468 738Z" fill="#A9845A"/>
+    <path d="M458 712Q512 728 566 712L560 736Q512 748 464 736Z" fill="#A9845A"/>
     <path d="M498 398C500 430 494 456 470 472C400 500 332 540 332 612C332 680 398 722 468 728Q512 734 556 728C626 722 692 680 692 612C692 540 624 500 554 472C530 456 524 430 526 398Q512 392 498 398Z" fill="#EDE0C3"/>
     <clipPath id="evl-clip"><path d="M498 398C500 430 494 456 470 472C400 500 332 540 332 612C332 680 398 722 468 728Q512 734 556 728C626 722 692 680 692 612C692 540 624 500 554 472C530 456 524 430 526 398Q512 392 498 398Z"/></clipPath>
     <g clip-path="url(#evl-clip)">

@@ -1,10 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
   <title>eepview mark, small sizes</title>
-  <!-- Every coordinate is a multiple of 64, so each edge lands on a whole pixel at 16 px (and 32 px). -->
-  <rect width="1024" height="1024" rx="192" fill="#1D5444"/>
-  <rect x="128" y="192" width="768" height="640" rx="64" fill="#F3EDE0"/>
-  <rect x="192" y="320" width="640" height="448" rx="64" fill="#0D2A23"/>
-  <path d="M448 448C384 448 320 512 320 576C320 640 384 704 448 704H576C640 704 704 640 704 576C704 512 640 448 576 448Z" fill="#D3BD94"/>
-  <path d="M512 448C576 512 576 640 576 704H448C448 640 448 512 512 448ZM448 448L512 384L576 448Z" fill="#FBF6EA"/>
-  <path d="M448 704H576V768H448Z" fill="#8A6C47"/>
+  <!-- Every coordinate is a multiple of 64, so each edge lands on a whole pixel at 16 px (and 32 px).
+       The root and the neck start inside the bulb and are drawn first, so the bulb covers each joint. -->
+  <rect width="1024" height="1024" rx="192" fill="#1F5A48"/>
+  <path d="M448 768H576V896H448Z" fill="#A9845A"/>
+  <path d="M448 384L512 128L576 384Z" fill="#EDE0C3"/>
+  <path d="M448 320C256 384 192 512 192 640C192 768 320 832 448 832H576C704 832 832 768 832 640C832 512 768 384 576 320Z" fill="#FBF6EA"/>
+  <path d="M512 320C576 448 576 640 576 832H448C448 640 448 448 512 320Z" fill="#EDE0C3"/>
+  <path d="M576 320C768 384 832 512 832 640C832 768 704 832 576 832C640 640 640 448 576 320Z" fill="#D3BD94"/>
 </svg>
