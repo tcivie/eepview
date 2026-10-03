@@ -52,7 +52,25 @@ export type Settings = {
   zoomDefault: number;
 };
 
-export type HistoryQuery = { q?: string; before?: number; limit?: number };
+export type HistoryCursor = { visited: number; id: string };
+export type HistoryQuery = { q?: string; before?: HistoryCursor; limit?: number };
+export type Platform = "macos" | "windows" | "linux";
+
+export type RouterStats = {
+  networkStatus: string | null;
+  uptimeSeconds: number | null;
+  routerKind: string | null;
+  routerVersion: string | null;
+  javaVersion: string | null;
+  bandwidthInBps: number | null;
+  bandwidthOutBps: number | null;
+  bandwidthHistory: { inBps: number[]; outBps: number[] } | null;
+  clientTunnels: number | null;
+  participatingTunnels: number | null;
+  buildSuccessRate: number | null;
+  knownRouters: number | null;
+  floodfills: number | null;
+};
 export type ClearRange = "hour" | "day" | "week" | "all";
 export type FindResult = { query: string; matches: number | null; active: number | null };
 export type Toast = { kind: string; text: string };
@@ -84,6 +102,7 @@ export interface Commands {
   bookmark_remove: { args: { id: string }; result: undefined };
   bookmark_find: { args: { url: string }; result: Bookmark | null };
   bookmarks_export: { args: Record<string, never>; result: string };
+  bookmarks_export_file: { args: Record<string, never>; result: string };
   bookmarks_import: { args: { json: string }; result: number };
   history_query: { args: { query: HistoryQuery }; result: HistoryEntry[] };
   history_remove: { args: { id: string }; result: undefined };
@@ -92,6 +111,9 @@ export interface Commands {
   settings_get: { args: Record<string, never>; result: Settings };
   settings_set: { args: { patch: Partial<Settings> }; result: Settings };
   router_status: { args: Record<string, never>; result: RouterStatus };
+  router_stats: { args: Record<string, never>; result: RouterStats };
+  chrome_set_height: { args: { px: number }; result: undefined };
+  platform: { args: Record<string, never>; result: Platform };
 }
 
 export interface Events {

@@ -48,25 +48,27 @@ export function timeOfDay(ts: number, locale = "en-GB"): string {
   return new Intl.DateTimeFormat(locale, { hour: "2-digit", minute: "2-digit" }).format(ts);
 }
 
+export interface Cursor {
+  visited: number;
+  id: string;
+}
+
+export function pageCursor<T extends Dated & { id: string }>(entries: T[]): Cursor | undefined {
+  const last = entries[entries.length - 1];
+  return last ? { visited: last.visited, id: last.id } : undefined;
+}
+
+export function isBeforeCursor(entry: Cursor, cursor: Cursor | undefined): boolean {
+  if (!cursor) return true;
+  if (entry.visited !== cursor.visited) return entry.visited < cursor.visited;
+  return entry.id < cursor.id;
+}
+
+export function newestFirst(a: Cursor, b: Cursor): number {
+  if (a.visited !== b.visited) return b.visited - a.visited;
+  return a.id < b.id ? 1 : -1;
+}
+
 export function oldestVisit<T extends Dated>(entries: T[]): number | undefined {
   return entries.length === 0 ? undefined : Math.min(...entries.map((e) => e.visited));
-}
-
-export function pageCursor<T extends Dated>(entries: T[]): number | undefined {
-  const oldest = oldestVisit(entries);
-  return oldest === undefined ? undefined : oldest + 1;
-}
-
-export interface PageMerge<T> {
-  entries: T[];
-  added: number;
-}
-
-export function mergePage<T extends Dated & { id: string }>(
-  existing: T[],
-  page: T[],
-): PageMerge<T> {
-  const known = new Set(existing.map((e) => e.id));
-  const fresh = page.filter((e) => !known.has(e.id));
-  return { entries: [...existing, ...fresh], added: fresh.length };
 }

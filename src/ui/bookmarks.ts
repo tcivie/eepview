@@ -7,7 +7,7 @@ import { folderGroups, folderNames } from "./lib/bookmark-groups.ts";
 import { bindClicks, delegateClick, runAndAnnounce } from "./shared/events.ts";
 import { setFieldError } from "./shared/form.ts";
 
-const BLOB_LIFETIME_MS = 60_000;
+const TOAST_MS = 6000;
 const ADDRESS_HINT = "A .i2p name or a .b32.i2p address.";
 
 type Draft = { url: string; title: string; folder: string | null };
@@ -16,6 +16,7 @@ let bookmarks: Bookmark[] = [];
 let editing: Bookmark | null = null;
 
 const status = (): HTMLElement => byId("bookmark-status");
+let toastTimer = 0;
 const countLabel = (n: number): string => (n === 1 ? "1 site" : `${n} sites`);
 const reportError = (error: unknown): void => announce(status(), errorText(error));
 const labelOf = (b: Bookmark): string => b.title || displayUrl(b.url);
@@ -118,14 +119,19 @@ function onRowAction(button: HTMLButtonElement): void {
   else openEditor(bookmarks.find((b) => b.id === id) ?? null);
 }
 
+function showToast(text: string): void {
+  const toast = byId("bookmark-toast");
+  toast.textContent = text;
+  toast.hidden = false;
+  window.clearTimeout(toastTimer);
+  toastTimer = window.setTimeout(() => {
+    toast.hidden = true;
+  }, TOAST_MS);
+}
+
 async function exportBookmarks(): Promise<void> {
-  const json = await call("bookmarks_export", {});
-  const link = document.createElement("a");
-  link.href = URL.createObjectURL(new Blob([json], { type: "application/json" }));
-  link.download = "eepview-bookmarks.json";
-  link.click();
-  window.setTimeout(() => URL.revokeObjectURL(link.href), BLOB_LIFETIME_MS);
-  announce(status(), `Exported ${countLabel(bookmarks.length)}.`);
+  const path = await call("bookmarks_export_file", {});
+  showToast(`Exported ${countLabel(bookmarks.length)} to ${path}`);
 }
 
 async function importFile(file: File): Promise<void> {

@@ -4,7 +4,8 @@ import {
   dayKey,
   dayLabel,
   groupByDay,
-  mergePage,
+  isBeforeCursor,
+  newestFirst,
   oldestVisit,
   pageCursor,
   timeOfDay,
@@ -64,24 +65,28 @@ describe("helpers", () => {
 });
 
 describe("paging", () => {
-  it("asks for the oldest timestamp again so ties are not lost", () => {
-    assert.equal(pageCursor([{ visited: 9 }, { visited: 4 }]), 5);
+  const rows = [
+    { id: "c", visited: 9 },
+    { id: "b", visited: 4 },
+    { id: "a", visited: 4 },
+  ];
+  it("uses the last row as the cursor", () => {
+    assert.deepEqual(pageCursor(rows), { visited: 4, id: "a" });
     assert.equal(pageCursor([]), undefined);
   });
-  it("drops rows it already has", () => {
-    const first = [
-      { id: "a", visited: 5 },
-      { id: "b", visited: 4 },
-    ];
-    const page = [
-      { id: "b", visited: 4 },
-      { id: "c", visited: 4 },
-    ];
-    const merged = mergePage(first, page);
+  it("keeps rows that tie on the timestamp", () => {
+    const cursor = { visited: 4, id: "b" };
     assert.deepEqual(
-      merged.entries.map((e) => e.id),
-      ["a", "b", "c"],
+      rows.filter((r) => isBeforeCursor(r, cursor)).map((r) => r.id),
+      ["a"],
     );
-    assert.equal(merged.added, 1);
+    assert.equal(isBeforeCursor({ id: "z", visited: 1 }, undefined), true);
+  });
+  it("sorts newest first, then by id", () => {
+    const shuffled = [rows[2], rows[0], rows[1]].filter((r) => r !== undefined);
+    assert.deepEqual(
+      shuffled.sort(newestFirst).map((r) => r.id),
+      ["c", "b", "a"],
+    );
   });
 });

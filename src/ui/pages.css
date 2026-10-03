@@ -1270,3 +1270,26 @@
 .history-sentinel {
   height: 1px;
 }
+
+.figures-row {
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+}
+
+.page-toast {
+  position: fixed;
+  right: var(--space-5);
+  bottom: var(--space-5);
+  z-index: 20;
+  max-width: min(480px, calc(100vw - 32px));
+  padding: var(--space-3) var(--space-4);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+  box-shadow: var(--shadow-float);
+  font-size: var(--fs-sm);
+  overflow-wrap: anywhere;
+}
+
+.page-toast[hidden] {
+  display: none;
+}

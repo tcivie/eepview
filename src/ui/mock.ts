@@ -6,13 +6,16 @@ import type {
   HistoryEntry,
   HistoryQuery,
   NavResult,
+  Platform,
   RouterState,
+  RouterStats,
   RouterStatus,
   Settings,
   Suggestion,
   TabInfo,
 } from "./contract.ts";
 import type { Backend } from "./ipc.ts";
+import { isBeforeCursor, newestFirst } from "./lib/history-groups.ts";
 import data from "./mock-data.json";
 import { localThemeStore } from "./theme.ts";
 
@@ -64,7 +67,9 @@ function historyEntry(i: number): HistoryEntry {
   return { id: `h${i}`, url, title, visited: now - ageMinutes * MINUTE, visits: 1 + (i % 4) };
 }
 
-let history: HistoryEntry[] = Array.from({ length: data.historySize }, (_, i) => historyEntry(i));
+let history: HistoryEntry[] = Array.from({ length: data.historySize }, (_, i) =>
+  historyEntry(i),
+).sort(newestFirst);
 
 const tab = (id: number, url: string, title: string, extra: Partial<TabInfo> = {}): TabInfo => ({
   id,
@@ -201,10 +206,9 @@ function matchesQuery(entry: HistoryEntry, q: string): boolean {
 }
 
 function queryHistory(query: HistoryQuery): HistoryEntry[] {
-  const before = query.before ?? Number.POSITIVE_INFINITY;
   const q = query.q ?? "";
   return history
-    .filter((e) => e.visited < before && (q === "" || matchesQuery(e, q)))
+    .filter((e) => isBeforeCursor(e, query.before) && (q === "" || matchesQuery(e, q)))
     .slice(0, query.limit ?? HISTORY_PAGE);
 }
 
@@ -266,6 +270,34 @@ function setSettings(patch: Partial<Settings>): Settings {
   return { ...settings };
 }
 
+function platformFromParams(): Platform {
+  const requested = params.get("platform");
+  return requested === "windows" || requested === "linux" ? requested : "macos";
+}
+
+let statsTick = 0;
+
+function wave(i: number, base: number, swing: number): number {
+  return Math.max(2048, base + Math.sin(i / 7) * swing + Math.sin(i * 1.7) * swing * 0.35);
+}
+
+function bandwidthSeries(base: number, swing: number): number[] {
+  return Array.from({ length: data.stats.samples }, (_, i) => wave(i + statsTick, base, swing));
+}
+
+function sampleStats(): RouterStats {
+  statsTick += 1;
+  const inBps = bandwidthSeries(data.stats.inBps, data.stats.inSwing);
+  const outBps = bandwidthSeries(data.stats.outBps, data.stats.outSwing);
+  return {
+    ...data.stats.fixed,
+    uptimeSeconds: data.stats.fixed.uptimeSeconds + statsTick * 5,
+    bandwidthInBps: inBps[inBps.length - 1] ?? null,
+    bandwidthOutBps: outBps[outBps.length - 1] ?? null,
+    bandwidthHistory: { inBps, outBps },
+  };
+}
+
 type Handler = (args: Record<string, unknown>) => unknown;
 const arg = <T>(args: Record<string, unknown>, key: string): T => args[key] as T;
 
@@ -310,6 +342,10 @@ const handlers: Record<CommandName, Handler> = {
   settings_get: () => ({ ...settings }),
   settings_set: (a) => setSettings(arg(a, "patch")),
   router_status: () => router,
+  router_stats: () => sampleStats(),
+  chrome_set_height: () => undefined,
+  platform: () => platformFromParams(),
+  bookmarks_export_file: () => data.exportPath,
 };
 
 export const mockBackend: Backend = {

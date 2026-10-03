@@ -2,6 +2,26 @@
   "proxy": "127.0.0.1:4444",
   "routerVersion": "2.10.0",
   "historySize": 160,
+  "exportPath": "~/Downloads/eepview-bookmarks.json",
+  "stats": {
+    "samples": 60,
+    "inBps": 45000,
+    "inSwing": 14000,
+    "outBps": 30000,
+    "outSwing": 9000,
+    "fixed": {
+      "networkStatus": "OK, reachable",
+      "uptimeSeconds": 11520,
+      "routerKind": "bundled",
+      "routerVersion": "2.10.0",
+      "javaVersion": "Temurin 21.0.8",
+      "clientTunnels": 6,
+      "participatingTunnels": 214,
+      "buildSuccessRate": 0.68,
+      "knownRouters": 4812,
+      "floodfills": 1136
+    }
+  },
   "bookmarks": [
     { "site": "stats.i2p/", "title": "Network statistics", "folder": null, "ageDays": 30 },
     { "site": "i2p-projekt.i2p/", "title": "The I2P project", "folder": null, "ageDays": 30 },

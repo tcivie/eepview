@@ -3,7 +3,7 @@ import type { ClearRange, HistoryEntry } from "./contract.ts";
 import { announce, byId } from "./dom.ts";
 import { call, errorText, on } from "./ipc.ts";
 import { displayUrl, hostOf } from "./lib/address.ts";
-import { groupByDay, mergePage, pageCursor, timeOfDay } from "./lib/history-groups.ts";
+import { groupByDay, pageCursor, timeOfDay } from "./lib/history-groups.ts";
 import { delegateClick, runAndAnnounce } from "./shared/events.ts";
 
 const PAGE_SIZE = 50;
@@ -72,9 +72,8 @@ async function loadMore(): Promise<void> {
   if (mine !== generation) return;
   loading = false;
   byId("history").setAttribute("aria-busy", "false");
-  const merged = mergePage(entries, page);
-  entries = merged.entries;
-  done = page.length < PAGE_SIZE || merged.added === 0;
+  entries = [...entries, ...page];
+  done = page.length < PAGE_SIZE;
   render();
 }
 
