@@ -10,6 +10,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="light dark" />
     <title>Bookmarks</title>
+    <link rel="icon" type="image/svg+xml" href="../../assets/brand/eepview-mark-small.svg" />
     <link rel="stylesheet" href="./theme.css" />
     <link rel="stylesheet" href="./ui.css" />
     <link rel="stylesheet" href="./pages.css" />
@@ -19,15 +20,11 @@
     <div class="shell">
       <aside class="rail">
         <a class="brand" href="./home.html">
-          <svg class="mark" viewBox="0 0 28 28" aria-hidden="true">
-            <rect x="1.75" y="1.75" width="24.5" height="24.5" rx="8" />
-            <rect x="6.5" y="6.5" width="15" height="15" rx="5" />
-            <rect class="core" x="11" y="11" width="6" height="6" rx="2" />
-          </svg>
+          <img class="mark" src="../../assets/brand/eepview-mark-small.svg" alt="" width="28" height="28" />
           eepview
         </a>
         <nav class="rail-nav" aria-label="eepview pages">
-          <ul>
+          <ul class="list">
             <li>
               <a href="./home.html">
                 <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -113,11 +110,11 @@
         </header>
 
         <p class="visually-hidden" id="bookmark-status" role="status" aria-live="polite"></p>
-        <p class="page-toast" id="bookmark-toast" role="status" aria-live="polite" hidden></p>
+        <p class="popover page-toast" id="bookmark-toast" role="status" aria-live="polite" hidden></p>
         <div class="folders" id="folders"></div>
 
         <template id="folder-template">
-          <section class="folder">
+          <section class="card card-flush folder">
             <header class="folder-head">
               <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
                 <path
@@ -125,18 +122,18 @@
                 />
               </svg>
               <h2 class="folder-name">Folder</h2>
-              <span class="folder-count muted"></span>
+              <span class="caption folder-count"></span>
             </header>
-            <ul class="rows"></ul>
+            <ul class="list rows"></ul>
           </section>
         </template>
 
         <template id="row-template">
-          <li class="row">
-            <span class="site-mark" aria-hidden="true">E</span>
-            <a class="row-link" href="./bookmarks.html">
-              <span class="row-name">Name</span>
-              <span class="row-addr">address.i2p</span>
+          <li class="list-row">
+            <span class="letter-icon site-mark" aria-hidden="true">E</span>
+            <a class="row-link bookmark-link" href="./bookmarks.html">
+              <span class="row-title row-name">Name</span>
+              <span class="addr truncate row-addr">address.i2p</span>
             </a>
             <span class="row-actions">
               <button class="icon-btn" type="button" data-action="edit" aria-label="Edit">
@@ -171,7 +168,7 @@
                 spellcheck="false"
                 aria-describedby="bm-address-hint"
               />
-              <span class="field-hint" id="bm-address-hint">A .i2p name or a .b32.i2p address.</span>
+              <span class="hint" id="bm-address-hint">A .i2p name or a .b32.i2p address.</span>
             </div>
             <div class="field">
               <label class="field-label" for="bm-folder">Folder</label>
@@ -184,7 +181,7 @@
                 aria-describedby="bm-folder-hint"
               />
               <datalist id="folder-list"></datalist>
-              <span class="field-hint" id="bm-folder-hint">
+              <span class="hint" id="bm-folder-hint">
                 Pick a folder or type a new name. Leave empty for no folder.
               </span>
             </div>

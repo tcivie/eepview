@@ -93,7 +93,7 @@ eepview shows router information but never changes the router configuration. It 
 ## How to use / run locally
 
 - `npm run tauri dev` with an I2P router on `127.0.0.1:4444`.
-- `EEPVIEW_PROXY=127.0.0.1:<port>` picks another router proxy. `EEPVIEW_START_URL`, `EEPVIEW_EXIT_AFTER`, `EEPVIEW_JS=off` and `EEPVIEW_LOG=1` are listed in the [IPC contract](ipc-contract.md#environment-and-command-line).
+- `EEPVIEW_PROXY=127.0.0.1:<port>` picks another router proxy. `EEPVIEW_START_URL`, `EEPVIEW_EXIT_AFTER`, and `EEPVIEW_JS=off` are listed in the [IPC contract](ipc-contract.md#environment-and-command-line).
 - Tests: `cargo test --workspace` in `src-tauri`.
 
 ## Limits

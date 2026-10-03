@@ -1,0 +1,77 @@
+/*
+ * SPDX-FileCopyrightText: 2026 The eepview contributors
+ * SPDX-License-Identifier: MIT
+ */
+
+@layer pages {
+  .preview {
+    padding: var(--space-6);
+    font-size: var(--fs-sm);
+  }
+
+  .preview h1 {
+    margin-bottom: var(--space-5);
+    font-size: var(--fs-xl);
+  }
+
+  .preview h2 {
+    margin-bottom: var(--space-3);
+    font-size: var(--fs-xs);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: 512px 1fr;
+    gap: var(--space-6);
+  }
+
+  .card + .card {
+    margin-top: var(--space-5);
+  }
+
+  .row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: var(--space-5);
+  }
+
+  .size {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-1-5);
+    font-size: var(--fs-2xs);
+    color: var(--color-text-muted);
+  }
+
+  .mono-mark {
+    display: block;
+    color: var(--color-text);
+  }
+
+  .logo-dark {
+    display: none;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .logo-light {
+      display: none;
+    }
+
+    :root:not([data-theme="light"]) .logo-dark {
+      display: block;
+    }
+  }
+
+  :root[data-theme="dark"] .logo-light {
+    display: none;
+  }
+
+  :root[data-theme="dark"] .logo-dark {
+    display: block;
+  }
+}

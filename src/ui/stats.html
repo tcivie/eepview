@@ -10,6 +10,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="light dark" />
     <title>Network</title>
+    <link rel="icon" type="image/svg+xml" href="../../assets/brand/eepview-mark-small.svg" />
     <link rel="stylesheet" href="./theme.css" />
     <link rel="stylesheet" href="./ui.css" />
     <link rel="stylesheet" href="./pages.css" />
@@ -19,15 +20,11 @@
     <div class="shell">
       <aside class="rail">
         <a class="brand" href="./home.html">
-          <svg class="mark" viewBox="0 0 28 28" aria-hidden="true">
-            <rect x="1.75" y="1.75" width="24.5" height="24.5" rx="8" />
-            <rect x="6.5" y="6.5" width="15" height="15" rx="5" />
-            <rect class="core" x="11" y="11" width="6" height="6" rx="2" />
-          </svg>
+          <img class="mark" src="../../assets/brand/eepview-mark-small.svg" alt="" width="28" height="28" />
           eepview
         </a>
         <nav class="rail-nav" aria-label="eepview pages">
-          <ul>
+          <ul class="list">
             <li>
               <a href="./home.html">
                 <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -85,7 +82,7 @@
           <p role="status"><span class="chip" id="net-chip" data-tone="building">Checking</span></p>
         </header>
 
-        <section class="section panel bandwidth" aria-labelledby="bw-title">
+        <section class="section card card-pad" aria-labelledby="bw-title">
           <div class="bandwidth-head">
             <h2 id="bw-title">Bandwidth</h2>
             <dl class="bandwidth-now">
@@ -112,11 +109,11 @@
               <line class="spark-grid" x1="0" y1="75" x2="600" y2="75" />
               <line class="spark-base" x1="0" y1="140" x2="600" y2="140" />
               <path class="spark-area" id="spark-in-area" d="M0 140" />
-              <path class="spark-line spark-line-in" id="spark-in" d="M0 140" />
-              <path class="spark-line spark-line-out" id="spark-out" d="M0 140" />
+              <path class="spark-line spark-in" id="spark-in" d="M0 140" />
+              <path class="spark-line spark-out" id="spark-out" d="M0 140" />
             </svg>
-            <span class="spark-max num" id="spark-max">—</span>
-            <figcaption class="spark-axis">
+            <span class="caption num spark-max" id="spark-max">—</span>
+            <figcaption class="caption spark-axis">
               <span>10 minutes ago</span>
               <span class="visually-hidden" id="spark-summary">No bandwidth figures yet.</span>
               <span>Now</span>
@@ -127,23 +124,23 @@
         <section class="section" aria-labelledby="tunnels-title">
           <div class="section-head">
             <h2 id="tunnels-title">Tunnels</h2>
-            <span class="muted tunnel-note">Each tunnel lasts 10 minutes, then the router builds a fresh one.</span>
+            <span class="hint">Each tunnel lasts 10 minutes, then the router builds a fresh one.</span>
           </div>
-          <dl class="panel figures figures-row">
+          <dl class="card card-pad facts facts-lg">
             <div>
               <dt>Client tunnels</dt>
               <dd class="num" id="client-tunnels">—</dd>
-              <dd class="figure-note">Carry your own traffic</dd>
+              <dd class="caption">Carry your own traffic</dd>
             </div>
             <div>
               <dt>Participating tunnels</dt>
               <dd class="num" id="participating-tunnels">—</dd>
-              <dd class="figure-note">Traffic you relay for others</dd>
+              <dd class="caption">Traffic you relay for others</dd>
             </div>
             <div>
               <dt>Tunnel build success</dt>
               <dd class="num" id="build-rate">—</dd>
-              <dd class="figure-note">
+              <dd class="caption">
                 <svg class="rate" viewBox="0 0 100 6" preserveAspectRatio="none" aria-hidden="true">
                   <rect class="rate-track" width="100" height="6" rx="3" />
                   <rect class="rate-fill" id="build-rate-bar" width="0" height="6" rx="3" />
@@ -158,7 +155,7 @@
           <div class="section-head">
             <h2 id="router-title">Router</h2>
           </div>
-          <dl class="facts panel router-facts">
+          <dl class="card card-pad facts">
             <div>
               <dt>Network status</dt>
               <dd id="network-status">—</dd>
@@ -188,7 +185,7 @@
               <dd class="mono" id="router-proxy">—</dd>
             </div>
           </dl>
-          <p class="muted router-detail" id="router-detail"></p>
+          <p class="hint" id="router-detail"></p>
         </section>
       </main>
     </div>

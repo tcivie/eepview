@@ -11,6 +11,7 @@ use tauri::{AppHandle, Manager, Runtime, Webview};
 
 use super::apply::with_core;
 use crate::core::{EngineOp, FindOp};
+use crate::diag::{self, Code, ErrorKind, Field, OpKind};
 
 /// Carries out one engine call.
 pub fn run<R: Runtime>(webview: &Webview<R>, tab: u32, op: &EngineOp) {
@@ -25,25 +26,60 @@ pub fn run<R: Runtime>(webview: &Webview<R>, tab: u32, op: &EngineOp) {
         EngineOp::Stop => go(webview, Nav::Stop),
     };
     if let Err(e) = result {
-        super::log::error("engine call", &e.to_string());
+        let (code, kind) = failure(op);
+        diag::event(code, &[Field::Op(kind), Field::Error(ErrorKind::from(&e))]);
     }
+}
+
+/// The event code and operation kind of a failed engine call.
+#[must_use]
+pub fn failure(op: &EngineOp) -> (Code, OpKind) {
+    match op {
+        EngineOp::Reload => (Code::EngineCallFailed, OpKind::Reload),
+        EngineOp::HardReload => (Code::EngineCallFailed, OpKind::HardReload),
+        EngineOp::Back => (Code::EngineCallFailed, OpKind::Back),
+        EngineOp::Forward => (Code::EngineCallFailed, OpKind::Forward),
+        EngineOp::Stop => (Code::EngineCallFailed, OpKind::Stop),
+        EngineOp::Zoom(_) => (Code::ZoomFailed, OpKind::Zoom),
+        EngineOp::Find(_) => (Code::FindFailed, OpKind::Find),
+        EngineOp::FindClear => (Code::FindFailed, OpKind::FindClear),
+    }
+}
+
+/// The operation kind of a bridge navigation.
+fn nav_op(nav: Nav) -> OpKind {
+    match nav {
+        Nav::Back => OpKind::Back,
+        Nav::Forward => OpKind::Forward,
+        Nav::Reload => OpKind::Reload,
+        Nav::HardReload => OpKind::HardReload,
+        Nav::Stop => OpKind::Stop,
+    }
+}
+
+/// Records a failed call of the platform bridge. Its error text is never logged.
+fn bridge_failed(op: OpKind) {
+    diag::event(
+        Code::EngineCallFailed,
+        &[Field::Op(op), Field::Error(ErrorKind::Platform)],
+    );
 }
 
 fn go<R: Runtime>(webview: &Webview<R>, nav: Nav) -> tauri::Result<()> {
     webview.with_webview(move |platform| {
-        if let Err(e) = eepview_platform::go(&platform, nav) {
-            super::log::error("engine call", &e);
+        if eepview_platform::go(&platform, nav).is_err() {
+            bridge_failed(nav_op(nav));
         }
     })
 }
 
 /// Hardens the engine and hooks the link under the mouse to the status bubble.
 pub fn native_hooks<R: Runtime>(platform: &PlatformWebview, app: &AppHandle<R>, tab: u32) {
-    if let Err(e) = eepview_platform::harden(platform) {
-        super::log::error("harden", &e);
+    if eepview_platform::harden(platform).is_err() {
+        bridge_failed(OpKind::Harden);
     }
-    if let Err(e) = eepview_platform::on_hover(platform, hover_callback(app, tab)) {
-        super::log::error("hover", &e);
+    if eepview_platform::on_hover(platform, hover_callback(app, tab)).is_err() {
+        bridge_failed(OpKind::Hover);
     }
 }
 
@@ -128,7 +164,10 @@ fn find_by_script<R: Runtime>(webview: &Webview<R>, tab: u32, find: &FindOp) {
         script_counted(&app, tab, &out);
     });
     if let Err(e) = result {
-        super::log::error("find", &e.to_string());
+        diag::event(
+            Code::FindFailed,
+            &[Field::Op(OpKind::Find), Field::Error(ErrorKind::from(&e))],
+        );
     }
 }
 
@@ -174,6 +213,25 @@ mod tests {
         count_callback(app.handle(), tab)(Some(2));
         script_counted(app.handle(), tab, "4");
         script_counted(app.handle(), tab, "-1");
+    }
+
+    #[test]
+    fn failures_name_their_operation() {
+        assert_eq!(failure(&EngineOp::Zoom(1.0)).0, Code::ZoomFailed);
+        assert_eq!(failure(&EngineOp::FindClear).0, Code::FindFailed);
+        assert_eq!(
+            failure(&EngineOp::Stop),
+            (Code::EngineCallFailed, OpKind::Stop)
+        );
+        for nav in [
+            Nav::Back,
+            Nav::Forward,
+            Nav::Reload,
+            Nav::HardReload,
+            Nav::Stop,
+        ] {
+            bridge_failed(nav_op(nav));
+        }
     }
 
     #[test]

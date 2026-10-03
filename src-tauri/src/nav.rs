@@ -13,7 +13,7 @@ use crate::net::host::is_i2p_host;
 pub const INTERNAL_SCHEME: &str = "eepview";
 
 /// Every internal page, as `eepview://<name>`.
-pub const INTERNAL_PAGES: [&str; 8] = [
+pub const INTERNAL_PAGES: [&str; 9] = [
     "home",
     "bookmarks",
     "history",
@@ -22,6 +22,7 @@ pub const INTERNAL_PAGES: [&str; 8] = [
     "setup",
     "blocked",
     "router-down",
+    "report",
 ];
 
 /// Schemes that never take `//`. Input that starts with one of them is never a host name.
@@ -266,6 +267,12 @@ mod tests {
             Target::Refused(r) => r,
             other => panic!("{input}: expected Refused, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn a_host_of_only_a_dot_is_refused_without_a_panic() {
+        assert_eq!(refused("data://.:0"), Refusal::NotI2p);
+        assert_eq!(refused("http://./"), Refusal::NotI2p);
     }
 
     #[test]

@@ -19,9 +19,9 @@ pub mod console;
 pub mod content;
 pub mod engine;
 pub mod env;
-pub mod log;
 pub mod menu;
 pub mod popup;
+pub mod report;
 pub mod state;
 pub mod surface;
 #[cfg(test)]
@@ -36,8 +36,12 @@ use std::time::Duration;
 use tauri::{App, AppHandle, Manager, RunEvent, Runtime, WindowEvent};
 
 use crate::core::{Core, Effect, Paths};
+use crate::diag::{self, Code};
 use crate::net::loopback::LoopbackAddr;
 use state::{Shared, now_ms};
+
+/// The app identifier of `tauri.conf.json`, for the log folder before Tauri starts.
+pub const IDENTIFIER: &str = "io.github.tcivie.eepview";
 
 /// Starts the browser and blocks until it exits.
 ///
@@ -45,18 +49,34 @@ use state::{Shared, now_ms};
 ///
 /// Fails when Tauri cannot start, for example when the system web view is missing.
 pub fn run() -> tauri::Result<()> {
-    log::start();
+    diag::install_panic_hook();
+    if let Some(dir) = diag::default_log_dir(IDENTIFIER) {
+        diag::init(&dir);
+    }
     let app = tauri::Builder::default()
+        .plugin(
+            tauri_plugin_opener::Builder::new()
+                .open_js_links_on_click(false)
+                .build(),
+        )
         .invoke_handler(handler())
         .on_menu_event(|app, event| menu::on_event(app, event.id().as_ref()))
         .setup(|app| setup(app).map_err(Into::into))
         .build(tauri::generate_context!())?;
-    app.run(|handle, event| match event {
-        RunEvent::WindowEvent { event, .. } => on_window_event(handle, &event),
-        RunEvent::Exit => console::stop(handle),
-        _ => {}
-    });
+    app.run(|handle, event| on_run_event(handle, &event));
     Ok(())
+}
+
+/// Window events lay the webviews out; the exit is recorded.
+fn on_run_event<R: Runtime>(handle: &AppHandle<R>, event: &RunEvent) {
+    match event {
+        RunEvent::WindowEvent { event, .. } => on_window_event(handle, event),
+        RunEvent::Exit => {
+            diag::event(Code::Shutdown, &[]);
+            console::stop(handle);
+        }
+        _ => {}
+    }
 }
 
 /// A window resize lays the webviews out again and closes the open popup.
@@ -125,6 +145,11 @@ macro_rules! contract_handler {
             commands::popup_open,
             commands::popup_size,
             commands::popup_close,
+            report::report_preview,
+            report::report_open,
+            report::diag_crash_status,
+            report::diag_crash_dismiss,
+            report::diag_logs_delete,
         ]
     };
 }
@@ -147,6 +172,12 @@ fn paths<R: Runtime>(app: &App<R>) -> Option<Paths> {
 }
 
 fn setup<R: Runtime>(app: &mut App<R>) -> tauri::Result<()> {
+    if diag::log_dir().is_none()
+        && let Some(dir) = report::log_dir(app.handle())
+    {
+        diag::init(&dir);
+    }
+    diag::event(Code::Startup, &[]);
     let core = new_core(paths(app), &env::proxy_text(), env::js_forced_off());
     app.manage(Shared::<R>::new(core));
     let menu = menu::build(app.handle())?;
@@ -229,6 +260,7 @@ mod tests {
     use tauri::PhysicalSize;
 
     use super::*;
+    use crate::diag::Ring;
     use crate::shell::testing::{bare, core, wait_for};
 
     fn inputs(urls: &[&str]) -> Inputs {
@@ -288,10 +320,26 @@ mod tests {
     }
 
     #[test]
+    fn the_log_folder_matches_the_app_identifier() {
+        let config = include_str!("../../tauri.conf.json");
+        assert!(config.contains(&format!("\"identifier\": \"{IDENTIFIER}\"")));
+        let app = bare();
+        let id = app.config().identifier.clone();
+        assert_eq!(diag::default_log_dir(&id), report::log_dir(app.handle()));
+    }
+
+    #[test]
     fn resizes_lay_the_webviews_out() {
         let app = bare();
         let resized = WindowEvent::Resized(PhysicalSize::new(800, 600));
         on_window_event(app.handle(), &resized);
         on_window_event(app.handle(), &WindowEvent::Focused(true));
+        on_run_event(app.handle(), &RunEvent::Exit);
+        on_run_event(app.handle(), &RunEvent::Ready);
+        assert!(
+            diag::recent(Ring::CAPACITY)
+                .iter()
+                .any(|r| r.code == Code::Shutdown)
+        );
     }
 }

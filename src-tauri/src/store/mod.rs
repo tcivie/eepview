@@ -15,14 +15,43 @@ use std::path::Path;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 
+use crate::diag::{self, Code, ErrorKind, Field, StoreKind};
+
 /// The schema version every store writes.
 pub const VERSION: u32 = 1;
 
-/// Reads a JSON file. `None` when it is missing or broken (the caller starts fresh).
+/// Reads a JSON file. `None` when it is missing or broken (the caller starts fresh). A
+/// broken file records `store-corrupt` with the store and the error kind.
 #[must_use]
 pub fn read_json<T: DeserializeOwned>(path: &Path) -> Option<T> {
-    let text = fs::read_to_string(path).ok()?;
-    serde_json::from_str(&text).ok()
+    let text = match fs::read_to_string(path) {
+        Ok(text) => text,
+        Err(e) if e.kind() == io::ErrorKind::NotFound => return None,
+        Err(e) => return corrupt(path, ErrorKind::from(&e)),
+    };
+    serde_json::from_str(&text)
+        .map_err(|e| corrupt::<()>(path, ErrorKind::from(&e)))
+        .ok()
+}
+
+/// Records a broken store file and gives `None`.
+fn corrupt<T>(path: &Path, error: ErrorKind) -> Option<T> {
+    let mut fields = vec![Field::Error(error)];
+    fields.extend(store_kind(path).map(Field::Store));
+    diag::event(Code::StoreCorrupt, &fields);
+    None
+}
+
+/// The store a file belongs to, by its name.
+#[must_use]
+pub fn store_kind(path: &Path) -> Option<StoreKind> {
+    match path.file_stem()?.to_str()? {
+        "bookmarks" => Some(StoreKind::Bookmarks),
+        "history" => Some(StoreKind::History),
+        "settings" => Some(StoreKind::Settings),
+        "sites" => Some(StoreKind::Sites),
+        _ => None,
+    }
 }
 
 /// Writes `value` as JSON to `path` atomically: a temp file next to it, flushed, then renamed.
@@ -87,8 +116,11 @@ mod tests {
     fn missing_or_broken_files_read_as_none() {
         let dir = testdir::fresh("broken");
         assert!(read_json::<Value>(&dir.join("none.json")).is_none());
-        std::fs::write(dir.join("bad.json"), "{nope").unwrap();
-        assert!(read_json::<Value>(&dir.join("bad.json")).is_none());
+        std::fs::write(dir.join("settings.json"), "{nope").unwrap();
+        assert!(read_json::<Value>(&dir.join("settings.json")).is_none());
+        assert!(read_json::<Value>(&dir).is_none());
+        assert_eq!(store_kind(&dir.join("sites.json")), Some(StoreKind::Sites));
+        assert_eq!(store_kind(&dir.join("other.json")), None);
     }
 
     #[test]

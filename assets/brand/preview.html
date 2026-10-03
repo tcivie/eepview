@@ -9,31 +9,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>eepview brand preview</title>
     <!-- Open with #light or #dark to force a theme. Without a fragment the page follows the system. -->
-    <style>
-      :root { --bg: #f4f2ec; --surface: #ffffff; --ink: #12302a; --muted: #5f6b66; --rule: #dfe3dc; }
-      @media (prefers-color-scheme: dark) {
-        :root:not(:has(#light:target)) { --bg: #0d1a16; --surface: #14241f; --ink: #eef2ea; --muted: #93a39b; --rule: #2a3d36; }
-      }
-      :root:has(#dark:target) { --bg: #0d1a16; --surface: #14241f; --ink: #eef2ea; --muted: #93a39b; --rule: #2a3d36; }
-      .logo-dark { display: none; }
-      @media (prefers-color-scheme: dark) {
-        :root:not(:has(#light:target)) .logo-light { display: none; }
-        :root:not(:has(#light:target)) .logo-dark { display: block; }
-      }
-      :root:has(#dark:target) .logo-light { display: none; }
-      :root:has(#dark:target) .logo-dark { display: block; }
-      body { margin: 0; padding: 40px; background: var(--bg); color: var(--ink); font: 14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; }
-      h1 { margin: 0 0 24px; font-size: 20px; font-weight: 600; }
-      h2 { margin: 0 0 12px; font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
-      .grid { display: grid; grid-template-columns: 512px 1fr; gap: 32px; }
-      .card { background: var(--surface); border: 1px solid var(--rule); border-radius: 16px; padding: 20px; margin-bottom: 20px; }
-      .row { display: flex; gap: 24px; align-items: flex-end; flex-wrap: wrap; }
-      .size { display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); }
-      .mono { display: block; color: var(--ink); }
-    </style>
+    <link rel="stylesheet" href="../../src/ui/theme.css" />
+    <link rel="stylesheet" href="../../src/ui/ui.css" />
+    <link rel="stylesheet" href="preview.css" />
+    <script src="preview.js"></script>
   </head>
-  <body>
-    <span id="light"></span><span id="dark"></span>
+  <body class="preview">
     <h1>eepview brand preview</h1>
     <div class="grid">
       <div>
@@ -41,14 +22,14 @@
         <img src="eepview-mark.svg" width="512" height="512" alt="eepview mark" />
       </div>
       <div>
-        <div class="card">
+        <div class="card card-pad">
           <h2>Master mark</h2>
           <div class="row">
             <div class="size"><img src="eepview-mark.svg" width="256" height="256" alt="" />256</div>
             <div class="size"><img src="eepview-mark.svg" width="128" height="128" alt="" />128</div>
           </div>
         </div>
-        <div class="card">
+        <div class="card card-pad">
           <h2>Small-size mark</h2>
           <div class="row">
             <div class="size"><img src="eepview-mark-small.svg" width="64" height="64" alt="" />64</div>
@@ -58,10 +39,10 @@
             <div class="size"><img src="eepview-mark-small.svg" width="16" height="16" alt="" />16</div>
           </div>
         </div>
-        <div class="card">
+        <div class="card card-pad">
           <h2>Single color (currentColor)</h2>
           <div class="row">
-            <div class="size"><svg class="mono" width="64" height="64" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" fill="currentColor">
+            <div class="size"><svg class="mono-mark" width="64" height="64" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" fill="currentColor">
   
   <!-- The exact silhouette of the master: the union of its shapes, in one color. -->
   <g transform="translate(524 478) rotate(18) scale(1.732) translate(-512 -563)">
@@ -72,7 +53,7 @@
     <path d="M498 398C500 430 494 456 470 472C400 500 332 540 332 612C332 680 398 722 468 728Q512 734 556 728C626 722 692 680 692 612C692 540 624 500 554 472C530 456 524 430 526 398Q512 392 498 398Z"/>
   </g>
 </svg>64</div>
-            <div class="size"><svg class="mono" width="32" height="32" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" fill="currentColor">
+            <div class="size"><svg class="mono-mark" width="32" height="32" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" fill="currentColor">
   
   <!-- The exact silhouette of the master: the union of its shapes, in one color. -->
   <g transform="translate(524 478) rotate(18) scale(1.732) translate(-512 -563)">
@@ -83,7 +64,7 @@
     <path d="M498 398C500 430 494 456 470 472C400 500 332 540 332 612C332 680 398 722 468 728Q512 734 556 728C626 722 692 680 692 612C692 540 624 500 554 472C530 456 524 430 526 398Q512 392 498 398Z"/>
   </g>
 </svg>32</div>
-            <div class="size"><svg class="mono" width="24" height="24" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" fill="currentColor">
+            <div class="size"><svg class="mono-mark" width="24" height="24" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" fill="currentColor">
   
   <!-- The exact silhouette of the master: the union of its shapes, in one color. -->
   <g transform="translate(524 478) rotate(18) scale(1.732) translate(-512 -563)">
@@ -94,7 +75,7 @@
     <path d="M498 398C500 430 494 456 470 472C400 500 332 540 332 612C332 680 398 722 468 728Q512 734 556 728C626 722 692 680 692 612C692 540 624 500 554 472C530 456 524 430 526 398Q512 392 498 398Z"/>
   </g>
 </svg>24</div>
-            <div class="size"><svg class="mono" width="16" height="16" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" fill="currentColor">
+            <div class="size"><svg class="mono-mark" width="16" height="16" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" fill="currentColor">
   
   <!-- The exact silhouette of the master: the union of its shapes, in one color. -->
   <g transform="translate(524 478) rotate(18) scale(1.732) translate(-512 -563)">
@@ -107,7 +88,7 @@
 </svg>16</div>
           </div>
         </div>
-        <div class="card">
+        <div class="card card-pad">
           <h2>Horizontal logo</h2>
           <img class="logo-light" src="eepview-logo-horizontal-light.svg" width="406" height="90" alt="eepview" />
           <img class="logo-dark" src="eepview-logo-horizontal-dark.svg" width="406" height="90" alt="eepview" />

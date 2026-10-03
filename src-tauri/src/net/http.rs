@@ -137,6 +137,19 @@ pub enum Refusal {
 }
 
 impl Refusal {
+    /// The reason kind for the diagnostics log. The host is never logged.
+    #[must_use]
+    pub fn reason(self) -> crate::diag::RefuseReason {
+        use crate::diag::RefuseReason as R;
+        match self {
+            Self::NotI2p => R::NotI2p,
+            Self::BadRequest => R::BadRequest,
+            Self::LengthRequired => R::LengthRequired,
+            Self::Upstream => R::Upstream,
+            Self::Busy => R::Busy,
+        }
+    }
+
     /// The full response the gatekeeper sends, with no upstream connection.
     #[must_use]
     pub fn response(self) -> Vec<u8> {
@@ -488,6 +501,15 @@ mod tests {
         assert!(out.contains("Content-Security-Policy: default-src"));
         assert!(out.contains("Connection: close\r\n"));
         assert!(!out.contains("keep-alive") && !out.contains("Alt-Svc"));
+    }
+
+    #[test]
+    fn refusals_have_a_reason_kind() {
+        assert_eq!(Refusal::Busy.reason().as_str(), "busy");
+        assert_eq!(Refusal::NotI2p.reason().as_str(), "not-i2p");
+        assert_eq!(Refusal::Upstream.reason().as_str(), "upstream");
+        assert_eq!(Refusal::BadRequest.reason().as_str(), "bad-request");
+        assert_eq!(Refusal::LengthRequired.reason().as_str(), "length-required");
     }
 
     #[test]
