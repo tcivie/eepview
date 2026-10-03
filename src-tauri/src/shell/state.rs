@@ -13,6 +13,7 @@ use tauri::{Manager, Runtime, Url};
 
 use crate::core::Core;
 use crate::net::gatekeeper::Gatekeeper;
+use crate::popup::Popups;
 
 /// Shared shell state, managed by Tauri.
 pub struct Shared<R: Runtime> {
@@ -30,6 +31,8 @@ pub struct Shared<R: Runtime> {
     pub fullscreen: AtomicBool,
     /// The window-button frames last measured (left edge, right edge), macOS only.
     pub buttons: Mutex<Option<(f64, f64)>>,
+    /// The toolbar popup that is open, if any.
+    pub popups: Mutex<Popups>,
     generation: AtomicU64,
 }
 
@@ -45,6 +48,7 @@ impl<R: Runtime> Shared<R> {
             stop_item: Mutex::new(None),
             fullscreen: AtomicBool::new(false),
             buttons: Mutex::new(None),
+            popups: Mutex::new(Popups::default()),
             generation: AtomicU64::new(0),
         }
     }

@@ -46,6 +46,9 @@ const COMMANDS: &[&str] = &[
     "platform",
     "chrome_insets",
     "window_fullscreen",
+    "popup_open",
+    "popup_size",
+    "popup_close",
 ];
 
 fn main() {

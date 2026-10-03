@@ -64,6 +64,17 @@ export type HistoryCursor = { visited: number; id: string };
 export type HistoryQuery = { q?: string; before?: HistoryCursor; limit?: number };
 export type ChromeInsets = { left: number };
 export type Platform = "macos" | "windows" | "linux";
+export type PopupKind = "suggestions" | "menu" | "router" | "hint";
+export type PopupAnchor = { x: number; y: number; width: number; height: number };
+export type SuggestionsData = { items: Suggestion[]; index: number };
+export type HintData = { title: string; text: string };
+export type PopupShow = {
+  id: number;
+  kind: PopupKind;
+  anchorWidth: number;
+  data: SuggestionsData | HintData | null;
+};
+export type PopupClosed = { id: number; kind: PopupKind; refocus: boolean };
 
 export type BandwidthHistory = { stepSeconds: number; inBps: number[]; outBps: number[] };
 export type RouterAction = "restart" | "stop";
@@ -134,6 +145,12 @@ export interface Commands {
   platform: { args: Record<string, never>; result: Platform };
   chrome_insets: { args: Record<string, never>; result: ChromeInsets };
   window_fullscreen: { args: Record<string, never>; result: boolean };
+  popup_open: {
+    args: { kind: PopupKind; anchor: PopupAnchor; data?: SuggestionsData | HintData };
+    result: number;
+  };
+  popup_size: { args: { id: number; width: number; height: number }; result: undefined };
+  popup_close: { args: { id: number; refocus?: boolean }; result: undefined };
 }
 
 export interface Events {
@@ -151,11 +168,15 @@ export interface Events {
   "chrome-insets-changed": ChromeInsets;
   "status-side": "left" | "right";
   "icons-changed": null;
+  "popup-show": PopupShow;
+  "popup-closed": PopupClosed;
+  "popup-select": { index: number };
 }
 
 /** Events a page sends to the shell. */
 export interface UiEvents {
   "status-size": { width: number; height: number };
+  "popup-select": { index: number };
 }
 
 export type CommandName = keyof Commands;

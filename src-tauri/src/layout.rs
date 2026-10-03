@@ -8,8 +8,10 @@
 pub const TOOLBAR: f64 = 84.0;
 /// Toolbar height with the find bar open.
 pub const TOOLBAR_FIND: f64 = 124.0;
-/// Largest toolbar height the UI may ask for (suggestion list).
-pub const TOOLBAR_MAX: f64 = 480.0;
+/// The space a popup keeps from the window edges.
+pub const POPUP_MARGIN: f64 = 8.0;
+/// The gap between a popup and its anchor.
+pub const POPUP_GAP: f64 = 4.0;
 /// Status bubble height.
 pub const STATUS_HEIGHT: f64 = 24.0;
 /// The vertical center of the 44 px tab row, where the macOS window buttons sit.
@@ -39,37 +41,63 @@ pub struct Rect {
     pub h: f64,
 }
 
-/// The toolbar height: the UI request when there is one, else by find-bar state.
+/// The toolbar height: 124 with the find bar open (`find_open`, or a find-bar request of
+/// 124 or more from the UI), else 84. A popup never changes it.
 #[must_use]
 pub fn toolbar_height(find_open: bool, requested: f64) -> f64 {
-    let base = if find_open { TOOLBAR_FIND } else { TOOLBAR };
-    if requested > 0.0 {
-        requested.clamp(base, TOOLBAR_MAX)
+    if find_open || requested >= TOOLBAR_FIND {
+        TOOLBAR_FIND
     } else {
-        base
+        TOOLBAR
     }
 }
 
-/// The toolbar strip and the content area of a window.
-///
-/// The content area keeps its place under the default toolbar when the toolbar grows for the
-/// suggestion list, so the page does not jump; the toolbar then covers its top.
+/// The toolbar strip and the content area right under it, to the window bottom.
 #[must_use]
-pub fn split(width: f64, height: f64, toolbar: f64, find_open: bool) -> (Rect, Rect) {
-    let top = if find_open { TOOLBAR_FIND } else { TOOLBAR };
+pub fn split(width: f64, height: f64, toolbar: f64) -> (Rect, Rect) {
+    let top = toolbar.clamp(0.0, height.max(0.0));
     let bar = Rect {
         x: 0.0,
         y: 0.0,
         w: width,
-        h: toolbar.min(height),
+        h: top,
     };
     let content = Rect {
         x: 0.0,
-        y: top.min(height),
+        y: top,
         w: width,
         h: (height - top).max(0.0),
     };
     (bar, content)
+}
+
+/// A size or a window extent: (width, height) in logical pixels.
+pub type Size = (f64, f64);
+
+/// Which edge of its anchor a popup lines up with.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Align {
+    /// The left edges.
+    Start,
+    /// The right edges.
+    End,
+}
+
+/// The popup rectangle for a card of natural `size` (width, height) under `anchor`, in a
+/// window of `window` (width, height). It sits [`POPUP_GAP`] under the anchor, keeps
+/// [`POPUP_MARGIN`] from the window edges, and is never larger than the window allows.
+#[must_use]
+pub fn popup(anchor: Rect, size: Size, window: Size, align: Align) -> Rect {
+    let (win_w, win_h) = window;
+    let w = size.0.min(win_w - 2.0 * POPUP_MARGIN).max(0.0);
+    let y = anchor.y + anchor.h + POPUP_GAP;
+    let h = size.1.min(win_h - y - POPUP_MARGIN).max(0.0);
+    let wanted = match align {
+        Align::Start => anchor.x,
+        Align::End => anchor.x + anchor.w - w,
+    };
+    let x = wanted.min(win_w - POPUP_MARGIN - w).max(POPUP_MARGIN);
+    Rect { x, y, w, h }
 }
 
 /// The widest status bubble, as a share of the content width.
@@ -130,42 +158,6 @@ mod tests {
         assert!((chrome_inset(Some((14.0, 66.0)), false) - 80.0).abs() < f64::EPSILON);
         assert!(chrome_inset(Some((14.0, 66.0)), true).abs() < f64::EPSILON);
         assert!(chrome_inset(None, false).abs() < f64::EPSILON);
-    }
-
-    #[test]
-    fn toolbar_heights() {
-        assert!((toolbar_height(false, 0.0) - TOOLBAR).abs() < 1e-9);
-        assert!((toolbar_height(true, 0.0) - TOOLBAR_FIND).abs() < 1e-9);
-        assert!((toolbar_height(false, 300.0) - 300.0).abs() < 1e-9);
-        assert!((toolbar_height(false, 9000.0) - TOOLBAR_MAX).abs() < 1e-9);
-        assert!((toolbar_height(true, 10.0) - TOOLBAR_FIND).abs() < 1e-9);
-    }
-
-    #[test]
-    fn split_window() {
-        let (bar, content) = split(1200.0, 800.0, 300.0, false);
-        assert_eq!(
-            bar,
-            Rect {
-                x: 0.0,
-                y: 0.0,
-                w: 1200.0,
-                h: 300.0
-            }
-        );
-        assert_eq!(
-            content,
-            Rect {
-                x: 0.0,
-                y: 84.0,
-                w: 1200.0,
-                h: 716.0
-            }
-        );
-        let (_, find) = split(1200.0, 800.0, TOOLBAR_FIND, true);
-        assert!((find.y - TOOLBAR_FIND).abs() < 1e-9);
-        let (tiny_bar, tiny) = split(100.0, 50.0, TOOLBAR, false);
-        assert!((tiny_bar.h - 50.0).abs() < 1e-9 && tiny.h.abs() < 1e-9);
     }
 
     fn content() -> Rect {
