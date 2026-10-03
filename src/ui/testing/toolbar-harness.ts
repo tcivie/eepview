@@ -28,6 +28,7 @@ export function tab(over: Partial<TabInfo> = {}): TabInfo {
     zoom: 1,
     jsOn: true,
     bookmarked: false,
+    icon: null,
     ...over,
   };
 }
