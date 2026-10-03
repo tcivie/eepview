@@ -61,7 +61,7 @@ The requirement tests are written from this section. Names in `code` are the int
 | `Field::Line(u32)` | `line` | decimal |
 | `Field::DurationMs(u64)` | `ms` | decimal |
 | `Field::Count(u64)` | `count` | decimal |
-| `Field::Status(u16)` | `status` | decimal |
+| `Field::Status(HttpStatus)` | `status` | `500`, `502`, `503`, `504`, `other-5xx` (R12.1) |
 | `Field::Managed(bool)` | `managed` | `true` or `false` |
 | `Field::Js(bool)` | `js` | `true` or `false` |
 | `Field::Ok(bool)` | `ok` | `true` or `false` |
@@ -154,7 +154,7 @@ The requirement tests are written from this section. Names in `code` are the int
 ### R6 Report (`diag::report`)
 
 - R6.1 `ReportKind::from_param(&str)`: `crash`, `blocked`, `router-down`, `load-failed`, anything else `General`. `ReportKind::title()`: `Problem report`, `Crash report`, `Blocked page report`, `Router down report`, `Page load report` (for `General`, `Crash`, `Blocked`, `RouterDown`, `LoadFailed`).
-- R6.2 `Report { kind: ReportKind, description: String, info: SystemInfo, log: Vec<String>, include_log: bool }`. `log` holds report lines, oldest first. The shell makes them with `diag::report_lines(&[Record]) -> Vec<String>`: `+<minutes>m <LEVEL> <code>` and the fields, where the minutes count from the oldest record. A report never holds a clock time, so nobody can match a log line to a request seen at that second. The local files keep the UTC time.
+- R6.2 `Report { kind: ReportKind, description: String, info: SystemInfo, log: Vec<String>, include_log: bool }`. `log` holds report lines, oldest first, and then the counter lines of R12.3. The shell makes them with `diag::report_lines(&[Record]) -> Vec<String>` (R13.1) and `diag::counter_lines()` (R12.3).
 - R6.3 `report::text(&Report) -> String` is the preview and the file. It is scrubbed (R4), and is:
 
 ```
@@ -173,7 +173,7 @@ Diagnostics log (last <n> events):
 - R6.5 `report::percent_encode(&str) -> String` keeps `A-Z a-z 0-9 - _ . ~` and writes every other UTF-8 byte as `%XX` (upper-case hex). A space is `%20`.
 - R6.6 The URL is at most `report::MAX_URL` (8000) characters. The oldest log lines go first. When any line goes, the line `report::TRIM_NOTE` (`[log trimmed, the full log is in the attached file]`) is the first line of the log part. When the URL is still too long without log lines, the description is cut: on the raw text, at a char boundary, before `percent_encode`, with `…` at the end.
 - R6.7 `report::is_issue_url(&str) -> bool` is true only for `ISSUE_PREFIX` alone or followed by `?`.
-- R6.8 `report::file_name(secs: u64) -> String` is `eepview-report-<YYYY-MM-DD>T<HH-MM-SS>Z.txt`, for example `eepview-report-2026-10-03T12-00-00Z.txt`.
+- R6.8 `report::file_name(n: u32) -> String` is `eepview-report.txt` for `n` 0 or 1, and `eepview-report (<n>).txt` for `n` 2 or more. The name holds no date (R13.2).
 
 ### R6b Issue form
 
@@ -216,9 +216,9 @@ Only the `internal` webview may call these (capability `capabilities/report.json
 | Tauri fails to start | `StartFailed` with `Error` |
 | A VERIFY result that changes the router state | `VerifyPassed`, or `VerifyFailed` with `Router` |
 | The router state turns ok, or stops being ok | `RouterUp`, `RouterDown` with `Router` |
-| The gatekeeper refuses a request | `GatekeeperRefused` with `Refuse` |
+| The gatekeeper refuses a request | counter `GatekeeperRefused` with `Refuse` (R12.2) |
 | The gatekeeper cannot start | `GatekeeperStartFailed` with `Error` |
-| The router answers 5xx, or a forwarded request fails | `PageLoadFailed` with `Status` or `Error` |
+| The router answers 5xx, or a forwarded request fails | counter `PageLoadFailed` with `Status` or `Error` (R12.2) |
 | A tab webview cannot be built | `WebviewCreateFailed` with `Error` |
 | An engine call fails | `EngineCallFailed`, `FindFailed` or `ZoomFailed`, with `Op` and `Error` |
 | A store file is broken | `StoreCorrupt` with `Store` and `Error` |
@@ -237,9 +237,41 @@ Only the `internal` webview may call these (capability `capabilities/report.json
 - R11.3 The toolbar menu has "Report a problem" (`eepview://report`). The blocked and router-down pages have the link "Report this problem" to `reportHref("blocked")` and `reportHref("router-down")`. The link carries only the kind, never the address.
 - R11.4 Settings > Privacy has the button "Delete diagnostics logs" (`id="delete-logs"`). It calls `diag_logs_delete` and says "Diagnostics logs deleted."
 
+### R12 No value a site controls
+
+A site can make the router answer with any status, and it can make any number of requests. So these values are a channel from the site into a public issue. They enter the log only in a closed, coarse form.
+
+- R12.1 `HttpStatus` is a closed enum: `S500`, `S502`, `S503`, `S504`, `Other5xx` (`as_str`: `500`, `502`, `503`, `504`, `other-5xx`). `HttpStatus::from_code(code: u16) -> Option<HttpStatus>` is `None` below 500 and above 599. No field holds a raw status number.
+- R12.2 Per-request results are counted, never recorded one by one. `diag::count(code: Code, field: Field)` adds 1 (saturating at `u64::MAX`) to the session counter of that pair. The gatekeeper calls it for each refusal (`Code::GatekeeperRefused`, `Field::Refuse`), each router 5xx answer (`Code::PageLoadFailed`, `Field::Status`), and each failed forwarded request (`Code::PageLoadFailed`, `Field::Error`). `diag::event` is never called for these.
+- R12.3 `diag::counters() -> Vec<(Code, Field, u64)>` lists the counters above 0, sorted by the code name and then the field text. `diag::count_bucket(n: u64) -> &'static str` is `0`, `1+` (1 to 9), `10+` (10 to 99), `100+` (100 to 999) or `1000+`. `diag::counter_lines() -> Vec<String>` gives `<code> <key>=<value> count=<bucket>` per counter. A report shows only the bucket, never the exact number.
+- R12.4 `diag::delete_logs` also clears the counters.
+
+### R13 No time in a report
+
+- R13.1 `diag::report_lines(&[Record]) -> Vec<String>` gives `<LEVEL> <code>` and ` key=value` per field, in record order. It holds no time and no time offset. The local log files keep the UTC second (R1.8).
+- R13.2 The report file in Downloads is `eepview-report.txt`. When that name exists, it is `eepview-report (2).txt`, then `(3)`, up to `(99)`. `report_open` returns that name.
+
+### R14 File safety
+
+- R14.1 On Unix, eepview creates the log folder with mode `0700`, and sets `0700` on it when it exists. The log files, the crash marker and the report file get mode `0600`.
+- R14.2 eepview never follows a symbolic link when it writes these files. The report file is created with `create_new`. The log files and the crash marker are opened with `O_NOFOLLOW` on Unix. A link in place of one of them makes the write fail.
+- R14.3 `report_open` checks that the written report file lies in the Downloads folder after both paths are resolved (`canonicalize`). Otherwise it fails with `ReportFailed`.
+
+### R15 More scrubbing (adds to R4.2)
+
+- R15.1 Before matching, `%2E` and `%2F` (any case) become `.` and `/`.
+- R15.2 A word with a dot and a non-ASCII letter is a host name (an internationalised name). The word is the run of letters, digits, `.` and `-`, with any port or path after it.
+- R15.3 A run of 32 or more hex digits (`0-9 a-f A-F`) is removed.
+- R15.4 Home folders: `Users` or `home` between two separators, where each separator is `/` or `\`, and the name after it up to the next separator, line end or quote (spaces are part of the name). Also `<drive>:\Documents and Settings\<name>` (either separator) and a UNC path `\<server>\<share>\<name>`, the server, share and name included.
+- R15.5 `rs`, `md` and `ts` are not file endings any more (they are country domains): `apply.rs` is removed like a host name. The file endings are `txt`, `log`, `json`, `html`, `js`, `css`, `toml`, `yml` and `plist`.
+
+### R16 Crash marker outside the log lock
+
+- R16.1 `diag::init` keeps the log folder in a place apart from the log lock. The panic hook writes the crash marker there first, and then tries the log lock (R3.1). So the marker is written even when another thread holds the log lock.
+
 ## Limits
 
-- The gatekeeper does not know which request is the page and which is a part of it. So `PageLoadFailed` counts every failed request, and there is no separate "load failed" page yet.
+- The gatekeeper does not know which request is the page and which is a part of it. So the `PageLoadFailed` counter counts every failed request, and there is no separate "load failed" page yet.
 - A crash in the web engine process itself is not detected yet.
 
 ## History
