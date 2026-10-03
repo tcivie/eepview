@@ -9,6 +9,8 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.node.json",
+    "test": "node --test \"src/**/*.test.ts\"",
+    "test:coverage": "./scripts/check-tested.sh && node --test --experimental-test-coverage --test-coverage-lines=80 --test-coverage-branches=70 --test-coverage-functions=80 --test-coverage-exclude=\"src/**/*.test.ts\" \"src/**/*.test.ts\"",
     "lint": "biome check .",
     "lint:fix": "biome check --write ."
   },
