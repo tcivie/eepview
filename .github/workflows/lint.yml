@@ -108,7 +108,7 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      - name: docs or changelog updated, wiki pages indexed
+      - name: docs or changelog updated, wiki pages indexed, docs placed in docs/wiki
         env:
           BASE_REF: ${{ github.base_ref }}
         run: ./scripts/docs-check.sh
