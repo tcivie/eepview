@@ -67,6 +67,7 @@ pub fn sync<R: Runtime>(app: &AppHandle<R>) {
     for label in labels.iter().filter(|l| Some(*l) != active.as_ref()) {
         hide(app, label);
     }
+    super::log::view(&format!("{view:?} active={active:?} labels={labels:?}"));
     match (view, active) {
         (View::Web(_), Some(label)) => show(app, &label, content),
         (View::Internal(page), _) => show_internal(app, &page, content),
@@ -149,5 +150,22 @@ pub fn remember_base<R: Runtime>(app: &AppHandle<R>, toolbar: &Webview<R>) {
     if let Ok(url) = toolbar.url() {
         let base: Option<Url> = url.join("/").ok();
         *lock(&shared(app).base) = base;
+    }
+}
+
+/// Sends `fullscreen-changed` when the window enters or leaves full screen (the UI drops the
+/// traffic-light inset in full screen).
+pub fn check_fullscreen<R: Runtime>(app: &AppHandle<R>) {
+    let Some(window) = app.get_window("main") else {
+        return;
+    };
+    let now = window.is_fullscreen().unwrap_or(false);
+    let before = shared(app)
+        .fullscreen
+        .swap(now, std::sync::atomic::Ordering::SeqCst);
+    if now != before {
+        for label in ["toolbar", "internal"] {
+            let _ = tauri::Emitter::emit_to(app, label, "fullscreen-changed", now);
+        }
     }
 }

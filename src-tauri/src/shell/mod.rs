@@ -45,6 +45,7 @@ pub fn run() -> tauri::Result<()> {
         } = event
         {
             view::sync(handle);
+            view::check_fullscreen(handle);
         }
     });
     Ok(())

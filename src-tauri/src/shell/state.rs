@@ -1,7 +1,7 @@
 //! The state the shell shares between commands, engine callbacks and the router watcher.
 
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -23,6 +23,8 @@ pub struct Shared<R: Runtime> {
     pub base: Mutex<Option<Url>>,
     /// The Stop menu item, enabled only while the active tab loads.
     pub stop_item: Mutex<Option<MenuItem<R>>>,
+    /// The last full-screen state sent to the UI.
+    pub fullscreen: AtomicBool,
     generation: AtomicU64,
 }
 
@@ -36,6 +38,7 @@ impl<R: Runtime> Shared<R> {
             labels: Mutex::new(HashMap::new()),
             base: Mutex::new(None),
             stop_item: Mutex::new(None),
+            fullscreen: AtomicBool::new(false),
             generation: AtomicU64::new(0),
         }
     }

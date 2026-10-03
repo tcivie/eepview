@@ -26,7 +26,7 @@ pub const STATUS_PAGE: &str = "src/ui/status.html";
 ///
 /// Fails when the window or a webview cannot be built.
 pub fn build<R: Runtime>(app: &mut App<R>) -> tauri::Result<Window<R>> {
-    let window = window_builder(app).build()?;
+    let window = window_builder(app)?.build()?;
     let (w, h) = (1200.0, 800.0);
     let (bar, content) = layout::split(w, h, layout::TOOLBAR, false);
     let toolbar = WebviewBuilder::new("toolbar", WebviewUrl::App(TOOLBAR_PAGE.into()));
@@ -53,23 +53,19 @@ pub fn build<R: Runtime>(app: &mut App<R>) -> tauri::Result<Window<R>> {
     Ok(window)
 }
 
-#[cfg(target_os = "macos")]
-fn window_builder<R: Runtime>(app: &App<R>) -> WindowBuilder<'_, R, App<R>> {
-    use tauri::TitleBarStyle;
-    WindowBuilder::new(app, "main")
-        .title("eepview")
-        .inner_size(1200.0, 800.0)
-        .min_inner_size(480.0, 320.0)
-        .title_bar_style(TitleBarStyle::Overlay)
-        .hidden_title(true)
-}
-
-#[cfg(not(target_os = "macos"))]
-fn window_builder<R: Runtime>(app: &App<R>) -> WindowBuilder<'_, R, App<R>> {
-    WindowBuilder::new(app, "main")
-        .title("eepview")
-        .inner_size(1200.0, 800.0)
-        .min_inner_size(480.0, 320.0)
+/// The main window from `tauri.conf.json` (`create: false`): on macOS the title bar is an
+/// overlay and the traffic lights sit in the 44 px tab row. Windows and Linux keep their
+/// native title bar (the macOS keys do nothing there).
+fn window_builder<R: Runtime>(app: &App<R>) -> tauri::Result<WindowBuilder<'_, R, App<R>>> {
+    let config = app
+        .config()
+        .app
+        .windows
+        .iter()
+        .find(|w| w.label == "main")
+        .cloned()
+        .unwrap_or_default();
+    WindowBuilder::from_config(app, &config)
 }
 
 /// The `internal` webview: bundled pages only. A link to an I2P site opens in the active tab;

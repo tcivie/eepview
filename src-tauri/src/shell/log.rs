@@ -41,3 +41,10 @@ pub fn router(state: &str, detail: Option<&str>) {
 pub fn error(what: &str, detail: &str) {
     eprintln!("[eepview] {what}: {detail}");
 }
+
+/// A layout decision.
+pub fn view(what: &str) {
+    if enabled() {
+        eprintln!("[eepview] +{}ms view {what}", elapsed_ms());
+    }
+}
