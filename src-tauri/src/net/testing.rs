@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 //! Test helpers with sockets, so tests outside `net/` never open one themselves (ADR 0001
-//! rule 2): a fake I2P router proxy on `127.0.0.1:0`.
+//! rule 2): a fake I2P router proxy and a fake router console on `127.0.0.1:0`.
 
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
@@ -10,6 +10,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
 
+use super::console::{ConsoleKind, VerifiedConsole as Verified, probe};
 use super::http::{self, Head};
 use super::loopback::LoopbackAddr;
 use super::verify::{Verdict, VerifiedUpstream, verify};
@@ -124,4 +125,61 @@ fn echo_tunnel(mut stream: TcpStream) {
     if let Ok(n) = stream.read(&mut buf) {
         let _ = stream.write_all(&buf[..n]);
     }
+}
+
+/// A fake router console of one type on a free loopback port. It answers every `GET` with
+/// a page that carries that console's marker, and records the request lines.
+pub struct FakeConsole {
+    kind: ConsoleKind,
+    addr: LoopbackAddr,
+    lines: Arc<Mutex<Vec<String>>>,
+}
+
+impl FakeConsole {
+    /// Starts the fake console.
+    pub fn start(kind: ConsoleKind) -> Self {
+        let (listener, addr) = LoopbackAddr::listen_any().unwrap();
+        let lines = Arc::new(Mutex::new(Vec::new()));
+        let log = Arc::clone(&lines);
+        thread::spawn(move || serve_console(&listener, kind, &log));
+        Self { kind, addr, lines }
+    }
+
+    /// The port it listens on.
+    pub fn port(&self) -> u16 {
+        self.addr.port()
+    }
+
+    /// The console after a passing probe.
+    pub fn verified(&self) -> Verified {
+        probe(self.kind, self.port()).expect("fake console failed the probe")
+    }
+
+    /// The request lines received so far.
+    pub fn requests(&self) -> Vec<String> {
+        self.lines.lock().unwrap().clone()
+    }
+}
+
+fn serve_console(listener: &TcpListener, kind: ConsoleKind, log: &Mutex<Vec<String>>) {
+    for stream in listener.incoming().flatten() {
+        console_answer(stream, kind, log);
+    }
+}
+
+fn console_answer(mut stream: TcpStream, kind: ConsoleKind, log: &Mutex<Vec<String>>) {
+    let Some((head, _)) = read_head(&mut stream) else {
+        return;
+    };
+    log.lock().unwrap().push(head.start.clone());
+    let body = match kind {
+        ConsoleKind::Java => {
+            "<html><head><link href=\"/themes/console/light/console.css?2.13.0\"></head></html>"
+        }
+        ConsoleKind::I2pd => {
+            "<html><body><b>Version:</b> 2.13.0<br><a href=\"/?page=i2p_tunnels\">I2P tunnels</a></body></html>"
+        }
+    };
+    let reply = format!("HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n{body}");
+    let _ = stream.write_all(reply.as_bytes());
 }

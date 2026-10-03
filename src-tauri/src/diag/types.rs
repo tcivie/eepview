@@ -339,6 +339,10 @@ named_enum!(
         OpenUrl => "open-url",
         /// Write the report file.
         WriteReport => "write-report",
+        /// Load the router console page.
+        ConsoleLoad => "console-load",
+        /// Close the router console view.
+        ConsoleClose => "console-close",
     }
 );
 

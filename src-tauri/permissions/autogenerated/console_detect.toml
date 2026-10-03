@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-console-detect"
+description = "Enables the console_detect command without any pre-configured scope."
+commands.allow = ["console_detect"]
+
+[[permission]]
+identifier = "deny-console-detect"
+description = "Denies the console_detect command without any pre-configured scope."
+commands.deny = ["console_detect"]

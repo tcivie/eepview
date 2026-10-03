@@ -55,7 +55,7 @@ The requirement tests are written from this section. Names in `code` are the int
 | `Field::Error(ErrorKind)` | `error` | see R1.4 |
 | `Field::Tab(TabKind)` | `tab` | `internal`, `web` |
 | `Field::Store(StoreKind)` | `store` | `bookmarks`, `history`, `settings`, `sites` |
-| `Field::Op(OpKind)` | `op` | `reload`, `hard-reload`, `zoom`, `find`, `find-clear`, `back`, `forward`, `stop`, `harden`, `hover`, `first-load`, `engine-filter`, `main-thread`, `spawn`, `reveal`, `open-url`, `write-report` |
+| `Field::Op(OpKind)` | `op` | `reload`, `hard-reload`, `zoom`, `find`, `find-clear`, `back`, `forward`, `stop`, `harden`, `hover`, `first-load`, `engine-filter`, `main-thread`, `spawn`, `reveal`, `open-url`, `write-report`, `console-load`, `console-close` |
 | `Field::Thread(ThreadName)` | `thread` | `main`, `router-watch`, `router-check`, `gatekeeper`, `other` |
 | `Field::Source(SourceFile)` | `file` | a source file name, no folder |
 | `Field::Line(u32)` | `line` | decimal |

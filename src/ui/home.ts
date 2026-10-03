@@ -2,10 +2,12 @@
 // SPDX-License-Identifier: MIT
 
 import "./boot.ts";
-import type { Bookmark, RouterStatus } from "./contract.ts";
+import { renderConsoleLinks, shownInActiveTab, wireConsoleClicks } from "./console-nav.ts";
+import type { Bookmark, ConsoleInfo, RouterStatus } from "./contract.ts";
 import { all, byId, cloneTemplate, setText } from "./dom.ts";
 import { call, errorText, on } from "./ipc.ts";
 import { displayUrl, hostOf } from "./lib/address.ts";
+import { routerVersion, shouldRedetect } from "./lib/console-links.ts";
 import { CRASH_TEXT, reportHref } from "./lib/report-page.ts";
 import { hopStates, versionText } from "./lib/router-view.ts";
 import { renderRouterSummary } from "./shared/router-summary.ts";
@@ -13,6 +15,8 @@ import { renderSiteMark } from "./site-mark.ts";
 
 const MAX_TILES = 11;
 const quiet = (): undefined => undefined;
+let lastStatus: RouterStatus | null = null;
+let lastConsole: ConsoleInfo | null = null;
 
 function tile(bookmark: Bookmark): HTMLElement {
   const item = cloneTemplate("tile-template");
@@ -39,18 +43,41 @@ function loadTiles(): void {
     });
 }
 
+function redetectWhenReady(status: RouterStatus): void {
+  if (!shouldRedetect(lastStatus, status)) return;
+  shownInActiveTab("home")
+    .then((shown) => (shown ? call("console_detect", {}).then(renderConsole) : undefined))
+    .catch(quiet);
+}
+
 function renderRouter(status: RouterStatus): void {
+  redetectWhenReady(status);
   const view = renderRouterSummary(
     { chip: byId("router-chip"), text: byId("router-text"), proxy: byId("router-proxy") },
     status,
   );
-  byId("router-version").textContent = versionText(status);
+  lastStatus = status;
+  showVersion();
   const states = hopStates(view.tone, all("#router-hops .hop").length);
   all<HTMLElement>("#router-hops .hop").forEach((hop, i) => {
     const state = states[i];
     if (state) hop.dataset.state = state;
     else delete hop.dataset.state;
   });
+}
+
+function showVersion(): void {
+  const version = routerVersion(lastStatus?.version ?? null, lastConsole);
+  byId("router-version").textContent = versionText({ version });
+}
+
+function renderConsole(info: ConsoleInfo): void {
+  lastConsole = info;
+  renderConsoleLinks(
+    { list: byId("console-links"), note: byId("console-note"), title: byId("console-title") },
+    info,
+  );
+  showVersion();
 }
 
 function hideCrashBanner(): Promise<void> {
@@ -71,6 +98,13 @@ byId("crash-report").addEventListener("click", () => {
 });
 call("diag_crash_status", {}).then(showCrashBanner).catch(quiet);
 loadTiles();
+wireConsoleClicks(byId("console-links"));
+shownInActiveTab("home")
+  .catch(() => false)
+  .then((shown) => call(shown ? "console_detect" : "console_status", {}))
+  .then(renderConsole)
+  .catch(quiet);
+on("console-changed", renderConsole).catch(quiet);
 call("router_status", {}).then(renderRouter).catch(quiet);
 on("router-status", renderRouter).catch(quiet);
 on("bookmarks-changed", loadTiles).catch(quiet);

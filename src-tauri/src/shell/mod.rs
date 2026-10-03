@@ -8,12 +8,14 @@
 //!   `popup`).
 //! - [`popup`]: places and shows the toolbar popups.
 //! - [`content`]: the only factory of remote `tab-*` webviews (ADR 0001).
+//! - [`console`]: the only factory of the `console` webview (the router's own pages).
 //! - [`engine`]: back, forward, stop, find and zoom with page JavaScript off.
 //! - [`commands`]: the IPC commands.
 
 pub mod apply;
 pub mod chrome;
 pub mod commands;
+pub mod console;
 pub mod content;
 pub mod engine;
 pub mod env;
@@ -26,6 +28,7 @@ pub mod surface;
 mod testing;
 pub mod view;
 pub mod watch;
+pub mod webrtc;
 
 use std::thread;
 use std::time::Duration;
@@ -68,7 +71,10 @@ pub fn run() -> tauri::Result<()> {
 fn on_run_event<R: Runtime>(handle: &AppHandle<R>, event: &RunEvent) {
     match event {
         RunEvent::WindowEvent { event, .. } => on_window_event(handle, event),
-        RunEvent::Exit => diag::event(Code::Shutdown, &[]),
+        RunEvent::Exit => {
+            diag::event(Code::Shutdown, &[]);
+            console::stop(handle);
+        }
         _ => {}
     }
 }
@@ -129,6 +135,9 @@ macro_rules! contract_handler {
             commands::connection_pause,
             commands::connection_resume,
             commands::router_control,
+            commands::console_status,
+            commands::console_detect,
+            commands::console_open,
             commands::chrome_set_height,
             commands::platform,
             commands::chrome_insets,

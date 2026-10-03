@@ -4,6 +4,7 @@
 //! Everything that opens a socket lives here (ADR 0001 rule 2).
 //!
 //! - [`host`]: the one I2P host predicate.
+//! - [`console`]: find and verify the router console (quick links only).
 //! - [`loopback`]: socket addresses that can only point at this machine.
 //! - [`verify`]: VERIFY of the router proxy, the only source of a [`verify::VerifiedUpstream`].
 //! - [`failures`]: the pages whose load failed, for history.
@@ -14,6 +15,7 @@
 //! - [`stats`]: router statistics from the router helper.
 //! - `testing` (tests only): a fake router proxy, so tests outside `net/` open no socket.
 
+pub mod console;
 pub mod failures;
 pub mod gatekeeper;
 pub mod host;
