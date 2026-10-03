@@ -165,11 +165,15 @@ fn r7_ui_calls_every_report_command() {
 // R11.3: the toolbar menu has "Report a problem", which opens `eepview://report`.
 #[test]
 fn r11_3_toolbar_menu_has_report_a_problem() {
+    // Since #55 the menu markup lives in the popup page.
     let toolbar = format!(
-        "{}\n{}\n{}",
+        "{}\n{}\n{}\n{}\n{}\n{}",
         read("toolbar.html"),
         read("toolbar.ts"),
-        sources(&ui().join("toolbar"))
+        sources(&ui().join("toolbar")),
+        read("popup.html"),
+        read("popup.ts"),
+        sources(&ui().join("popup"))
     );
     assert!(toolbar.contains("Report a problem"));
     assert!(toolbar.contains("eepview://report"));
