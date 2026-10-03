@@ -25,6 +25,8 @@ eepview = { path = ".." }
 libfuzzer-sys = "=0.4.13"
 # The L3b rule pattern is a regular expression; url_rules compares it with the host predicate.
 regex = "1"
+# The rule list of layer L3b is JSON; url_rules reads it back.
+serde_json = "1"
 # The same `url` crate as `tauri::Url` (one lock entry), for `nav::guard`.
 url = "2"
 

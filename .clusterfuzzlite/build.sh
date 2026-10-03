@@ -41,6 +41,10 @@ cp fuzz/dictionaries/url.dict "$OUT/address_bar.dict"
 cp fuzz/dictionaries/url.dict "$OUT/url_rules.dict"
 for target in fuzz/fuzz_targets/*.rs; do
   name="$(basename "$target" .rs)"
+  # The seeds are the crash inputs that fuzzing found; every run starts from them.
+  if [ -d "fuzz/seeds/$name" ]; then
+    zip -qj "$OUT/${name}_seed_corpus.zip" "fuzz/seeds/$name"/*
+  fi
   cp "$SRC/target/x86_64-unknown-linux-gnu/release/$name" "$OUT/$name"
   bundle_libs "$name"
 done

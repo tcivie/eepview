@@ -315,7 +315,7 @@ fn terminate(client: &mut TcpStream, early: &[u8], host: &str, shared: &Shared) 
     let head = read_head(&mut source)?;
     let (unread, _) = source.into_inner();
     let Some((head, mut rest)) = head else {
-        return Ok(());
+        return refuse(client, Refusal::BadRequest);
     };
     rest.extend_from_slice(unread);
     match http::plan_inner(&head, host) {

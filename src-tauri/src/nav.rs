@@ -128,16 +128,21 @@ fn web_target(mut url: Url) -> Target {
 }
 
 /// `foo.i2p.` and `foo.i2p` name the same host; the address bar keeps the short form.
+///
+/// Only a host that is an I2P name once the dot is gone is changed. `set_host` never gets an
+/// empty or invalid host: `url` 2.5.8 builds a corrupt URL from an empty host on a URL with a
+/// port, and `Url::password` then panics. The guard refuses every other host as it is.
 fn trim_trailing_dot(url: &mut Url) {
-    let Some(host) = url.host_str().map(str::to_owned) else {
+    let Some(short) = url
+        .host_str()
+        .and_then(|host| host.strip_suffix('.'))
+        .filter(|short| is_i2p_host(short))
+        .map(str::to_owned)
+    else {
         return;
     };
-    // A host of only a dot ("data://.:0") has nothing left: `set_host("")` trips a debug
-    // assertion in the url crate. Such a URL is never I2P; the guard refuses it as it is.
-    if let Some(short) = host.strip_suffix('.').filter(|s| !s.is_empty()) {
-        // A failed set_host leaves the URL as it was; the guard then refuses it.
-        let _ = url.set_host(Some(short));
-    }
+    // A failed set_host leaves the URL as it was; the guard then refuses it.
+    let _ = url.set_host(Some(&short));
 }
 
 fn internal_target(text: &str) -> Target {
@@ -437,5 +442,27 @@ mod tests {
             internal_from_url(&Url::parse("http://home/").unwrap()),
             None
         );
+    }
+
+    // Req: the address bar never panics; a malformed URL is refused (found by the fuzz target
+    // `address_bar`, docs/wiki/fuzzing.md).
+    #[test]
+    fn a_dot_host_with_a_port_is_refused_and_never_panics() {
+        for input in [
+            "e://.:6/e:05#604",
+            "http://.:6/",
+            "http://.:80/x",
+            "e://.:6/",
+            "http://..:6/",
+            "http://.i2p.:6/",
+            "x://a.:1/",
+        ] {
+            assert!(
+                matches!(classify(input), Target::Refused(_)),
+                "{input}: {:?}",
+                classify(input)
+            );
+        }
+        assert_eq!(web("http://stats.i2p.:8080/x"), "http://stats.i2p:8080/x");
     }
 }

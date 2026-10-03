@@ -123,6 +123,32 @@ fn malformed_and_chunked_requests_are_refused() {
     assert_eq!(router.connections(), base);
 }
 
+// Req: RFC 9112 2.2 and 5.5: a bare CR in the request line or the headers, and a bare LF or CR
+// inside a header value, get 400, and nothing goes upstream. The first inputs come from the
+// fuzz target `gatekeeper_request` (docs/wiki/fuzzing.md).
+#[test]
+fn a_bare_cr_or_lf_gets_400_and_sends_nothing_upstream() {
+    let (router, gate, base) = setup();
+    let seen = router.lines();
+    for raw in [
+        "\r http://site.i2p/ HTTP/1.1\r\nHost: site.i2p\r\n\r\n",
+        "GET\r http://site.i2p/ HTTP/1.1\r\n\r\n",
+        "GET http://site.i2p/ HTTP/1.1\r\nX: a\nHost: evil.example\r\n\r\n",
+        "GET http://site.i2p/ HTTP/1.1\r\nX: a\rHost: evil.example\r\n\r\n",
+    ] {
+        let out = send(&gate, raw);
+        assert!(out.starts_with("HTTP/1.1 400"), "{raw:?}: {out}");
+    }
+    // The exact fuzz input, as the request inside a `CONNECT` tunnel.
+    let tunnel = send(
+        &gate,
+        "CONNECT site.i2p:80 HTTP/1.1\r\n\r\n\r / HTTP/1.1\r\n\r\n",
+    );
+    assert!(tunnel.ends_with("Bad Request"), "{tunnel}");
+    assert_eq!(router.connections(), base, "a connection went upstream");
+    assert_eq!(router.lines(), seen, "the router saw a request");
+}
+
 #[test]
 fn tls_tunnels_can_be_closed() {
     let router = FakeRouter::start();

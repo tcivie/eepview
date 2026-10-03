@@ -24,7 +24,7 @@ The Rust side of the browser, in `src-tauri/`: tabs, navigation, bookmarks, hist
 - Back and forward follow the standard per-tab session history: a new navigation clears the forward list, and back and forward never leave the tab's own history.
 - `bookmark_add` refuses a non-I2P URL with `not-i2p`.
 - Hand-edited store files are not trusted: a settings homepage that is not an I2P site or an internal page falls back to `eepview://home`; history keeps only I2P entries, newest first, at most 10 000.
-- Gatekeeper: duplicate `Content-Length` headers are refused with 400; a request body cut short closes both sides at once.
+- Gatekeeper: a bare CR in the request line or a header, and a bare LF in a header value, get 400 and nothing goes upstream (RFC 9112), also inside a `CONNECT` tunnel; duplicate `Content-Length` headers are refused with 400; a request body cut short closes both sides at once.
 
 ## Requirements (UX batch 1)
 
@@ -111,3 +111,4 @@ eepview shows router information but never changes the router configuration. It 
 - 2026-10-03 — Site icons in tabs, bookmarks and history — [#53](https://github.com/tcivie/eepview/pull/53)
 - 2026-10-03 — Toolbar popups in their own `popup` webview; the toolbar stays 84 px — [#55](https://github.com/tcivie/eepview/pull/55)
 - 2026-10-03 — Router console quick links and the console window — [#54](https://github.com/tcivie/eepview/pull/54)
+- 2026-10-03 — The address bar refuses a dot host with a port instead of panicking; the gatekeeper refuses a bare CR or LF in a head — [#69](https://github.com/tcivie/eepview/pull/69)
