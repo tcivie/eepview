@@ -2,6 +2,21 @@
 
 This wiki is generated from docs/wiki in the repository. Edit it there, in a PR. Each PR that changes a feature updates its page. See [AGENTS.md](https://github.com/tcivie/eepview/blob/main/AGENTS.md).
 
+## User guide
+
+- [Install](install.md)
+- [First run](first-run.md)
+- [Using eepview](using-eepview.md)
+- [Privacy and security](privacy-and-security.md)
+- [Troubleshooting](troubleshooting.md)
+- [FAQ](faq.md)
+
+## Developer guide
+
+- [Developer guide](developer-guide.md)
+
+## Features
+
 | Feature | Status | Page | Added in |
 | --- | --- | --- | --- |
 | CI and quality gates | shipped | [CI and quality gates](ci-and-quality-gates.md) | [#1](https://github.com/tcivie/eepview/pull/1) |
