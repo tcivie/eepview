@@ -3,3 +3,7 @@ cognitive-complexity-threshold = 10
 too-many-lines-threshold = 40
 too-many-arguments-threshold = 5
 excessive-nesting-threshold = 3
+# Tests may unwrap, expect and panic; production code may not (Cargo.toml [lints]).
+allow-unwrap-in-tests = true
+allow-expect-in-tests = true
+allow-panic-in-tests = true

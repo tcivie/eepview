@@ -1,6 +1,11 @@
-// Prevents additional console window on Windows in release, DO NOT REMOVE!!
+//! The eepview binary.
+
+// No console window next to the app on Windows release builds.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    eepview_lib::run();
+    if let Err(error) = eepview_lib::run() {
+        eprintln!("eepview: {error}");
+        std::process::exit(1);
+    }
 }

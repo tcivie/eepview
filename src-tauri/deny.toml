@@ -3,11 +3,32 @@
 
 [graph]
 all-features = true
+# The desktop targets eepview ships for. Tauri pulls reqwest only on Android and iOS.
+targets = [
+  "x86_64-unknown-linux-gnu",
+  "aarch64-apple-darwin",
+  "x86_64-apple-darwin",
+  "x86_64-pc-windows-msvc",
+  "aarch64-pc-windows-msvc",
+]
 
 [bans]
 multiple-versions = "allow"
 wildcards = "deny"
 allow-wildcard-paths = true
+# ADR 0001 rule 3: no HTTP client crates. Only net/ talks to the network, with std sockets.
+deny = [
+  { crate = "reqwest", reason = "ADR 0001: no HTTP client crates" },
+  { crate = "hyper", reason = "ADR 0001: no HTTP client crates" },
+  { crate = "ureq", reason = "ADR 0001: no HTTP client crates" },
+  { crate = "isahc", reason = "ADR 0001: no HTTP client crates" },
+  { crate = "curl", reason = "ADR 0001: no HTTP client crates" },
+  { crate = "attohttpc", reason = "ADR 0001: no HTTP client crates" },
+  { crate = "surf", reason = "ADR 0001: no HTTP client crates" },
+  { crate = "minreq", reason = "ADR 0001: no HTTP client crates" },
+  { crate = "tungstenite", reason = "ADR 0001: no HTTP client crates" },
+  { crate = "tokio-tungstenite", reason = "ADR 0001: no HTTP client crates" },
+]
 
 [sources]
 unknown-registry = "deny"
