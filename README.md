@@ -1,10 +1,6 @@
-<h1 align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/tcivie/eepview/main/assets/brand/eepview-logo-horizontal-dark.svg">
-    <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/tcivie/eepview/main/assets/brand/eepview-logo-horizontal-light.svg">
-    <img alt="eepview" src="https://raw.githubusercontent.com/tcivie/eepview/main/assets/brand/eepview-logo-horizontal-light.svg" width="360">
-  </picture>
-</h1>
+<!-- TODO: centered logo. Add it from assets/brand/ once the brand PR has merged. -->
+
+<h1 align="center">eepview</h1>
 
 <p align="center">A small browser that opens I2P sites and nothing else.</p>
 

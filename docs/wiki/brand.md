@@ -18,7 +18,6 @@ All files are in `assets/brand/`.
 | `eepview-logo-horizontal-light.svg`, `eepview-logo-horizontal-dark.svg` | Mark plus wordmark, for light and dark backgrounds |
 | `app-icon-1024.png` | The master mark rendered at 1024 px with a soft drop shadow, the source for the icon set |
 | `preview.html`, `preview-light.png`, `preview-dark.png` | Preview sheet: master, small 64/48/32/24/16, mono, horizontal logo |
-| `concepts/*.svg` | The three early concept sketches |
 
 Open a preview page with `#light` or `#dark` to force a theme.
 
