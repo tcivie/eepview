@@ -1,12 +1,12 @@
 //! The browser state machine. Pure: commands and engine events go in, [`Effect`]s come out,
 //! and the shell (`shell/`) carries them out. No Tauri runtime here, so all of it is tested.
 
-mod find;
+pub mod find;
 mod keys;
 mod library;
 mod navigation;
 mod page;
-mod router;
+pub mod router;
 mod tab_ops;
 
 #[cfg(test)]
@@ -171,6 +171,7 @@ pub struct Core {
     find_open: bool,
     toolbar_request: f64,
     hover: Debounce,
+    js_forced_off: bool,
 }
 
 impl Core {
@@ -204,6 +205,7 @@ impl Core {
             find_open: false,
             toolbar_request: 0.0,
             hover: Debounce::default(),
+            js_forced_off: false,
         };
         let home = core.home_url();
         core.tabs.open(&home, crate::tabs::Place::End, true);
@@ -311,7 +313,12 @@ impl Core {
     }
 
     fn js_of(&self, host: &str) -> bool {
-        self.prefs.js(host, self.settings.js_default)
+        !self.js_forced_off && self.prefs.js(host, self.settings.js_default)
+    }
+
+    /// Turns page JavaScript off for every site for this run (`EEPVIEW_JS=off`).
+    pub fn force_js_off(&mut self) {
+        self.js_forced_off = true;
     }
 
     fn toast(kind: &'static str, text: impl Into<String>) -> Effect {

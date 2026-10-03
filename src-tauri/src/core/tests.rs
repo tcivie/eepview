@@ -526,3 +526,26 @@ fn save_errors_become_toasts() {
         matches!(&fx[0], Effect::Emit(Event::Toast(t)) if t.text.starts_with("Could not save"))
     );
 }
+
+#[test]
+fn verdicts_map_to_states() {
+    use crate::core::router::status_of;
+    use crate::net::verify::Verdict;
+    let cases = [
+        (Verdict::Down("x".into()), true, "down"),
+        (Verdict::NotI2p("x".into()), true, "not-i2p"),
+        (Verdict::Outproxy("x".into()), true, "outproxy"),
+    ];
+    for (verdict, gate, state) in cases {
+        assert_eq!(status_of(&verdict, "p", gate).state, state);
+    }
+}
+
+#[test]
+fn js_can_be_forced_off() {
+    let mut c = core();
+    c.force_js_off();
+    c.site_js_set("stats.i2p", true);
+    let fx = c.navigate(STATS).1;
+    assert!(!loads(&fx)[0].js);
+}

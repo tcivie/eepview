@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-zoom-out"
+description = "Enables the zoom_out command without any pre-configured scope."
+commands.allow = ["zoom_out"]
+
+[[permission]]
+identifier = "deny-zoom-out"
+description = "Denies the zoom_out command without any pre-configured scope."
+commands.deny = ["zoom_out"]

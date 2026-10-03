@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "status",
+  "description": "The status bubble: it only listens for link-hover.",
+  "webviews": ["status"],
+  "permissions": ["core:event:allow-listen", "core:event:allow-unlisten"]
+}
