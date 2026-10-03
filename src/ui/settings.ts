@@ -56,10 +56,17 @@ function showSettings(settings: Settings): void {
   showHomepage(settings.homepage);
 }
 
+function showSavedSettings(): void {
+  call("settings_get", {})
+    .then(showSettings)
+    .catch(() => undefined);
+}
+
 function save(patch: Partial<Settings>, message: string): void {
-  runAndAnnounce(() => call("settings_set", { patch }).then(showSettings), status(), message).catch(
-    () => undefined,
-  );
+  const task = () => call("settings_set", { patch }).then(showSettings);
+  runAndAnnounce(task, status(), message).then((saved) => {
+    if (!saved) showSavedSettings();
+  });
 }
 
 function onSwitch(event: Event): void {

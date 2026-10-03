@@ -7,6 +7,7 @@ import { folderGroups, folderNames } from "./lib/bookmark-groups.ts";
 import { bindClicks, delegateClick, runAndAnnounce } from "./shared/events.ts";
 import { setFieldError } from "./shared/form.ts";
 
+const BLOB_LIFETIME_MS = 60_000;
 const ADDRESS_HINT = "A .i2p name or a .b32.i2p address.";
 
 type Draft = { url: string; title: string; folder: string | null };
@@ -123,7 +124,7 @@ async function exportBookmarks(): Promise<void> {
   link.href = URL.createObjectURL(new Blob([json], { type: "application/json" }));
   link.download = "eepview-bookmarks.json";
   link.click();
-  URL.revokeObjectURL(link.href);
+  window.setTimeout(() => URL.revokeObjectURL(link.href), BLOB_LIFETIME_MS);
   announce(status(), `Exported ${countLabel(bookmarks.length)}.`);
 }
 

@@ -15,6 +15,7 @@ const START_PEERS = 312;
 
 type Stop = () => void;
 let stopRunning: Stop | null = null;
+let handOffTimer = 0;
 
 function isStep(value: unknown): value is Step {
   return typeof value === "string" && (STEPS as readonly string[]).includes(value);
@@ -38,11 +39,17 @@ function updateStepper(step: Step): void {
   });
 }
 
+function handOff(step: Step): void {
+  window.clearTimeout(handOffTimer);
+  handOffTimer = window.setTimeout(() => showStep(step, true), HAND_OFF_MS);
+}
+
 function showStep(step: Step, moveFocus: boolean): void {
   for (const section of all<HTMLElement>("[data-step]")) {
     section.hidden = section.dataset.step !== step;
   }
   updateStepper(step);
+  window.clearTimeout(handOffTimer);
   stopRunning?.();
   stopRunning = RUNNERS[step]?.() ?? null;
   if (moveFocus) document.querySelector<HTMLElement>(`[data-step="${step}"] h1`)?.focus();
@@ -86,7 +93,7 @@ function showProgress(transfer: Transfer, percent: number): void {
 function finishDownload(): void {
   byId("verify-state").textContent = "Signatures match";
   announce(byId("download-status"), "Download complete. Signatures match. Starting the router.");
-  window.setTimeout(() => showStep("tunnels", true), HAND_OFF_MS);
+  handOff("tunnels");
 }
 
 function announceMilestone(transfer: Transfer, percent: number): void {
@@ -157,7 +164,7 @@ function runTunnels(): Stop {
     if (elapsed % 2 === 0) buildNextHop(queue);
     if (queue.length > 0) return;
     window.clearInterval(timer);
-    window.setTimeout(() => showStep("ready", true), HAND_OFF_MS);
+    handOff("ready");
   }, BUILD_TICK_MS);
   return () => window.clearInterval(timer);
 }
