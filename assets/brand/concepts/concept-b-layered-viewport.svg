@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <title>Concept B: layered viewport</title>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1F5C63"/>
+      <stop offset="1" stop-color="#103236"/>
+    </linearGradient>
+  </defs>
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#bg)"/>
+  <rect x="222" y="250" width="580" height="524" rx="64" fill="none" stroke="#EAF4F1" stroke-width="36"/>
+  <path d="M240 350H784" stroke="#EAF4F1" stroke-width="36"/>
+  <rect x="312" y="420" width="400" height="290" rx="40" fill="none" stroke="#7FD1C3" stroke-width="28" opacity=".45"/>
+  <rect x="372" y="466" width="280" height="198" rx="30" fill="none" stroke="#7FD1C3" stroke-width="28" opacity=".7"/>
+  <rect x="432" y="512" width="160" height="106" rx="22" fill="none" stroke="#7FD1C3" stroke-width="28"/>
+  <circle cx="512" cy="565" r="18" fill="#EAF4F1"/>
+</svg>
