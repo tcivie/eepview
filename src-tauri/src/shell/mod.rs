@@ -24,6 +24,7 @@ pub mod input;
 pub mod menu;
 pub mod popup;
 pub mod report;
+pub mod sampler;
 pub mod state;
 pub mod surface;
 #[cfg(test)]
@@ -75,7 +76,7 @@ fn on_run_event<R: Runtime>(handle: &AppHandle<R>, event: &RunEvent) {
         RunEvent::WindowEvent { event, .. } => on_window_event(handle, event),
         RunEvent::Exit => {
             diag::event(Code::Shutdown, &[]);
-            console::stop(handle);
+            sampler::shutdown(handle);
         }
         _ => {}
     }
@@ -170,6 +171,7 @@ fn paths<R: Runtime>(app: &App<R>) -> Option<Paths> {
         settings: config.join("settings.json"),
         sites: config.join("sites.json"),
         icons: data.join("icons"),
+        bandwidth: data.join("bandwidth.json"),
     })
 }
 
@@ -221,6 +223,7 @@ fn start<R: Runtime>(app: &mut App<R>, inputs: Inputs) -> tauri::Result<()> {
     surface::paint_window(&handle);
     open_start_urls(&handle, &inputs.urls);
     watch::start(&handle, inputs.proxy);
+    sampler::start(&handle);
     if let Some(seconds) = inputs.exit_after {
         exit_later(handle, seconds);
     }

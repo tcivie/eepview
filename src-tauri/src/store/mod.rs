@@ -3,6 +3,7 @@
 
 //! Small JSON stores with a `version` field, written atomically (temp file + rename).
 
+pub mod bandwidth;
 pub mod bookmarks;
 pub mod history;
 pub mod settings;

@@ -10,7 +10,7 @@ use std::time::Duration;
 use tauri::{AppHandle, Runtime};
 
 use super::apply::with_core;
-use super::state::{lock, now_ms, shared};
+use super::state::{lock, shared};
 use crate::core::router::status_of;
 use crate::diag::{self, Code, ErrorKind, Field, OpKind, RouterState};
 use crate::net::gatekeeper::Gatekeeper;
@@ -26,30 +26,16 @@ pub fn start<R: Runtime>(app: &AppHandle<R>, proxy: Result<LoopbackAddr, String>
     let app = app.clone();
     spawn("router-watch", move || {
         loop {
-            tick(&app, &proxy, super::env::router_helper());
+            tick(&app, &proxy);
             thread::sleep(PERIOD);
         }
     });
 }
 
-/// One round of the watcher: VERIFY, then a statistics sample.
-fn tick<R: Runtime>(
-    app: &AppHandle<R>,
-    proxy: &Result<LoopbackAddr, String>,
-    helper: Option<(LoopbackAddr, String)>,
-) {
+/// One round of the watcher: VERIFY. The statistics are the sampler's (`shell::sampler`).
+fn tick<R: Runtime>(app: &AppHandle<R>, proxy: &Result<LoopbackAddr, String>) {
     let verdict = proxy.clone().map_or_else(Verdict::Down, verify);
     apply(app, &verdict);
-    sample(app, helper);
-}
-
-/// Records the router bandwidth for `router_stats().history`, when a helper is configured.
-fn sample<R: Runtime>(app: &AppHandle<R>, helper: Option<(LoopbackAddr, String)>) {
-    if let Some((addr, token)) = helper {
-        let stats = crate::net::stats::fetch(addr, &token);
-        lock(&shared(app).core).record_stats(now_ms(), &stats);
-        with_core(app, |core| core.router_version(stats.version.as_deref()));
-    }
 }
 
 /// VERIFY now, off the main thread (after `connection_resume()`).
@@ -148,14 +134,10 @@ mod tests {
     fn a_passing_verify_opens_the_gate() {
         let app = app();
         let router = FakeRouter::start();
-        tick(app.handle(), &Ok(router.addr), None);
+        tick(app.handle(), &Ok(router.addr));
         assert!(gate_open(&app));
         assert_eq!(core(&app).router().state, "ok");
-        tick(
-            app.handle(),
-            &Ok(router.addr),
-            Some((dead_addr(), "token".into())),
-        );
+        tick(app.handle(), &Ok(router.addr));
         assert!(gate_open(&app));
         assert!(core(&app).stats_history().is_empty());
     }
@@ -164,11 +146,11 @@ mod tests {
     fn a_failing_verify_closes_the_gate() {
         let app = app();
         let router = FakeRouter::start();
-        tick(app.handle(), &Ok(router.addr), None);
-        tick(app.handle(), &Ok(dead_addr()), None);
+        tick(app.handle(), &Ok(router.addr));
+        tick(app.handle(), &Ok(dead_addr()));
         assert!(!gate_open(&app));
         assert_eq!(core(&app).router().state, "down");
-        tick(app.handle(), &Err("EEPVIEW_PROXY: bad".into()), None);
+        tick(app.handle(), &Err("EEPVIEW_PROXY: bad".into()));
         assert!(!gate_open(&app));
     }
 
@@ -177,7 +159,7 @@ mod tests {
         let app = app();
         let router = FakeRouter::start();
         core(&app).pause();
-        tick(app.handle(), &Ok(router.addr), None);
+        tick(app.handle(), &Ok(router.addr));
         assert!(!gate_open(&app));
         close_gate(app.handle());
         assert!(!gate_open(&app));

@@ -10,14 +10,13 @@ use std::path::Path;
 use tauri::{AppHandle, Manager, Runtime};
 
 use super::apply::apply;
-use super::console::{current, stopped};
 use super::popup::Anchor;
 use super::state::{lock, now_ms, shared};
 use crate::core::find::Zoom;
 use crate::core::{Core, Effect};
-use crate::net::console::{ConsoleInfo, fetch_stats};
+use crate::net::console::ConsoleInfo;
 use crate::net::loopback::LoopbackAddr;
-use crate::net::stats::{RouterStats, StatsSource, pick};
+use crate::net::stats::RouterStats;
 use crate::popup::Kind;
 use crate::session::Step;
 use crate::store::bookmarks::export_file_name;
@@ -435,38 +434,22 @@ pub async fn router_status<R: Runtime>(app: AppHandle<R>) -> Res<RouterStatus> {
     read(app, move |c| c.router().clone()).await
 }
 
-/// `router_stats()`: from the router helper named by `EEPVIEW_ROUTER_STATUS` and
-/// `EEPVIEW_ROUTER_STATUS_TOKEN`, else from the stored router console; all fields `null`
-/// without a source. `history` holds the bandwidth of the last 10 minutes.
+/// `router_stats()`: the figures of the last round of the stats sampler (`shell::sampler`),
+/// all `null` before the first one. `history` holds the bandwidth of the last 10 minutes.
+/// It sends no request.
 ///
 /// # Errors
 ///
 /// Fails only when the worker thread that runs the command panics.
 #[tauri::command]
 pub async fn router_stats<R: Runtime>(app: AppHandle<R>) -> Res<RouterStats> {
-    blocking(move || current_stats(&app, super::env::router_helper())).await
+    blocking(move || current_stats(&app)).await
 }
 
-/// The `router_stats()` answer: the helper when it answers, else the stored console (no
-/// probe, one request), else all `null`. A console answer adds its bandwidth sample to the
-/// history, at most one per 4 s.
-pub fn current_stats<R: Runtime>(
-    app: &AppHandle<R>,
-    helper: Option<(LoopbackAddr, String)>,
-) -> RouterStats {
-    let from_helper = helper.and_then(|(addr, token)| crate::net::stats::try_fetch(addr, &token));
-    let (mut stats, source) = pick(from_helper, || {
-        current(app)
-            .filter(|_| !stopped(app))
-            .and_then(|console| fetch_stats(&console))
-    });
-    let app_shared = shared(app);
-    let mut core = lock(&app_shared.core);
-    if source == StatsSource::Console {
-        core.record_stats_spaced(now_ms(), &stats);
-    }
-    stats.history = core.stats_history();
-    stats
+/// The `router_stats()` answer: the latest figures of the sampler and the bandwidth of the
+/// last 10 minutes. No request to the helper or the console, and no sample.
+pub fn current_stats<R: Runtime>(app: &AppHandle<R>) -> RouterStats {
+    lock(&shared(app).core).stats_answer(now_ms())
 }
 
 /// The router helper statistics, all `null` without a helper.

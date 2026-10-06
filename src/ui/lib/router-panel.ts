@@ -111,7 +111,7 @@ export function panelControls(status: PanelStatusLike): PanelControls {
   };
 }
 
-export function recentWindow(values: readonly number[], stepSeconds: number): number[] {
+export function recentWindow<T>(values: readonly T[], stepSeconds: number): T[] {
   if (stepSeconds <= 0) return [...values];
   const count = Math.max(MIN_POINTS, Math.ceil(SPARK_WINDOW_SECONDS / stepSeconds) + 1);
   return values.slice(-count);
@@ -119,15 +119,20 @@ export function recentWindow(values: readonly number[], stepSeconds: number): nu
 
 export interface SparkHistory {
   stepSeconds: number;
-  inBps: readonly number[];
-  outBps: readonly number[];
+  inBps: readonly (number | null)[];
+  outBps: readonly (number | null)[];
 }
 
+const filledCount = (values: readonly (number | null)[]): number =>
+  values.filter((v) => v !== null).length;
+
+/** The series to draw; null when the history is null or a series has fewer than 2 values. */
 export function sparkSeries(
   history: SparkHistory | null,
-): { inBps: number[]; outBps: number[] } | null {
+): { inBps: (number | null)[]; outBps: (number | null)[] } | null {
   if (!history) return null;
   const inBps = recentWindow(history.inBps, history.stepSeconds);
   const outBps = recentWindow(history.outBps, history.stepSeconds);
-  return inBps.length < MIN_POINTS || outBps.length < MIN_POINTS ? null : { inBps, outBps };
+  const short = filledCount(inBps) < MIN_POINTS || filledCount(outBps) < MIN_POINTS;
+  return short ? null : { inBps, outBps };
 }

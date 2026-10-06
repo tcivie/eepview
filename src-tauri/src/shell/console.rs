@@ -325,6 +325,9 @@ pub fn set_console<R: Runtime>(app: &AppHandle<R>, console: Option<VerifiedConso
     if before.origin.is_some() && before.origin != info.origin {
         close(app);
     }
+    if info.found {
+        super::sampler::wake(app);
+    }
     let _ = app.emit_to(EventTarget::App, "console-changed", info.clone());
     for label in LISTENERS {
         if app.get_webview(label).is_some() {

@@ -4,6 +4,7 @@
 import type { RouterStats } from "../contract.ts";
 
 export const HISTORY_STEP_SECONDS = 5;
+export const HISTORY_SLOTS = 120;
 
 const MS_PER_SECOND = 1000;
 const PERCENT = 100;
@@ -17,7 +18,7 @@ export interface StatsView {
   javaVersion: string | null;
   bandwidthInBps: number | null;
   bandwidthOutBps: number | null;
-  history: { stepSeconds: number; inBps: number[]; outBps: number[] } | null;
+  history: { stepSeconds: number; inBps: (number | null)[]; outBps: (number | null)[] } | null;
   clientTunnels: number | null;
   exploratoryTunnels: number | null;
   inboundTunnels: number | null;
@@ -40,28 +41,29 @@ function buildRate(build: RouterStats["tunnelBuildSuccessPercent"]): number | nu
   return percent === null ? null : percent / PERCENT;
 }
 
-const MAX_GAP_MS = 2 * HISTORY_STEP_SECONDS * MS_PER_SECOND;
+const STEP_MS = HISTORY_STEP_SECONDS * MS_PER_SECOND;
+const LAST_SLOT = HISTORY_SLOTS - 1;
 
-/** The index where the last run of samples starts: no gap in it is above `MAX_GAP_MS`. */
-function runStart(history: RouterStats["history"]): number {
-  let start = history.length - 1;
-  while (start > 0) {
-    const previous = history[start - 1];
-    const current = history[start];
-    if (!previous || !current || current.t - previous.t > MAX_GAP_MS) break;
-    start -= 1;
+const emptySlots = (): (number | null)[] => Array.from({ length: HISTORY_SLOTS }, () => null);
+
+/** The slot of a sample time: 119 is now, each slot 5 s older than the next one. */
+const slotOf = (t: number, nowMs: number): number => LAST_SLOT - Math.round((nowMs - t) / STEP_MS);
+
+/** The 120 time slots of the last 10 minutes; a slot with no sample stays null. */
+function historyView(history: RouterStats["history"], nowMs: number): StatsView["history"] {
+  const inBps = emptySlots();
+  const outBps = emptySlots();
+  const times: number[] = Array.from({ length: HISTORY_SLOTS }, () => Number.NEGATIVE_INFINITY);
+  let filled = false;
+  for (const sample of history) {
+    const slot = slotOf(sample.t, nowMs);
+    if (slot < 0 || slot > LAST_SLOT || sample.t < (times[slot] ?? 0)) continue;
+    times[slot] = sample.t;
+    inBps[slot] = sample.in;
+    outBps[slot] = sample.out;
+    filled = true;
   }
-  return start;
-}
-
-function historyView(history: RouterStats["history"]): StatsView["history"] {
-  if (history.length === 0) return null;
-  const run = history.slice(runStart(history));
-  return {
-    stepSeconds: HISTORY_STEP_SECONDS,
-    inBps: run.map((sample) => sample.in),
-    outBps: run.map((sample) => sample.out),
-  };
+  return filled ? { stepSeconds: HISTORY_STEP_SECONDS, inBps, outBps } : null;
 }
 
 const NO_STATS: RouterStats = {
@@ -78,8 +80,11 @@ const NO_STATS: RouterStats = {
   history: [],
 };
 
-/** The view of a `router_stats` answer: the figures the router panel and the Network page show. */
-export function statsView(answer: RouterStats | null | undefined): StatsView {
+/**
+ * The view of a `router_stats` answer: the figures the router panel and the Network page show.
+ * `nowMs` is the time now in Unix ms; the history slots end there.
+ */
+export function statsView(answer: RouterStats | null | undefined, nowMs: number): StatsView {
   const stats = answer ?? NO_STATS;
   return {
     networkStatus: stats.networkStatus,
@@ -90,7 +95,7 @@ export function statsView(answer: RouterStats | null | undefined): StatsView {
     javaVersion: null,
     bandwidthInBps: stats.bandwidthBytesPerSecond.in1s,
     bandwidthOutBps: stats.bandwidthBytesPerSecond.out1s,
-    history: historyView(stats.history),
+    history: historyView(stats.history, nowMs),
     clientTunnels: stats.tunnels.client,
     exploratoryTunnels: stats.tunnels.exploratory,
     inboundTunnels: stats.tunnels.in,
