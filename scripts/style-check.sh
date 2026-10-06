@@ -58,4 +58,5 @@ report "spacing, radius and font size must come from a token" < <(raw_values)
 SKIP="$THEME" scan "$TOKEN_DEF" "define tokens only in ${THEME}" '*.css'
 scan "$HTML_STYLE" "no inline style in HTML" '*.html'
 scan "$TS_STYLE" "no inline style in code" 'src/*.ts' 'scripts/*.mjs'
+SKIP="$THEME" scan '^[^[:space:]/*}@]' "a rule outside @layer beats every layer, the [hidden] rule too" 'src/ui/*.css'
 exit "$status"
