@@ -51,3 +51,4 @@ Report it in private. Never use a public issue. Follow the steps in [SECURITY.md
 
 - 2026-10-03 — Write the page — [#28](https://github.com/tcivie/eepview/pull/28)
 - 2026-10-03 — Site icons — [#53](https://github.com/tcivie/eepview/pull/53)
+- 2026-10-06 — Router bandwidth history on disk — [#83](https://github.com/tcivie/eepview/pull/83)

@@ -5,7 +5,7 @@ SPDX-License-Identifier: MIT
 
 # Router console
 
-Status: shipped in [#54](https://github.com/tcivie/eepview/pull/54). The console tab and the one link (R7, R12, R15, R23–R30): in progress in [#76](https://github.com/tcivie/eepview/pull/76). Router statistics from the console (R31–R46): in progress in [#78](https://github.com/tcivie/eepview/pull/78). Background sampling, the saved bandwidth history and the rate units (R47–R55): in progress.
+Status: shipped in [#54](https://github.com/tcivie/eepview/pull/54). The console tab and the one link (R7, R12, R15, R23–R30): in progress in [#76](https://github.com/tcivie/eepview/pull/76). Router statistics from the console (R31–R46): in progress in [#78](https://github.com/tcivie/eepview/pull/78). Background sampling, the saved bandwidth history and the rate units (R47–R55): in progress in [#83](https://github.com/tcivie/eepview/pull/83).
 
 eepview shows router information. It does not change the router configuration. All router configuration goes through the router's own console pages. eepview finds the console of the router in use and gives one link to it, "I2P Router Console". The user reaches every other console page from the console itself. When the router has no eepview helper, eepview also reads the router statistics from that console (R31–R46).
 
@@ -629,7 +629,7 @@ The point of value `v` in slot `i` of `n` values is `x = i × 600 / (n − 1)` a
 - `src/ui/lib/router-stats.test.ts` (R41, with the history run), `src/ui/lib/stats-view.test.ts` (R42), `src/ui/lib/router-panel.test.ts` (R42, R43)
 - `src/ui/popup-router.test.ts` and `src/ui/popup-page.test.ts`: their `router_stats` stubs move to the contract v1.7 shape (R41)
 - `src/ui/lib/console-links.test.ts` (R44)
-- `src-tauri/src/shell/sampler/tests.rs` (declared from `sampler.rs` as `#[cfg(test)] mod tests;`: R31, R34, R40, R45, R47–R49, R53 through `tick`, `start`, `wake`, `stop`, `shutdown` and `current_stats`). The R31, R34, R40 and R45 tests of `src-tauri/src/shell/commands/tests.rs` that called `current_stats(app, helper)` move here and call `tick`; `current_stats(app)` keeps the R49 tests.
+- `src-tauri/src/shell/sampler/tests.rs` (declared from `sampler.rs` as `#[cfg(test)] mod tests;`: R31, R34, R40, R45, R47–R49, R53 through `tick`, `start`, `wake`, `stop`, `shutdown` and `current_stats`). The R31, R34, R40 and R45 tests of `src-tauri/src/shell/commands/tests.rs` that called `current_stats(app, helper)` move here and call `tick`; `current_stats(app)` keeps the R49 tests, and the R45 case after `detect_now` stays there too: the architecture test (R6) allows detection calls only under the console module and the commands.
 - `src-tauri/src/store/bandwidth/tests.rs` (declared from `bandwidth.rs`: R50–R52) and the R52 `restored` and R49 `recent` tests in `src-tauri/src/net/stats/requirement_tests.rs`
 - `src/ui/lib/router-stats.test.ts` (R41 slots), `src/ui/lib/stats-view.test.ts` (R54), `src/ui/lib/sparkline.test.ts` (R55, new), `src/ui/lib/router-panel.test.ts` (R55 `sparkSeries`)
 
@@ -649,3 +649,4 @@ The point of value `v` in slot `i` of `n` values is `x = i × 600 / (n − 1)` a
 - 2026-10-03 — Router console detection, quick links and the console view — [#54](https://github.com/tcivie/eepview/pull/54)
 - 2026-10-03 — The console opens in a console tab; one "I2P Router Console" link replaces the five page links — [#76](https://github.com/tcivie/eepview/pull/76)
 - 2026-10-03 — Router statistics from the console, UI contract shape — [#78](https://github.com/tcivie/eepview/pull/78)
+- 2026-10-06 — Background stats sampler, saved bandwidth history, rate units with K = 1 000 — [#83](https://github.com/tcivie/eepview/pull/83)
