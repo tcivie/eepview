@@ -100,5 +100,6 @@ Tests check these. Each one names the behavior, not the code.
 
 ## History
 
+- 2026-10-06 — The Home router card shows the four real router checks — [#84](https://github.com/tcivie/eepview/pull/84)
 - 2026-10-03 — The router panel, the menu, the hint and the suggestions show in the `popup` webview — [#55](https://github.com/tcivie/eepview/pull/55)
 - 2026-10-03 — Numbered PO requirements for the find bar, suggestions, history, bookmarks, tabs and stats — [#49](https://github.com/tcivie/eepview/pull/49)

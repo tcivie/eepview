@@ -5,7 +5,7 @@ SPDX-License-Identifier: MIT
 
 # Router checks
 
-Status: in progress.
+Status: in progress in [#84](https://github.com/tcivie/eepview/pull/84).
 
 The router card on the Home page shows the four checks that eepview runs on the router. Each check shows what the backend found, and nothing else. A check turns green only when the backend reports that it passed. No timer and no CSS animation in the page changes a check.
 
@@ -235,4 +235,4 @@ export function checkAnnouncement(before: VerifyCheck[] | null | undefined,
 
 ## History
 
-- 2026-10-06 — The router card shows the four real checks instead of the decorative hop path.
+- 2026-10-06 — The router card shows the four real checks instead of the decorative hop path — [#84](https://github.com/tcivie/eepview/pull/84).
