@@ -86,6 +86,7 @@ See [Router console](router-console.md) for the requirements (R1–R30). The con
 - **Accept errors back off** (50 ms doubling to 1 s), so a persistent error such as no free file descriptors costs no CPU.
 - **The blocked page replaces a tab only on a click.** The engines report frame navigations like top-level ones, with no frame flag. A refused navigation to the link under the mouse shows the blocked page; any other refused navigation (a frame, a script, a redirect) only shows a toast. Page events from a hidden web view are ignored while the tab shows an internal page.
 - The `internal` webview's `on_navigation` lives in `chrome.rs`: it keeps bundled pages inside the bundle and sends any other URL through `navigate`.
+- **App Transport Security is off for web content only.** The macOS bundle sets `NSAllowsArbitraryLoadsInWebContent`, because ATS refuses every `http://` page load and eepsites are `http://`. This weakens no layer: L2 still sends every content request to the gatekeeper on loopback, and L1 still forwards only `.i2p` hosts. The Rust code uses plain sockets, which ATS never covers. See [Browser shell](browser-shell.md) (B1).
 - `EEPVIEW_PROXY`, `EEPVIEW_START_URL`, `EEPVIEW_EXIT_AFTER` and `EEPVIEW_JS` exist in the release binary, so the leak test runs the real binary. They cannot weaken a layer: the upstream still has to pass VERIFY, and the gatekeeper still enforces `.i2p`.
 
 ## Leak test
