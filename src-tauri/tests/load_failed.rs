@@ -5,7 +5,7 @@
 //! "Failed loads" section of `docs/wiki/browser-shell.md` (F1, F5, F6). The tests read the
 //! requirement and the public interface only, never the implementation.
 
-use eepview_lib::core::Core;
+use eepview_lib::core::{Core, Effect, Event};
 use eepview_lib::nav::{INTERNAL_PAGES, Target, classify};
 use eepview_lib::session::Step;
 use eepview_lib::types::{HistoryQuery, RouterStatus};
@@ -70,6 +70,16 @@ fn pair(address: &str, key: &str) -> Option<String> {
 
 fn history_len(core: &Core) -> usize {
     core.history_query(&HistoryQuery::default()).len()
+}
+
+/// A core whose active tab finished `A`, then loaded `B` and failed it after the commit (F6).
+fn failed_after_commit() -> (Core, u32) {
+    let (mut core, id) = loading(PAGE_A);
+    core.page_finished(id, PAGE_A, NOW);
+    core.navigate(PAGE_B);
+    core.page_started(id, PAGE_B);
+    core.load_failed(id, Some(PAGE_B), "unreachable", "NSURLErrorDomain -1004");
+    (core, id)
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -165,10 +175,14 @@ fn f1_a_failure_of_a_background_tab_shows_the_page_in_that_tab() {
 // ---------------------------------------------------------------------------------------------
 
 #[test]
-fn f5_no_failed_address_gives_the_address_the_tab_was_loading() {
+fn f5_no_failed_address_gives_a_page_with_no_url_pair() {
     let (mut core, id) = loading(PAGE_A);
     core.load_failed(id, None, "engine", CODE);
-    assert_eq!(pair(&url_of(&core, id), "url").as_deref(), Some(PAGE_A));
+    let shown = url_of(&core, id);
+    assert!(shown.starts_with("eepview://load-failed?"), "shows {shown}");
+    assert_eq!(pair(&shown, "url"), None, "F5: no url pair, no fallback");
+    assert_eq!(pair(&shown, "reason").as_deref(), Some("engine"));
+    assert_eq!(pair(&shown, "code").as_deref(), Some(CODE));
 }
 
 #[test]
@@ -176,22 +190,13 @@ fn f5_a_non_i2p_address_never_reaches_the_page() {
     let (mut core, id) = loading(PAGE_A);
     core.load_failed(id, Some("http://example.com/"), "blocked", CODE);
     let shown = url_of(&core, id);
-    assert_eq!(
-        pair(&shown, "url").as_deref(),
-        Some(PAGE_A),
-        "F5: the tab address"
-    );
-    assert!(
-        pairs(&shown)
-            .iter()
-            .all(|(_, v)| !v.contains("example.com")),
-        "F5: leaked in {shown}"
-    );
+    assert!(shown.starts_with("eepview://load-failed?"), "shows {shown}");
+    assert_eq!(pair(&shown, "url"), None, "F5: no url pair");
     assert!(!shown.contains("example.com"), "F5: leaked in {shown}");
 }
 
 #[test]
-fn f5_other_clearnet_forms_never_reach_the_page() {
+fn f5_other_clearnet_forms_give_a_page_with_no_url_pair() {
     for bad in [
         "https://example.com/path?q=1",
         "http://127.0.0.1:7657/",
@@ -203,12 +208,27 @@ fn f5_other_clearnet_forms_never_reach_the_page() {
         let (mut core, id) = loading(PAGE_A);
         core.load_failed(id, Some(bad), "blocked", CODE);
         let shown = url_of(&core, id);
-        assert_eq!(
-            pair(&shown, "url").as_deref(),
-            Some(PAGE_A),
+        assert!(
+            shown.starts_with("eepview://load-failed?"),
             "failed {bad:?}"
         );
+        assert_eq!(pair(&shown, "url"), None, "failed {bad:?}");
     }
+}
+
+#[test]
+fn f5_the_tab_address_is_no_fallback_during_back_or_reload() {
+    let (mut core, id) = loading(PAGE_A);
+    core.page_finished(id, PAGE_A, NOW);
+    core.navigate(PAGE_B);
+    core.page_started(id, PAGE_B);
+    core.load_failed(id, None, "engine", CODE);
+    let shown = url_of(&core, id);
+    assert_eq!(pair(&shown, "url"), None, "F5: the tab was leaving A or B");
+    assert!(
+        !shown.contains("a.i2p") && !shown.contains("b.i2p"),
+        "{shown}"
+    );
 }
 
 #[test]
@@ -275,20 +295,32 @@ fn f6_back_is_possible_from_the_error_page() {
 }
 
 #[test]
-fn f6_back_leaves_the_error_page_for_the_page_before_it() {
+fn f6_back_after_a_failure_after_the_commit_goes_to_the_page_before_the_failed_one() {
+    let (mut core, id) = failed_after_commit();
+    let effects = core.step(Step::Back);
+    assert!(!effects.is_empty(), "F6: back does something");
+    assert_eq!(url_of(&core, id), PAGE_A, "F6: A, with no page_started");
+}
+
+#[test]
+fn f6_back_after_a_failure_before_the_commit_goes_to_the_page_before() {
     let (mut core, id) = loading(PAGE_A);
     core.page_finished(id, PAGE_A, NOW);
     core.navigate(PAGE_B);
-    core.page_started(id, PAGE_B);
     core.load_failed(id, Some(PAGE_B), "unreachable", "NSURLErrorDomain -1004");
-    let effects = core.step(Step::Back);
-    assert!(!effects.is_empty(), "F6: back does something");
-    core.page_started(id, PAGE_A);
-    assert_eq!(
-        url_of(&core, id),
-        PAGE_A,
-        "F6: the page before the error page"
-    );
+    assert!(url_of(&core, id).starts_with("eepview://load-failed?"));
+    core.step(Step::Back);
+    assert_eq!(url_of(&core, id), PAGE_A, "F6: A, with no page_started");
+}
+
+#[test]
+fn f6_the_failure_clears_the_status_bubble() {
+    let (mut core, id) = loading(PAGE_A);
+    let effects = core.load_failed(id, Some(FAILED), "blocked", CODE);
+    let hidden = effects
+        .iter()
+        .any(|e| matches!(e, Effect::Emit(Event::Hover(None))));
+    assert!(hidden, "F6: the Loading bubble hides, got {effects:?}");
 }
 
 #[test]
@@ -331,6 +363,48 @@ fn f6_a_failure_after_the_load_finished_changes_nothing() {
         "F6: the load already ended, got {effects:?}"
     );
     assert_eq!(url_of(&core, id), PAGE_A);
+}
+
+// ---------------------------------------------------------------------------------------------
+// F7: Reload on the error page
+// ---------------------------------------------------------------------------------------------
+
+#[test]
+fn f7_reload_on_the_error_page_loads_its_address_again() {
+    let (mut core, id) = failed_after_commit();
+    core.reload(false);
+    assert_eq!(
+        url_of(&core, id),
+        PAGE_B,
+        "F7: B again, in place of the error"
+    );
+    assert!(is_loading(&core, id), "F7: the tab loads B");
+}
+
+#[test]
+fn f7_a_reload_that_works_leaves_no_error_entry_in_the_list() {
+    let (mut core, id) = failed_after_commit();
+    core.reload(false);
+    core.page_started(id, PAGE_B);
+    core.page_finished(id, PAGE_B, NOW);
+    let can_back = core.tab_info(id).is_some_and(|t| t.nav.can_back);
+    assert!(can_back, "F7: A is still behind B");
+    core.step(Step::Back);
+    assert_eq!(
+        url_of(&core, id),
+        PAGE_A,
+        "F7: one Back gives A, no error entry"
+    );
+}
+
+#[test]
+fn f7_reload_on_an_error_page_with_no_url_pair_changes_nothing() {
+    let (mut core, id) = loading(PAGE_A);
+    core.load_failed(id, None, "engine", CODE);
+    let shown = url_of(&core, id);
+    core.reload(false);
+    assert_eq!(url_of(&core, id), shown, "F7: the error page stays");
+    assert!(!is_loading(&core, id), "F7: nothing loads");
 }
 
 // ---------------------------------------------------------------------------------------------

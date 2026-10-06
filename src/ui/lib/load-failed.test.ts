@@ -12,6 +12,7 @@ describe("loadFailedView reads the page query", () => {
       query({ url: "http://a.i2p/x", reason: "blocked", code: "NSURLErrorDomain -1022" }),
     );
     assert.equal(view.address, "http://a.i2p/x");
+    assert.equal(view.url, "http://a.i2p/x");
     assert.equal(view.reason, "blocked");
     assert.equal(view.code, "NSURLErrorDomain -1022");
   });
@@ -41,6 +42,10 @@ describe("loadFailedView defaults", () => {
   it("[browser-shell F7] a missing address is empty", () => {
     assert.equal(loadFailedView(query({ reason: "blocked" })).address, "");
   });
+  it("[browser-shell F7] a missing url gives an empty url field", () => {
+    assert.equal(loadFailedView(query({ reason: "blocked" })).url, "");
+    assert.equal(loadFailedView("").url, "");
+  });
   it("[browser-shell F7] a missing code is empty", () => {
     assert.equal(loadFailedView(query({ url: "http://a.i2p/" })).code, "");
   });
@@ -60,18 +65,20 @@ describe("loadFailedView address length", () => {
     assert.equal(address.length, 2048);
     assert.equal(loadFailedView(query({ url: address })).address, address);
   });
-  it("[browser-shell F7] a longer address is cut to 2048 characters with an ellipsis", () => {
+  it("[browser-shell F7] a longer address is cut to 2047 characters plus an ellipsis", () => {
     const address = `http://a.i2p/${"b".repeat(5000)}`;
     const shown = loadFailedView(query({ url: address })).address;
     assert.equal(shown.length, 2048);
-    assert.ok(shown.endsWith("…"));
-    assert.ok(address.startsWith(shown.slice(0, -1)));
+    assert.equal(shown, `${address.slice(0, 2047)}…`);
   });
   it("[browser-shell F7] an address one character over the limit is cut", () => {
     const address = "c".repeat(2049);
     const shown = loadFailedView(query({ url: address })).address;
-    assert.equal(shown.length, 2048);
-    assert.ok(shown.endsWith("…"));
+    assert.equal(shown, `${"c".repeat(2047)}…`);
+  });
+  it("[browser-shell F7] the url field keeps the whole raw address", () => {
+    const address = `http://a.i2p/${"d".repeat(5000)}`;
+    assert.equal(loadFailedView(query({ url: address })).url, address);
   });
 });
 

@@ -40,6 +40,16 @@ fn f2_webkit_frame_load_interrupted_102_is_not_a_failure() {
 }
 
 #[test]
+fn f2_webkit_204_the_engine_shows_the_file_is_not_a_failure() {
+    assert_eq!(reason(WK, 204), None);
+}
+
+#[test]
+fn f2_204_in_the_nsurl_domain_is_a_failure() {
+    assert_eq!(reason(NS, 204), Some(FailReason::Engine));
+}
+
+#[test]
 fn f2_cancel_ignores_the_address() {
     let cancelled = LoadFailure {
         domain: NS.to_owned(),
@@ -101,7 +111,7 @@ fn f3_an_unknown_nsurl_code_is_engine() {
 
 #[test]
 fn f3_an_unknown_webkit_code_is_engine() {
-    for code in [0, 100, 101, 103, 105, 204] {
+    for code in [0, 100, 101, 103, 105, 300] {
         assert_eq!(reason(WK, code), Some(FailReason::Engine), "code {code}");
     }
 }
