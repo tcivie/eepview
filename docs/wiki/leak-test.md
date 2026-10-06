@@ -8,7 +8,18 @@ of [ADR 0001](adr-0001-no-leak-architecture.md).
 
 ## What it does
 
-`tests/leak/harness.py` (Python 3, standard library only) runs the real release binary:
+`tests/leak/harness.py` (Python 3, standard library only) runs the real release build, in the
+form that users run:
+
+- macOS runs the binary inside `eepview.app`. The bundle's `Info.plist` turns on App Transport
+  Security (ATS). A bare binary has no `Info.plist`, so ATS never applies to it, and a run of the
+  bare binary missed a bug where no `http://` page loaded in the installed app ([#85](https://github.com/tcivie/eepview/pull/85)).
+- Windows runs `eepview.exe`. The installer copies this same file, and WebView2 gets its proxy
+  from the code, not from a file that the installer writes.
+- Linux runs the bare binary. The AppImage carries its own WebKitGTK libraries, which this run
+  does not cover yet ([#86](https://github.com/tcivie/eepview/issues/86)).
+
+The run itself:
 
 - `EEPVIEW_PROXY` points at a fake I2P proxy. The proxy passes VERIFY (`GET http://proxy.i2p/`),
   serves `leaktest.i2p` and `frame.leaktest.i2p`, answers clearnet with `503 No Outproxy

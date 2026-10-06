@@ -90,7 +90,7 @@ sha256sum --check --ignore-missing SHA256SUMS
 
 - `publish` attests and releases only for a `refs/tags/v*` ref that is not a dry run. A manual run on a branch never makes a release. It still signs the files, so each dry run adds entries to the public Rekor log.
 - A dry run signs with the identity of its own ref (`refs/heads/...`). Those signatures do not match the `refs/tags/v` pattern above, by design.
-- The macOS release ships only the `.dmg`. `bundle.macOS.signingIdentity` is `-` in `src-tauri/tauri.conf.json`, so the Tauri bundler ad-hoc signs the `.app` before it builds the `.dmg`. A build step mounts the `.dmg` and runs `codesign --verify --deep --strict` and `codesign -dv` on the app. It fails unless the report says `Signature=adhoc`. There is no Developer ID signature and no notarization.
+- The macOS release ships only the `.dmg`. `bundle.macOS.signingIdentity` is `-` in `src-tauri/tauri.conf.json`, so the Tauri bundler ad-hoc signs the `.app` before it builds the `.dmg`. A build step mounts the `.dmg` and runs `codesign --verify --deep --strict` and `codesign -dv` on the app. It fails unless the report says `Signature=adhoc`. It also fails unless the app's `Info.plist` sets `NSAppTransportSecurity` > `NSAllowsArbitraryLoadsInWebContent` to true; without it no `http://` eepsite loads ([Browser shell](browser-shell.md), B1). There is no Developer ID signature and no notarization.
 - Windows installers are not signed.
 - The `gates` job skips its check on a branch dry run, so a pipeline change can be tested before merge. It needs a green `main` at the tagged commit. A dry run on `main` fails while the checks of `main` HEAD are red or still running.
 - The pipeline has no lint exclusion. actionlint and `zizmor --offline --persona=pedantic` report nothing.
@@ -103,3 +103,4 @@ sha256sum --check --ignore-missing SHA256SUMS
 - [#39](https://github.com/tcivie/eepview/pull/39): the gate also reads the checks of the merged PR head.
 - [#47](https://github.com/tcivie/eepview/pull/47): permission comments in `release.yml`; zizmor runs with the pedantic persona.
 - [#50](https://github.com/tcivie/eepview/pull/50): generated changelog and release notes from commit titles with git-cliff.
+- [#85](https://github.com/tcivie/eepview/pull/85): the dmg check also requires the App Transport Security key for web content in the app.

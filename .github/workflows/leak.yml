@@ -49,7 +49,22 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, macos-15, windows-2025]
+        # Each OS runs the form of the app that users run. macOS needs the .app: its Info.plist
+        # turns on App Transport Security, which a bare binary never meets (the tabs-never-load
+        # bug of #85). See docs/wiki/leak-test.md for why Linux and Windows run the binary.
+        include:
+          - os: ubuntu-24.04
+            build_args: --no-bundle
+            binary: src-tauri/target/release/eepview
+            harness_args: --xvfb --strace
+          - os: macos-15
+            build_args: --bundles app
+            binary: src-tauri/target/release/bundle/macos/eepview.app/Contents/MacOS/eepview
+            harness_args: ""
+          - os: windows-2025
+            build_args: --no-bundle
+            binary: src-tauri/target/release/eepview.exe
+            harness_args: ""
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -76,29 +91,27 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      # macOS runs the app from its .app bundle, as users do: the bundle's Info.plist turns on
-      # App Transport Security, which a bare binary never meets (the tabs-never-load bug).
-      - name: Build the release binary
-        if: runner.os != 'macOS'
-        run: npm run tauri -- build --no-bundle -- --locked
-      - name: Build the release app bundle
-        if: runner.os == 'macOS'
-        run: npm run tauri -- build --bundles app -- --locked
+      - name: Build the release app
+        shell: bash
+        env:
+          BUILD_ARGS: ${{ matrix.build_args }}
+        run: |
+          read -ra build <<<"$BUILD_ARGS"
+          npm run tauri -- build "${build[@]}" -- --locked
       - name: Check PIE, RELRO and NX on the Linux binary
         if: runner.os == 'Linux'
         run: ./scripts/check-hardening.sh src-tauri/target/release/eepview
       - name: Run the leak test
         shell: bash
+        env:
+          BINARY: ${{ matrix.binary }}
+          HARNESS_ARGS: ${{ matrix.harness_args }}
         run: |
           set -o pipefail
           py="$(command -v python3 || command -v python)"
-          args=(--binary src-tauri/target/release/eepview --out leak-results)
-          if [ "$RUNNER_OS" = Linux ]; then args+=(--xvfb --strace); fi
-          if [ "$RUNNER_OS" = Windows ]; then args[1]=src-tauri/target/release/eepview.exe; fi
-          if [ "$RUNNER_OS" = macOS ]; then
-            args[1]=src-tauri/target/release/bundle/macos/eepview.app/Contents/MacOS/eepview
-          fi
-          "$py" tests/leak/harness.py "${args[@]}" | tee -a "$GITHUB_STEP_SUMMARY"
+          read -ra extra <<<"$HARNESS_ARGS"
+          "$py" tests/leak/harness.py --binary "$BINARY" --out leak-results "${extra[@]}" \
+            | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Upload the leak logs
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

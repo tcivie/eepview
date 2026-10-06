@@ -43,6 +43,7 @@ Found in QA of the first shell build. Fixed in [#57](https://github.com/tcivie/e
 - **B1.** The macOS `.app` loads `http://` eepsites. App Transport Security (ATS) applies to every app with an `Info.plist`, and by default it refuses each `http://` load of a `WKWebView`. `src-tauri/Info.plist` (Tauri merges it into the bundle) sets one key: `NSAppTransportSecurity` > `NSAllowsArbitraryLoadsInWebContent`. It covers web view content only. The file sets no other key, and the ATS exemption is no wider (`src-tauri/tests/app_transport.rs`).
 - ADR 0001 does not change. Every content request still goes to the gatekeeper on loopback, and the gatekeeper forwards only `.i2p` hosts. The Rust code uses plain sockets, which ATS never covers, so the key changes nothing for the gatekeeper, VERIFY or the icon fetch.
 - The macOS leak test runs the binary inside the `.app` bundle, as users do. A bare binary has no `Info.plist`, so ATS never applies to it.
+- The release job checks the key in the `.app` of each dmg (`scripts/verify-dmg-signature.sh`), so a bundler change that drops it fails the release.
 
 ## Toolbar popups
 
