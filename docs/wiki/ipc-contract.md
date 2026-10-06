@@ -5,7 +5,7 @@ SPDX-License-Identifier: MIT
 
 # IPC contract
 
-Version 1.7. The Rust shell (`src-tauri/`) and the UI (`src/ui/`) build against this page.
+Version 1.9. The Rust shell (`src-tauri/`) and the UI (`src/ui/`) build against this page.
 Change it in a PR that changes both sides, or keep the old form working as a shim.
 
 ## History
@@ -22,6 +22,7 @@ Change it in a PR that changes both sides, or keep the old form working as a shi
 - v1.6: the console tab. `TabInfo.kind` adds `"console"`. `console_open()` takes no argument and opens the console home page in the console tab. `ConsoleInfo.pages`, `ConsolePage` and the `no-page` reason are gone ([#76](https://github.com/tcivie/eepview/pull/76)).
 - v1.7: `RouterStats.uptimeResolutionMs`, `.floodfills`, `.tunnels.client`, `.tunnels.exploratory`, `.tunnelBuildSuccessPercent.total`. `router_stats` reads the detected router console when there is no router helper. The UI reads this shape (`src/ui/contract.ts`). See [Router console](router-console.md#router-statistics-from-the-console).
 - v1.8: no new command or event. The keyboard shortcuts follow the K1 table of [Links, menus and shortcuts](links-and-shortcuts.md): new window N, and on Windows and Linux Ctrl+F4, Alt+D, F6, F5, Ctrl+F5, Ctrl+PageUp, Ctrl+PageDown and Alt+Home; Cmd+. and Cmd+Shift+[ ] on macOS. Alt+Left and Alt+Right are Back and Forward on Windows and Linux only. Esc stops a load only from a page (K4). The engines report link clicks, context menus and mouse buttons to the shell, never to a page ([#77](https://github.com/tcivie/eepview/pull/77)).
+- v1.9: `RouterStatus.checks`, `VerifyCheck`, `CheckId`, `CheckState`: the four router checks that the Home page shows. `router-status` also fires when a check changes. See [Router checks](router-checks.md).
 
 ## Window layout
 
@@ -97,7 +98,7 @@ At most 10 000 entries. Nothing is recorded while `history.enabled` is false.
 
 ### Router and connection
 
-- `router_status() -> RouterStatus`
+- `router_status() -> RouterStatus`, with the four router checks in `checks` ([Router checks](router-checks.md)).
 - `router_stats() -> RouterStats`. Every field may be `null`. The source is the router helper when it answers, else the detected router console (read only, one loopback `GET`), else none: see [Router console](router-console.md#router-statistics-from-the-console), R31–R46.
 - `connection_pause()`: closes the gatekeeper, destroys every `tab-*` webview and shows `eepview://router-down?reason=paused`.
 - `connection_resume()`: runs VERIFY again. The gatekeeper opens and the active tab reloads only when VERIFY passes. If it fails, everything stays closed.
@@ -138,7 +139,7 @@ Rust sends them to `toolbar`, `internal`, `status` and `popup`.
 - `tabs-changed: TabInfo[]`: open, close, move, select.
 - `tab-updated: TabInfo`: URL, title, loading, history, zoom.
 - `find-result: {query, matches: number | null, active: number | null}`
-- `router-status: RouterStatus`: every 5 s and on change.
+- `router-status: RouterStatus`: every 5 s and on change, also when a router check changes (V14 of [Router checks](router-checks.md)).
 - `bookmarks-changed`, `history-changed`, `settings-changed: Settings`
 - `shortcut: {action}`: actions the UI handles (`focus-address`, `open-find`, …).
 - `toast: {kind: "info" | "warn", text}`: refused downloads, new windows and in-page navigations.
@@ -174,7 +175,13 @@ type Settings = { homepage: string; theme: "system" | "light" | "dark"; jsDefaul
   history: { enabled: boolean }; keepCookies: boolean; zoomDefault: number };
 type RouterStatus = { state: "verifying" | "ok" | "building" | "down" | "not-i2p";
   proxy: string; version: string | null; detail: string | null;
-  paused: boolean; managed: boolean };
+  paused: boolean; managed: boolean;
+  checks: VerifyCheck[] };  // always 4, in this order: proxy-i2p, version, no-outproxy, tunnels
+type CheckId = "proxy-i2p" | "version" | "no-outproxy" | "tunnels";
+type CheckState = "pending" | "running" | "passed" | "failed" | "not-checked";
+type VerifyCheck = { id: CheckId; state: CheckState;
+  detail: string | null;     // the short reason; never null for "failed" and "not-checked"
+  passedAt: number | null };  // Unix ms when it turned "passed"; null in every other state
 type RouterStats = { version: string | null; uptimeMs: number | null;
   uptimeResolutionMs: number | null;  // uptimeMs is rounded down to a multiple of this
   networkStatus: string | null;

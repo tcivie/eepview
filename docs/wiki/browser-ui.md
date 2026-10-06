@@ -38,6 +38,12 @@ The error screens use the parts of the router-stopped page: a red-edged box with
 
 Screenshots of every screen before and after the review, in light and dark, at 800×600 and 1440×900: `docs/images/ui/setup-review/`.
 
+## Home router card
+
+The Home page starts with the router card. It shows the state chip and one line, the router version, the proxy address, a "Network details" link and the "I2P Router Console" link.
+
+Under the state line, the card lists the four router checks: the proxy is an I2P router, the router version is supported, no outproxy, and network up with a client tunnel built. Each row shows the real state of its check as text: Waiting, Checking, Passed at a time, Failed or Not checked, with the short reason. A row turns green only when the backend reports that the check passed. No timer and no animation changes a row. The rules are in [Router checks](router-checks.md).
+
 ## Router panel
 
 A click on the router status dot opens a panel under the dot. The panel shows:
