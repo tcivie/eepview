@@ -101,13 +101,13 @@ function renderSpark(history: ReturnType<typeof statsView>["history"]): void {
     return;
   }
   const max = scaleMax([...series.inBps, ...series.outBps]);
-  byId("rp-spark-in").setAttribute("d", linePath(series.inBps, max));
-  byId("rp-spark-area").setAttribute("d", areaPath(series.inBps, max));
-  byId("rp-spark-out").setAttribute("d", linePath(series.outBps, max));
+  byId("rp-spark-in").setAttribute("d", linePath(series.inBps, max) || EMPTY_PATH);
+  byId("rp-spark-area").setAttribute("d", areaPath(series.inBps, max) || EMPTY_PATH);
+  byId("rp-spark-out").setAttribute("d", linePath(series.outBps, max) || EMPTY_PATH);
 }
 
 function renderStats(stats: RouterStats): void {
-  const view = statsView(stats);
+  const view = statsView(stats, Date.now());
   const text = panelText(view);
   for (const [id, key] of Object.entries(STAT_FIELDS)) byId(id).textContent = text[key];
   if (text.version === MISSING) showConsoleVersion();

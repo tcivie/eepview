@@ -13,12 +13,12 @@ mod navigation;
 mod page;
 pub mod router;
 mod site_icons;
+mod stats;
 mod tab_ops;
 
 #[cfg(test)]
 mod tests;
 
-use crate::net::stats::{History as StatsHistory, RouterStats, Sample};
 use std::path::PathBuf;
 use tauri::Url;
 
@@ -45,6 +45,8 @@ pub struct Paths {
     pub sites: PathBuf,
     /// `icons/`: the site icons (data dir).
     pub icons: PathBuf,
+    /// `bandwidth.json`: the router bandwidth of the last 10 minutes (data dir).
+    pub bandwidth: PathBuf,
 }
 
 /// Something the shell must do.
@@ -214,7 +216,7 @@ pub struct Core {
     toolbar_request: f64,
     hover: Debounce,
     js_forced_off: bool,
-    stats: StatsHistory,
+    stats: stats::StatsState,
     /// The link under the mouse in the active tab: a refused navigation to it is a click.
     pointed: Option<Url>,
     /// The tab whose next commit takes keyboard focus: its navigation came from the address bar.
@@ -250,6 +252,7 @@ impl Core {
                 .as_ref()
                 .map_or_else(IconStore::default, |p| IconStore::load(&p.icons)),
             icon_jobs: site_icons::IconJobs::default(),
+            stats: stats::StatsState::load(paths.as_ref(), now),
             paths,
             router: verifying(proxy),
             checks: checks::Checks::new(),
@@ -258,7 +261,6 @@ impl Core {
             toolbar_request: 0.0,
             hover: Debounce::default(),
             js_forced_off: false,
-            stats: StatsHistory::default(),
             pointed: None,
             focus_on_commit: None,
             link_run: None,
@@ -381,22 +383,6 @@ impl Core {
 
     fn js_of(&self, host: &str) -> bool {
         !self.js_forced_off && self.prefs.js(host, self.settings.js_default)
-    }
-
-    /// Records one router stats sample (every watcher tick).
-    pub fn record_stats(&mut self, now: u64, stats: &RouterStats) {
-        self.stats.record(now, stats);
-    }
-
-    /// Records a console stats sample, unless the newest one is less than 4 s old.
-    pub fn record_stats_spaced(&mut self, now: u64, stats: &RouterStats) {
-        self.stats.record_spaced(now, stats);
-    }
-
-    /// The router bandwidth of the last 10 minutes.
-    #[must_use]
-    pub fn stats_history(&self) -> Vec<Sample> {
-        self.stats.samples()
     }
 
     /// Turns page JavaScript off for every site for this run (`EEPVIEW_JS=off`).

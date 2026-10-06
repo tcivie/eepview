@@ -6,6 +6,7 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -45,6 +46,10 @@ pub struct Shared<R: Runtime> {
     pub console_retry: AtomicU64,
     /// True once the console rule list is attached to the console view.
     pub console_armed: AtomicBool,
+    /// The wake channel of the running stats sampler; dropping it ends the sampler.
+    pub sampler: Mutex<Option<Sender<()>>>,
+    /// True while a stats sampler thread runs.
+    pub sampler_live: AtomicBool,
     /// The label of the live webview of each tab.
     pub labels: Mutex<HashMap<u32, String>>,
     /// The origin of the bundled pages (`tauri://localhost` or the dev server).
@@ -80,6 +85,8 @@ impl<R: Runtime> Shared<R> {
             console_watch: AtomicU64::new(0),
             console_retry: AtomicU64::new(0),
             console_armed: AtomicBool::new(false),
+            sampler: Mutex::new(None),
+            sampler_live: AtomicBool::new(false),
             labels: Mutex::new(HashMap::new()),
             base: Mutex::new(None),
             stop_item: Mutex::new(None),

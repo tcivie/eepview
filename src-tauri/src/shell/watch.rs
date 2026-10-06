@@ -33,7 +33,8 @@ pub fn start<R: Runtime>(app: &AppHandle<R>, proxy: Result<LoopbackAddr, String>
     });
 }
 
-/// One round of the watcher: VERIFY, a statistics sample, then router checks 2 to 4.
+/// One round of the watcher: VERIFY, then router checks 2 to 4. The bandwidth history is the
+/// sampler's (`shell::sampler`).
 fn tick<R: Runtime>(
     app: &AppHandle<R>,
     proxy: &Result<LoopbackAddr, String>,
@@ -42,22 +43,13 @@ fn tick<R: Runtime>(
     with_core(app, Core::verify_started);
     let verdict = proxy.clone().map_or_else(Verdict::Down, verify);
     apply(app, &verdict);
-    after_verify(app, helper, true);
+    after_verify(app, helper);
 }
 
 /// After a VERIFY round: the helper statistics, the router version they give, then router
-/// checks 2 to 4. With `record`, a configured helper also adds its bandwidth sample to
-/// `router_stats().history`.
-fn after_verify<R: Runtime>(
-    app: &AppHandle<R>,
-    helper: Option<&(LoopbackAddr, String)>,
-    record: bool,
-) {
+/// checks 2 to 4 (router checks V10). It adds no sample to the history.
+fn after_verify<R: Runtime>(app: &AppHandle<R>, helper: Option<&(LoopbackAddr, String)>) {
     let answer = helper.and_then(|(addr, token)| crate::net::stats::try_fetch(*addr, token));
-    if record && helper.is_some() {
-        let stats = answer.clone().unwrap_or_default();
-        lock(&shared(app).core).record_stats(now_ms(), &stats);
-    }
     let version = answer.as_ref().and_then(|s| s.version.clone());
     with_core(app, |core| core.router_version(version.as_deref()));
     super::checks::run(app, answer);
@@ -70,7 +62,7 @@ pub fn check_now<R: Runtime>(app: &AppHandle<R>, proxy: Result<LoopbackAddr, Str
         with_core(&app, Core::verify_started);
         let verdict = proxy.map_or_else(Verdict::Down, verify);
         apply(&app, &verdict);
-        after_verify(&app, super::env::router_helper().as_ref(), false);
+        after_verify(&app, super::env::router_helper().as_ref());
     });
 }
 

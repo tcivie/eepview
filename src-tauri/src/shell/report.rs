@@ -92,15 +92,17 @@ fn deliver<R: Runtime>(app: &AppHandle<R>, report: &Report) -> Result<Opened, St
 }
 
 /// What a report needs from the core.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 struct CoreFacts {
     state: RouterState,
+    router_version: Option<String>,
     managed: bool,
     js_default: bool,
     tabs: usize,
 }
 
-/// The router state, managed flag, JS default and tab count of the core.
+/// The router state and version (the sampler gives the helper's), managed flag, JS default
+/// and tab count of the core.
 fn core_facts(core: &Core) -> CoreFacts {
     let router = core.router();
     let state = if router.paused {
@@ -110,6 +112,7 @@ fn core_facts(core: &Core) -> CoreFacts {
     };
     CoreFacts {
         state,
+        router_version: router.version.clone(),
         managed: router.managed,
         js_default: core.settings().js_default,
         tabs: core.tabs().len(),
@@ -118,7 +121,7 @@ fn core_facts(core: &Core) -> CoreFacts {
 
 /// The system facts of a report.
 fn info(facts: CoreFacts) -> SystemInfo {
-    let version = super::commands::helper_stats(super::env::router_helper()).version;
+    let version = facts.router_version;
     SystemInfo {
         version: env!("CARGO_PKG_VERSION").to_owned(),
         commit: COMMIT.to_owned(),

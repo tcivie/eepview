@@ -15,6 +15,7 @@ Status: the design is written. The protections are coming in v0.1. eepview is pr
 - **Private by default.** Cookies and cache vanish when you quit. JavaScript is off until you turn it on for a site. You can turn history off.
 - **Site icons stay with the site.** Once a day at most, eepview asks the site you visit for its icon (`/favicon.ico`). The request goes to that same `.i2p` site, through the same I2P proxy as the page, with no cookies and no referrer. Nothing goes anywhere else. eepview draws the icon again as a new image and keeps it only while the site is in your bookmarks or history. Clearing history clears the icons too. See [Site icons](site-icons.md).
 - **Plain HTTP eepsites on macOS.** Eepsites use `http://`, and I2P encrypts the traffic end to end. macOS blocks `http://` pages in apps by default (App Transport Security). eepview lifts that rule for the page view only. Every page request still goes through the eepview proxy to the I2P router.
+- **Router bandwidth stays on your computer.** Every 5 s, eepview reads the bandwidth of the router on this computer. It keeps the last 10 minutes in `bandwidth.json` in the app data folder: numbers and times only, no address and no site. See [Router console](router-console.md#background-sampling-and-the-saved-history).
 - **Consent first.** eepview downloads and installs nothing without your click.
 
 See [No-leak architecture](no-leak-architecture.md) for the full design.
@@ -52,3 +53,4 @@ Report it in private. Never use a public issue. Follow the steps in [SECURITY.md
 - 2026-10-03 — Write the page — [#28](https://github.com/tcivie/eepview/pull/28)
 - 2026-10-03 — Site icons — [#53](https://github.com/tcivie/eepview/pull/53)
 - 2026-10-06 — Plain HTTP eepsites on macOS (App Transport Security for web content) — [#85](https://github.com/tcivie/eepview/pull/85)
+- 2026-10-06 — Router bandwidth history on disk — [#83](https://github.com/tcivie/eepview/pull/83)
