@@ -58,5 +58,10 @@ report "spacing, radius and font size must come from a token" < <(raw_values)
 SKIP="$THEME" scan "$TOKEN_DEF" "define tokens only in ${THEME}" '*.css'
 scan "$HTML_STYLE" "no inline style in HTML" '*.html'
 scan "$TS_STYLE" "no inline style in code" 'src/*.ts' 'scripts/*.mjs'
-SKIP="$THEME" scan '^[^[:space:]/*}@]' "a rule outside @layer beats every layer, the [hidden] rule too" 'src/ui/*.css'
+LAYERS="$(sed -nE 's/^@layer ([a-z, -]+);$/\1/p' "$THEME" | tr -d ',')"
+[ -n "$LAYERS" ] || fail "${THEME} must declare the layer order (@layer a, b, c;)"
+css_layers() {
+  git ls-files -z -- '*.css' | xargs -0 awk -v layers="$LAYERS" -f scripts/css-layers.awk || true
+}
+report "every rule must sit in a layer that ${THEME} declares" < <(css_layers)
 exit "$status"
