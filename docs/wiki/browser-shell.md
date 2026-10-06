@@ -38,6 +38,12 @@ Found in QA of the first shell build. Fixed in [#57](https://github.com/tcivie/e
 6. The Router card on the Home page never shows "Unknown". It shows `I2P <version>` when the router reports its version, and "Version not reported by the router" when it does not. The version comes from the router statistics when a router helper is set up.
 7. After you close the last tab, Cmd/Ctrl+Shift+T opens that closed tab again, with the page it showed. The fresh Home tab that replaced it may stay or go.
 
+## macOS bundle: App Transport Security
+
+- **B1.** The macOS `.app` loads `http://` eepsites. App Transport Security (ATS) applies to every app with an `Info.plist`, and by default it refuses each `http://` load of a `WKWebView`. `src-tauri/Info.plist` (Tauri merges it into the bundle) sets one key: `NSAppTransportSecurity` > `NSAllowsArbitraryLoadsInWebContent`. It covers web view content only. The file sets no other key, and the ATS exemption is no wider (`src-tauri/tests/app_transport.rs`).
+- ADR 0001 does not change. Every content request still goes to the gatekeeper on loopback, and the gatekeeper forwards only `.i2p` hosts. The Rust code uses plain sockets, which ATS never covers, so the key changes nothing for the gatekeeper, VERIFY or the icon fetch.
+- The macOS leak test runs the binary inside the `.app` bundle, as users do. A bare binary has no `Info.plist`, so ATS never applies to it.
+
 ## Toolbar popups
 
 The toolbar has four popups: the address suggestions, the main menu, the router panel and the router hint (hovering the router dot). They show in their own webview, `popup`, over the page. The toolbar never grows for them.
@@ -113,3 +119,4 @@ eepview shows router information but never changes the router configuration. It 
 - 2026-10-03 — Router console quick links and the console window — [#54](https://github.com/tcivie/eepview/pull/54)
 - 2026-10-03 — The address bar refuses a dot host with a port instead of panicking; the gatekeeper refuses a bare CR or LF in a head — [#69](https://github.com/tcivie/eepview/pull/69)
 - 2026-10-03 — The router console opens in a console tab, with one console link — [#76](https://github.com/tcivie/eepview/pull/76)
+- 2026-10-06 — Root cause of "no eepsite loads, the tab spins forever" on macOS: ATS refused every `http://` load in the `.app` bundle before WebKit opened a socket (`NSURLErrorDomain -1022`). wry does not report a failed provisional load, so the tab never stopped loading. The leak test ran the bare binary, which has no `Info.plist`, so CI missed it. Fix: `NSAllowsArbitraryLoadsInWebContent` in `src-tauri/Info.plist` (B1), and the macOS leak test runs the `.app` — [#85](https://github.com/tcivie/eepview/pull/85)
