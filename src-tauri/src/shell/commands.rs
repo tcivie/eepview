@@ -452,13 +452,6 @@ pub fn current_stats<R: Runtime>(app: &AppHandle<R>) -> RouterStats {
     lock(&shared(app).core).stats_answer(now_ms())
 }
 
-/// The router helper statistics, all `null` without a helper.
-pub fn helper_stats(helper: Option<(LoopbackAddr, String)>) -> RouterStats {
-    helper.map_or_else(RouterStats::default, |(addr, token)| {
-        crate::net::stats::fetch(addr, &token)
-    })
-}
-
 /// `connection_pause()`: closes the gatekeeper and every tab webview until resume.
 ///
 /// # Errors

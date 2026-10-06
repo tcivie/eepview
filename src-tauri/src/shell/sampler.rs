@@ -8,7 +8,7 @@
 use std::sync::atomic::Ordering;
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError, TryRecvError};
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use tauri::{AppHandle, Runtime};
 
@@ -75,15 +75,27 @@ pub fn shutdown<R: Runtime>(app: &AppHandle<R>) {
     lock(&shared(app).core).save_stats(now_ms());
 }
 
-/// The sampler loop: a round at once, then one per [`SAMPLE_EVERY`] or per wake, until
-/// [`stop`] drops the wake channel.
+/// The sampler loop: a round at once, then one per [`SAMPLE_EVERY`] on a fixed schedule, or
+/// per wake, until [`stop`] drops the wake channel.
 fn run<R: Runtime>(app: &AppHandle<R>, rounds: &Receiver<()>) {
+    let mut due = Instant::now();
     while open(rounds) {
+        let timed = Instant::now() >= due;
         tick(app, super::env::router_helper());
-        if let Err(RecvTimeoutError::Disconnected) = rounds.recv_timeout(SAMPLE_EVERY) {
+        if timed {
+            due = after(due, Instant::now());
+        }
+        let wait = due.saturating_duration_since(Instant::now());
+        if let Err(RecvTimeoutError::Disconnected) = rounds.recv_timeout(wait) {
             return;
         }
     }
+}
+
+/// When the timed round after the one due at `due` is due: one period later, or at once
+/// (`now`) when the round ended after that, and the schedule goes on from then.
+fn after(due: Instant, now: Instant) -> Instant {
+    (due + SAMPLE_EVERY).max(now)
 }
 
 /// Drops the pending wakes. False once the sampler is stopped.
@@ -111,7 +123,13 @@ pub fn tick<R: Runtime>(app: &AppHandle<R>, helper: Option<(LoopbackAddr, String
     let version = stats.version.clone();
     let now = now_ms();
     {
+        let gate = lock(&shell.gate);
         let mut core = lock(&shell.core);
+        if gate.is_none() {
+            core.set_latest_stats(RouterStats::default());
+            return;
+        }
+        drop(gate);
         if source != StatsSource::None {
             core.record_stats_spaced(now, &stats);
         }

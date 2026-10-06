@@ -77,6 +77,12 @@ impl History {
         }
     }
 
+    /// The newest sample, if any.
+    #[must_use]
+    pub fn newest(&self) -> Option<Sample> {
+        self.samples.back().copied()
+    }
+
     /// The samples, oldest first.
     #[must_use]
     pub fn samples(&self) -> Vec<Sample> {

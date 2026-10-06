@@ -8,12 +8,14 @@ use super::{Core, Paths};
 use crate::net::stats::{History, RouterStats, SAVE_EVERY_MS, Sample};
 use crate::store::bandwidth;
 
-/// The latest figures, the history, and the time of the last save.
+/// The latest figures, the history, the time of the last save attempt, and whether a
+/// sample came since the last save.
 #[derive(Debug, Default)]
 pub(super) struct StatsState {
     history: History,
     latest: RouterStats,
-    saved_at: u64,
+    tried_at: u64,
+    unsaved: bool,
 }
 
 impl StatsState {
@@ -23,7 +25,8 @@ impl StatsState {
         Self {
             history: paths.map_or_else(History::default, |p| bandwidth::load(&p.bandwidth, now)),
             latest: RouterStats::default(),
-            saved_at: now,
+            tried_at: now,
+            unsaved: false,
         }
     }
 }
@@ -31,12 +34,16 @@ impl StatsState {
 impl Core {
     /// Records one router stats sample.
     pub fn record_stats(&mut self, now: u64, stats: &RouterStats) {
+        let before = self.stats.history.newest();
         self.stats.history.record(now, stats);
+        self.stats.unsaved |= self.stats.history.newest() != before;
     }
 
     /// Records a stats sample, unless the newest one is less than 4 s old.
     pub fn record_stats_spaced(&mut self, now: u64, stats: &RouterStats) {
+        let before = self.stats.history.newest();
         self.stats.history.record_spaced(now, stats);
+        self.stats.unsaved |= self.stats.history.newest() != before;
     }
 
     /// The router bandwidth that the history holds, oldest first.
@@ -63,22 +70,23 @@ impl Core {
         }
     }
 
-    /// Saves the history when the last save is at least [`SAVE_EVERY_MS`] before `now`. True
-    /// when it wrote the file.
+    /// Saves the history when a sample came since the last save and the last attempt is at
+    /// least [`SAVE_EVERY_MS`] before `now`. A failed attempt counts. True when it wrote the
+    /// file.
     pub fn save_stats_if_due(&mut self, now: u64) -> bool {
-        now.saturating_sub(self.stats.saved_at) >= SAVE_EVERY_MS && self.save_stats(now)
+        let due = now.saturating_sub(self.stats.tried_at) >= SAVE_EVERY_MS;
+        self.stats.unsaved && due && self.save_stats(now)
     }
 
-    /// Saves the history now. True when it wrote the file; false without paths or when the
-    /// write fails (the next save tries again).
+    /// Saves the history now (the quit save). True when it wrote the file; false without
+    /// paths or when the write fails (the next try is [`SAVE_EVERY_MS`] later).
     pub fn save_stats(&mut self, now: u64) -> bool {
         let Some(path) = self.paths.as_ref().map(|p| p.bandwidth.clone()) else {
             return false;
         };
+        self.stats.tried_at = now;
         let saved = bandwidth::save(&path, &self.stats.history).is_ok();
-        if saved {
-            self.stats.saved_at = now;
-        }
+        self.stats.unsaved &= !saved;
         saved
     }
 }

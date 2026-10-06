@@ -49,12 +49,19 @@ function rateDecimals(value: number): number {
   return value < KILO ? 1 : 0;
 }
 
+/** `value` written with the decimals of its form, which come from the rounded value. */
+function scaled(value: number): { text: string; rounded: number } {
+  const rounded = Number(value.toFixed(rateDecimals(value)));
+  return { text: value.toFixed(rateDecimals(rounded)), rounded };
+}
+
 /** A rate in bytes per second, with K = 1 000: "230 B/s", "53.91 kB/s", "2.50 MB/s". */
 export function formatRate(bps: number | null): string {
   if (bps === null) return MISSING;
-  if (bps < KILO) return `${Math.round(bps)} B/s`;
-  const [value, unit] = bps < MEGA ? [bps / KILO, "kB/s"] : [bps / MEGA, "MB/s"];
-  return `${value.toFixed(rateDecimals(value))} ${unit}`;
+  if (Math.round(bps) < KILO) return `${Math.round(bps)} B/s`;
+  const kilo = scaled(bps / KILO);
+  if (kilo.rounded < KILO) return `${kilo.text} kB/s`;
+  return `${scaled(bps / MEGA).text} MB/s`;
 }
 
 export function formatCount(n: number | null): string {
