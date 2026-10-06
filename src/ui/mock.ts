@@ -23,6 +23,7 @@ import type {
 } from "./contract.ts";
 import type { Backend } from "./ipc.ts";
 import { isBeforeCursor, newestFirst } from "./lib/history-groups.ts";
+import { CHECK_ORDER } from "./lib/router-checks.ts";
 import data from "./mock-data.json";
 import { localThemeStore } from "./theme.ts";
 
@@ -112,7 +113,6 @@ let tabs: TabInfo[] = data.tabs.map((t, i) => {
   });
 });
 
-const CHECK_IDS: CheckId[] = ["proxy-i2p", "version", "no-outproxy", "tunnels"];
 const CHECKED_AT = Date.now() - 3 * MINUTE;
 const PASSED_DETAIL: Record<CheckId, string | null> = {
   "proxy-i2p": null,
@@ -151,14 +151,14 @@ const passedCheck = (id: CheckId): VerifyCheck => ({
 
 function openChecks(state: RouterState): VerifyCheck[] {
   const mixed = params.get("checks") === "mixed";
-  return CHECK_IDS.map((id) => {
+  return CHECK_ORDER.map((id) => {
     if (state === "building" && id === "tunnels") return { ...pendingCheck(id), state: "running" };
     return (mixed ? MIXED[id] : undefined) ?? passedCheck(id);
   });
 }
 
 function mockChecks(state: RouterState, paused: boolean, detail: string | null): VerifyCheck[] {
-  const checks = CHECK_IDS.map(pendingCheck);
+  const checks = CHECK_ORDER.map(pendingCheck);
   if (paused) return checks;
   if (state === "ok" || state === "building") return openChecks(state);
   if (state === "verifying")

@@ -50,7 +50,7 @@ Each requirement is a test target. The tests check these rules, not the code.
 ### Checks 2 to 4
 
 - **V9 When they run.** When check 1 turns `passed` and the connection is not paused, checks 2 to 4 turn `running`. In the same round, eepview runs them (V10 to V13). It runs them again in every VERIFY round (every 5 s) while the gate is open.
-- **V10 Facts.** eepview reads these facts once per round:
+- **V10 Facts.** eepview reads these facts once per round. It reads them on a thread of their own, not on the watcher thread, so a slow console never delays the next VERIFY round. At most one such read runs at a time: a round that starts while the last read still runs skips checks 2 to 4.
   - The router type: the type of the console that detection stored ([Router console](router-console.md), R5): Java I2P or i2pd. With no stored console, the type is not known.
   - The router version: `RouterStatus.version` (from the router helper) when it is set, else the version of the stored console (R18).
   - The router statistics: from the router helper when it answers, else from the stored console, with the request of R32 and R33. With neither, there are none. This read adds no sample to the bandwidth history (R40 does not change).
@@ -65,10 +65,10 @@ Each requirement is a test target. The tests check these rules, not the code.
 - **V12 Check 3, no outproxy.**
   - The proxy port is the port of `RouterStatus.proxy` (`127.0.0.1:4444` gives 4444).
   - **Java I2P.** In each Java I2P configuration folder of R2, in that order: every file in `i2ptunnel.config.d/`, by file name, then `i2ptunnel.config`. A file is a Java properties file (`key=value`; `#` and `!` start a comment line). In `i2ptunnel.config`, the keys of tunnel `<n>` are `tunnel.<n>.<key>`. A file in `i2ptunnel.config.d/` holds one tunnel, and its keys are either `<key>` or `tunnel.<n>.<key>`. A tunnel is the HTTP proxy when `type` is `httpclient` and `listenPort` is the proxy port. Its outproxies are the values of `proxyList` and of `option.i2ptunnel.httpclient.SSLOutproxies`, split on `,`, `;` and white space. Empty parts and repeats are dropped. The order is kept.
-  - **i2pd.** Each `i2pd.conf` of R2, in that order. The keys of the `[httpproxy]` section count. `#` starts a comment. A file with no `[httpproxy]` section has no HTTP proxy; an empty section uses the defaults. The section is the HTTP proxy when `enabled` is not `false` and `port` (default `4444`) is the proxy port. Its outproxies are the value of `outproxy`, split on `,`, each part trimmed, empty parts dropped.
-  - **Which files.** Router type Java I2P: the Java I2P files only. i2pd: the i2pd files only. Type not known: both. Within one type, the first HTTP proxy found wins. When the type is not known and both types have an HTTP proxy on the port: `not-checked`, and the detail says that both a Java I2P and an i2pd configuration use that port.
+  - **i2pd.** Each `i2pd.conf` of R2, in that order. The keys of the `[httpproxy]` section count. A key `httpproxy.<key>` before the first section counts as `<key>` of `[httpproxy]` too (i2pd reads both forms). `#` starts a comment. A file with neither has no HTTP proxy; an empty section uses the defaults. `enabled` is off when it is `false`, `0`, `no` or `off`, in any case. The section is the HTTP proxy when `enabled` is not off and `port` (default `4444`) is the proxy port. Its outproxies are the value of `outproxy`, split on `,`, each part trimmed, empty parts dropped.
+  - **Which files.** Router type Java I2P: the Java I2P files only. i2pd: the i2pd files only. Type not known: both. Within one Java I2P folder, or one `i2pd.conf`, the first HTTP proxy found wins. eepview reads every folder and every file of the type. When more than one has an HTTP proxy on the port and their outproxy lists differ: `not-checked`, and the detail says that the router configurations disagree and names the files. A stale `~/.i2p` from an old install can sit next to the configuration of the router that runs, and eepview cannot tell which one is in use. When they agree, the first file in the order of R2 is the one named. When the type is not known and both types have an HTTP proxy on the port: `not-checked`, and the detail says that both a Java I2P and an i2pd configuration use that port.
   - **Result.** No HTTP proxy found on the port: `not-checked`. The detail says that no router configuration with an HTTP proxy on that port was found. An HTTP proxy with no outproxy: `passed`. The detail names the file. An HTTP proxy with outproxies: `failed`. The detail names each outproxy.
-  - eepview only reads these files. A missing or unreadable file counts as no HTTP proxy. A detail names a file by its name only, never by its folder.
+  - eepview only reads these files. A missing or unreadable file counts as no HTTP proxy. It reads them again only when the list of files or the modification time of one of them changed since the last round. A detail names a file by its name only, never by its folder.
   - A router that eepview manages (Phase 3) gets a configuration from eepview with no outproxy. This same rule reads it.
 - **V13 Check 4, network and tunnels.**
   - No statistics (V10): `not-checked`. The detail says that the router statistics are not available.
@@ -195,6 +195,10 @@ pub enum OutproxyFinding {
 pub fn java_outproxies(config: &str, port: u16) -> Option<Vec<String>>;
 /// The outproxies of the `[httpproxy]` section of one `i2pd.conf` when it serves `port`.
 pub fn i2pd_outproxies(i2pd_conf: &str, port: u16) -> Option<Vec<String>>;
+/// The files `find_outproxy` reads for `kind`, each with its modification time (`None`
+/// when it cannot be read). Equal stamps mean an equal finding.
+pub fn config_stamps(kind: Option<RouterKind>, env: &dyn Fn(&str) -> Option<String>)
+    -> Vec<(PathBuf, Option<SystemTime>)>;
 /// V12 over the files of this OS (the folders of `net::console::java_config_dirs` and the
 /// files of `net::console::i2pd_config_files`, with the same `env`).
 pub use crate::net::console::ConsoleKind as RouterKind;

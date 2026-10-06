@@ -3,7 +3,7 @@
 
 import type { CheckId, CheckState, VerifyCheck } from "../contract.ts";
 
-const ORDER: readonly CheckId[] = ["proxy-i2p", "version", "no-outproxy", "tunnels"];
+export const CHECK_ORDER: readonly CheckId[] = ["proxy-i2p", "version", "no-outproxy", "tunnels"];
 
 export const CHECK_NAMES: Record<CheckId, string> = {
   "proxy-i2p": "Proxy is an I2P router",
@@ -35,8 +35,10 @@ export function clockTime(ms: number): string {
   return `${two(at.getHours())}:${two(at.getMinutes())}:${two(at.getSeconds())}`;
 }
 
+const KNOWN_STATES: ReadonlySet<string> = new Set(Object.keys(STATE_TEXT));
+
 function knownState(state: CheckState): CheckState {
-  return state in STATE_TEXT ? state : "pending";
+  return KNOWN_STATES.has(state) ? state : "pending";
 }
 
 function stateText(state: CheckState, passedAt: number | null): string {
@@ -63,7 +65,7 @@ function viewOf(check: VerifyCheck): CheckView {
 }
 
 export function checkViews(checks: VerifyCheck[] | null | undefined): CheckView[] {
-  return ORDER.map((id) => viewOf(checkOf(checks, id)));
+  return CHECK_ORDER.map((id) => viewOf(checkOf(checks, id)));
 }
 
 export function checkAnnouncement(

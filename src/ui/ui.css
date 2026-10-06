@@ -923,12 +923,12 @@
     font-size: var(--fs-sm);
   }
 
-  .check {
+  .checks > .check {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto;
-    column-gap: var(--space-2);
-    row-gap: var(--space-0-5);
+    gap: var(--space-0-5) var(--space-2);
     align-items: center;
+    cursor: default;
   }
 
   .check-mark {
@@ -962,46 +962,46 @@
     overflow-wrap: anywhere;
   }
 
-  .check[data-state="running"] .check-mark {
+  .checks > .check[data-state="running"] .check-mark {
     border-style: solid;
     border-color: var(--color-accent);
   }
 
-  .check[data-state="passed"] .check-mark {
+  .checks > .check[data-state="passed"] .check-mark {
     border: 2px solid var(--color-accent);
     background: var(--color-accent);
     color: var(--color-accent-text);
   }
 
-  .check[data-state="passed"] .check-mark::after {
+  .checks > .check[data-state="passed"] .check-mark::after {
     content: "✓";
   }
 
-  .check[data-state="passed"] .check-state {
+  .checks > .check[data-state="passed"] .check-state {
     color: var(--color-accent);
   }
 
-  .check[data-state="failed"] .check-mark {
+  .checks > .check[data-state="failed"] .check-mark {
     border: 2px solid var(--color-danger);
     border-radius: var(--radius-xxs);
     background: var(--color-danger-soft);
     color: var(--color-danger);
   }
 
-  .check[data-state="failed"] .check-mark::after {
+  .checks > .check[data-state="failed"] .check-mark::after {
     content: "✕";
   }
 
-  .check[data-state="failed"] .check-state,
-  .check[data-state="failed"] .check-detail {
+  .checks > .check[data-state="failed"] .check-state,
+  .checks > .check[data-state="failed"] .check-detail {
     color: var(--color-danger);
   }
 
-  .check[data-state="not-checked"] .check-mark {
+  .checks > .check[data-state="not-checked"] .check-mark {
     border-style: solid;
   }
 
-  .check[data-state="not-checked"] .check-mark::after {
+  .checks > .check[data-state="not-checked"] .check-mark::after {
     content: "–";
   }
 

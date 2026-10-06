@@ -10,8 +10,9 @@
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::time::SystemTime;
 
-use super::console::{i2pd_config_files, java_config_dirs, properties};
+use super::console::{i2pd_config_files, java_config_dirs, properties, split_files};
 
 /// The router type: the type of its console (Java I2P or i2pd).
 pub use super::console::ConsoleKind as RouterKind;
@@ -101,46 +102,64 @@ pub fn java_outproxies(config: &str, port: u16) -> Option<Vec<String>> {
     Some(split_list(&listed, &[',', ';']))
 }
 
-/// The `key = value` lines of the `[<name>]` section of an `i2pd.conf` text, comments
-/// removed. `None` when the text has no such section.
-fn section<'a>(text: &'a str, name: &str) -> Option<Vec<(&'a str, &'a str)>> {
-    let mut inside = false;
-    let mut out: Option<Vec<(&str, &str)>> = None;
-    for line in text.lines() {
-        let line = line.split('#').next().unwrap_or_default().trim();
-        let header = line.strip_prefix('[').and_then(|l| l.strip_suffix(']'));
-        inside = header.map_or(inside, |found| found.trim() == name);
-        if !inside {
-            continue;
-        }
-        let fields = out.get_or_insert_with(Vec::new);
-        let pair = header.is_none().then(|| line.split_once('=')).flatten();
-        fields.extend(pair.map(|(k, v)| (k.trim(), v.trim())));
-    }
-    out
+/// The i2pd section of the HTTP proxy.
+const SECTION: &str = "httpproxy";
+
+/// The name of a `[<name>]` section header line.
+fn header(line: &str) -> Option<&str> {
+    line.strip_prefix('[')
+        .and_then(|l| l.strip_suffix(']'))
+        .map(str::trim)
 }
 
-/// The outproxies of the `[httpproxy]` section of one `i2pd.conf` when it serves `port`.
-/// A text with no `[httpproxy]` section names no HTTP proxy.
+/// The key and value of `line` when it is a key of the HTTP proxy: inside `[httpproxy]`, or
+/// `httpproxy.<key>` before the first section.
+fn proxy_key<'a>(section: Option<&str>, line: &'a str) -> Option<(&'a str, &'a str)> {
+    let (key, value) = line.split_once('=')?;
+    let (key, value) = (key.trim(), value.trim());
+    match section {
+        Some(SECTION) => Some((key, value)),
+        Some(_) => None,
+        None => key.strip_prefix("httpproxy.").map(|k| (k, value)),
+    }
+}
+
+/// The keys of the HTTP proxy in an `i2pd.conf` text, comments removed. `None` when the text
+/// has no `[httpproxy]` section and no `httpproxy.<key>` key.
+fn httpproxy_fields(text: &str) -> Option<Vec<(&str, &str)>> {
+    let mut section = None;
+    let mut seen = false;
+    let mut out = Vec::new();
+    for raw in text.lines() {
+        let line = raw.split('#').next().unwrap_or_default().trim();
+        if let Some(name) = header(line) {
+            section = Some(name);
+            seen |= name == SECTION;
+        } else if let Some(pair) = proxy_key(section, line) {
+            seen = true;
+            out.push(pair);
+        }
+    }
+    seen.then_some(out)
+}
+
+/// An i2pd boolean that turns an option off.
+fn is_off(value: &str) -> bool {
+    ["false", "0", "no", "off"]
+        .iter()
+        .any(|off| value.eq_ignore_ascii_case(off))
+}
+
+/// The outproxies of the HTTP proxy of one `i2pd.conf` when it serves `port`: the
+/// `[httpproxy]` section, or the `httpproxy.<key>` keys before the first section.
 #[must_use]
 pub fn i2pd_outproxies(i2pd_conf: &str, port: u16) -> Option<Vec<String>> {
-    let fields = section(i2pd_conf, "httpproxy")?;
-    if value(&fields, "enabled").is_some_and(|v| v.eq_ignore_ascii_case("false")) {
+    let fields = httpproxy_fields(i2pd_conf)?;
+    if value(&fields, "enabled").is_some_and(is_off) {
         return None;
     }
     let serves = value(&fields, "port").map_or(Some(I2PD_PROXY_PORT), |p| p.parse().ok());
     (serves == Some(port)).then(|| split_list(value(&fields, "outproxy").unwrap_or(""), &[',']))
-}
-
-/// The tunnel files of a Java I2P configuration folder: `i2ptunnel.config.d/*` by name, then
-/// `i2ptunnel.config`.
-fn java_tunnel_files(dir: &Path) -> Vec<PathBuf> {
-    let mut files: Vec<PathBuf> = fs::read_dir(dir.join("i2ptunnel.config.d"))
-        .map(|entries| entries.flatten().map(|e| e.path()).collect())
-        .unwrap_or_default();
-    files.sort();
-    files.push(dir.join("i2ptunnel.config"));
-    files
 }
 
 /// The name of `file`, without its folder.
@@ -150,35 +169,64 @@ fn file_name(file: &Path) -> String {
         .unwrap_or_default()
 }
 
-type Found = Option<(String, Vec<String>)>;
+/// An HTTP proxy found: the file name and its outproxies.
+type Hit = (String, Vec<String>);
 
 /// The first file in `files` whose text `parse` finds an HTTP proxy in.
-fn first_in(files: &[PathBuf], parse: impl Fn(&str) -> Option<Vec<String>>) -> Found {
+fn first_in(files: &[PathBuf], parse: impl Fn(&str) -> Option<Vec<String>>) -> Option<Hit> {
     files.iter().find_map(|file| {
         let text = fs::read_to_string(file).ok()?;
         parse(&text).map(|list| (file_name(file), list))
     })
 }
 
-fn first_java(port: u16, env: &dyn Fn(&str) -> Option<String>) -> Found {
-    let files: Vec<PathBuf> = java_config_dirs(env)
+/// The file groups of a router type: one per Java I2P folder, one per `i2pd.conf`.
+fn groups(kind: RouterKind, env: &dyn Fn(&str) -> Option<String>) -> Vec<Vec<PathBuf>> {
+    match kind {
+        RouterKind::Java => java_config_dirs(env)
+            .iter()
+            .map(|dir| split_files(dir, "i2ptunnel.config"))
+            .collect(),
+        RouterKind::I2pd => i2pd_config_files(env)
+            .into_iter()
+            .map(|f| vec![f])
+            .collect(),
+    }
+}
+
+/// The first HTTP proxy on `port` of each group of `kind`.
+fn hits(kind: RouterKind, port: u16, env: &dyn Fn(&str) -> Option<String>) -> Vec<Hit> {
+    let parse = |text: &str| match kind {
+        RouterKind::Java => java_outproxies(text, port),
+        RouterKind::I2pd => i2pd_outproxies(text, port),
+    };
+    groups(kind, env)
         .iter()
-        .flat_map(|dir| java_tunnel_files(dir))
-        .collect();
-    first_in(&files, |text| java_outproxies(text, port))
+        .filter_map(|files| first_in(files, parse))
+        .collect()
 }
 
-fn first_i2pd(port: u16, env: &dyn Fn(&str) -> Option<String>) -> Found {
-    first_in(&i2pd_config_files(env), |text| i2pd_outproxies(text, port))
-}
-
-fn finding(found: Found, port: u16) -> OutproxyFinding {
-    match found {
-        None => OutproxyFinding::Unknown(format!(
+fn decide(found: &[Hit], port: u16) -> OutproxyFinding {
+    let Some((file, outproxies)) = found.first() else {
+        return OutproxyFinding::Unknown(format!(
             "No router configuration with an HTTP proxy on port {port} was found."
-        )),
-        Some((file, outproxies)) if outproxies.is_empty() => OutproxyFinding::Clear { file },
-        Some((file, outproxies)) => OutproxyFinding::Listed { file, outproxies },
+        ));
+    };
+    if found.iter().any(|(_, other)| other != outproxies) {
+        let files: Vec<&str> = found.iter().map(|(f, _)| f.as_str()).collect();
+        return OutproxyFinding::Unknown(format!(
+            "The router configurations disagree about the HTTP proxy on port {port}: {}.",
+            files.join(", ")
+        ));
+    }
+    let file = file.clone();
+    if outproxies.is_empty() {
+        OutproxyFinding::Clear { file }
+    } else {
+        OutproxyFinding::Listed {
+            file,
+            outproxies: outproxies.clone(),
+        }
     }
 }
 
@@ -190,17 +238,39 @@ pub fn find_outproxy(
     port: u16,
     env: &dyn Fn(&str) -> Option<String>,
 ) -> OutproxyFinding {
-    match kind {
-        Some(RouterKind::Java) => finding(first_java(port, env), port),
-        Some(RouterKind::I2pd) => finding(first_i2pd(port, env), port),
-        None => match (first_java(port, env), first_i2pd(port, env)) {
-            (Some(_), Some(_)) => OutproxyFinding::Unknown(format!(
-                "Both a Java I2P and an i2pd configuration use port {port}, and the router \
-                 type is not known."
-            )),
-            (java, i2pd) => finding(java.or(i2pd), port),
-        },
+    if let Some(kind) = kind {
+        return decide(&hits(kind, port, env), port);
     }
+    let (java, i2pd) = (
+        hits(RouterKind::Java, port, env),
+        hits(RouterKind::I2pd, port, env),
+    );
+    if !java.is_empty() && !i2pd.is_empty() {
+        return OutproxyFinding::Unknown(format!(
+            "Both a Java I2P and an i2pd configuration use port {port}, and the router type \
+             is not known."
+        ));
+    }
+    decide(if java.is_empty() { &i2pd } else { &java }, port)
+}
+
+/// The files [`find_outproxy`] reads for `kind`, each with its modification time (`None`
+/// when it cannot be read). Equal stamps mean an equal finding.
+#[must_use]
+pub fn config_stamps(
+    kind: Option<RouterKind>,
+    env: &dyn Fn(&str) -> Option<String>,
+) -> Vec<(PathBuf, Option<SystemTime>)> {
+    let kinds = kind.map_or(vec![RouterKind::Java, RouterKind::I2pd], |k| vec![k]);
+    kinds
+        .into_iter()
+        .flat_map(|k| groups(k, env))
+        .flatten()
+        .map(|file| {
+            let modified = fs::metadata(&file).and_then(|m| m.modified()).ok();
+            (file, modified)
+        })
+        .collect()
 }
 
 #[cfg(test)]

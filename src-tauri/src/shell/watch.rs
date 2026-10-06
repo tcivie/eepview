@@ -16,7 +16,6 @@ use crate::core::router::status_of;
 use crate::diag::{self, Code, ErrorKind, Field, OpKind, RouterState};
 use crate::net::gatekeeper::Gatekeeper;
 use crate::net::loopback::LoopbackAddr;
-use crate::net::stats::RouterStats;
 use crate::net::verify::{Verdict, verify};
 use crate::types::RouterStatus;
 
@@ -28,7 +27,7 @@ pub fn start<R: Runtime>(app: &AppHandle<R>, proxy: Result<LoopbackAddr, String>
     let app = app.clone();
     spawn("router-watch", move || {
         loop {
-            tick(&app, &proxy, super::env::router_helper());
+            tick(&app, &proxy, super::env::router_helper().as_ref());
             thread::sleep(PERIOD);
         }
     });
@@ -38,27 +37,30 @@ pub fn start<R: Runtime>(app: &AppHandle<R>, proxy: Result<LoopbackAddr, String>
 fn tick<R: Runtime>(
     app: &AppHandle<R>,
     proxy: &Result<LoopbackAddr, String>,
-    helper: Option<(LoopbackAddr, String)>,
+    helper: Option<&(LoopbackAddr, String)>,
 ) {
     with_core(app, Core::verify_started);
     let verdict = proxy.clone().map_or_else(Verdict::Down, verify);
     apply(app, &verdict);
-    let stats = sample(app, helper);
-    super::checks::run(app, stats);
+    after_verify(app, helper, true);
 }
 
-/// Records the router bandwidth for `router_stats().history`, when a helper is configured.
-/// Returns the helper statistics when it answered.
-fn sample<R: Runtime>(
+/// After a VERIFY round: the helper statistics, the router version they give, then router
+/// checks 2 to 4. With `record`, a configured helper also adds its bandwidth sample to
+/// `router_stats().history`.
+fn after_verify<R: Runtime>(
     app: &AppHandle<R>,
-    helper: Option<(LoopbackAddr, String)>,
-) -> Option<RouterStats> {
-    let (addr, token) = helper?;
-    let answer = crate::net::stats::try_fetch(addr, &token);
-    let stats = answer.clone().unwrap_or_default();
-    lock(&shared(app).core).record_stats(now_ms(), &stats);
-    with_core(app, |core| core.router_version(stats.version.as_deref()));
-    answer
+    helper: Option<&(LoopbackAddr, String)>,
+    record: bool,
+) {
+    let answer = helper.and_then(|(addr, token)| crate::net::stats::try_fetch(*addr, token));
+    if record && helper.is_some() {
+        let stats = answer.clone().unwrap_or_default();
+        lock(&shared(app).core).record_stats(now_ms(), &stats);
+    }
+    let version = answer.as_ref().and_then(|s| s.version.clone());
+    with_core(app, |core| core.router_version(version.as_deref()));
+    super::checks::run(app, answer);
 }
 
 /// VERIFY now, off the main thread (after `connection_resume()`).
@@ -68,20 +70,20 @@ pub fn check_now<R: Runtime>(app: &AppHandle<R>, proxy: Result<LoopbackAddr, Str
         with_core(&app, Core::verify_started);
         let verdict = proxy.map_or_else(Verdict::Down, verify);
         apply(&app, &verdict);
-        let helper = super::env::router_helper();
-        let stats = helper.and_then(|(addr, token)| crate::net::stats::try_fetch(addr, &token));
-        super::checks::run(&app, stats);
+        after_verify(&app, super::env::router_helper().as_ref(), false);
     });
 }
 
-/// Runs `f` on a named thread.
-fn spawn(name: &str, f: impl FnOnce() + Send + 'static) {
-    if let Err(e) = thread::Builder::new().name(name.into()).spawn(f) {
+/// Runs `f` on a named thread. False when the thread could not start.
+pub(super) fn spawn(name: &str, f: impl FnOnce() + Send + 'static) -> bool {
+    let started = thread::Builder::new().name(name.into()).spawn(f);
+    if let Err(e) = &started {
         diag::event(
             Code::ThreadFailed,
-            &[Field::Op(OpKind::Spawn), Field::Error(ErrorKind::from(&e))],
+            &[Field::Op(OpKind::Spawn), Field::Error(ErrorKind::from(e))],
         );
     }
+    started.is_ok()
 }
 
 /// Closes the gatekeeper (after `connection_pause()`).
@@ -167,7 +169,7 @@ mod tests {
         tick(
             app.handle(),
             &Ok(router.addr),
-            Some((dead_addr(), "token".into())),
+            Some(&(dead_addr(), "token".into())),
         );
         assert!(gate_open(&app));
         assert!(core(&app).stats_history().is_empty());
@@ -209,7 +211,7 @@ mod tests {
     #[test]
     fn spawn_runs_the_closure() {
         let (tx, rx) = std::sync::mpsc::channel();
-        spawn("test-spawn", move || tx.send(7).unwrap());
+        assert!(spawn("test-spawn", move || tx.send(7).unwrap()));
         assert_eq!(rx.recv().unwrap(), 7);
     }
 }

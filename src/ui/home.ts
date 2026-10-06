@@ -71,7 +71,7 @@ function renderChecks(checks: VerifyCheck[] | undefined): void {
   });
   const said = checkAnnouncement(lastChecks, checks);
   if (said) announce(byId("router-checks-live"), said);
-  lastChecks = checks ?? [];
+  if (checks) lastChecks = checks;
 }
 
 function renderRouter(status: RouterStatus): void {

@@ -201,16 +201,22 @@ pub fn i2pd_config_files(env: &dyn Fn(&str) -> Option<String>) -> Vec<PathBuf> {
 /// by name, then `clients.config`.
 #[must_use]
 pub fn java_ports_in(dir: &Path) -> Vec<u16> {
-    let mut files: Vec<PathBuf> = fs::read_dir(dir.join("clients.config.d"))
-        .map(|entries| entries.flatten().map(|e| e.path()).collect())
-        .unwrap_or_default();
-    files.sort();
-    files.push(dir.join("clients.config"));
-    files
+    split_files(dir, "clients.config")
         .iter()
         .filter_map(|file| fs::read_to_string(file).ok())
         .filter_map(|text| java_console_port(&text))
         .collect()
+}
+
+/// The files of a Java I2P configuration split into `<name>.d/`: every file in `<name>.d/`
+/// by name, then `<name>`.
+pub(crate) fn split_files(dir: &Path, name: &str) -> Vec<PathBuf> {
+    let mut files: Vec<PathBuf> = fs::read_dir(dir.join(format!("{name}.d")))
+        .map(|entries| entries.flatten().map(|e| e.path()).collect())
+        .unwrap_or_default();
+    files.sort();
+    files.push(dir.join(name));
+    files
 }
 
 /// The web console port in an `i2pd.conf` file.
