@@ -336,7 +336,7 @@ fn sample(t: u64, inbound: u64, out: u64) -> Sample {
 
 fn restored(samples: &[(u64, u64, u64)], now: u64) -> History {
     let list = samples.iter().map(|&(t, i, o)| sample(t, i, o)).collect();
-    History::restored(list, now)
+    History::restored(now, list)
 }
 
 fn triples(samples: &[Sample]) -> Vec<(u64, u64, u64)> {

@@ -192,8 +192,10 @@ mod router_stats_command {
     use crate::net::console::{ConsoleKind, stats_path};
     use crate::net::stats::RouterStats;
     use crate::net::testing::FakeConsole;
-    use crate::shell::console::{set_console, stop};
+    use crate::shell::console::{detect_now, set_console, stop};
     use crate::shell::sampler::tick;
+    use crate::shell::testing::detect_lock;
+    use tauri::AppHandle;
 
     const JAVA: &str =
         include_str!("../../../tests/fixtures/console/java-2.13.0-xhr1-summaryframe.txt");
@@ -307,5 +309,43 @@ mod router_stats_command {
         assert_eq!(value["tunnels"]["participating"], Value::Null);
         assert_eq!(value["uptimeMs"], Value::Null);
         assert_eq!(value["history"], json!([]));
+    }
+
+    /// Requests for the Java stats path.
+    fn stats_requests(fake: &FakeConsole) -> usize {
+        let path = stats_path(ConsoleKind::Java);
+        fake.requests()
+            .iter()
+            .filter(|line| line.split(' ').nth(1) == Some(path))
+            .count()
+    }
+
+    /// Calls `stop` of the console loops when dropped, also when the test fails, so the
+    /// loops that `detect_now` starts never keep probing the ports during the next test.
+    struct StopOnDrop(AppHandle<Mock>);
+
+    impl Drop for StopOnDrop {
+        fn drop(&mut self) {
+            stop(&self.0);
+        }
+    }
+
+    #[test]
+    fn r45_after_detect_now_the_console_is_queried_again() {
+        // R45: "until `detect_now` runs again". `detect_now` probes the default ports and
+        // stores what it finds; the stored console is then the fake.
+        let _lock = detect_lock();
+        let (app, _router, fake) = gated_java_app();
+        stop(&handle(&app));
+        let _guard = StopOnDrop(handle(&app));
+        let _ = detect_now(&handle(&app));
+        set_console(app.handle(), Some(fake.verified()));
+        let before = stats_requests(&fake);
+        tick(&handle(&app), None);
+        assert_eq!(stats_requests(&fake), before + 1, "one request again");
+        assert_eq!(
+            current_stats(&handle(&app)).tunnels.participating,
+            Some(398)
+        );
     }
 }

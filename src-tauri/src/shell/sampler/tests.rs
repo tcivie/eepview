@@ -22,10 +22,10 @@ use crate::net::console::{ConsoleKind, stats_path};
 use crate::net::stats::RouterStats;
 use crate::net::testing::{FakeConsole, FakeHelper, FakeRouter, dead_addr};
 use crate::shell::commands::current_stats;
-use crate::shell::console::{detect_now, set_console, stop as stop_console};
+use crate::shell::console::{set_console, stop as stop_console};
 use crate::shell::env::DEFAULT_PROXY;
 use crate::shell::state::Shared;
-use crate::shell::testing::{Mock, app, core, detect_lock, invoke, open_gate, wait_for};
+use crate::shell::testing::{Mock, app, core, invoke, open_gate, wait_for};
 
 const JAVA: &str =
     include_str!("../../../tests/fixtures/console/java-2.13.0-xhr1-summaryframe.txt");
@@ -123,25 +123,27 @@ fn triples(stats: &RouterStats) -> Vec<(u64, u64, u64)> {
 static SAMPLER_LOCK: Mutex<()> = Mutex::new(());
 
 struct Running {
+    app: AppHandle<Mock>,
     _lock: MutexGuard<'static, ()>,
 }
 
 impl Running {
-    fn begin() -> Self {
+    fn begin(app: &App<Mock>) -> Self {
         let lock = SAMPLER_LOCK.lock().unwrap_or_else(PoisonError::into_inner);
-        stop();
+        let app = handle(app);
+        stop(&app);
         assert!(
-            wait_for(|| !running()),
+            wait_for(|| !running(&app)),
             "a sampler of an earlier test ended"
         );
-        Self { _lock: lock }
+        Self { app, _lock: lock }
     }
 }
 
 impl Drop for Running {
     fn drop(&mut self) {
-        stop();
-        wait_for(|| !running());
+        stop(&self.app);
+        wait_for(|| !running(&self.app));
     }
 }
 
@@ -437,33 +439,8 @@ fn r45_after_stop_a_helper_that_does_not_answer_gives_all_null_not_the_console()
     assert_eq!(fake.requests().len(), seen);
 }
 
-/// Calls `stop` of the console loops when dropped, also when the test fails, so the loops
-/// that `detect_now` starts never keep probing the ports during the next test.
-struct StopOnDrop(AppHandle<Mock>);
-
-impl Drop for StopOnDrop {
-    fn drop(&mut self) {
-        stop_console(&self.0);
-    }
-}
-
-#[test]
-fn r45_after_detect_now_the_console_is_queried_again() {
-    // R45: "until `detect_now` runs again". `detect_now` probes the default ports and stores
-    // what it finds; the stored console is then the fake.
-    let _lock = detect_lock();
-    let (app, _router, fake, _seen) = stopped_app();
-    let _guard = StopOnDrop(handle(&app));
-    let _ = detect_now(&handle(&app));
-    set_console(app.handle(), Some(fake.verified()));
-    let before = stats_requests(&fake);
-    round(&app);
-    assert_eq!(stats_requests(&fake), before + 1, "one request again");
-    assert_eq!(
-        current_stats(&handle(&app)).tunnels.participating,
-        Some(398)
-    );
-}
+// R45 "until `detect_now` runs again": in `shell/commands/tests.rs`, the only test place
+// besides the console module that may call detection (architecture test R6).
 
 // ---------------------------------------------------------------- R49 pages only read
 
@@ -537,21 +514,21 @@ fn r48_a_round_right_after_the_start_saves_no_history() {
 #[test]
 fn r47_start_returns_true_then_false_while_the_sampler_runs() {
     let (app, _router) = gated();
-    let _run = Running::begin();
+    let _run = Running::begin(&app);
     assert!(start(&handle(&app)), "the first start starts the thread");
-    assert!(running());
+    assert!(running(&handle(&app)));
     assert!(!start(&handle(&app)), "a second start starts nothing");
     assert!(!start(&handle(&app)));
-    assert!(running());
+    assert!(running(&handle(&app)));
 }
 
 #[test]
 fn r47_start_works_again_after_the_sampler_ended() {
     let (app, _router) = gated();
-    let _run = Running::begin();
+    let _run = Running::begin(&app);
     assert!(start(&handle(&app)));
-    stop();
-    assert!(wait_for(|| !running()));
+    stop(&handle(&app));
+    assert!(wait_for(|| !running(&handle(&app))));
     assert!(start(&handle(&app)), "no thread runs, so start starts one");
 }
 
@@ -560,7 +537,7 @@ fn r47_a_round_runs_at_once_after_start() {
     // R47: "runs one round at once", not after 5 s.
     let (app, _router) = gated();
     let fake = java_console(&app);
-    let _run = Running::begin();
+    let _run = Running::begin(&app);
     let started = Instant::now();
     assert!(start(&handle(&app)));
     assert!(wait_for(|| stats_requests(&fake) >= 1));
@@ -576,13 +553,13 @@ fn r47_a_round_runs_at_once_after_start() {
 fn r47_wake_makes_the_running_sampler_do_a_round_now() {
     let (app, _router) = gated();
     let fake = java_console(&app);
-    let _run = Running::begin();
+    let _run = Running::begin(&app);
     assert!(start(&handle(&app)));
     assert!(wait_for(|| stats_requests(&fake) >= 1));
     std::thread::sleep(Duration::from_millis(300));
     let before = stats_requests(&fake);
     let woken = Instant::now();
-    wake();
+    wake(&handle(&app));
     assert!(wait_for(|| stats_requests(&fake) > before));
     assert!(
         woken.elapsed() < Duration::from_secs(4),
@@ -594,11 +571,11 @@ fn r47_wake_makes_the_running_sampler_do_a_round_now() {
 fn r47_wake_with_no_sampler_does_nothing() {
     let (app, _router) = gated();
     let fake = java_console(&app);
-    let _run = Running::begin();
+    let _run = Running::begin(&app);
     let seen = fake.requests().len();
-    wake();
+    wake(&handle(&app));
     std::thread::sleep(Duration::from_millis(300));
-    assert!(!running(), "wake never starts a sampler");
+    assert!(!running(&handle(&app)), "wake never starts a sampler");
     assert_eq!(fake.requests().len(), seen);
 }
 
@@ -607,7 +584,7 @@ fn r47_a_console_that_detection_stores_wakes_the_sampler() {
     // R47: "When `set_console` stores a found console that differs from the stored one, it
     // calls `wake`": the figures show before the next timed round, 5 s later.
     let (app, _router) = gated();
-    let _run = Running::begin();
+    let _run = Running::begin(&app);
     assert!(start(&handle(&app)));
     std::thread::sleep(Duration::from_millis(500));
     let stored = Instant::now();
@@ -630,13 +607,13 @@ fn r47_a_console_that_detection_stores_wakes_the_sampler() {
 fn r53_stop_ends_the_sampler_without_waiting_for_its_5_seconds() {
     let (app, _router) = gated();
     let fake = java_console(&app);
-    let _run = Running::begin();
+    let _run = Running::begin(&app);
     assert!(start(&handle(&app)));
     assert!(wait_for(|| stats_requests(&fake) >= 1));
     std::thread::sleep(Duration::from_millis(300));
     let stopped = Instant::now();
-    stop();
-    assert!(wait_for(|| !running()));
+    stop(&handle(&app));
+    assert!(wait_for(|| !running(&handle(&app))));
     assert!(
         stopped.elapsed() < Duration::from_secs(4),
         "{:?}",
@@ -648,13 +625,13 @@ fn r53_stop_ends_the_sampler_without_waiting_for_its_5_seconds() {
 fn r53_after_stop_the_sampler_starts_no_round() {
     let (app, _router) = gated();
     let fake = java_console(&app);
-    let _run = Running::begin();
+    let _run = Running::begin(&app);
     assert!(start(&handle(&app)));
     assert!(wait_for(|| stats_requests(&fake) >= 1));
-    stop();
-    assert!(wait_for(|| !running()));
+    stop(&handle(&app));
+    assert!(wait_for(|| !running(&handle(&app))));
     let seen = stats_requests(&fake);
-    wake();
+    wake(&handle(&app));
     std::thread::sleep(Duration::from_millis(500));
     assert_eq!(stats_requests(&fake), seen, "no round after stop");
 }
@@ -662,17 +639,17 @@ fn r53_after_stop_the_sampler_starts_no_round() {
 #[test]
 fn r53_shutdown_stops_the_sampler() {
     let (app, _router) = gated();
-    let _run = Running::begin();
+    let _run = Running::begin(&app);
     assert!(start(&handle(&app)));
     shutdown(&handle(&app));
-    assert!(wait_for(|| !running()));
+    assert!(wait_for(|| !running(&handle(&app))));
 }
 
 #[test]
 fn r53_shutdown_stops_the_console_loops() {
     // R53, R22, R45: after the quit, a round asks no console.
-    let _run = Running::begin();
     let (app, _router) = gated();
+    let _run = Running::begin(&app);
     let fake = java_console(&app);
     shutdown(&handle(&app));
     let seen = fake.requests().len();
@@ -690,7 +667,7 @@ fn r53_shutdown_saves_the_history_once() {
     std::fs::write(&paths.bandwidth, bandwidth_json(&saved)).unwrap();
     let app = app_with_paths(paths.clone());
     std::fs::remove_file(&paths.bandwidth).unwrap();
-    let _run = Running::begin();
+    let _run = Running::begin(&app);
     shutdown(&handle(&app));
     let text = std::fs::read_to_string(&paths.bandwidth).unwrap();
     let file: Value = serde_json::from_str(&text).unwrap();

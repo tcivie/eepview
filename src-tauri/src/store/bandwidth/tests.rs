@@ -353,7 +353,7 @@ mod core_calls {
             floodfills: Some(1570),
             ..RouterStats::default()
         };
-        core.set_latest_stats(now, latest);
+        core.set_latest_stats(latest);
         let stats = core.stats_answer(now);
         assert_eq!(stats.uptime_ms, Some(28_800_000));
         assert_eq!(stats.floodfills, Some(1570));
@@ -376,7 +376,7 @@ mod core_calls {
         let samples = [(now - 10_000, 1, 2)];
         let (mut core, paths) = core_with("bandwidth-core-first", &samples, now);
         std::fs::remove_file(&paths.bandwidth).unwrap();
-        core.set_latest_stats(now, RouterStats::default());
+        core.set_latest_stats(RouterStats::default());
         assert!(!core.save_stats_if_due(now + 59_999));
         assert!(!paths.bandwidth.exists(), "no save before 60 s");
         assert!(core.save_stats_if_due(now + 60_000));
@@ -387,7 +387,7 @@ mod core_calls {
     fn r51_a_save_is_due_again_60_seconds_after_the_last_one() {
         let now = now_ms();
         let (mut core, paths) = core_with("bandwidth-core-again", &[], now);
-        core.set_latest_stats(now, RouterStats::default());
+        core.set_latest_stats(RouterStats::default());
         assert!(core.save_stats_if_due(now + 60_000));
         std::fs::remove_file(&paths.bandwidth).unwrap();
         assert!(!core.save_stats_if_due(now + 60_000));
@@ -407,7 +407,7 @@ mod core_calls {
         let mut paths = paths_in(&dir);
         paths.bandwidth = blocked.join("bandwidth.json");
         let mut core = Core::new(Some(paths.clone()), "p", now);
-        core.set_latest_stats(now, RouterStats::default());
+        core.set_latest_stats(RouterStats::default());
         let before = core.stats_answer(now);
         assert!(!core.save_stats_if_due(now + 60_000), "the save fails");
         assert_eq!(core.stats_answer(now), before);
@@ -427,11 +427,11 @@ mod core_calls {
         let samples = [(now - 10_000, 1, 2), (now - 5_000, 3, 4)];
         let (mut core, paths) = core_with("bandwidth-core-quit", &samples, now);
         std::fs::remove_file(&paths.bandwidth).unwrap();
-        core.set_latest_stats(now, RouterStats::default());
+        core.set_latest_stats(RouterStats::default());
         assert!(core.save_stats(now));
         assert_eq!(triples(&load(&paths.bandwidth, now)), samples);
         let mut bare = Core::new(None, "p", now);
-        bare.set_latest_stats(now, RouterStats::default());
+        bare.set_latest_stats(RouterStats::default());
         assert!(!bare.save_stats(now), "no paths, no file");
     }
 }
