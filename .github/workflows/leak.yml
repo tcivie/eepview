@@ -76,8 +76,14 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      # macOS runs the app from its .app bundle, as users do: the bundle's Info.plist turns on
+      # App Transport Security, which a bare binary never meets (the tabs-never-load bug).
       - name: Build the release binary
+        if: runner.os != 'macOS'
         run: npm run tauri -- build --no-bundle -- --locked
+      - name: Build the release app bundle
+        if: runner.os == 'macOS'
+        run: npm run tauri -- build --bundles app -- --locked
       - name: Check PIE, RELRO and NX on the Linux binary
         if: runner.os == 'Linux'
         run: ./scripts/check-hardening.sh src-tauri/target/release/eepview
@@ -89,6 +95,9 @@ jobs:
           args=(--binary src-tauri/target/release/eepview --out leak-results)
           if [ "$RUNNER_OS" = Linux ]; then args+=(--xvfb --strace); fi
           if [ "$RUNNER_OS" = Windows ]; then args[1]=src-tauri/target/release/eepview.exe; fi
+          if [ "$RUNNER_OS" = macOS ]; then
+            args[1]=src-tauri/target/release/bundle/macos/eepview.app/Contents/MacOS/eepview
+          fi
           "$py" tests/leak/harness.py "${args[@]}" | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Upload the leak logs
         if: failure()
