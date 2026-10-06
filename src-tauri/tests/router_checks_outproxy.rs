@@ -9,11 +9,12 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::time::SystemTime;
 
 use eepview_lib::core::checks::{Outcome, outproxy_outcome};
 use eepview_lib::net::console::{ConsoleKind, i2pd_config_files, java_config_dirs};
 use eepview_lib::net::outproxy::{
-    OutproxyFinding, find_outproxy, i2pd_outproxies, java_outproxies,
+    OutproxyFinding, config_stamps, find_outproxy, i2pd_outproxies, java_outproxies,
 };
 
 const PORT: u16 = 4444;
@@ -24,6 +25,8 @@ mod support {
     use super::*;
 
     static NEXT: AtomicUsize = AtomicUsize::new(0);
+
+    pub(super) type Stamps = Vec<(PathBuf, Option<SystemTime>)>;
 
     /// A fresh folder in the system temp folder, removed on drop.
     pub(super) struct Sandbox {
@@ -71,8 +74,23 @@ mod support {
             inside.expect("an i2pd.conf path inside the sandbox")
         }
 
+        /// The i2pd.conf paths of this OS that live in the sandbox, in order.
+        pub(super) fn i2pd_files(&self) -> Vec<PathBuf> {
+            let all = i2pd_config_files(&self.env());
+            let inside: Vec<PathBuf> = all
+                .into_iter()
+                .filter(|f| f.starts_with(&self.root))
+                .collect();
+            assert!(!inside.is_empty(), "an i2pd.conf path inside the sandbox");
+            inside
+        }
+
         pub(super) fn find(&self, kind: Option<ConsoleKind>, port: u16) -> OutproxyFinding {
             find_outproxy(kind, port, &self.env())
+        }
+
+        pub(super) fn stamps(&self, kind: Option<ConsoleKind>) -> Stamps {
+            config_stamps(kind, &self.env())
         }
     }
 
@@ -99,9 +117,46 @@ mod support {
             other => panic!("V12: expected unknown, got {other:?}"),
         }
     }
+
+    /// The configurations disagree: unknown, and the reason says so and names the file.
+    pub(super) fn assert_unknown_disagree(finding: &OutproxyFinding, file: &str) {
+        match finding {
+            OutproxyFinding::Unknown(reason) => {
+                let lower = reason.to_lowercase();
+                assert!(lower.contains("disagree"), "V12: disagree: {reason:?}");
+                assert!(lower.contains(file), "V12: names the files: {reason:?}");
+            }
+            other => panic!("V12: expected unknown (disagree), got {other:?}"),
+        }
+    }
+
+    /// Some stamp is for a path that ends with `tail`.
+    pub(super) fn has_stamp(stamps: &Stamps, tail: &Path) -> bool {
+        stamps.iter().any(|(path, _)| path.ends_with(tail))
+    }
+
+    /// Some stamp is for a path that ends with `tail`, and carries a modification time.
+    pub(super) fn has_stamp_with_time(stamps: &Stamps, tail: &Path) -> bool {
+        stamps
+            .iter()
+            .any(|(path, time)| path.ends_with(tail) && time.is_some())
+    }
+
+    /// Some stamp is for a Java I2P tunnel file or for a file in a tunnel folder.
+    pub(super) fn names_java_file(stamps: &Stamps) -> bool {
+        stamps.iter().any(|(path, _)| {
+            path.file_name() == Some(std::ffi::OsStr::new("i2ptunnel.config"))
+                || path
+                    .components()
+                    .any(|c| c.as_os_str() == "i2ptunnel.config.d")
+        })
+    }
 }
 
-use support::{Sandbox, assert_unknown_about_http_proxy, put};
+use support::{
+    Sandbox, Stamps, assert_unknown_about_http_proxy, assert_unknown_disagree, has_stamp,
+    has_stamp_with_time, names_java_file, put,
+};
 
 fn strings(items: &[&str]) -> Vec<String> {
     items.iter().map(|s| String::from(*s)).collect()
@@ -393,6 +448,103 @@ fn v12_i2pd_a_comment_line_starts_with_hash() {
     );
 }
 
+#[test]
+fn v12_i2pd_a_dotted_key_before_the_first_section_is_a_key_of_httpproxy() {
+    let text = "httpproxy.enabled = true\nhttpproxy.port = 4444\n\
+                httpproxy.outproxy = http://a.i2p , http://b.i2p\n";
+    let want = Some(strings(&["http://a.i2p", "http://b.i2p"]));
+    assert_eq!(i2pd_outproxies(text, PORT), want, "V12: only dotted keys");
+    assert_eq!(
+        i2pd_outproxies("httpproxy.port = 4445\n", 4445),
+        Some(vec![]),
+        "V12: a file with only a dotted port has an HTTP proxy"
+    );
+    assert_eq!(
+        i2pd_outproxies("httpproxy.port = 4445\n", PORT),
+        None,
+        "V12: the dotted port is the port"
+    );
+    assert_eq!(
+        i2pd_outproxies("httpproxy.enabled = true\n", PORT),
+        Some(vec![]),
+        "V12: the default port"
+    );
+}
+
+#[test]
+fn v12_i2pd_dotted_keys_and_the_section_add_up() {
+    let text = "httpproxy.outproxy = http://dotted.i2p\n[httpproxy]\nport = 4444\n";
+    assert_eq!(
+        i2pd_outproxies(text, PORT),
+        Some(strings(&["http://dotted.i2p"])),
+        "V12: dotted outproxy, section port"
+    );
+    let other = "httpproxy.port = 4445\n[httpproxy]\noutproxy = http://section.i2p\n";
+    assert_eq!(
+        i2pd_outproxies(other, 4445),
+        Some(strings(&["http://section.i2p"])),
+        "V12: dotted port, section outproxy"
+    );
+}
+
+#[test]
+fn v12_i2pd_enabled_is_off_for_false_zero_no_and_off_in_any_case() {
+    for value in ["false", "0", "no", "off", "OFF", "Off", "FALSE", "No"] {
+        let section = format!("[httpproxy]\nenabled = {value}\nport = 4444\n");
+        assert_eq!(
+            i2pd_outproxies(&section, PORT),
+            None,
+            "V12: enabled = {value}"
+        );
+        let dotted = format!("httpproxy.enabled = {value}\nhttpproxy.port = 4444\n");
+        assert_eq!(
+            i2pd_outproxies(&dotted, PORT),
+            None,
+            "V12: httpproxy.enabled = {value}"
+        );
+    }
+}
+
+#[test]
+fn v12_i2pd_enabled_is_on_for_any_other_value() {
+    for value in ["true", "1", "yes", "on", "ON", "True"] {
+        let section = format!("[httpproxy]\nenabled = {value}\nport = 4444\n");
+        assert_eq!(
+            i2pd_outproxies(&section, PORT),
+            Some(vec![]),
+            "V12: enabled = {value}"
+        );
+    }
+}
+
+#[test]
+fn v12_i2pd_a_dotted_key_after_a_section_header_belongs_to_that_section() {
+    let alone = "[other]\nhttpproxy.enabled = true\nhttpproxy.port = 4444\n";
+    assert_eq!(
+        i2pd_outproxies(alone, PORT),
+        None,
+        "V12: keys of [other] are not an HTTP proxy"
+    );
+    let outproxy = "[httpproxy]\nport = 4444\n[other]\nhttpproxy.outproxy = http://x.i2p\n";
+    assert_eq!(
+        i2pd_outproxies(outproxy, PORT),
+        Some(vec![]),
+        "V12: the dotted outproxy in [other] is not an outproxy of the HTTP proxy"
+    );
+    let off = "[httpproxy]\nport = 4444\n[other]\nhttpproxy.enabled = false\n";
+    assert_eq!(
+        i2pd_outproxies(off, PORT),
+        Some(vec![]),
+        "V12: the dotted enabled in [other] does not switch the HTTP proxy off"
+    );
+    let port = "[httpproxy]\nport = 4444\n[other]\nhttpproxy.port = 4445\n";
+    assert_eq!(
+        i2pd_outproxies(port, 4445),
+        None,
+        "V12: the dotted port in [other] is not the proxy port"
+    );
+}
+
 // ---------------------------------------------------------------------------------------------
 // V12, the files of this OS (find_outproxy on real folders).
 
@@ -509,18 +661,92 @@ fn v12_files_java_a_file_without_the_proxy_is_skipped() {
 }
 
 #[test]
-fn v12_files_java_the_first_folder_wins() {
+fn v12_files_java_folders_that_disagree_give_unknown() {
     let sandbox = Sandbox::new();
-    for (n, dir) in sandbox.java_dirs().iter().enumerate() {
+    let dirs = sandbox.java_dirs();
+    for (n, dir) in dirs.iter().enumerate() {
         let proxies = if n == 0 { "" } else { "later.i2p" };
         put(&dir.join("i2ptunnel.config"), &java_http(PORT, proxies));
     }
     let found = sandbox.find(Some(ConsoleKind::Java), PORT);
+    if dirs.len() >= 2 {
+        assert_unknown_disagree(&found, "i2ptunnel.config");
+    } else {
+        assert_eq!(
+            found,
+            clear("i2ptunnel.config"),
+            "V12: one folder, no clash"
+        );
+    }
+}
+
+#[test]
+fn v12_files_java_folders_that_agree_give_the_first_folders_file() {
+    let sandbox = Sandbox::new();
+    for (n, dir) in sandbox.java_dirs().iter().enumerate() {
+        let text = java_http(PORT, "same.i2p");
+        if n == 0 {
+            put(&dir.join("i2ptunnel.config.d").join("first.config"), &text);
+        } else {
+            put(&dir.join("i2ptunnel.config"), &text);
+        }
+    }
+    let found = sandbox.find(Some(ConsoleKind::Java), PORT);
     assert_eq!(
         found,
-        clear("i2ptunnel.config"),
-        "V12: the first folder, in the order of R2"
+        listed("first.config", &["same.i2p"]),
+        "V12: equal lists, the first file in the order of R2 is named"
     );
+}
+
+#[test]
+fn v12_files_java_folders_that_agree_on_no_outproxy_give_clear_of_the_first_file() {
+    let sandbox = Sandbox::new();
+    for (n, dir) in sandbox.java_dirs().iter().enumerate() {
+        let text = java_http(PORT, "");
+        if n == 0 {
+            put(&dir.join("i2ptunnel.config"), &text);
+        } else {
+            put(&dir.join("i2ptunnel.config.d").join("later.config"), &text);
+        }
+    }
+    let found = sandbox.find(Some(ConsoleKind::Java), PORT);
+    assert_eq!(found, clear("i2ptunnel.config"), "V12: first folder's file");
+}
+
+#[test]
+fn v12_files_i2pd_files_that_disagree_give_unknown() {
+    let sandbox = Sandbox::new();
+    let files = sandbox.i2pd_files();
+    for (n, file) in files.iter().enumerate() {
+        let proxies = if n == 0 { "" } else { "http://later.i2p" };
+        put(file, &i2pd_http(PORT, proxies));
+    }
+    let found = sandbox.find(Some(ConsoleKind::I2pd), PORT);
+    if files.len() >= 2 {
+        assert_unknown_disagree(&found, "i2pd.conf");
+    } else {
+        assert_eq!(found, clear("i2pd.conf"), "V12: one file, no clash");
+    }
+}
+
+#[test]
+fn v12_files_i2pd_reads_a_file_with_only_dotted_keys() {
+    let sandbox = Sandbox::new();
+    put(
+        &sandbox.i2pd_file(),
+        "httpproxy.enabled = true\nhttpproxy.port = 4444\n",
+    );
+    assert_eq!(
+        sandbox.find(Some(ConsoleKind::I2pd), PORT),
+        clear("i2pd.conf"),
+        "V12: dotted keys only"
+    );
+    put(
+        &sandbox.i2pd_file(),
+        "httpproxy.enabled = off\nhttpproxy.port = 4444\n",
+    );
+    assert_unknown_about_http_proxy(&sandbox.find(Some(ConsoleKind::I2pd), PORT));
 }
 
 #[test]
@@ -742,5 +968,106 @@ fn v12_files_the_result_of_a_find_gives_the_outcome_of_the_spec() {
     assert!(
         matches!(none, Outcome::NotChecked(_)),
         "V12: no HTTP proxy: {none:?}"
+    );
+}
+
+// ---------------------------------------------------------------------------------------------
+// V12, the stamps of the files that find_outproxy reads.
+
+#[test]
+fn v12_stamps_include_a_tunnel_file_in_the_java_folder_with_its_time() {
+    let sandbox = Sandbox::new();
+    let tail = Path::new("i2ptunnel.config.d").join("a.config");
+    put(
+        &sandbox.java_dir().join(&tail),
+        "type=httpclient\nlistenPort=4444\n",
+    );
+    let stamps = sandbox.stamps(Some(ConsoleKind::Java));
+    assert!(has_stamp_with_time(&stamps, &tail), "V12: {stamps:?}");
+    let unknown_kind = sandbox.stamps(None);
+    assert!(
+        has_stamp_with_time(&unknown_kind, &tail),
+        "V12: an unknown type lists the Java files too: {unknown_kind:?}"
+    );
+}
+
+#[test]
+fn v12_stamps_include_i2ptunnel_config_when_it_exists() {
+    let sandbox = Sandbox::new();
+    put(
+        &sandbox.java_dir().join("i2ptunnel.config"),
+        &java_http(PORT, ""),
+    );
+    let stamps = sandbox.stamps(Some(ConsoleKind::Java));
+    assert!(
+        has_stamp_with_time(&stamps, Path::new("i2ptunnel.config")),
+        "V12: {stamps:?}"
+    );
+}
+
+#[test]
+fn v12_stamps_change_when_a_new_tunnel_file_is_written() {
+    let sandbox = Sandbox::new();
+    let folder = sandbox.java_dir().join("i2ptunnel.config.d");
+    let empty = sandbox.stamps(Some(ConsoleKind::Java));
+    put(
+        &folder.join("a.config"),
+        "type=httpclient\nlistenPort=4444\n",
+    );
+    let one = sandbox.stamps(Some(ConsoleKind::Java));
+    assert_ne!(empty, one, "V12: the first tunnel file changes the stamps");
+    put(
+        &folder.join("b.config"),
+        "type=httpclient\nlistenPort=4445\n",
+    );
+    let two = sandbox.stamps(Some(ConsoleKind::Java));
+    assert_ne!(one, two, "V12: another tunnel file changes the stamps");
+    assert_eq!(
+        two,
+        sandbox.stamps(Some(ConsoleKind::Java)),
+        "V12: nothing written, the same stamps"
+    );
+}
+
+#[test]
+fn v12_stamps_of_i2pd_list_no_java_file() {
+    let sandbox = Sandbox::new();
+    put(
+        &sandbox.java_dir().join("i2ptunnel.config"),
+        &java_http(PORT, ""),
+    );
+    put(
+        &sandbox
+            .java_dir()
+            .join("i2ptunnel.config.d")
+            .join("a.config"),
+        "type=httpclient\nlistenPort=4444\n",
+    );
+    put(&sandbox.i2pd_file(), &i2pd_http(PORT, ""));
+    let stamps: Stamps = sandbox.stamps(Some(ConsoleKind::I2pd));
+    assert!(!names_java_file(&stamps), "V12: no Java file: {stamps:?}");
+    assert!(
+        has_stamp_with_time(&stamps, Path::new("i2pd.conf")),
+        "V12: the i2pd file: {stamps:?}"
+    );
+}
+
+#[test]
+fn v12_stamps_of_java_list_no_i2pd_file() {
+    let sandbox = Sandbox::new();
+    put(
+        &sandbox.java_dir().join("i2ptunnel.config"),
+        &java_http(PORT, ""),
+    );
+    put(&sandbox.i2pd_file(), &i2pd_http(PORT, ""));
+    let stamps = sandbox.stamps(Some(ConsoleKind::Java));
+    assert!(
+        !has_stamp(&stamps, Path::new("i2pd.conf")),
+        "V12: no i2pd file: {stamps:?}"
+    );
+    let all = sandbox.stamps(None);
+    assert!(
+        has_stamp(&all, Path::new("i2pd.conf")),
+        "V12: an unknown type lists the i2pd files too: {all:?}"
     );
 }
