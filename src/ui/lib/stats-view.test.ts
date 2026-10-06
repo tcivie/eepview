@@ -12,19 +12,71 @@ import {
 } from "./stats-view.ts";
 
 describe("Network page numbers", () => {
-  it("[browser-ui 11] shows a rate under 1 KB in B/s with one decimal", () => {
-    assert.match(formatRate(512), /^512\.0\s?B\/s$/);
+  it("[browser-ui 11] shows a rate under 1 000 B/s in whole bytes", () => {
+    assert.equal(formatRate(512), "512 B/s");
   });
-  it("[browser-ui 11] shows a rate in KB/s with one decimal", () => {
-    assert.match(formatRate(1536), /^1\.5\s?KB\/s$/);
+  it("[browser-ui 11] shows a rate in kB/s with K = 1 000", () => {
+    assert.equal(formatRate(1536), "1.54 kB/s");
   });
-  it("[browser-ui 11] shows a rate in MB/s with one decimal", () => {
-    assert.match(formatRate(3_000_000), /^(2\.9|3\.0)\s?MB\/s$/);
+  it("[browser-ui 11] shows a rate in MB/s with K = 1 000", () => {
+    assert.equal(formatRate(3_000_000), "3.00 MB/s");
   });
   it("[browser-ui 12] shows a ratio as a percentage with one decimal", () => {
     assert.equal(formatPercent(0.874), "87.4%");
     assert.equal(formatPercent(0.5), "50.0%");
     assert.equal(formatPercent(1), "100.0%");
+  });
+});
+
+describe("[R54] formatRate", () => {
+  it('[R54] null gives "—"', () => {
+    assert.equal(formatRate(null), "—");
+  });
+
+  it("[R54] below 1 000 it gives whole bytes, `<n> B/s`", () => {
+    assert.equal(formatRate(0), "0 B/s");
+    assert.equal(formatRate(230), "230 B/s");
+    assert.equal(formatRate(999), "999 B/s");
+  });
+
+  it("[R54] below 1 000 the byte count is rounded to an integer, with no decimal digit", () => {
+    assert.equal(formatRate(230.4), "230 B/s");
+    assert.equal(formatRate(229.6), "230 B/s");
+    assert.doesNotMatch(formatRate(230), /\./);
+  });
+});
+
+describe("[R54] formatRate units and digits", () => {
+  it("[R54] from 1 000 up to 1 000 000 it gives `<v> kB/s` with v = bps / 1 000", () => {
+    assert.equal(formatRate(1000), "1.00 kB/s");
+    assert.equal(formatRate(1024), "1.02 kB/s");
+    assert.equal(formatRate(53_910), "53.91 kB/s");
+  });
+
+  it("[R54] from 1 000 000 up it gives `<v> MB/s` with v = bps / 1 000 000", () => {
+    assert.equal(formatRate(1_000_000), "1.00 MB/s");
+    assert.equal(formatRate(2_500_000), "2.50 MB/s");
+  });
+
+  it("[R54] v has 2 decimals below 100, 1 decimal below 1 000, else none", () => {
+    assert.equal(formatRate(99_990), "99.99 kB/s");
+    assert.equal(formatRate(100_000), "100.0 kB/s");
+    assert.equal(formatRate(123_500), "123.5 kB/s");
+    assert.equal(formatRate(999_900), "999.9 kB/s");
+    assert.equal(formatRate(99_990_000), "99.99 MB/s");
+    assert.equal(formatRate(100_000_000), "100.0 MB/s");
+    assert.equal(formatRate(1_500_000_000), "1500 MB/s");
+  });
+
+  it("[R54] the Java I2P console rate of 53.91 KBps shows as 53.91 kB/s, not 52.6", () => {
+    assert.equal(formatRate(53_910), "53.91 kB/s");
+    assert.doesNotMatch(formatRate(53_910), /52\.6/);
+  });
+
+  it('[R54] never writes "KB/s", the unit is "kB/s"', () => {
+    for (const bps of [1000, 53_910, 123_500, 999_900]) {
+      assert.doesNotMatch(formatRate(bps), /KB\/s/);
+    }
   });
 });
 
@@ -46,9 +98,9 @@ const STATS: StatsLike = {
 
 describe("Network page", () => {
   const text = statsText(STATS);
-  it("[browser-ui 11] shows the bandwidth rates with a unit and one decimal", () => {
-    assert.match(text.bandwidthIn, /^1\.5\s?KB\/s$/);
-    assert.match(text.bandwidthOut, /^512\.0\s?B\/s$/);
+  it("[browser-ui 11] shows the bandwidth rates with a unit, K = 1 000", () => {
+    assert.equal(text.bandwidthIn, "1.54 kB/s");
+    assert.equal(text.bandwidthOut, "512 B/s");
   });
   it("[browser-ui 12] shows the tunnel build success ratio as a percentage with one decimal", () => {
     assert.equal(text.buildRate, "87.4%");

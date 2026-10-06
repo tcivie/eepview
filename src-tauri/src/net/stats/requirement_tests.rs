@@ -324,3 +324,184 @@ fn r40_record_spaced_stores_the_same_sample_as_record() {
         vec![recorded(50_000, &stats), recorded(60_000, &stats)]
     );
 }
+
+// ---------------------------------------------------------------- R49 recent, R50, R52 restored
+
+const TEN_MINUTES_MS: u64 = 600_000;
+
+/// A sample made the way the file makes it: from `{"t", "in", "out"}`.
+fn sample(t: u64, inbound: u64, out: u64) -> Sample {
+    serde_json::from_value(json!({ "t": t, "in": inbound, "out": out })).unwrap()
+}
+
+fn restored(samples: &[(u64, u64, u64)], now: u64) -> History {
+    let list = samples.iter().map(|&(t, i, o)| sample(t, i, o)).collect();
+    History::restored(list, now)
+}
+
+fn triples(samples: &[Sample]) -> Vec<(u64, u64, u64)> {
+    samples.iter().map(|s| (s.t, s.inbound, s.out)).collect()
+}
+
+#[test]
+fn r52_sample_deserializes_from_t_in_out() {
+    // R51, R52: the file writes a sample as `{"t": <Unix ms>, "in": <B/s>, "out": <B/s>}`.
+    let value = sample(1_234, 56, 78);
+    assert_eq!((value.t, value.inbound, value.out), (1_234, 56, 78));
+}
+
+#[test]
+fn r52_sample_serializes_to_t_in_out_and_nothing_else() {
+    let value = serde_json::to_value(sample(1_234, 56, 78)).unwrap();
+    assert_eq!(value, json!({ "t": 1_234, "in": 56, "out": 78 }));
+}
+
+#[test]
+fn r52_restored_keeps_the_samples_of_the_last_ten_minutes() {
+    // R52: `now - 600 000 <= t <= now`, both ends included.
+    let now = 5_000_000;
+    let history = restored(
+        &[
+            (now - TEN_MINUTES_MS - 1, 1, 1),
+            (now - TEN_MINUTES_MS, 2, 2),
+            (now - 5_000, 3, 3),
+            (now, 4, 4),
+            (now + 1, 5, 5),
+        ],
+        now,
+    );
+    assert_eq!(
+        triples(&history.samples()),
+        [
+            (now - TEN_MINUTES_MS, 2, 2),
+            (now - 5_000, 3, 3),
+            (now, 4, 4)
+        ]
+    );
+}
+
+#[test]
+fn r52_restored_drops_a_sample_less_than_four_seconds_after_the_previous_kept_one() {
+    let now = 5_000_000;
+    let base = now - 30_000;
+    let history = restored(
+        &[
+            (base, 1, 1),
+            (base + 3_999, 2, 2),
+            (base + 4_000, 3, 3),
+            (base + 7_999, 4, 4),
+            (base + 8_000, 5, 5),
+        ],
+        now,
+    );
+    assert_eq!(
+        times(&history),
+        vec![base, base + 4_000, base + 8_000],
+        "the gap counts from the previous kept sample"
+    );
+}
+
+#[test]
+fn r52_restored_keeps_the_samples_in_time_order() {
+    let now = 5_000_000;
+    let history = restored(
+        &[
+            (now - 5_000, 3, 3),
+            (now - 15_000, 1, 1),
+            (now - 10_000, 2, 2),
+        ],
+        now,
+    );
+    assert_eq!(
+        times(&history),
+        vec![now - 15_000, now - 10_000, now - 5_000]
+    );
+}
+
+#[test]
+fn r52_restored_of_nothing_is_an_empty_history() {
+    assert!(restored(&[], 5_000_000).samples().is_empty());
+}
+
+#[test]
+fn r52_restored_keeps_the_values_of_each_sample() {
+    let now = 5_000_000;
+    let history = restored(&[(now - 5_000, 53_910, 37_370)], now);
+    assert_eq!(triples(&history.samples()), [(now - 5_000, 53_910, 37_370)]);
+}
+
+#[test]
+fn r49_recent_gives_the_samples_of_the_last_ten_minutes_oldest_first() {
+    // R49: "stored samples whose `t` is at most 10 minutes (600 000 ms) before now".
+    let now = 5_000_000;
+    let mut history = History::default();
+    for (t, v) in [(now - 590_000, 1), (now - 300_000, 2), (now - 5_000, 3)] {
+        history.record_spaced(t, &with_bandwidth(v, v));
+    }
+    assert_eq!(
+        triples(&history.recent(now)),
+        [
+            (now - 590_000, 1, 1),
+            (now - 300_000, 2, 2),
+            (now - 5_000, 3, 3)
+        ]
+    );
+}
+
+#[test]
+fn r49_recent_drops_a_sample_more_than_ten_minutes_old() {
+    let now = 5_000_000;
+    let mut history = History::default();
+    history.record_spaced(now - TEN_MINUTES_MS - 1, &with_bandwidth(1, 1));
+    history.record_spaced(now - TEN_MINUTES_MS + 4_000, &with_bandwidth(2, 2));
+    assert_eq!(
+        triples(&history.recent(now)),
+        [(now - TEN_MINUTES_MS + 4_000, 2, 2)]
+    );
+}
+
+#[test]
+fn r49_recent_keeps_a_sample_exactly_ten_minutes_old() {
+    let now = 5_000_000;
+    let mut history = History::default();
+    history.record_spaced(now - TEN_MINUTES_MS, &with_bandwidth(1, 1));
+    assert_eq!(times_of(&history.recent(now)), vec![now - TEN_MINUTES_MS]);
+}
+
+#[test]
+fn r49_recent_of_an_empty_history_is_empty() {
+    assert!(History::default().recent(5_000_000).is_empty());
+}
+
+#[test]
+fn r49_recent_changes_nothing_in_the_history() {
+    let now = 5_000_000;
+    let mut history = History::default();
+    history.record_spaced(now - 5_000, &with_bandwidth(1, 1));
+    let before = history.samples();
+    let _ = history.recent(now + 3 * TEN_MINUTES_MS);
+    assert_eq!(history.samples(), before, "a read adds and removes nothing");
+}
+
+fn times_of(samples: &[Sample]) -> Vec<u64> {
+    samples.iter().map(|s| s.t).collect()
+}
+
+#[test]
+fn r50_the_history_keeps_every_sample_of_the_last_ten_minutes() {
+    // R50: at 5 s per round, at least the last 120 samples; nothing older than 10 minutes.
+    let start = 1_000_000;
+    let mut history = History::default();
+    for i in 0..300_u64 {
+        history.record_spaced(start + i * 5_000, &with_bandwidth(i, i));
+    }
+    let newest = start + 299 * 5_000;
+    let kept = history.samples();
+    assert!(kept.len() >= 120, "kept {}", kept.len());
+    assert_eq!(kept.last().map(|s| s.t), Some(newest));
+    assert!(kept.iter().all(|s| newest - s.t <= TEN_MINUTES_MS));
+    assert!(
+        kept.iter().any(|s| newest - s.t >= 595_000),
+        "the oldest of 10 minutes stays"
+    );
+}

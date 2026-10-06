@@ -226,9 +226,10 @@ fn console_answer(
 }
 
 /// A fake router helper on a free loopback port. It answers every request with `200` and
-/// a JSON body.
+/// a JSON body, and counts the requests.
 pub struct FakeHelper {
     addr: LoopbackAddr,
+    requests: Arc<AtomicUsize>,
 }
 
 impl FakeHelper {
@@ -236,8 +237,15 @@ impl FakeHelper {
     pub fn serving(json: &str) -> Self {
         let (listener, addr) = LoopbackAddr::listen_any().unwrap();
         let body = json.to_owned();
-        thread::spawn(move || serve_helper(&listener, &body));
-        Self { addr }
+        let requests = Arc::new(AtomicUsize::new(0));
+        let count = Arc::clone(&requests);
+        thread::spawn(move || serve_helper(&listener, &body, &count));
+        Self { addr, requests }
+    }
+
+    /// The requests received so far.
+    pub fn requests(&self) -> usize {
+        self.requests.load(Ordering::SeqCst)
     }
 
     /// The address it listens on.
@@ -246,11 +254,12 @@ impl FakeHelper {
     }
 }
 
-fn serve_helper(listener: &TcpListener, body: &str) {
+fn serve_helper(listener: &TcpListener, body: &str, count: &AtomicUsize) {
     for mut stream in listener.incoming().flatten() {
         if read_head(&mut stream).is_none() {
             continue;
         }
+        count.fetch_add(1, Ordering::SeqCst);
         let reply = format!(
             "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
             body.len()

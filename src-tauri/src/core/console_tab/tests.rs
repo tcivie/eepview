@@ -740,6 +740,7 @@ fn r28_a_restart_shows_no_console_tab() {
         settings: dir.join("settings.json"),
         sites: dir.join("sites.json"),
         icons: dir.join("icons"),
+        bandwidth: dir.join("bandwidth.json"),
     };
     let mut c = Core::new(Some(paths.clone()), "127.0.0.1:4444", 0);
     c.router_changed(status("ok", false));
