@@ -327,6 +327,8 @@ named_enum!(
         Hover => "hover",
         /// The input hook (links, keys, mouse buttons, context menus).
         Input => "input",
+        /// The failed-load hook.
+        LoadFailed => "load-failed",
         /// The clipboard.
         Clipboard => "clipboard",
         /// The first load of a tab.

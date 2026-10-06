@@ -13,6 +13,7 @@ const uiPages = [
   "setup",
   "blocked",
   "router-down",
+  "load-failed",
   "report",
   "toolbar",
   "status",

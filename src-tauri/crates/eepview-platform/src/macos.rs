@@ -13,12 +13,12 @@ use objc2::rc::Retained;
 use objc2::runtime::{AnyObject, NSObject, ProtocolObject, Sel};
 use objc2::{DefinedClass, MainThreadOnly, Message, define_class, msg_send, sel};
 use objc2_foundation::{
-    MainThreadMarker, NSError, NSNumber, NSObjectProtocol, NSString, NSUserDefaults,
+    MainThreadMarker, NSError, NSNumber, NSObjectProtocol, NSString, NSURL, NSUserDefaults,
 };
 use objc2_web_kit::{
     WKContentRuleList, WKContentRuleListStore, WKContentWorld, WKFindConfiguration, WKFindResult,
-    WKScriptMessage, WKScriptMessageHandler, WKUserContentController, WKUserScript,
-    WKUserScriptInjectionTime, WKWebView,
+    WKNavigation, WKNavigationDelegate, WKScriptMessage, WKScriptMessageHandler,
+    WKUserContentController, WKUserScript, WKUserScriptInjectionTime, WKWebView,
 };
 
 use objc2_app_kit::{
@@ -29,8 +29,8 @@ use objc2_foundation::NSRect;
 
 use crate::{
     CLEAR_SELECTION_SCRIPT, FindRequest, HOVER_CHANNEL, HOVER_SCRIPT, Hooks, INPUT_CHANNEL, Keys,
-    Native, Nav, PlatformWebview, Rules, WindowButtons, count_script, hover_target, input_script,
-    parse_message,
+    LoadFailure, Native, Nav, PlatformWebview, Rules, WindowButtons, count_script, hover_target,
+    input_script, parse_message,
 };
 
 thread_local! {
@@ -557,4 +557,131 @@ fn measure(window: &NSWindow, first: &NSButton, last: &NSButton) -> WindowButton
         right: b.origin.x + b.size.width,
         center_y: height - (a.origin.y + a.size.height / 2.0),
     }
+}
+
+/// The ivars of [`FailRelay`].
+pub struct FailIvars {
+    /// wry's navigation delegate: every call but the two fail calls goes straight to it.
+    inner: Retained<ProtocolObject<dyn WKNavigationDelegate>>,
+    callback: Box<dyn Fn(LoadFailure)>,
+}
+
+define_class!(
+    // SAFETY: NSObject has no subclassing rules; the class adds no Drop impl and only
+    // reads its ivars on the main thread.
+    #[unsafe(super(NSObject))]
+    #[thread_kind = MainThreadOnly]
+    #[ivars = FailIvars]
+    struct FailRelay;
+
+    // SAFETY: NSObjectProtocol has no required methods.
+    unsafe impl NSObjectProtocol for FailRelay {}
+
+    // SAFETY: the method signatures match the two optional fail methods of the protocol.
+    unsafe impl WKNavigationDelegate for FailRelay {
+        #[unsafe(method(webView:didFailProvisionalNavigation:withError:))]
+        fn did_fail_provisional(
+            &self,
+            view: &WKWebView,
+            navigation: Option<&WKNavigation>,
+            error: &NSError,
+        ) {
+            (self.ivars().callback)(load_failure(error));
+            let inner = &self.ivars().inner;
+            if inner.respondsToSelector(sel!(webView:didFailProvisionalNavigation:withError:)) {
+                // SAFETY: wry's delegate implements this method (checked above); all
+                // arguments are the live ones WebKit passed in.
+                unsafe { inner.webView_didFailProvisionalNavigation_withError(view, navigation, error) };
+            }
+        }
+
+        #[unsafe(method(webView:didFailNavigation:withError:))]
+        fn did_fail(&self, view: &WKWebView, navigation: Option<&WKNavigation>, error: &NSError) {
+            (self.ivars().callback)(load_failure(error));
+            let inner = &self.ivars().inner;
+            if inner.respondsToSelector(sel!(webView:didFailNavigation:withError:)) {
+                // SAFETY: as above.
+                unsafe { inner.webView_didFailNavigation_withError(view, navigation, error) };
+            }
+        }
+    }
+
+    impl FailRelay {
+        /// `WebKit` asks once, when the delegate is set, which methods exist: ours and wry's.
+        #[unsafe(method(respondsToSelector:))]
+        fn responds_to_selector(&self, selector: Sel) -> bool {
+            // SAFETY: `respondsToSelector:` of NSObject takes a selector and returns a BOOL.
+            let own: bool = unsafe { msg_send![super(self), respondsToSelector: selector] };
+            own || self.ivars().inner.respondsToSelector(selector)
+        }
+
+        /// Every other delegate call goes to wry's delegate.
+        #[unsafe(method(forwardingTargetForSelector:))]
+        fn forwarding_target(&self, _selector: Sel) -> *mut AnyObject {
+            let inner: &AnyObject = self.ivars().inner.as_ref();
+            std::ptr::from_ref(inner).cast_mut()
+        }
+    }
+);
+
+impl FailRelay {
+    fn new(
+        inner: Retained<ProtocolObject<dyn WKNavigationDelegate>>,
+        callback: Box<dyn Fn(LoadFailure)>,
+        mtm: MainThreadMarker,
+    ) -> Retained<Self> {
+        let this = mtm.alloc::<Self>().set_ivars(FailIvars { inner, callback });
+        // SAFETY: `init` of NSObject on a freshly allocated instance with ivars set.
+        unsafe { msg_send![super(this), init] }
+    }
+}
+
+/// The key under which a view keeps its [`FailRelay`] alive (only its address counts).
+static RELAY_KEY: u8 = 0;
+
+/// The failure that `WebKit` reports in `error`.
+fn load_failure(error: &NSError) -> LoadFailure {
+    let key = NSString::from_str("NSErrorFailingURLKey");
+    let url = error
+        .userInfo()
+        .objectForKey(&key)
+        .and_then(|value| value.downcast::<NSURL>().ok())
+        .and_then(|url| url.absoluteString())
+        .map(|text| text.to_string());
+    LoadFailure {
+        domain: error.domain().to_string(),
+        code: i64::try_from(error.code()).unwrap_or_default(),
+        url,
+    }
+}
+
+/// Puts a [`FailRelay`] in front of wry's navigation delegate. The view keeps the relay alive.
+///
+/// # Errors
+///
+/// Fails when the engine handle or wry's delegate is missing.
+pub fn on_load_failed(
+    webview: &PlatformWebview,
+    callback: Box<dyn Fn(LoadFailure)>,
+) -> Result<(), String> {
+    let (view, mtm) = view(webview)?;
+    // SAFETY: a plain getter on a live view on the main thread.
+    let inner = unsafe { view.navigationDelegate() }.ok_or("no navigation delegate")?;
+    let relay = FailRelay::new(inner, callback, mtm);
+    let object: &AnyObject = view.as_ref();
+    let value: &AnyObject = relay.as_ref();
+    // SAFETY: both objects are live; the view retains the relay for its whole life, and the
+    // key is the address of a static.
+    unsafe {
+        objc2::ffi::objc_setAssociatedObject(
+            std::ptr::from_ref(object).cast_mut(),
+            std::ptr::from_ref(&RELAY_KEY).cast(),
+            std::ptr::from_ref(value).cast_mut(),
+            objc2::ffi::OBJC_ASSOCIATION_RETAIN_NONATOMIC,
+        );
+    }
+    // SAFETY: a setter on a live view on the main thread; the delegate is weak, and the
+    // association above keeps the relay alive.
+    unsafe { view.setNavigationDelegate(Some(ProtocolObject::from_ref(&*relay))) };
+    Ok(())
 }

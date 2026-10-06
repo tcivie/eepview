@@ -56,6 +56,11 @@
       "query": "dev=1"
     },
     {
+      "name": "load-failed",
+      "page": "load-failed.html",
+      "query": "dev=1"
+    },
+    {
       "name": "status",
       "page": "status.html",
       "query": "dev=1"

@@ -6,7 +6,7 @@
 //! reload and zoom use Tauri. Only `WebView2` lacks a native find with counts, so it gets an
 //! app-injected script (`ExecuteScript` runs with page JavaScript off).
 
-use eepview_platform::{FindRequest, Nav, PlatformWebview};
+use eepview_platform::{FindRequest, LoadFailure, Nav, PlatformWebview};
 use tauri::{AppHandle, Manager, Runtime, Webview};
 
 use super::apply::with_core;
@@ -83,6 +83,23 @@ pub fn native_hooks<R: Runtime>(platform: &PlatformWebview, app: &AppHandle<R>, 
     if eepview_platform::on_hover(platform, hover_callback(app, tab)).is_err() {
         bridge_failed(OpKind::Hover);
     }
+    if eepview_platform::on_load_failed(platform, fail_callback(app, tab)).is_err() {
+        bridge_failed(OpKind::LoadFailed);
+    }
+}
+
+/// The callback that gets a load the engine failed in `tab`. A cancelled load is no failure.
+fn fail_callback<R: Runtime>(app: &AppHandle<R>, tab: u32) -> Box<dyn Fn(LoadFailure)> {
+    let app = app.clone();
+    Box::new(move |failure: LoadFailure| {
+        let Some(reason) = failure.reason() else {
+            return;
+        };
+        let code = failure.code_text();
+        with_core(&app, |core| {
+            core.load_failed(tab, failure.url.as_deref(), reason.as_str(), &code)
+        });
+    })
 }
 
 /// The callback that gets the link under the mouse in `tab`.

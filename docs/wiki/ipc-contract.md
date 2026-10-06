@@ -39,13 +39,14 @@ One OS window with several webviews (Tauri `unstable` multi-webview).
 
 On macOS the window has an overlay title bar with a hidden title. The traffic lights sit in the tab row. Windows and Linux keep the native decorations.
 
-Internal pages: `eepview://home`, `bookmarks`, `history`, `stats`, `settings`, `setup`, `blocked`, `router-down`.
+Internal pages: `eepview://home`, `bookmarks`, `history`, `stats`, `settings`, `setup`, `blocked`, `router-down`, `load-failed`.
 `eepview://<page>?<query>` loads `src/ui/<page>.html?<query>` in the `internal` webview.
 
 | Page | Parameters |
 |---|---|
 | `blocked` | `url`: the refused address |
 | `router-down` | `url`: the page to load when the router is back; `state`: `RouterStatus.state`; `reason=paused` while the connection is paused |
+| `load-failed` | `url`: the address that did not load; `reason`: `blocked`, `unreachable` or `engine`; `code`: the engine error, such as `NSURLErrorDomain -1022` ([Browser shell](browser-shell.md), F1 to F7) |
 | `history` | `q`: the search text from the address bar |
 
 ## Commands

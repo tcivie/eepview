@@ -131,6 +131,33 @@ impl Core {
         fx
     }
 
+    /// The engine failed the main-frame load of tab `id` (docs/wiki/browser-shell.md F1, F5,
+    /// F6): the tab stops loading and shows the `load-failed` page. `url` is the address the
+    /// engine failed; a non-I2P one is replaced by the address the tab was loading. A failure
+    /// for a tab that is not loading a web page changes nothing.
+    pub fn load_failed(
+        &mut self,
+        id: u32,
+        url: Option<&str>,
+        reason: &str,
+        code: &str,
+    ) -> Vec<Effect> {
+        if !self.shows_web(id) {
+            return Vec::new();
+        }
+        let Some(tab) = self.tabs.get(id).filter(|t| t.loading) else {
+            return Vec::new();
+        };
+        let address = url.filter(|u| is_allowed(u)).unwrap_or(&tab.url).to_owned();
+        let params = [
+            ("url", address.as_str()),
+            ("reason", reason),
+            ("code", code),
+        ];
+        let page = internal_with("load-failed", &params);
+        self.go_internal(id, &page)
+    }
+
     /// The document title of a tab changed.
     pub fn title_changed(&mut self, id: u32, title: &str) -> Vec<Effect> {
         if !self.shows_web(id) {

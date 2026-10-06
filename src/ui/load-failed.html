@@ -1,0 +1,43 @@
+<!doctype html>
+<!--
+  SPDX-FileCopyrightText: 2026 The eepview contributors
+  SPDX-License-Identifier: MIT
+-->
+<html lang="en">
+  <head>
+    <script src="/theme-boot.js"></script>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Page did not load</title>
+    <link rel="icon" type="image/svg+xml" href="../../assets/brand/eepview-mark-small.svg" />
+    <link rel="stylesheet" href="./theme.css" />
+    <link rel="stylesheet" href="./ui.css" />
+    <link rel="stylesheet" href="./pages.css" />
+    <script type="module" src="./load-failed.ts"></script>
+  </head>
+  <body>
+    <main class="notice" id="main">
+      <ol class="hops notice-hops" aria-label="The page stopped before the I2P router">
+        <li class="hop" data-state="built"><span class="hop-node"></span>You</li>
+        <li class="hop" data-state="refused"><span class="hop-node"></span>Engine</li>
+        <li class="hop"><span class="hop-node"></span>Router</li>
+        <li class="hop hop-end"><span class="hop-node"></span>Site</li>
+      </ol>
+      <h1 class="display">This page did not load</h1>
+      <p class="lede" id="failed-reason">
+        The system stopped the request before it left your computer, so nothing went out.
+      </p>
+      <div class="banner banner-lg" data-tone="danger">
+        <p class="caption">Address</p>
+        <p class="refused-url" id="failed-url">http://stats.i2p/</p>
+        <p class="hint" id="failed-code-line">Error <span class="mono" id="failed-code">NSURLErrorDomain -1022</span></p>
+      </div>
+      <div class="actions notice-actions">
+        <button class="btn btn-primary" type="button" id="retry-btn">Try again</button>
+        <button class="btn" type="button" id="back-btn">Go back</button>
+      </div>
+      <p class="notice-hint"><a class="report-link" id="report-link" href="./report.html">Report this problem</a></p>
+    </main>
+  </body>
+</html>

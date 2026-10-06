@@ -45,6 +45,18 @@ Found in QA of the first shell build. Fixed in [#57](https://github.com/tcivie/e
 - The macOS leak test runs the binary inside the `.app` bundle, as users do. A bare binary has no `Info.plist`, so ATS never applies to it.
 - The release job checks the key in the `.app` of each dmg (`scripts/verify-dmg-signature.sh`), so a bundler change that drops it fails the release.
 
+## Failed loads
+
+A tab never spins forever. Before this, a load that the engine failed on macOS left the tab loading with a blank page: wry reports no failed navigation there.
+
+- **F1.** When the engine fails the main-frame load of a web tab, before the first commit or after it, the tab stops loading and shows `eepview://load-failed?url=<address>&reason=<reason>&code=<code>`. On macOS the platform bridge reports `webView:didFailProvisionalNavigation:withError:` and `webView:didFailNavigation:withError:` (`eepview_platform::on_load_failed`). Windows (`NavigationCompleted`) and Linux (`load-changed` after `load-failed`) already report a failed load as finished and show the engine's own error page, so the bridge reports nothing there.
+- **F2.** A cancelled load is not a failure, and the tab stays as it is: `NSURLErrorDomain` -999 (a new load replaced it, or Stop) and `WebKitErrorDomain` 102 (the navigation guard or a download policy stopped it).
+- **F3.** `reason` is `blocked` when the system or the engine filter stopped the request before it left the computer (`NSURLErrorDomain` -1022 App Transport Security, `WebKitErrorDomain` 104 content rule list). It is `unreachable` when the connection to the gatekeeper failed (`NSURLErrorDomain` -1001 timed out, -1003 host not found, -1004 cannot connect, -1005 connection lost, -1006 DNS failed, -1009 offline). Any other error is `engine`.
+- **F4.** `code` is the error domain, a space and the error number, for example `NSURLErrorDomain -1022`.
+- **F5.** `url` is the address the engine failed, when it is an allowed I2P address. Otherwise it is the address the tab was loading. A non-I2P address never reaches the page.
+- **F6.** A failed load makes no history entry. Back leaves the error page for the page before it. A failure for a tab that is not loading a web page (it shows an internal page, or the load already ended) changes nothing.
+- **F7.** The page says that the page did not load, shows the address, a sentence for the reason and the code, and has **Try again** (navigates to the address again), **Go back**, and the "Report this problem" link of kind `load-failed`.
+
 ## Toolbar popups
 
 The toolbar has four popups: the address suggestions, the main menu, the router panel and the router hint (hovering the router dot). They show in their own webview, `popup`, over the page. The toolbar never grows for them.
