@@ -6,7 +6,8 @@
 # Allowed at the top level: the `@layer a, b;` order statement, `:root` token blocks, and an
 # `@media` or `@supports` block that holds only `:root` blocks.
 #
-# Usage: awk -v layers="base components pages state" -f scripts/css-layers.awk file.css ...
+# Run it in the C locale (LC_ALL=C): macOS awk stops on a multibyte character in UTF-8.
+# Usage: LC_ALL=C awk -v layers="base components pages state" -f scripts/css-layers.awk file.css ...
 # Prints one "file:line: reason" per fault and exits 1 when there is one.
 
 BEGIN {

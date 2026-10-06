@@ -61,7 +61,7 @@ scan "$TS_STYLE" "no inline style in code" 'src/*.ts' 'scripts/*.mjs'
 LAYERS="$(sed -nE 's/^@layer ([a-z, -]+);$/\1/p' "$THEME" | tr -d ',')"
 [ -n "$LAYERS" ] || fail "${THEME} must declare the layer order (@layer a, b, c;)"
 css_layers() {
-  git ls-files -z -- '*.css' | xargs -0 awk -v layers="$LAYERS" -f scripts/css-layers.awk || true
+  git ls-files -z -- '*.css' | xargs -0 env LC_ALL=C awk -v layers="$LAYERS" -f scripts/css-layers.awk || true
 }
 report "every rule must sit in a layer that ${THEME} declares" < <(css_layers)
 exit "$status"

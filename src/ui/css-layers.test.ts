@@ -26,8 +26,10 @@ function check(css: string): Result {
   const file = join(dir, "sample.css");
   writeFileSync(file, css);
   try {
+    // The C locale reads bytes: macOS awk stops on a multibyte character in a UTF-8 locale.
     const out = execFileSync("awk", ["-v", `layers=${LAYERS}`, "-f", SCRIPT, file], {
       encoding: "utf8",
+      env: { ...process.env, LC_ALL: "C" },
     });
     return { ok: true, out };
   } catch (error) {
@@ -87,6 +89,10 @@ describe("the layer rule of the style check fails", () => {
 });
 
 describe("the layer rule of the style check", () => {
+  it("reads a stylesheet with multibyte text in any locale", () => {
+    assert.equal(check('@layer pages {\n  .a::before { content: "✓ –"; }\n}\n').ok, true);
+  });
+
   it("ignores braces in comments", () => {
     assert.equal(
       check("/* .a { } */\n@layer pages {\n  /* } .b { */\n  .c { gap: 0; }\n}\n").ok,
