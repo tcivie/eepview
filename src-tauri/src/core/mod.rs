@@ -4,6 +4,7 @@
 //! The browser state machine. Pure: commands and engine events go in, [`Effect`]s come out,
 //! and the shell (`shell/`) carries them out. No Tauri runtime here, so all of it is tested.
 
+pub mod checks;
 mod console_tab;
 pub mod find;
 mod keys;
@@ -208,6 +209,8 @@ pub struct Core {
     icon_jobs: site_icons::IconJobs,
     paths: Option<Paths>,
     router: RouterStatus,
+    /// The four router checks of the Home page (`docs/wiki/router-checks.md`).
+    checks: checks::Checks,
     find: Option<FindState>,
     find_open: bool,
     toolbar_request: f64,
@@ -252,6 +255,7 @@ impl Core {
             stats: stats::StatsState::load(paths.as_ref(), now),
             paths,
             router: verifying(proxy),
+            checks: checks::Checks::new(),
             find: None,
             find_open: false,
             toolbar_request: 0.0,

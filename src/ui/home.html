@@ -94,13 +94,33 @@
               <span class="chip" id="router-chip" data-tone="building">Checking</span>
               <span id="router-text">Checking the router.</span>
             </p>
-            <ol class="hops hops-compact" id="router-hops" aria-label="Your traffic passes 3 hops before it reaches a site">
-              <li class="hop" data-state="built"><span class="hop-node"></span>You</li>
-              <li class="hop"><span class="hop-node"></span>Hop</li>
-              <li class="hop"><span class="hop-node"></span>Hop</li>
-              <li class="hop"><span class="hop-node"></span>Hop</li>
-              <li class="hop hop-end"><span class="hop-node"></span>Site</li>
+            <ol class="checks" id="router-checks" aria-label="Router checks">
+              <li class="check" data-check="proxy-i2p" data-state="pending">
+                <span class="check-mark" aria-hidden="true"></span>
+                <span class="check-name">Proxy is an I2P router</span>
+                <span class="check-state">Waiting</span>
+                <span class="check-detail" hidden></span>
+              </li>
+              <li class="check" data-check="version" data-state="pending">
+                <span class="check-mark" aria-hidden="true"></span>
+                <span class="check-name">Router version is supported</span>
+                <span class="check-state">Waiting</span>
+                <span class="check-detail" hidden></span>
+              </li>
+              <li class="check" data-check="no-outproxy" data-state="pending">
+                <span class="check-mark" aria-hidden="true"></span>
+                <span class="check-name">No outproxy</span>
+                <span class="check-state">Waiting</span>
+                <span class="check-detail" hidden></span>
+              </li>
+              <li class="check" data-check="tunnels" data-state="pending">
+                <span class="check-mark" aria-hidden="true"></span>
+                <span class="check-name">Network up, client tunnel built</span>
+                <span class="check-state">Waiting</span>
+                <span class="check-detail" hidden></span>
+              </li>
             </ol>
+            <p class="visually-hidden" id="router-checks-live" role="status" aria-live="polite"></p>
           </div>
           <dl class="facts router-card-facts">
             <div>

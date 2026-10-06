@@ -4,6 +4,7 @@
 //! The state the shell shares between commands, engine callbacks and the router watcher.
 
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
@@ -16,7 +17,15 @@ use crate::context_menu::Target;
 use crate::core::Core;
 use crate::net::console::VerifiedConsole;
 use crate::net::gatekeeper::Gatekeeper;
+use crate::net::outproxy::{OutproxyFinding, RouterKind};
 use crate::popup::Popups;
+
+/// What the outproxy finding of router check 3 was read from: router type, proxy port and
+/// the stamps of the files, then the finding.
+pub type OutproxySeen = (
+    (Option<RouterKind>, u16, Vec<(PathBuf, Option<SystemTime>)>),
+    OutproxyFinding,
+);
 
 /// Shared shell state, managed by Tauri.
 pub struct Shared<R: Runtime> {
@@ -56,6 +65,10 @@ pub struct Shared<R: Runtime> {
     /// The label of the webview of the last context menu, and its target: the chosen item
     /// acts on them.
     pub menu_target: Mutex<Option<(String, Target)>>,
+    /// True while router checks 2 to 4 run on their thread: a round skips them meanwhile.
+    pub checks_busy: AtomicBool,
+    /// The last outproxy finding and the file stamps it came from (router check 3).
+    pub outproxy_seen: Mutex<Option<OutproxySeen>>,
     generation: AtomicU64,
 }
 
@@ -81,6 +94,8 @@ impl<R: Runtime> Shared<R> {
             buttons: Mutex::new(None),
             popups: Mutex::new(Popups::default()),
             menu_target: Mutex::new(None),
+            checks_busy: AtomicBool::new(false),
+            outproxy_seen: Mutex::new(None),
             generation: AtomicU64::new(0),
         }
     }

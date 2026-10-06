@@ -17,6 +17,7 @@ import type {
   Settings,
   Suggestion,
   TabInfo,
+  VerifyCheck,
 } from "./contract.ts";
 import type { Backend } from "./ipc.ts";
 
@@ -222,5 +223,53 @@ describe("contract: history", () => {
     assert.equal(rest.length, all.length - 1);
     await invoke("history_clear", { range: "all" });
     assert.deepEqual(await invoke("history_query", { query: { limit: 10_000 } }), []);
+  });
+});
+
+const IDS = ["proxy-i2p", "version", "no-outproxy", "tunnels"];
+const STATES = ["pending", "running", "passed", "failed", "not-checked"];
+const checks = async (): Promise<VerifyCheck[]> =>
+  ((await invoke("router_status")) as RouterStatus).checks;
+
+describe("contract: router checks (V1)", () => {
+  it("V1: router_status has exactly four checks, in the order of the table", async () => {
+    const list = await checks();
+    assert.ok(Array.isArray(list), "router_status has checks");
+    assert.deepEqual(
+      list.map((c) => c.id),
+      IDS,
+    );
+  });
+  it("V1: each check is {id, state, detail, passedAt}", async () => {
+    for (const c of await checks()) {
+      assert.deepEqual(Object.keys(c).sort(), ["detail", "id", "passedAt", "state"], c.id);
+    }
+  });
+  it("V2: every state is one of pending, running, passed, failed and not-checked", async () => {
+    for (const c of await checks()) assert.ok(STATES.includes(c.state), `${c.id}: ${c.state}`);
+  });
+});
+
+describe("contract: router checks (V3, V4)", () => {
+  it("V4: passedAt is a number exactly when the state is passed, else null", async () => {
+    for (const c of await checks()) {
+      if (c.state === "passed") {
+        assert.equal(typeof c.passedAt, "number", c.id);
+      } else {
+        assert.equal(c.passedAt, null, c.id);
+      }
+    }
+  });
+  it("V3: a failed or not-checked check has a detail that is not empty", async () => {
+    for (const c of await checks()) {
+      if (c.state === "failed" || c.state === "not-checked") {
+        assert.ok(typeof c.detail === "string" && c.detail.length > 0, `${c.id}: ${c.detail}`);
+      }
+    }
+  });
+  it("V3: a pending or running check has a null detail", async () => {
+    for (const c of await checks()) {
+      if (c.state === "pending" || c.state === "running") assert.equal(c.detail, null, c.id);
+    }
   });
 });

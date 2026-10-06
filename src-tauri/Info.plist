@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  SPDX-FileCopyrightText: 2026 The eepview contributors
+  SPDX-License-Identifier: MIT
+
+  Merged into the macOS app bundle by Tauri. Eepsites are plain http://, and App Transport
+  Security refuses every http:// load of a WKWebView in a bundled app (the tab never loads).
+  This key lifts that rule for web view content only. Every content request still goes to the
+  gatekeeper on loopback (ADR 0001). The Rust code uses plain sockets, which ATS never covers.
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoadsInWebContent</key>
+		<true/>
+	</dict>
+</dict>
+</plist>

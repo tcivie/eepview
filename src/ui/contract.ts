@@ -42,6 +42,16 @@ export type Suggestion = { url: string; title: string; source: "bookmark" | "his
 
 export type RouterState = "verifying" | "ok" | "building" | "down" | "not-i2p" | "outproxy";
 
+/** The four router checks (contract v1.9, docs/wiki/router-checks.md). */
+export type CheckId = "proxy-i2p" | "version" | "no-outproxy" | "tunnels";
+export type CheckState = "pending" | "running" | "passed" | "failed" | "not-checked";
+export type VerifyCheck = {
+  id: CheckId;
+  state: CheckState;
+  detail: string | null;
+  passedAt: number | null;
+};
+
 export type RouterStatus = {
   state: RouterState;
   proxy: string;
@@ -49,6 +59,7 @@ export type RouterStatus = {
   detail: string | null;
   managed: boolean;
   paused: boolean;
+  checks: VerifyCheck[];
 };
 
 export type Settings = {

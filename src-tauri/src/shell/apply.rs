@@ -156,7 +156,7 @@ fn payload(core: &Core, event: &Event) -> (&'static str, Value) {
         Event::TabsChanged => ("tabs-changed", json!(core.tab_infos())),
         Event::TabUpdated(id) => ("tab-updated", json!(core.tab_info(*id))),
         Event::Find(result) => ("find-result", json!(result)),
-        Event::Router => ("router-status", json!(core.router())),
+        Event::Router => ("router-status", json!(core.router_report())),
         Event::Bookmarks => ("bookmarks-changed", Value::Null),
         Event::History => ("history-changed", Value::Null),
         Event::Settings => ("settings-changed", json!(core.settings())),

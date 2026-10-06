@@ -24,7 +24,7 @@ use crate::store::settings::Settings;
 use crate::tabs::Place;
 use crate::types::{
     Bookmark, ChromeInsets, ControlResult, HistoryEntry, HistoryQuery, NavResult, NewBookmark,
-    RouterStatus, Suggestion, TabInfo,
+    RouterReport, Suggestion, TabInfo,
 };
 
 type Res<T> = Result<T, String>;
@@ -430,8 +430,8 @@ pub async fn settings_set<R: Runtime>(app: AppHandle<R>, patch: Value) -> Res<Se
 ///
 /// Fails only when the worker thread that runs the command panics.
 #[tauri::command]
-pub async fn router_status<R: Runtime>(app: AppHandle<R>) -> Res<RouterStatus> {
-    read(app, move |c| c.router().clone()).await
+pub async fn router_status<R: Runtime>(app: AppHandle<R>) -> Res<RouterReport> {
+    read(app, Core::router_report).await
 }
 
 /// `router_stats()`: the figures of the last round of the stats sampler (`shell::sampler`),

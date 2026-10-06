@@ -176,7 +176,7 @@ fn direct_calls_match_the_ipc_answers() {
     assert_eq!(block_on(tab_list(handle(&app))).unwrap().len(), 1);
     assert!(block_on(tab_new(handle(&app), None)).is_ok());
     assert_eq!(
-        block_on(router_status(handle(&app))).unwrap().proxy,
+        block_on(router_status(handle(&app))).unwrap().status.proxy,
         "127.0.0.1:4444"
     );
 }

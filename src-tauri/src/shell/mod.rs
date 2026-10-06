@@ -14,6 +14,7 @@
 //! - [`input`]: link clicks, keys, mouse buttons and context menus from the engines.
 
 pub mod apply;
+pub mod checks;
 pub mod chrome;
 pub mod commands;
 pub mod console;
