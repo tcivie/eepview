@@ -21,17 +21,26 @@ interface Result {
   out: string;
 }
 
-function check(css: string): Result {
+/** A UTF-8 locale that exists on the runner: macOS has en_US.UTF-8, Linux has C.UTF-8. */
+const UTF8 = process.platform === "darwin" ? "en_US.UTF-8" : "C.UTF-8";
+
+/** Runs the check. Exit 1 is a found fault; any other failure is an awk crash and throws. */
+function check(css: string, locale = "C"): Result {
   const dir = mkdtempSync(join(tmpdir(), "css-layers-"));
   const file = join(dir, "sample.css");
   writeFileSync(file, css);
   try {
     const out = execFileSync("awk", ["-v", `layers=${LAYERS}`, "-f", SCRIPT, file], {
       encoding: "utf8",
+      env: { ...process.env, LC_ALL: locale },
     });
     return { ok: true, out };
   } catch (error) {
-    return { ok: false, out: String((error as { stdout?: string }).stdout ?? "") };
+    const failed = error as { status?: number; stdout?: string; stderr?: string };
+    if (failed.status !== 1) {
+      throw new Error(`awk crashed (exit ${failed.status}): ${failed.stderr ?? ""}`);
+    }
+    return { ok: false, out: String(failed.stdout ?? "") };
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -87,6 +96,13 @@ describe("the layer rule of the style check fails", () => {
 });
 
 describe("the layer rule of the style check", () => {
+  it("reads multibyte text in a UTF-8 locale, and still finds a fault after it", () => {
+    const css = '@layer pages {\n  .a::before { content: "✓ ✕ –"; }\n}\n.b { gap: 0; }\n';
+    const result = check(css, UTF8);
+    assert.equal(result.ok, false);
+    assert.match(result.out, /:4: rule outside @layer: \.b/);
+  });
+
   it("ignores braces in comments", () => {
     assert.equal(
       check("/* .a { } */\n@layer pages {\n  /* } .b { */\n  .c { gap: 0; }\n}\n").ok,

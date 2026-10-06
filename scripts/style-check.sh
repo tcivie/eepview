@@ -60,8 +60,18 @@ scan "$HTML_STYLE" "no inline style in HTML" '*.html'
 scan "$TS_STYLE" "no inline style in code" 'src/*.ts' 'scripts/*.mjs'
 LAYERS="$(sed -nE 's/^@layer ([a-z, -]+);$/\1/p' "$THEME" | tr -d ',')"
 [ -n "$LAYERS" ] || fail "${THEME} must declare the layer order (@layer a, b, c;)"
+# awk exits 1 when it found a fault. Any other non-zero exit is a crash, and a crash must fail the
+# gate: it prints only to stderr, so the report would read nothing and pass. awk runs once, without
+# xargs, because xargs turns every exit code into the same one.
 css_layers() {
-  git ls-files -z -- '*.css' | xargs -0 awk -v layers="$LAYERS" -f scripts/css-layers.awk || true
+  local code=0 file sheets=()
+  while IFS= read -r -d '' file; do
+    sheets+=("$file")
+  done < <(git ls-files -z -- '*.css')
+  awk -v layers="$LAYERS" -f scripts/css-layers.awk "${sheets[@]}" || code=$?
+  if [ "$code" -gt 1 ]; then
+    echo "scripts/css-layers.awk: awk stopped with exit ${code}, so the layer check did not run"
+  fi
 }
 report "every rule must sit in a layer that ${THEME} declares" < <(css_layers)
 exit "$status"
