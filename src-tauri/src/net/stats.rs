@@ -10,7 +10,7 @@ use std::collections::VecDeque;
 use std::io::{Read, Write};
 use std::time::Duration;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use super::loopback::LoopbackAddr;
@@ -25,8 +25,11 @@ pub const HISTORY_SPAN_MS: u64 = 10 * 60 * 1000;
 /// [`History::record_spaced`] adds no sample when the newest one is younger than this.
 pub const MIN_SAMPLE_GAP_MS: u64 = 4_000;
 
-/// One bandwidth sample, bytes per second over the last second.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+/// The saved history is written at most once per this many ms.
+pub const SAVE_EVERY_MS: u64 = 60_000;
+
+/// One bandwidth sample, bytes per second: the "now" figure of the source.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Sample {
     /// Unix time in ms.
     pub t: u64,
@@ -37,7 +40,8 @@ pub struct Sample {
     pub out: u64,
 }
 
-/// The bandwidth of the last 10 minutes, one sample per watcher tick (5 s). Memory only.
+/// The bandwidth of the last 10 minutes, one sample per sampler round (5 s). The store
+/// `store::bandwidth` saves it.
 #[derive(Debug, Default)]
 pub struct History {
     samples: VecDeque<Sample>,
@@ -73,10 +77,44 @@ impl History {
         }
     }
 
+    /// The newest sample, if any.
+    #[must_use]
+    pub fn newest(&self) -> Option<Sample> {
+        self.samples.back().copied()
+    }
+
     /// The samples, oldest first.
     #[must_use]
     pub fn samples(&self) -> Vec<Sample> {
         self.samples.iter().copied().collect()
+    }
+
+    /// A history from saved samples: in time order, each sample with
+    /// `now - HISTORY_SPAN_MS <= t <= now` that is at least [`MIN_SAMPLE_GAP_MS`] after the
+    /// previous kept one.
+    #[must_use]
+    pub fn restored(now: u64, mut samples: Vec<Sample>) -> Self {
+        samples.sort_by_key(|s| s.t);
+        let window = now.saturating_sub(HISTORY_SPAN_MS)..=now;
+        let mut kept: VecDeque<Sample> = VecDeque::new();
+        for sample in samples.into_iter().filter(|s| window.contains(&s.t)) {
+            let spaced = kept
+                .back()
+                .is_none_or(|last| sample.t - last.t >= MIN_SAMPLE_GAP_MS);
+            kept.extend(spaced.then_some(sample));
+        }
+        Self { samples: kept }
+    }
+
+    /// The samples of the last 10 minutes before `now`, oldest first.
+    #[must_use]
+    pub fn recent(&self, now: u64) -> Vec<Sample> {
+        let oldest = now.saturating_sub(HISTORY_SPAN_MS);
+        self.samples
+            .iter()
+            .filter(|s| s.t >= oldest)
+            .copied()
+            .collect()
     }
 }
 

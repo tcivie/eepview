@@ -174,6 +174,7 @@ fn r1_2_enum_values_match_the_table() {
         (StoreKind::History, "history"),
         (StoreKind::Settings, "settings"),
         (StoreKind::Sites, "sites"),
+        (StoreKind::Bandwidth, "bandwidth"),
     ];
     for (value, name) in stores {
         assert_eq!(value.as_str(), name);

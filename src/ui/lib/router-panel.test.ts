@@ -131,12 +131,57 @@ describe("Router panel sparkline", () => {
   it("Router panel: keeps a history shorter than 10 minutes whole", () => {
     assert.deepEqual(recentWindow([1, 2, 3], 5), [1, 2, 3]);
   });
-  it("Router panel: trims both directions of the history to 10 minutes", () => {
-    const long = Array.from({ length: 300 }, (_, n) => n);
-    const series = sparkSeries({ stepSeconds: 5, inBps: long, outBps: long });
-    assert.ok((series?.inBps.length ?? 0) <= 121);
-    assert.ok((series?.outBps.length ?? 0) <= 121);
+});
+
+/** 120 slots, all null, with the given `[slot, value]` pairs set. */
+const slotsOf = (...entries: [number, number][]): (number | null)[] => {
+  const slots: (number | null)[] = Array.from({ length: 120 }, () => null);
+  for (const [slot, value] of entries) slots[slot] = value;
+  return slots;
+};
+
+describe("[R54] the router panel writes the rates with K = 1 000", () => {
+  it("[R54] shows 2 048 B/s as 2.05 kB/s and 1 000 000 B/s as 1.00 MB/s", () => {
+    const { bandwidth } = panelText(stats());
+    assert.ok(bandwidth.includes("2.05 kB/s"), bandwidth);
+    assert.ok(bandwidth.includes("1.00 MB/s"), bandwidth);
+    assert.ok(!bandwidth.includes("KB/s"), bandwidth);
+  });
+});
+
+describe("[R55] the router panel sparkline draws the slots", () => {
+  const history = (inBps: (number | null)[], outBps: (number | null)[]) => ({
+    stepSeconds: 5,
+    inBps,
+    outBps,
+  });
+
+  it("[R55] gives the 120 slots of both series as they are, nulls included", () => {
+    const inBps = slotsOf([10, 5], [11, 6], [119, 7]);
+    const outBps = slotsOf([0, 1], [1, 2]);
+    assert.deepEqual(sparkSeries(history(inBps, outBps)), { inBps, outBps });
+  });
+
+  it("[R55] gives null when the history is null", () => {
     assert.equal(sparkSeries(null), null);
+  });
+
+  it("[R55] gives null when a series has fewer than 2 non-null values", () => {
+    const many = slotsOf([1, 1], [2, 2], [3, 3]);
+    assert.equal(sparkSeries(history(slotsOf([5, 5]), many)), null);
+    assert.equal(sparkSeries(history(many, slotsOf([5, 5]))), null);
+    assert.equal(sparkSeries(history(many, slotsOf())), null);
+    assert.equal(sparkSeries(history(slotsOf(), slotsOf())), null);
+  });
+
+  it("[R55] counts the non-null values, not the slots: two values apart are enough", () => {
+    const apart = slotsOf([3, 1], [90, 2]);
+    assert.deepEqual(sparkSeries(history(apart, apart)), { inBps: apart, outBps: apart });
+  });
+
+  it("[R55] keeps a zero value, which is a figure and not a gap", () => {
+    const zeros = slotsOf([118, 0], [119, 0]);
+    assert.deepEqual(sparkSeries(history(zeros, zeros)), { inBps: zeros, outBps: zeros });
   });
 });
 
@@ -251,19 +296,22 @@ describe("[R43] the tunnels line keeps the in and out form", () => {
 describe("[R43] the tunnels line of an i2pd answer", () => {
   it("[R43] shows — in · — out · <participating> participating", () => {
     // R38: i2pd gives no tunnels.in, out, client or exploratory; only participating.
-    const view = statsView({
-      version: null,
-      uptimeMs: 93_784_000,
-      uptimeResolutionMs: 1000,
-      networkStatus: "OK",
-      knownRouters: 3021,
-      floodfills: 812,
-      activePeers: null,
-      tunnels: { in: null, out: null, participating: 157, client: null, exploratory: null },
-      bandwidthBytesPerSecond: { in1s: 12_636, out1s: 5806, in5m: null, out5m: null },
-      tunnelBuildSuccessPercent: { exploratory: null, client: null, total: 42 },
-      history: [],
-    });
+    const view = statsView(
+      {
+        version: null,
+        uptimeMs: 93_784_000,
+        uptimeResolutionMs: 1000,
+        networkStatus: "OK",
+        knownRouters: 3021,
+        floodfills: 812,
+        activePeers: null,
+        tunnels: { in: null, out: null, participating: 157, client: null, exploratory: null },
+        bandwidthBytesPerSecond: { in1s: 12_636, out1s: 5806, in5m: null, out5m: null },
+        tunnelBuildSuccessPercent: { exploratory: null, client: null, total: 42 },
+        history: [],
+      },
+      Date.now(),
+    );
     assert.equal(panelText(view).tunnels, "— in · — out · 157 participating");
   });
 });

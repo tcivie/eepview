@@ -54,7 +54,7 @@ The requirement tests are written from this section. Names in `code` are the int
 | `Field::Refuse(RefuseReason)` | `refuse` | `not-i2p`, `bad-request`, `length-required`, `upstream`, `busy` |
 | `Field::Error(ErrorKind)` | `error` | see R1.4 |
 | `Field::Tab(TabKind)` | `tab` | `internal`, `web` |
-| `Field::Store(StoreKind)` | `store` | `bookmarks`, `history`, `settings`, `sites` |
+| `Field::Store(StoreKind)` | `store` | `bookmarks`, `history`, `settings`, `sites`, `bandwidth` (the saved router bandwidth, [Router console](router-console.md) R51) |
 | `Field::Op(OpKind)` | `op` | `reload`, `hard-reload`, `zoom`, `find`, `find-clear`, `back`, `forward`, `stop`, `harden`, `hover`, `input`, `load-failed`, `clipboard`, `first-load`, `engine-filter`, `main-thread`, `spawn`, `reveal`, `open-url`, `write-report`, `console-load`, `console-close` |
 | `Field::Thread(ThreadName)` | `thread` | `main`, `router-watch`, `router-check`, `gatekeeper`, `other` |
 | `Field::Source(SourceFile)` | `file` | a source file name, no folder |
@@ -281,3 +281,4 @@ A site can make the router answer with any status, and it can make any number of
 - 2026-10-03 — Diagnostics log and report flow — [#56](https://github.com/tcivie/eepview/pull/56)
 - 2026-10-03 — The leak-test trace `diag::trace` (R9.1a) — [#71](https://github.com/tcivie/eepview/pull/71)
 - 2026-10-03 — The `input` and `clipboard` operations of the engine input hooks — [#77](https://github.com/tcivie/eepview/pull/77)
+- 2026-10-06 — The `bandwidth` store — [#83](https://github.com/tcivie/eepview/pull/83)

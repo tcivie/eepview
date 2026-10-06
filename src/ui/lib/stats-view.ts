@@ -12,7 +12,7 @@ export interface StatsLike {
   javaVersion: string | null;
   bandwidthInBps: number | null;
   bandwidthOutBps: number | null;
-  history: { stepSeconds: number; inBps: number[]; outBps: number[] } | null;
+  history: { stepSeconds: number; inBps: (number | null)[]; outBps: (number | null)[] } | null;
   clientTunnels: number | null;
   participatingTunnels: number | null;
   buildSuccessRate: number | null;
@@ -35,16 +35,33 @@ export interface StatsText {
   floodfills: string;
 }
 
-const BYTES_PER_KIB = 1024;
+/** K = 1 000, as the Java I2P console writes its rates. */
+const KILO = 1000;
+const MEGA = KILO * KILO;
+const TWO_DECIMALS_BELOW = 100;
 const MINUTE_S = 60;
 const HOUR_S = 3600;
 const DAY_S = 86_400;
 
+/** Decimals of a scaled rate, as the console writes them: 2 below 100, 1 below 1 000. */
+function rateDecimals(value: number): number {
+  if (value < TWO_DECIMALS_BELOW) return 2;
+  return value < KILO ? 1 : 0;
+}
+
+/** `value` written with the decimals of its form, which come from the rounded value. */
+function scaled(value: number): { text: string; rounded: number } {
+  const rounded = Number(value.toFixed(rateDecimals(value)));
+  return { text: value.toFixed(rateDecimals(rounded)), rounded };
+}
+
+/** A rate in bytes per second, with K = 1 000: "230 B/s", "53.91 kB/s", "2.50 MB/s". */
 export function formatRate(bps: number | null): string {
   if (bps === null) return MISSING;
-  if (bps < BYTES_PER_KIB) return `${bps.toFixed(1)} B/s`;
-  const kb = bps / BYTES_PER_KIB;
-  return kb >= BYTES_PER_KIB ? `${(kb / BYTES_PER_KIB).toFixed(1)} MB/s` : `${kb.toFixed(1)} KB/s`;
+  if (Math.round(bps) < KILO) return `${Math.round(bps)} B/s`;
+  const kilo = scaled(bps / KILO);
+  if (kilo.rounded < KILO) return `${kilo.text} kB/s`;
+  return `${scaled(bps / MEGA).text} MB/s`;
 }
 
 export function formatCount(n: number | null): string {

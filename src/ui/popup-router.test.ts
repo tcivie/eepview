@@ -10,11 +10,14 @@ import { sleep, stubShell, until } from "./testing/shell-stub.ts";
 
 const stub = stubShell("popup.html");
 const { doc } = stub;
+// The history samples are placed relative to the time now: the panel draws the slots of the
+// last 10 minutes (R41, R55), so a sample from a fixed old time would fall out of range.
+const NOW = Date.now();
 const history = [
-  { t: 1000, in: 100, out: 50 },
-  { t: 6000, in: 400, out: 60 },
-  { t: 11_000, in: 250, out: 70 },
-  { t: 16_000, in: 900, out: 80 },
+  { t: NOW - 15_000, in: 100, out: 50 },
+  { t: NOW - 10_000, in: 400, out: 60 },
+  { t: NOW - 5000, in: 250, out: 70 },
+  { t: NOW, in: 900, out: 80 },
 ];
 // The router_stats answer in the IPC contract v1.7 shape (docs/wiki/ipc-contract.md).
 const FULL = {
@@ -98,8 +101,8 @@ describe("the router panel shows the router", () => {
 
   it("[browser-ui panel] shows the bandwidth and the proxy address", async () => {
     await showPanel(status, FULL);
-    assert.ok(text("rp-bandwidth").includes("1.5 KB/s"), text("rp-bandwidth"));
-    assert.ok(text("rp-bandwidth").includes("2.0 KB/s"), text("rp-bandwidth"));
+    assert.ok(text("rp-bandwidth").includes("1.54 kB/s"), text("rp-bandwidth"));
+    assert.ok(text("rp-bandwidth").includes("2.05 kB/s"), text("rp-bandwidth"));
     assert.ok(text("rp-proxy").includes("127.0.0.1:4444"));
   });
 
@@ -108,6 +111,29 @@ describe("the router panel shows the router", () => {
     const line = attr("rp-spark-in", "d") ?? "";
     assert.ok(line.startsWith("M") && line.length > "M0 140".length, line);
     assert.notEqual(attr("rp-spark-out", "d"), "M0 140");
+  });
+});
+
+describe("the router panel sparkline and missing figures", () => {
+  it("[R55] a single sample is too few: the sparkline is the empty path", async () => {
+    await showPanel(status, { ...FULL, history: [{ t: Date.now(), in: 100, out: 50 }] });
+    assert.equal(attr("rp-spark-in", "d"), "M0 140");
+    assert.equal(attr("rp-spark-out", "d"), "M0 140");
+  });
+
+  it("[R55] a gap in the samples breaks the sparkline into two lines", async () => {
+    const now = Date.now();
+    const gapped = [
+      { t: now - 300_000, in: 100, out: 50 },
+      { t: now - 295_000, in: 200, out: 60 },
+      { t: now - 5000, in: 300, out: 70 },
+      { t: now, in: 400, out: 80 },
+    ];
+    await showPanel(status, { ...FULL, history: gapped });
+    for (const id of ["rp-spark-in", "rp-spark-out"]) {
+      const lines = (attr(id, "d") ?? "").match(/M/g) ?? [];
+      assert.equal(lines.length, 2, `${id}: ${attr(id, "d")}`);
+    }
   });
 
   it('[browser-ui panel] shows "—" for a missing figure', async () => {

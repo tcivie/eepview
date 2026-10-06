@@ -66,6 +66,7 @@ fn paths() -> TempPaths {
         settings: dir.join("settings.json"),
         sites: dir.join("sites.json"),
         icons: dir.join("icons"),
+        bandwidth: dir.join("bandwidth.json"),
     })
 }
 

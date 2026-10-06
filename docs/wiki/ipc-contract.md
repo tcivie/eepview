@@ -5,7 +5,7 @@ SPDX-License-Identifier: MIT
 
 # IPC contract
 
-Version 1.9. The Rust shell (`src-tauri/`) and the UI (`src/ui/`) build against this page.
+Version 1.10. The Rust shell (`src-tauri/`) and the UI (`src/ui/`) build against this page.
 Change it in a PR that changes both sides, or keep the old form working as a shim.
 
 ## History
@@ -23,7 +23,8 @@ Change it in a PR that changes both sides, or keep the old form working as a shi
 - v1.7: `RouterStats.uptimeResolutionMs`, `.floodfills`, `.tunnels.client`, `.tunnels.exploratory`, `.tunnelBuildSuccessPercent.total`. `router_stats` reads the detected router console when there is no router helper. The UI reads this shape (`src/ui/contract.ts`). See [Router console](router-console.md#router-statistics-from-the-console).
 - v1.8: no new command or event. The keyboard shortcuts follow the K1 table of [Links, menus and shortcuts](links-and-shortcuts.md): new window N, and on Windows and Linux Ctrl+F4, Alt+D, F6, F5, Ctrl+F5, Ctrl+PageUp, Ctrl+PageDown and Alt+Home; Cmd+. and Cmd+Shift+[ ] on macOS. Alt+Left and Alt+Right are Back and Forward on Windows and Linux only. Esc stops a load only from a page (K4). The engines report link clicks, context menus and mouse buttons to the shell, never to a page ([#77](https://github.com/tcivie/eepview/pull/77)).
 - v1.9: `RouterStatus.checks`, `VerifyCheck`, `CheckId`, `CheckState`: the four router checks that the Home page shows. `router-status` also fires when a check changes. See [Router checks](router-checks.md). [#84](https://github.com/tcivie/eepview/pull/84)
-- v1.10: internal page `load-failed` (`url`, `reason`, `code`): a load that the engine failed. See [Browser shell](browser-shell.md), F1 to F7. [#87](https://github.com/tcivie/eepview/pull/87)
+- v1.10: `router_stats` sends no request and records no sample: it answers the figures of the background sampler, which asks the router every 5 s. The 10-minute `history` is saved in `bandwidth.json` and loaded at start. The shape does not change ([#83](https://github.com/tcivie/eepview/pull/83)). See [Router console](router-console.md#background-sampling-and-the-saved-history).
+- v1.11: internal page `load-failed` (`url`, `reason`, `code`): a load that the engine failed. See [Browser shell](browser-shell.md), F1 to F8. [#87](https://github.com/tcivie/eepview/pull/87)
 
 ## Window layout
 
@@ -194,7 +195,7 @@ type RouterStats = { version: string | null; uptimeMs: number | null;
     in5m: number | null; out5m: number | null };
   tunnelBuildSuccessPercent: { exploratory: number | null; client: number | null;
     total: number | null };
-  history: { t: number; in: number; out: number }[] };  // last 10 min; the UI draws the last contiguous run (R41)
+  history: { t: number; in: number; out: number }[] };  // last 10 min, saved; the UI draws 120 time slots (R41)
 type ConsoleInfo = { found: boolean; kind: "java" | "i2pd" | null; origin: string | null;
   version: string | null };  // origin and version: display only
 ```

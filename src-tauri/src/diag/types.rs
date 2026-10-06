@@ -299,6 +299,8 @@ named_enum!(
         Settings => "settings",
         /// `sites.json`.
         Sites => "sites",
+        /// `bandwidth.json`: the saved router bandwidth.
+        Bandwidth => "bandwidth",
     }
 );
 

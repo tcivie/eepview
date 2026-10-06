@@ -8,7 +8,18 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { RouterStats } from "../contract.ts";
-import { HISTORY_STEP_SECONDS, type StatsView, statsView } from "./router-stats.ts";
+import { HISTORY_SLOTS, HISTORY_STEP_SECONDS, type StatsView, statsView } from "./router-stats.ts";
+
+/** The time now, in Unix ms, that every test passes to `statsView`. */
+const NOW = 1_700_000_000_000;
+const STEP_MS = 5000;
+
+/** 120 slots, all null, with the given `[slot, value]` pairs set. */
+const slotsOf = (...entries: [number, number][]): (number | null)[] => {
+  const slots: (number | null)[] = Array.from({ length: 120 }, () => null);
+  for (const [slot, value] of entries) slots[slot] = value;
+  return slots;
+};
 
 const NULL_VIEW: StatsView = {
   networkStatus: null,
@@ -60,9 +71,9 @@ const FULL: RouterStats = {
   bandwidthBytesPerSecond: { in1s: 12_636, out1s: 5806, in5m: 11_000, out5m: 5000 },
   tunnelBuildSuccessPercent: { exploratory: 70, client: 80, total: 42 },
   history: [
-    { t: 1000, in: 10, out: 20 },
-    { t: 6000, in: 30, out: 40 },
-    { t: 11_000, in: 50, out: 60 },
+    { t: NOW - 10_000, in: 10, out: 20 },
+    { t: NOW - 5000, in: 30, out: 40 },
+    { t: NOW, in: 50, out: 60 },
   ],
 };
 
@@ -75,7 +86,11 @@ const FULL_VIEW: StatsView = {
   javaVersion: null,
   bandwidthInBps: 12_636,
   bandwidthOutBps: 5806,
-  history: { stepSeconds: 5, inBps: [10, 30, 50], outBps: [20, 40, 60] },
+  history: {
+    stepSeconds: 5,
+    inBps: slotsOf([117, 10], [118, 30], [119, 50]),
+    outBps: slotsOf([117, 20], [118, 40], [119, 60]),
+  },
   clientTunnels: 14,
   exploratoryTunnels: 9,
   inboundTunnels: 3,
@@ -89,52 +104,52 @@ const FULL_VIEW: StatsView = {
 
 describe("[R41] statsView maps the contract shape to the view", () => {
   it("[R41] gives every view field from its RouterStats field", () => {
-    assert.deepEqual(statsView(FULL), FULL_VIEW);
+    assert.deepEqual(statsView(FULL, NOW), FULL_VIEW);
   });
 
   it("[R41] shows the shortest bandwidth window, in1s and out1s, not the 5 minute one", () => {
-    const view = statsView(FULL);
+    const view = statsView(FULL, NOW);
     assert.equal(view.bandwidthInBps, 12_636);
     assert.equal(view.bandwidthOutBps, 5806);
   });
 
   it("[R41] gives the routerKind and the javaVersion as null", () => {
-    const view = statsView(FULL);
+    const view = statsView(FULL, NOW);
     assert.equal(view.routerKind, null);
     assert.equal(view.javaVersion, null);
   });
 
   it("[R41] the history step is 5 seconds", () => {
     assert.equal(HISTORY_STEP_SECONDS, 5);
-    assert.equal(statsView(FULL).history?.stepSeconds, 5);
+    assert.equal(statsView(FULL, NOW).history?.stepSeconds, 5);
   });
 });
 
 describe("[R41] statsView with a missing input", () => {
   it("[R41] a null input gives a view with every field null", () => {
-    assert.deepEqual(statsView(null), NULL_VIEW);
+    assert.deepEqual(statsView(null, NOW), NULL_VIEW);
   });
 
   it("[R41] an undefined input gives a view with every field null", () => {
-    assert.deepEqual(statsView(undefined), NULL_VIEW);
+    assert.deepEqual(statsView(undefined, NOW), NULL_VIEW);
   });
 
   it("[R41] an answer with every field null gives a view with every field null", () => {
-    assert.deepEqual(statsView(emptyStats()), NULL_VIEW);
+    assert.deepEqual(statsView(emptyStats(), NOW), NULL_VIEW);
   });
 });
 
 describe("[R41] statsView uptime", () => {
   it("[R41] uptimeSeconds is floor(uptimeMs / 1000)", () => {
-    assert.equal(statsView(stats({ uptimeMs: 28_800_999 })).uptimeSeconds, 28_800);
-    assert.equal(statsView(stats({ uptimeMs: 999 })).uptimeSeconds, 0);
-    assert.equal(statsView(stats({ uptimeMs: 0 })).uptimeSeconds, 0);
-    assert.equal(statsView(stats({ uptimeMs: null })).uptimeSeconds, null);
+    assert.equal(statsView(stats({ uptimeMs: 28_800_999 }), NOW).uptimeSeconds, 28_800);
+    assert.equal(statsView(stats({ uptimeMs: 999 }), NOW).uptimeSeconds, 0);
+    assert.equal(statsView(stats({ uptimeMs: 0 }), NOW).uptimeSeconds, 0);
+    assert.equal(statsView(stats({ uptimeMs: null }), NOW).uptimeSeconds, null);
   });
 
   it("[R41] uptimeResolutionSeconds is max(1, floor(uptimeResolutionMs / 1000))", () => {
     const resolution = (ms: number | null): number | null =>
-      statsView(stats({ uptimeResolutionMs: ms })).uptimeResolutionSeconds;
+      statsView(stats({ uptimeResolutionMs: ms }), NOW).uptimeResolutionSeconds;
     assert.equal(resolution(3_600_000), 3600);
     assert.equal(resolution(86_400_000), 86_400);
     assert.equal(resolution(60_000), 60);
@@ -144,20 +159,20 @@ describe("[R41] statsView uptime", () => {
 
   it("[R41] a resolution under one second is at least 1 second", () => {
     const resolution = (ms: number): number | null =>
-      statsView(stats({ uptimeResolutionMs: ms })).uptimeResolutionSeconds;
+      statsView(stats({ uptimeResolutionMs: ms }), NOW).uptimeResolutionSeconds;
     assert.equal(resolution(1), 1);
     assert.equal(resolution(999), 1);
     assert.equal(resolution(0), 1);
   });
 
   it("[R41] a null uptimeResolutionMs gives a null uptimeResolutionSeconds", () => {
-    assert.equal(statsView(stats({ uptimeResolutionMs: null })).uptimeResolutionSeconds, null);
+    assert.equal(statsView(stats({ uptimeResolutionMs: null }), NOW).uptimeResolutionSeconds, null);
   });
 });
 
 describe("[R41] statsView build success", () => {
   const rate = (build: RouterStats["tunnelBuildSuccessPercent"]): number | null =>
-    statsView(stats({ tunnelBuildSuccessPercent: build })).buildSuccessRate;
+    statsView(stats({ tunnelBuildSuccessPercent: build }), NOW).buildSuccessRate;
 
   it("[R41] is total / 100 when total is set", () => {
     assert.equal(rate({ exploratory: 10, client: 20, total: 42 }), 0.42);
@@ -182,6 +197,7 @@ describe("[R41] statsView tunnels and counts", () => {
   it("[R41] maps tunnels.in, out, participating, client and exploratory", () => {
     const view = statsView(
       stats({ tunnels: { in: 1, out: 2, participating: 3, client: 4, exploratory: 5 } }),
+      NOW,
     );
     assert.equal(view.inboundTunnels, 1);
     assert.equal(view.outboundTunnels, 2);
@@ -193,6 +209,7 @@ describe("[R41] statsView tunnels and counts", () => {
   it("[R41] keeps a null tunnel count null and a zero count zero", () => {
     const view = statsView(
       stats({ tunnels: { in: null, out: 0, participating: 0, client: null, exploratory: 0 } }),
+      NOW,
     );
     assert.equal(view.inboundTunnels, null);
     assert.equal(view.outboundTunnels, 0);
@@ -212,6 +229,7 @@ describe("[R41] statsView counts and status", () => {
         floodfills: 9,
         version: "2.10.0",
       }),
+      NOW,
     );
     assert.equal(view.networkStatus, "FIREWALLED");
     assert.equal(view.activePeers, 7);
@@ -223,112 +241,194 @@ describe("[R41] statsView counts and status", () => {
   it("[R41] keeps a zero bandwidth, which is a figure and not a missing one", () => {
     const view = statsView(
       stats({ bandwidthBytesPerSecond: { in1s: 0, out1s: 0, in5m: null, out5m: null } }),
+      NOW,
     );
     assert.equal(view.bandwidthInBps, 0);
     assert.equal(view.bandwidthOutBps, 0);
   });
 });
 
-describe("[R41] statsView history", () => {
-  it("[R41] an empty history gives a null history", () => {
-    assert.equal(statsView(stats({ history: [] })).history, null);
-  });
-
-  it("[R41] a history gives its in and out values, oldest first, in steps of 5 seconds", () => {
-    const view = statsView(
-      stats({
-        history: [
-          { t: 100, in: 1, out: 9 },
-          { t: 5100, in: 2, out: 8 },
-        ],
-      }),
-    );
-    assert.deepEqual(view.history, { stepSeconds: 5, inBps: [1, 2], outBps: [9, 8] });
-  });
-
-  it("[R41] a single sample is a history", () => {
-    const view = statsView(stats({ history: [{ t: 1, in: 5, out: 6 }] }));
-    assert.deepEqual(view.history, { stepSeconds: 5, inBps: [5], outBps: [6] });
-  });
-});
-
 type Sample = RouterStats["history"][number];
 
-/** A sample at `t` ms whose in and out are `t / 1000` and `t / 1000 + 1`, so a test reads which sample was kept. */
-const sampleAt = (t: number): Sample => ({ t, in: t / 1000, out: t / 1000 + 1 });
+/** A sample at `t` ms whose in and out are `value` and `value + 1`, so a test reads which one stays. */
+const sampleAt = (t: number, value = 1): Sample => ({ t, in: value, out: value + 1 });
 
-const runOf = (times: number[]): StatsView["history"] =>
-  statsView(stats({ history: times.map(sampleAt) })).history;
+/** The in series of the view of `history`, or null when the view has no history. */
+const inSlots = (history: Sample[], nowMs = NOW): (number | null)[] | null =>
+  statsView(stats({ history }), nowMs).history?.inBps ?? null;
 
-const historyOf = (times: number[]): StatsView["history"] => ({
-  stepSeconds: 5,
-  inBps: times.map((t) => t / 1000),
-  outBps: times.map((t) => t / 1000 + 1),
-});
+const outSlots = (history: Sample[], nowMs = NOW): (number | null)[] | null =>
+  statsView(stats({ history }), nowMs).history?.outBps ?? null;
 
-describe("[R41] statsView history run", () => {
-  it("[R41] a gap above 10 000 ms ends the run: only the samples after it are kept", () => {
-    assert.deepEqual(runOf([0, 5000, 10_000, 20_001, 25_001]), historyOf([20_001, 25_001]));
+/** Samples at `NOW - back` ms for each `back`, with the in value of its position, newest first. */
+const samplesBack = (...back: number[]): Sample[] => back.map((ms, n) => sampleAt(NOW - ms, n + 1));
+
+describe("[R41] statsView history slots", () => {
+  it("[R41] the history has 120 slots of 5 seconds", () => {
+    assert.equal(HISTORY_SLOTS, 120);
+    const history = statsView(stats({ history: [sampleAt(NOW)] }), NOW).history;
+    assert.equal(history?.stepSeconds, 5);
+    assert.equal(history?.inBps.length, 120);
+    assert.equal(history?.outBps.length, 120);
   });
 
-  it("[R41] a gap of 10 001 ms ends the run, a gap of 10 000 ms does not", () => {
-    assert.deepEqual(runOf([0, 10_001]), historyOf([10_001]));
-    assert.deepEqual(runOf([0, 10_000]), historyOf([0, 10_000]));
+  it("[R41] slot 119 is now and slot 0 is 595 seconds ago, oldest first", () => {
+    const history = [sampleAt(NOW - 119 * STEP_MS, 7), sampleAt(NOW, 9)];
+    assert.deepEqual(inSlots(history), slotsOf([0, 7], [119, 9]));
+    assert.deepEqual(outSlots(history), slotsOf([0, 8], [119, 10]));
   });
 
-  it("[R41] a gap of exactly 10 000 ms stays in the run", () => {
-    assert.deepEqual(runOf([0, 10_000, 20_000, 30_000]), historyOf([0, 10_000, 20_000, 30_000]));
+  it("[R41] a sample every 5 seconds fills slot 0 to slot 119 with no gap", () => {
+    const history = Array.from({ length: 120 }, (_, n) => sampleAt(NOW - (119 - n) * STEP_MS, n));
+    assert.deepEqual(
+      inSlots(history),
+      Array.from({ length: 120 }, (_, n) => n),
+    );
   });
 
-  it("[R41] a gap just under 10 000 ms stays in the run", () => {
-    assert.deepEqual(runOf([0, 9999]), historyOf([0, 9999]));
-  });
-
-  it("[R41] keeps only the last run when there are several gaps", () => {
-    const times = [0, 5000, 20_000, 25_000, 40_000, 45_000, 50_000];
-    assert.deepEqual(runOf(times), historyOf([40_000, 45_000, 50_000]));
-  });
-
-  it("[R41] a gap before the newest sample leaves that one sample as the run", () => {
-    assert.deepEqual(runOf([0, 5000, 10_000, 30_000]), historyOf([30_000]));
-  });
-});
-
-describe("[R41] statsView history run edge cases", () => {
-  it("[R41] a single sample is a run", () => {
-    assert.deepEqual(runOf([7000]), historyOf([7000]));
-  });
-
-  it("[R41] an empty history gives a null history", () => {
-    assert.equal(runOf([]), null);
-  });
-
-  it("[R41] a history with no gap is kept whole, oldest first", () => {
-    const times = [1000, 6000, 11_000, 16_000, 21_000];
-    assert.deepEqual(runOf(times), historyOf(times));
+  it("[R41] the time now comes from the caller: the same sample moves one slot a step later", () => {
+    const history = [sampleAt(NOW, 3)];
+    assert.deepEqual(inSlots(history, NOW), slotsOf([119, 3]));
+    assert.deepEqual(inSlots(history, NOW + STEP_MS), slotsOf([118, 3]));
+    assert.deepEqual(inSlots(history, NOW + 10 * STEP_MS), slotsOf([109, 3]));
   });
 });
 
-describe("[R41] statsView history run keeps samples as they are", () => {
-  it("[R41] never adds, repeats or interpolates a sample", () => {
-    const view = runOf([0, 5000, 25_000, 30_000]);
-    assert.deepEqual(view, historyOf([25_000, 30_000]));
-    assert.equal(view?.inBps.length, 2);
-    assert.equal(view?.outBps.length, 2);
+describe("[R41] statsView history slot of the newest sample", () => {
+  it("[R41] the newest sample goes to slot 119 - Math.round((nowMs - t) / 5000)", () => {
+    assert.deepEqual(inSlots([sampleAt(NOW - 2400)]), slotsOf([119, 1]));
+    assert.deepEqual(inSlots([sampleAt(NOW - 2500)]), slotsOf([118, 1]));
+    assert.deepEqual(inSlots([sampleAt(NOW - 7400)]), slotsOf([118, 1]));
+    assert.deepEqual(inSlots([sampleAt(NOW - 7500)]), slotsOf([117, 1]));
+    assert.deepEqual(inSlots([sampleAt(NOW - 40 * STEP_MS, 2)]), slotsOf([79, 2]));
   });
 
-  it("[R41] keeps the in and out of each kept sample unchanged", () => {
+  it("[R41] a sample up to 2 500 ms after now goes to slot 119", () => {
+    assert.deepEqual(inSlots([sampleAt(NOW + 2000)]), slotsOf([119, 1]));
+    assert.deepEqual(inSlots([sampleAt(NOW + 2500)]), slotsOf([119, 1]));
+  });
+
+  it("[R41] a sample with t above nowMs + 2 500 is dropped", () => {
+    assert.equal(inSlots([sampleAt(NOW + 2501)]), null);
+    assert.equal(inSlots([sampleAt(NOW + STEP_MS)]), null);
+  });
+
+  it("[R41] the newest sample that is not dropped gets the slot, not the dropped one", () => {
+    const history = [sampleAt(NOW + 3000, 8), sampleAt(NOW - 1000, 4)];
+    assert.deepEqual(inSlots(history), slotsOf([119, 4]));
+  });
+});
+
+describe("[R41] statsView history slots from the newest sample back", () => {
+  it("[R41] samples 5 300 ms apart fill every slot, with no null", () => {
+    const history = Array.from({ length: 120 }, (_, n) => sampleAt(NOW - (119 - n) * 5300, n));
+    assert.deepEqual(
+      inSlots(history),
+      Array.from({ length: 120 }, (_, n) => n),
+    );
+  });
+
+  it("[R41] a late sampler never leaves an empty slot: gaps up to 10 000 ms are one slot", () => {
+    const history = samplesBack(0, 5300, 10_300, 16_400, 21_300, 31_300);
+    assert.deepEqual(
+      inSlots(history),
+      slotsOf([119, 1], [118, 2], [117, 3], [116, 4], [115, 5], [114, 6]),
+    );
+  });
+});
+
+describe("[R41] statsView history slots across a gap", () => {
+  it("[R41] a gap of exactly 10 000 ms is one slot, a gap of 10 001 ms is two", () => {
+    assert.deepEqual(inSlots(samplesBack(0, 10_000)), slotsOf([119, 1], [118, 2]));
+    assert.deepEqual(inSlots(samplesBack(0, 10_001)), slotsOf([119, 1], [117, 2]));
+  });
+
+  it("[R41] a gap above 10 000 ms is Math.round(gap / 5000) slots", () => {
+    assert.deepEqual(inSlots(samplesBack(0, 12_400)), slotsOf([119, 1], [117, 2]));
+    assert.deepEqual(inSlots(samplesBack(0, 12_500)), slotsOf([119, 1], [116, 2]));
+  });
+
+  it("[R41] a 15 second gap leaves 2 null slots", () => {
+    const slots = inSlots(samplesBack(0, 15_000));
+    assert.deepEqual(slots, slotsOf([119, 1], [116, 2]));
+    assert.equal(slots?.[118], null);
+    assert.equal(slots?.[117], null);
+  });
+
+  it("[R41] the gap counts from the next newer sample, so a late sample moves the older ones", () => {
+    const history = samplesBack(2400, 7400, 30_000);
+    assert.deepEqual(inSlots(history), slotsOf([119, 1], [118, 2], [113, 3]));
+  });
+
+  it("[R41] two samples close in time are two slots: no sample replaces another", () => {
+    const history = [sampleAt(NOW - 1000, 10), sampleAt(NOW, 20)];
+    assert.deepEqual(inSlots(history), slotsOf([118, 10], [119, 20]));
+    assert.deepEqual(outSlots(history), slotsOf([118, 11], [119, 21]));
+  });
+
+  it("[R41] a history in any order gives the same slots", () => {
+    const sorted = samplesBack(0, 5300, 21_000, 26_000);
+    const shuffled = [sorted[2], sorted[0], sorted[3], sorted[1]].filter(
+      (s): s is Sample => s !== undefined,
+    );
+    assert.equal(shuffled.length, 4);
+    assert.deepEqual(inSlots(shuffled), inSlots(sorted));
+    assert.deepEqual(inSlots(shuffled), slotsOf([119, 1], [118, 2], [115, 3], [114, 4]));
+  });
+});
+
+describe("[R41] statsView history drops the samples below slot 0", () => {
+  it("[R41] a sample whose slot is below 0 is dropped, and every older one with it", () => {
+    const history = samplesBack(0, 5000, 119 * STEP_MS, 120 * STEP_MS, 121 * STEP_MS);
+    const slots = inSlots(history);
+    assert.deepEqual(slots, slotsOf([119, 1], [118, 2], [0, 3]));
+  });
+
+  it("[R41] an older sample after a big gap is dropped too once the slots are below 0", () => {
+    const history = samplesBack(0, 125 * STEP_MS, 126 * STEP_MS + 1000);
+    assert.deepEqual(inSlots(history), slotsOf([119, 1]));
+  });
+
+  it("[R41] a newest sample older than 10 minutes gives a null history", () => {
+    assert.equal(inSlots([sampleAt(NOW - 120 * STEP_MS)]), null);
+    assert.equal(inSlots(samplesBack(3_600_000, 3_605_000)), null);
+  });
+});
+
+describe("[R41] statsView history keeps the samples as they are", () => {
+  it("[R41] a slot with no sample is null, in both arrays", () => {
+    const view = statsView(stats({ history: samplesBack(0, 15_000) }), NOW).history;
+    assert.equal(view?.inBps[118], null);
+    assert.equal(view?.outBps[118], null);
+    assert.equal(view?.inBps.filter((v) => v !== null).length, 2);
+    assert.equal(view?.outBps.filter((v) => v !== null).length, 2);
+  });
+
+  it("[R41] a gap in the samples stays a gap: nothing is added, repeated or interpolated", () => {
+    const history = [sampleAt(NOW - 100 * STEP_MS, 4), sampleAt(NOW - 10 * STEP_MS, 8)];
+    const slots = inSlots(history);
+    assert.deepEqual(slots, slotsOf([19, 4], [109, 8]));
+    assert.equal(slots?.filter((v) => v !== null).length, 2);
+  });
+
+  it("[R41] keeps the in and out of each sample unchanged, zero included", () => {
     const history: Sample[] = [
-      { t: 0, in: 1, out: 2 },
-      { t: 30_000, in: 33, out: 44 },
-      { t: 35_000, in: 0, out: 0 },
+      { t: NOW - STEP_MS, in: 33, out: 44 },
+      { t: NOW, in: 0, out: 0 },
     ];
-    const view = statsView(stats({ history })).history;
-    assert.deepEqual(view, { stepSeconds: 5, inBps: [33, 0], outBps: [44, 0] });
+    const view = statsView(stats({ history }), NOW).history;
+    assert.deepEqual(view?.inBps, slotsOf([118, 33], [119, 0]));
+    assert.deepEqual(view?.outBps, slotsOf([118, 44], [119, 0]));
+  });
+});
+
+describe("[R41] statsView history is null when no sample gets a slot", () => {
+  it("[R41] an empty history gives a null history", () => {
+    assert.equal(statsView(stats({ history: [] }), NOW).history, null);
   });
 
-  it("[R41] the run rule uses the time of the samples, not their number", () => {
-    const times = [0, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10_000, 11_000];
-    assert.deepEqual(runOf(times), historyOf(times));
+  it("[R41] a history whose samples are all out of range gives a null history", () => {
+    const history = [sampleAt(NOW - 200 * STEP_MS), sampleAt(NOW + 10 * STEP_MS)];
+    assert.equal(statsView(stats({ history }), NOW).history, null);
   });
 });

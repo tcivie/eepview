@@ -3,6 +3,7 @@
 
 //! Small JSON stores with a `version` field, written atomically (temp file + rename).
 
+pub mod bandwidth;
 pub mod bookmarks;
 pub mod history;
 pub mod settings;
@@ -50,6 +51,7 @@ pub fn store_kind(path: &Path) -> Option<StoreKind> {
         "history" => Some(StoreKind::History),
         "settings" => Some(StoreKind::Settings),
         "sites" => Some(StoreKind::Sites),
+        "bandwidth" => Some(StoreKind::Bandwidth),
         _ => None,
     }
 }
