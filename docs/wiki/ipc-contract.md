@@ -5,7 +5,7 @@ SPDX-License-Identifier: MIT
 
 # IPC contract
 
-Version 1.7. The Rust shell (`src-tauri/`) and the UI (`src/ui/`) build against this page.
+Version 1.8. The Rust shell (`src-tauri/`) and the UI (`src/ui/`) build against this page.
 Change it in a PR that changes both sides, or keep the old form working as a shim.
 
 ## History
@@ -21,6 +21,7 @@ Change it in a PR that changes both sides, or keep the old form working as a shi
 - v1.5: `console_status`, `console_detect`, `console_open`, `console-changed`, `ConsoleInfo`, the `console` webview ([#54](https://github.com/tcivie/eepview/pull/54)).
 - v1.6: the console tab. `TabInfo.kind` adds `"console"`. `console_open()` takes no argument and opens the console home page in the console tab. `ConsoleInfo.pages`, `ConsolePage` and the `no-page` reason are gone ([#76](https://github.com/tcivie/eepview/pull/76)).
 - v1.7: `RouterStats.uptimeResolutionMs`, `.floodfills`, `.tunnels.client`, `.tunnels.exploratory`, `.tunnelBuildSuccessPercent.total`. `router_stats` reads the detected router console when there is no router helper. The UI reads this shape (`src/ui/contract.ts`). See [Router console](router-console.md#router-statistics-from-the-console).
+- v1.8: `router_stats` sends no request and records no sample: it answers the figures of the background sampler, which asks the router every 5 s. The 10-minute `history` is saved in `bandwidth.json` and loaded at start. The shape does not change. See [Router console](router-console.md#background-sampling-and-the-saved-history).
 - v1.8: no new command or event. The keyboard shortcuts follow the K1 table of [Links, menus and shortcuts](links-and-shortcuts.md): new window N, and on Windows and Linux Ctrl+F4, Alt+D, F6, F5, Ctrl+F5, Ctrl+PageUp, Ctrl+PageDown and Alt+Home; Cmd+. and Cmd+Shift+[ ] on macOS. Alt+Left and Alt+Right are Back and Forward on Windows and Linux only. Esc stops a load only from a page (K4). The engines report link clicks, context menus and mouse buttons to the shell, never to a page ([#77](https://github.com/tcivie/eepview/pull/77)).
 
 ## Window layout
@@ -185,7 +186,7 @@ type RouterStats = { version: string | null; uptimeMs: number | null;
     in5m: number | null; out5m: number | null };
   tunnelBuildSuccessPercent: { exploratory: number | null; client: number | null;
     total: number | null };
-  history: { t: number; in: number; out: number }[] };  // last 10 min; the UI draws the last contiguous run (R41)
+  history: { t: number; in: number; out: number }[] };  // last 10 min, saved; the UI draws 120 time slots (R41)
 type ConsoleInfo = { found: boolean; kind: "java" | "i2pd" | null; origin: string | null;
   version: string | null };  // origin and version: display only
 ```
