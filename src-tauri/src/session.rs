@@ -116,6 +116,15 @@ impl Session {
         }
     }
 
+    /// Puts `url` in place of the current entry: an error page takes the place of the load
+    /// that failed, and a new try takes the place of the error page. The engine list no
+    /// longer matches this list, so later steps load their entry.
+    pub fn replace_current(&mut self, url: &str) {
+        self.pending = None;
+        url.clone_into(&mut self.entries[self.index]);
+        self.engine_reset();
+    }
+
     /// The tab webview was built again: its engine list is empty.
     pub fn engine_reset(&mut self) {
         self.engine_back = 0;

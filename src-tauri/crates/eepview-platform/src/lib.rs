@@ -123,7 +123,7 @@ impl LoadFailure {
     #[must_use]
     pub fn reason(&self) -> Option<FailReason> {
         match (self.domain.as_str(), self.code) {
-            (URL_DOMAIN, -999) | (WEBKIT_DOMAIN, 102) => None,
+            (URL_DOMAIN, -999) | (WEBKIT_DOMAIN, 102 | 204) => None,
             (URL_DOMAIN, -1022) | (WEBKIT_DOMAIN, 104) => Some(FailReason::Blocked),
             (URL_DOMAIN, -1001 | -1003 | -1004 | -1005 | -1006 | -1009) => {
                 Some(FailReason::Unreachable)
@@ -293,7 +293,8 @@ pub fn on_input(webview: &PlatformWebview, hooks: Hooks) -> Result<(), String> {
 }
 
 /// Calls `callback` when the engine fails a main-frame load of this webview. Only macOS
-/// needs it: there wry reports no failed load. Install it once per webview.
+/// needs it: there wry reports no failed load. Install it once per webview. Elsewhere it
+/// does nothing.
 ///
 /// # Errors
 ///
@@ -302,7 +303,17 @@ pub fn on_load_failed(
     webview: &PlatformWebview,
     callback: Box<dyn Fn(LoadFailure)>,
 ) -> Result<(), String> {
-    imp::on_load_failed(webview, callback)
+    #[cfg(target_os = "macos")]
+    {
+        imp::on_load_failed(webview, callback)
+    }
+    // wry reports a failed load as finished here, and the engine shows its own error page.
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = webview;
+        drop(callback);
+        Ok(())
+    }
 }
 
 /// Puts plain text on the system clipboard.

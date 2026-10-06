@@ -13,16 +13,18 @@ const SAMPLE = "?url=http%3A%2F%2Fstats.i2p%2F&reason=blocked&code=NSURLErrorDom
 const query = new URLSearchParams(window.location.search);
 const search = devMode && !query.has("url") ? SAMPLE : window.location.search;
 const view = loadFailedView(search);
-const address = new URLSearchParams(search).get("url") ?? "";
 
 byId("failed-url").textContent = view.address;
 byId("failed-reason").textContent = view.reasonText;
 byId("failed-code").textContent = view.code;
 byId("failed-code-line").hidden = view.code === "";
 byId<HTMLAnchorElement>("report-link").href = reportHref("load-failed");
-byId("back-btn").addEventListener("click", () => window.history.back());
+byId("back-btn").addEventListener("click", () => {
+  call("go_back", {}).catch(() => undefined);
+});
 const retry = byId<HTMLButtonElement>("retry-btn");
-retry.disabled = address === "";
+// Try again is Reload: it loads the address in place of this page (F7).
+retry.disabled = view.url === "";
 retry.addEventListener("click", () => {
-  call("navigate", { input: address }).catch(() => undefined);
+  call("reload", {}).catch(() => undefined);
 });

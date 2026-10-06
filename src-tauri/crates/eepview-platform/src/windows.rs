@@ -510,17 +510,3 @@ pub fn edit(_webview: &PlatformWebview, _command: Native) -> Result<(), String> 
 
 /// No system menu items to take out.
 pub fn quiet_menus() {}
-
-/// wry reports a failed load as finished here, and the engine shows its own error page, so
-/// nothing needs a callback.
-///
-/// # Errors
-///
-/// Never fails.
-pub fn on_load_failed(
-    _webview: &PlatformWebview,
-    callback: Box<dyn Fn(crate::LoadFailure)>,
-) -> Result<(), String> {
-    drop(callback);
-    Ok(())
-}

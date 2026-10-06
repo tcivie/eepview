@@ -8,16 +8,17 @@ use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::ptr::NonNull;
 
-use block2::RcBlock;
-use objc2::rc::Retained;
+use block2::{DynBlock, RcBlock};
+use objc2::rc::{Retained, Weak};
 use objc2::runtime::{AnyObject, NSObject, ProtocolObject, Sel};
 use objc2::{DefinedClass, MainThreadOnly, Message, define_class, msg_send, sel};
 use objc2_foundation::{
     MainThreadMarker, NSError, NSNumber, NSObjectProtocol, NSString, NSURL, NSUserDefaults,
 };
 use objc2_web_kit::{
-    WKContentRuleList, WKContentRuleListStore, WKContentWorld, WKFindConfiguration, WKFindResult,
-    WKNavigation, WKNavigationDelegate, WKScriptMessage, WKScriptMessageHandler,
+    WKContentRuleList, WKContentRuleListStore, WKContentWorld, WKDownload, WKFindConfiguration,
+    WKFindResult, WKNavigation, WKNavigationAction, WKNavigationActionPolicy, WKNavigationDelegate,
+    WKNavigationResponse, WKNavigationResponsePolicy, WKScriptMessage, WKScriptMessageHandler,
     WKUserContentController, WKUserScript, WKUserScriptInjectionTime, WKWebView,
 };
 
@@ -561,8 +562,9 @@ fn measure(window: &NSWindow, first: &NSButton, last: &NSButton) -> WindowButton
 
 /// The ivars of [`FailRelay`].
 pub struct FailIvars {
-    /// wry's navigation delegate: every call but the two fail calls goes straight to it.
-    inner: Retained<ProtocolObject<dyn WKNavigationDelegate>>,
+    /// wry's navigation delegate, which gets every call. Weak: wry owns it, and a strong link
+    /// would make a cycle through the view.
+    inner: Weak<ProtocolObject<dyn WKNavigationDelegate>>,
     callback: Box<dyn Fn(LoadFailure)>,
 }
 
@@ -577,8 +579,62 @@ define_class!(
     // SAFETY: NSObjectProtocol has no required methods.
     unsafe impl NSObjectProtocol for FailRelay {}
 
-    // SAFETY: the method signatures match the two optional fail methods of the protocol.
+    // SAFETY: every method signature matches its method of the protocol. Each one passes the
+    // call on to wry's delegate. Once wry has let its delegate go, a policy call cancels the
+    // navigation (fail closed) and the other calls do nothing.
     unsafe impl WKNavigationDelegate for FailRelay {
+        #[unsafe(method(webView:decidePolicyForNavigationAction:decisionHandler:))]
+        fn decide_action(
+            &self,
+            view: &WKWebView,
+            action: &WKNavigationAction,
+            handler: &DynBlock<dyn Fn(WKNavigationActionPolicy)>,
+        ) {
+            match self.inner(sel!(webView:decidePolicyForNavigationAction:decisionHandler:)) {
+                // SAFETY: wry's delegate implements the method; the arguments are live.
+                Some(inner) => unsafe {
+                    inner.webView_decidePolicyForNavigationAction_decisionHandler(
+                        view, action, handler,
+                    );
+                },
+                None => handler.call((WKNavigationActionPolicy::Cancel,)),
+            }
+        }
+
+        #[unsafe(method(webView:decidePolicyForNavigationResponse:decisionHandler:))]
+        fn decide_response(
+            &self,
+            view: &WKWebView,
+            response: &WKNavigationResponse,
+            handler: &DynBlock<dyn Fn(WKNavigationResponsePolicy)>,
+        ) {
+            match self.inner(sel!(webView:decidePolicyForNavigationResponse:decisionHandler:)) {
+                // SAFETY: as above.
+                Some(inner) => unsafe {
+                    inner.webView_decidePolicyForNavigationResponse_decisionHandler(
+                        view, response, handler,
+                    );
+                },
+                None => handler.call((WKNavigationResponsePolicy::Cancel,)),
+            }
+        }
+
+        #[unsafe(method(webView:didCommitNavigation:))]
+        fn did_commit(&self, view: &WKWebView, navigation: Option<&WKNavigation>) {
+            if let Some(inner) = self.inner(sel!(webView:didCommitNavigation:)) {
+                // SAFETY: as above.
+                unsafe { inner.webView_didCommitNavigation(view, navigation) };
+            }
+        }
+
+        #[unsafe(method(webView:didFinishNavigation:))]
+        fn did_finish(&self, view: &WKWebView, navigation: Option<&WKNavigation>) {
+            if let Some(inner) = self.inner(sel!(webView:didFinishNavigation:)) {
+                // SAFETY: as above.
+                unsafe { inner.webView_didFinishNavigation(view, navigation) };
+            }
+        }
+
         #[unsafe(method(webView:didFailProvisionalNavigation:withError:))]
         fn did_fail_provisional(
             &self,
@@ -587,49 +643,76 @@ define_class!(
             error: &NSError,
         ) {
             (self.ivars().callback)(load_failure(error));
-            let inner = &self.ivars().inner;
-            if inner.respondsToSelector(sel!(webView:didFailProvisionalNavigation:withError:)) {
-                // SAFETY: wry's delegate implements this method (checked above); all
-                // arguments are the live ones WebKit passed in.
-                unsafe { inner.webView_didFailProvisionalNavigation_withError(view, navigation, error) };
+            if let Some(inner) = self.inner(sel!(webView:didFailProvisionalNavigation:withError:)) {
+                // SAFETY: as above.
+                unsafe {
+                    inner.webView_didFailProvisionalNavigation_withError(view, navigation, error);
+                }
             }
         }
 
         #[unsafe(method(webView:didFailNavigation:withError:))]
         fn did_fail(&self, view: &WKWebView, navigation: Option<&WKNavigation>, error: &NSError) {
             (self.ivars().callback)(load_failure(error));
-            let inner = &self.ivars().inner;
-            if inner.respondsToSelector(sel!(webView:didFailNavigation:withError:)) {
+            if let Some(inner) = self.inner(sel!(webView:didFailNavigation:withError:)) {
                 // SAFETY: as above.
                 unsafe { inner.webView_didFailNavigation_withError(view, navigation, error) };
             }
         }
-    }
 
-    impl FailRelay {
-        /// `WebKit` asks once, when the delegate is set, which methods exist: ours and wry's.
-        #[unsafe(method(respondsToSelector:))]
-        fn responds_to_selector(&self, selector: Sel) -> bool {
-            // SAFETY: `respondsToSelector:` of NSObject takes a selector and returns a BOOL.
-            let own: bool = unsafe { msg_send![super(self), respondsToSelector: selector] };
-            own || self.ivars().inner.respondsToSelector(selector)
+        #[unsafe(method(webView:navigationAction:didBecomeDownload:))]
+        fn action_download(
+            &self,
+            view: &WKWebView,
+            action: &WKNavigationAction,
+            download: &WKDownload,
+        ) {
+            if let Some(inner) = self.inner(sel!(webView:navigationAction:didBecomeDownload:)) {
+                // SAFETY: as above.
+                unsafe { inner.webView_navigationAction_didBecomeDownload(view, action, download) };
+            }
         }
 
-        /// Every other delegate call goes to wry's delegate.
-        #[unsafe(method(forwardingTargetForSelector:))]
-        fn forwarding_target(&self, _selector: Sel) -> *mut AnyObject {
-            let inner: &AnyObject = self.ivars().inner.as_ref();
-            std::ptr::from_ref(inner).cast_mut()
+        #[unsafe(method(webView:navigationResponse:didBecomeDownload:))]
+        fn response_download(
+            &self,
+            view: &WKWebView,
+            response: &WKNavigationResponse,
+            download: &WKDownload,
+        ) {
+            if let Some(inner) = self.inner(sel!(webView:navigationResponse:didBecomeDownload:)) {
+                // SAFETY: as above.
+                unsafe {
+                    inner.webView_navigationResponse_didBecomeDownload(view, response, download);
+                }
+            }
+        }
+
+        #[unsafe(method(webViewWebContentProcessDidTerminate:))]
+        fn process_ended(&self, view: &WKWebView) {
+            if let Some(inner) = self.inner(sel!(webViewWebContentProcessDidTerminate:)) {
+                // SAFETY: as above.
+                unsafe { inner.webViewWebContentProcessDidTerminate(view) };
+            }
         }
     }
 );
 
 impl FailRelay {
+    /// wry's delegate, while it lives and implements `selector`.
+    fn inner(&self, selector: Sel) -> Option<Retained<ProtocolObject<dyn WKNavigationDelegate>>> {
+        self.ivars()
+            .inner
+            .load()
+            .filter(|inner| inner.respondsToSelector(selector))
+    }
+
     fn new(
-        inner: Retained<ProtocolObject<dyn WKNavigationDelegate>>,
+        inner: &ProtocolObject<dyn WKNavigationDelegate>,
         callback: Box<dyn Fn(LoadFailure)>,
         mtm: MainThreadMarker,
     ) -> Retained<Self> {
+        let inner = Weak::from(inner);
         let this = mtm.alloc::<Self>().set_ivars(FailIvars { inner, callback });
         // SAFETY: `init` of NSObject on a freshly allocated instance with ivars set.
         unsafe { msg_send![super(this), init] }
@@ -667,7 +750,7 @@ pub fn on_load_failed(
     let (view, mtm) = view(webview)?;
     // SAFETY: a plain getter on a live view on the main thread.
     let inner = unsafe { view.navigationDelegate() }.ok_or("no navigation delegate")?;
-    let relay = FailRelay::new(inner, callback, mtm);
+    let relay = FailRelay::new(&inner, callback, mtm);
     let object: &AnyObject = view.as_ref();
     let value: &AnyObject = relay.as_ref();
     // SAFETY: both objects are live; the view retains the relay for its whole life, and the
