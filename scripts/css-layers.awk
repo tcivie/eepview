@@ -6,8 +6,10 @@
 # Allowed at the top level: the `@layer a, b;` order statement, `:root` token blocks, and an
 # `@media` or `@supports` block that holds only `:root` blocks.
 #
-# Run it in the C locale (LC_ALL=C): macOS awk stops on a multibyte character in UTF-8.
-# Usage: LC_ALL=C awk -v layers="base components pages state" -f scripts/css-layers.awk file.css ...
+# It runs in any locale: the scan loop compares single characters with plain ASCII strings and runs
+# a regex only on a whole prelude, never on a part of a multibyte character.
+#
+# Usage: awk -v layers="base components pages state" -f scripts/css-layers.awk file.css ...
 # Prints one "file:line: reason" per fault and exits 1 when there is one.
 
 BEGIN {
@@ -18,6 +20,7 @@ BEGIN {
 FNR == 1 {
   depth = 0
   prelude = ""
+  blank = 1
   in_comment = 0
 }
 
@@ -68,17 +71,23 @@ function open_block(p, kind, name) {
     if (c == "{") {
       open_block(trim(prelude))
       prelude = ""
+      blank = 1
     } else if (c == "}") {
       if (depth > 0) depth--
       prelude = ""
+      blank = 1
     } else if (c == ";") {
       p = trim(prelude)
       if (depth == 0 && p !~ /^@layer[[:space:]]+[A-Za-z0-9_, -]+$/) {
         fault("statement outside @layer: " p)
       }
       prelude = ""
+      blank = 1
     } else {
-      if (trim(prelude) == "" && c !~ /[[:space:]]/) start = FNR
+      if (blank && c != " " && c != "\t" && c != "\r") {
+        start = FNR
+        blank = 0
+      }
       prelude = prelude c
     }
   }

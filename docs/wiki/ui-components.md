@@ -52,7 +52,7 @@ The stylesheets are split into cascade layers. A later layer always wins, so a p
 - a stylesheet other than `theme.css` defines a custom property. Tokens live in one file.
 - an HTML file has a `style` attribute or a `<style>` element.
 - a TypeScript file, or a script under `scripts/`, sets an inline style (`.style`, `cssText`, `setAttribute("style", …)`).
-- a style rule in any `.css` file sits outside an `@layer`, or in a layer that `theme.css` does not declare in its `@layer base, components, pages, state;` order. An unlayered rule beats every layer, so it beats `[hidden]` in `@layer state`. The only top-level forms allowed are that order statement, `:root` token blocks, and an `@media` or `@supports` block that holds only `:root` blocks. `scripts/css-layers.awk` reads the brace structure, not the indent, and `src/ui/css-layers.test.ts` tests it.
+- a style rule in any `.css` file sits outside an `@layer`, or in a layer that `theme.css` does not declare in its `@layer base, components, pages, state;` order. An unlayered rule beats every layer, so it beats `[hidden]` in `@layer state`. The only top-level forms allowed are that order statement, `:root` token blocks, and an `@media` or `@supports` block that holds only `:root` blocks. `scripts/css-layers.awk` reads the brace structure, not the indent, and `src/ui/css-layers.test.ts` tests it. It works in any locale (it never runs a regex on part of a multibyte character), and an awk crash fails the check instead of passing it silently.
 
 `scripts/palette-check.sh` covers raw colors.
 
@@ -66,3 +66,4 @@ Two values are known only at run time: the width of the macOS window buttons (`-
 
 - 2026-10-03 — One shared component set, cascade layers and the style check — [#65](https://github.com/tcivie/eepview/pull/65)
 - 2026-10-06 — The style check rejects a rule outside a declared layer, after the crash banner could not hide — [#82](https://github.com/tcivie/eepview/pull/82)
+- 2026-10-06 — The layer check works in a UTF-8 locale, and an awk crash fails it — [#88](https://github.com/tcivie/eepview/pull/88)
