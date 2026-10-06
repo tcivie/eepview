@@ -370,27 +370,82 @@ mod core_calls {
         assert_eq!(answered(&core, now + 99_999), samples);
     }
 
-    #[test]
-    fn r51_the_first_timed_save_comes_60_seconds_after_the_core_was_made() {
-        let now = now_ms();
-        let samples = [(now - 10_000, 1, 2)];
-        let (mut core, paths) = core_with("bandwidth-core-first", &samples, now);
+    /// Adds a sample of `in1s` / `out1s` at `t`, as a round of the sampler does.
+    fn add_sample(core: &mut Core, t: u64, in1s: u64, out1s: u64) {
+        core.record_stats_spaced(t, &with_bandwidth(in1s, out1s));
+    }
+
+    /// A core made at `now` over a file with `samples`, which is then deleted, so that a
+    /// file on disk shows a save.
+    fn core_without_file(name: &str, samples: &[(u64, u64, u64)], now: u64) -> (Core, Paths) {
+        let (core, paths) = core_with(name, samples, now);
         std::fs::remove_file(&paths.bandwidth).unwrap();
-        core.set_latest_stats(RouterStats::default());
-        assert!(!core.save_stats_if_due(now + 59_999));
-        assert!(!paths.bandwidth.exists(), "no save before 60 s");
-        assert!(core.save_stats_if_due(now + 60_000));
-        assert_eq!(triples(&load(&paths.bandwidth, now + 60_000)), samples);
+        (core, paths)
     }
 
     #[test]
-    fn r51_a_save_is_due_again_60_seconds_after_the_last_one() {
+    fn r51_the_first_timed_save_comes_60_seconds_after_the_core_was_made() {
         let now = now_ms();
-        let (mut core, paths) = core_with("bandwidth-core-again", &[], now);
-        core.set_latest_stats(RouterStats::default());
+        let loaded = (now - 10_000, 1, 2);
+        let (mut core, paths) = core_without_file("bandwidth-core-first", &[loaded], now);
+        add_sample(&mut core, now + 1_000, 9, 10);
+        assert!(!core.save_stats_if_due(now + 59_999));
+        assert!(!paths.bandwidth.exists(), "no save before 60 s");
+        assert!(core.save_stats_if_due(now + 60_000));
+        let saved = triples(&load(&paths.bandwidth, now + 60_000));
+        assert_eq!(saved, [loaded, (now + 1_000, 9, 10)]);
+    }
+
+    #[test]
+    fn r51_with_no_new_sample_nothing_is_written_even_after_60_seconds() {
+        // R51: "it does not write while no sample comes". The loaded samples are not new.
+        let now = now_ms();
+        let (mut core, paths) =
+            core_without_file("bandwidth-core-idle", &[(now - 10_000, 1, 2)], now);
+        assert!(!core.save_stats_if_due(now + 60_000));
+        assert!(!core.save_stats_if_due(now + 600_000));
+        assert!(!paths.bandwidth.exists());
+    }
+
+    #[test]
+    fn r51_a_sample_that_the_history_does_not_add_makes_no_save_due() {
+        // R51: only a sample that the history got counts: too close to the newest, or with no
+        // `in1s` and `out1s`, it adds nothing.
+        let now = now_ms();
+        let (mut core, paths) =
+            core_without_file("bandwidth-core-dropped", &[(now - 10_000, 1, 2)], now);
+        add_sample(&mut core, now - 8_000, 5, 6);
+        core.record_stats_spaced(now + 1_000, &RouterStats::default());
+        assert!(!core.save_stats_if_due(now + 60_000));
+        assert!(!paths.bandwidth.exists());
+    }
+
+    #[test]
+    fn r51_a_save_needs_a_new_sample_each_time() {
+        let now = now_ms();
+        let (mut core, paths) = core_without_file("bandwidth-core-each", &[], now);
+        add_sample(&mut core, now + 1_000, 1, 2);
         assert!(core.save_stats_if_due(now + 60_000));
         std::fs::remove_file(&paths.bandwidth).unwrap();
-        assert!(!core.save_stats_if_due(now + 60_000));
+        assert!(
+            !core.save_stats_if_due(now + 120_000),
+            "no sample since the save"
+        );
+        assert!(!paths.bandwidth.exists());
+        add_sample(&mut core, now + 121_000, 3, 4);
+        assert!(core.save_stats_if_due(now + 121_000 + 60_000));
+        assert!(paths.bandwidth.exists());
+    }
+
+    #[test]
+    fn r51_a_save_is_due_again_60_seconds_after_the_last_attempt() {
+        let now = now_ms();
+        let (mut core, paths) = core_without_file("bandwidth-core-again", &[], now);
+        add_sample(&mut core, now + 1_000, 1, 2);
+        assert!(core.save_stats_if_due(now + 60_000));
+        std::fs::remove_file(&paths.bandwidth).unwrap();
+        add_sample(&mut core, now + 65_000, 3, 4);
+        assert!(!core.save_stats_if_due(now + 65_000), "never more often");
         assert!(!core.save_stats_if_due(now + 119_999), "never more often");
         assert!(!paths.bandwidth.exists());
         assert!(core.save_stats_if_due(now + 120_000));
@@ -398,8 +453,9 @@ mod core_calls {
     }
 
     #[test]
-    fn r51_a_failed_save_changes_nothing_and_the_next_due_save_tries_again() {
-        // R51: "A save that fails changes nothing in memory; the next due save tries again."
+    fn r51_a_failed_save_changes_nothing_and_counts_as_an_attempt() {
+        // R51: "A save that fails changes nothing in memory and counts as an attempt: the next
+        // try comes 60 s later, not at the next round."
         let now = now_ms();
         let dir = testdir::fresh("bandwidth-core-fail");
         let blocked = dir.join("blocked");
@@ -407,31 +463,61 @@ mod core_calls {
         let mut paths = paths_in(&dir);
         paths.bandwidth = blocked.join("bandwidth.json");
         let mut core = Core::new(Some(paths.clone()), "p", now);
-        core.set_latest_stats(RouterStats::default());
-        let before = core.stats_answer(now);
+        add_sample(&mut core, now + 1_000, 1, 2);
+        let before = core.stats_answer(now + 60_000);
         assert!(!core.save_stats_if_due(now + 60_000), "the save fails");
-        assert_eq!(core.stats_answer(now), before);
+        assert_eq!(core.stats_answer(now + 60_000), before);
         std::fs::remove_file(&blocked).unwrap();
         std::fs::create_dir(&blocked).unwrap();
         assert!(
-            core.save_stats_if_due(now + 60_001),
-            "the next call tries again"
+            !core.save_stats_if_due(now + 60_001),
+            "not at the next round"
+        );
+        assert!(!core.save_stats_if_due(now + 119_999));
+        assert!(!paths.bandwidth.exists());
+        assert!(
+            core.save_stats_if_due(now + 120_000),
+            "60 s after the attempt"
         );
         assert!(paths.bandwidth.exists());
     }
 
     #[test]
     fn r53_save_stats_writes_the_file_with_paths_and_does_nothing_without() {
-        // R53: the quit saves once more, whatever the time since the last save.
+        // R53, R51: the quit saves once more, whatever the time since the last save.
         let now = now_ms();
         let samples = [(now - 10_000, 1, 2), (now - 5_000, 3, 4)];
-        let (mut core, paths) = core_with("bandwidth-core-quit", &samples, now);
-        std::fs::remove_file(&paths.bandwidth).unwrap();
+        let (mut core, paths) = core_without_file("bandwidth-core-quit", &samples, now);
         core.set_latest_stats(RouterStats::default());
-        assert!(core.save_stats(now));
+        assert!(core.save_stats(now), "no new sample, still written");
         assert_eq!(triples(&load(&paths.bandwidth, now)), samples);
         let mut bare = Core::new(None, "p", now);
         bare.set_latest_stats(RouterStats::default());
         assert!(!bare.save_stats(now), "no paths, no file");
+    }
+
+    #[test]
+    fn r53_the_quit_save_writes_again_right_after_a_timed_save() {
+        let now = now_ms();
+        let (mut core, paths) = core_without_file("bandwidth-core-quit-twice", &[], now);
+        add_sample(&mut core, now + 1_000, 1, 2);
+        assert!(core.save_stats_if_due(now + 60_000));
+        std::fs::remove_file(&paths.bandwidth).unwrap();
+        assert!(core.save_stats(now + 60_001));
+        assert!(paths.bandwidth.exists());
+    }
+}
+
+mod store_kind {
+    use std::path::Path;
+
+    use crate::diag::StoreKind;
+    use crate::store::store_kind;
+
+    #[test]
+    fn diagnostics_r1_2_the_bandwidth_file_is_the_bandwidth_store_kind() {
+        let path = Path::new("/data/eepview/bandwidth.json");
+        assert_eq!(store_kind(path), Some(StoreKind::Bandwidth));
+        assert_eq!(StoreKind::Bandwidth.as_str(), "bandwidth");
     }
 }

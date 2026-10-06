@@ -6,7 +6,7 @@
 
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
 
@@ -141,6 +141,18 @@ struct Page {
     path: String,
     status: u16,
     body: String,
+    hold: Option<Arc<AtomicBool>>,
+}
+
+/// Lets a held fake console answer: until [`Release::release`] runs, the page that it holds
+/// gets no answer.
+pub struct Release(Arc<AtomicBool>);
+
+impl Release {
+    /// Lets the held page answer, now and for every later request.
+    pub fn release(&self) {
+        self.0.store(true, Ordering::SeqCst);
+    }
 }
 
 impl FakeConsole {
@@ -156,8 +168,23 @@ impl FakeConsole {
             path: path.to_owned(),
             status,
             body: body.to_owned(),
+            hold: None,
         };
         Self::run(kind, Some(page))
+    }
+
+    /// Like [`FakeConsole::serving`], but a request for `path` is logged at once and
+    /// answered only after [`Release::release`] (or after 10 s), so a test can act while the
+    /// request is in flight.
+    pub fn serving_held(kind: ConsoleKind, path: &str, status: u16, body: &str) -> (Self, Release) {
+        let flag = Arc::new(AtomicBool::new(false));
+        let page = Page {
+            path: path.to_owned(),
+            status,
+            body: body.to_owned(),
+            hold: Some(Arc::clone(&flag)),
+        };
+        (Self::run(kind, Some(page)), Release(flag))
     }
 
     fn run(kind: ConsoleKind, page: Option<Page>) -> Self {
@@ -206,6 +233,7 @@ fn console_answer(
     };
     log.lock().unwrap().push(head.start.clone());
     if let Some(page) = page.filter(|p| head.start.split(' ').nth(1) == Some(p.path.as_str())) {
+        wait_for_release(page.hold.as_deref());
         let reply = format!(
             "HTTP/1.0 {} Fake\r\nContent-Type: text/html\r\n\r\n{}",
             page.status, page.body
@@ -223,6 +251,17 @@ fn console_answer(
     };
     let reply = format!("HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n{body}");
     let _ = stream.write_all(reply.as_bytes());
+}
+
+/// Waits until `hold` is set, at most 10 s. No hold, no wait.
+fn wait_for_release(hold: Option<&AtomicBool>) {
+    let Some(flag) = hold else { return };
+    for _ in 0..1_000 {
+        if flag.load(Ordering::SeqCst) {
+            return;
+        }
+        thread::sleep(std::time::Duration::from_millis(10));
+    }
 }
 
 /// A fake router helper on a free loopback port. It answers every request with `200` and

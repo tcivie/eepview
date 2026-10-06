@@ -57,7 +57,9 @@ describe("[R54] formatRate units and digits", () => {
     assert.equal(formatRate(1_000_000), "1.00 MB/s");
     assert.equal(formatRate(2_500_000), "2.50 MB/s");
   });
+});
 
+describe("[R54] formatRate digits and rounding", () => {
   it("[R54] v has 2 decimals below 100, 1 decimal below 1 000, else none", () => {
     assert.equal(formatRate(99_990), "99.99 kB/s");
     assert.equal(formatRate(100_000), "100.0 kB/s");
@@ -66,6 +68,16 @@ describe("[R54] formatRate units and digits", () => {
     assert.equal(formatRate(99_990_000), "99.99 MB/s");
     assert.equal(formatRate(100_000_000), "100.0 MB/s");
     assert.equal(formatRate(1_500_000_000), "1500 MB/s");
+  });
+
+  it("[R54] the form comes from the rounded value: 99.996 kB reads 100.0 kB/s, not 100.00", () => {
+    assert.equal(formatRate(99_996), "100.0 kB/s");
+    assert.equal(formatRate(99_996_000), "100.0 MB/s");
+  });
+
+  it("[R54] a value that rounds to 1 000 moves to the next unit", () => {
+    assert.equal(formatRate(999.6), "1.00 kB/s");
+    assert.equal(formatRate(999_960), "1.00 MB/s");
   });
 
   it("[R54] the Java I2P console rate of 53.91 KBps shows as 53.91 kB/s, not 52.6", () => {

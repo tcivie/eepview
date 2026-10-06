@@ -192,6 +192,38 @@ fn r48_a_closed_gate_nulls_the_figures_and_keeps_the_history() {
     assert_eq!(stats.history.len(), 1, "the history stays");
 }
 
+#[test]
+fn r48_a_pause_while_the_request_runs_gives_all_null_and_no_sample() {
+    // R48 step 3: "Before it stores anything, it checks again, under the lock of the core,
+    // that the gatekeeper runs." The console holds its answer until the connection is paused.
+    let (app, _router) = gated();
+    let stats = stats_path(ConsoleKind::Java);
+    let (fake, release) = FakeConsole::serving_held(ConsoleKind::Java, stats, 200, JAVA);
+    set_console(app.handle(), Some(fake.verified()));
+    let helper = FakeHelper::serving(HELPER_JSON);
+    tick(&handle(&app), Some((helper.addr(), "token".to_owned())));
+    assert_eq!(current_stats(&handle(&app)).uptime_ms, Some(5_000));
+    let seen = stats_requests(&fake);
+    let worker = {
+        let app_handle = handle(&app);
+        std::thread::spawn(move || tick(&app_handle, None))
+    };
+    assert!(
+        wait_for(|| stats_requests(&fake) > seen),
+        "the request is in flight"
+    );
+    invoke(&app, "connection_pause", json!({})).unwrap();
+    release.release();
+    worker.join().unwrap();
+    let after = current_stats(&handle(&app));
+    assert_eq!(after.uptime_ms, None, "the old figures are gone too");
+    assert_eq!(
+        after.tunnels.participating, None,
+        "the console answer is not stored"
+    );
+    assert!(after.history.is_empty(), "no sample from the late answer");
+}
+
 // ---------------------------------------------------------------- R31 source order
 
 #[test]
