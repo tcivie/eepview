@@ -3,13 +3,14 @@
 
 import "./boot.ts";
 import { renderConsoleLink, shownInActiveTab, wireConsoleClicks } from "./console-nav.ts";
-import type { Bookmark, ConsoleInfo, RouterStatus } from "./contract.ts";
-import { all, byId, cloneTemplate, setText } from "./dom.ts";
+import type { Bookmark, ConsoleInfo, RouterStatus, VerifyCheck } from "./contract.ts";
+import { all, announce, byId, cloneTemplate, setText } from "./dom.ts";
 import { call, errorText, on } from "./ipc.ts";
 import { displayUrl, hostOf } from "./lib/address.ts";
 import { routerVersion, shouldRedetect } from "./lib/console-links.ts";
 import { CRASH_TEXT, reportHref } from "./lib/report-page.ts";
-import { hopStates, versionText } from "./lib/router-view.ts";
+import { type CheckView, checkAnnouncement, checkViews } from "./lib/router-checks.ts";
+import { versionText } from "./lib/router-view.ts";
 import { renderRouterSummary } from "./shared/router-summary.ts";
 import { renderSiteMark } from "./site-mark.ts";
 
@@ -17,6 +18,7 @@ const MAX_TILES = 11;
 const quiet = (): undefined => undefined;
 let lastStatus: RouterStatus | null = null;
 let lastConsole: ConsoleInfo | null = null;
+let lastChecks: VerifyCheck[] | null = null;
 
 function tile(bookmark: Bookmark): HTMLElement {
   const item = cloneTemplate("tile-template");
@@ -50,20 +52,37 @@ function redetectWhenReady(status: RouterStatus): void {
     .catch(quiet);
 }
 
+function paintCheck(row: HTMLElement, view: CheckView | undefined): void {
+  if (!view) return;
+  row.dataset.check = view.id;
+  row.dataset.state = view.state;
+  setText(row, ".check-name", view.name);
+  setText(row, ".check-state", view.stateText);
+  const detail = row.querySelector<HTMLElement>(".check-detail");
+  if (!detail) return;
+  detail.textContent = view.detail ?? "";
+  detail.hidden = !view.detail;
+}
+
+function renderChecks(checks: VerifyCheck[] | undefined): void {
+  const views = checkViews(checks);
+  all<HTMLElement>("#router-checks .check").forEach((row, i) => {
+    paintCheck(row, views[i]);
+  });
+  const said = checkAnnouncement(lastChecks, checks);
+  if (said) announce(byId("router-checks-live"), said);
+  if (checks) lastChecks = checks;
+}
+
 function renderRouter(status: RouterStatus): void {
   redetectWhenReady(status);
-  const view = renderRouterSummary(
+  renderRouterSummary(
     { chip: byId("router-chip"), text: byId("router-text"), proxy: byId("router-proxy") },
     status,
   );
   lastStatus = status;
   showVersion();
-  const states = hopStates(view.tone, all("#router-hops .hop").length);
-  all<HTMLElement>("#router-hops .hop").forEach((hop, i) => {
-    const state = states[i];
-    if (state) hop.dataset.state = state;
-    else delete hop.dataset.state;
-  });
+  renderChecks(status.checks);
 }
 
 function showVersion(): void {

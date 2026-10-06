@@ -3,9 +3,10 @@
 
 //! Router status changes: no `tab-*` webview exists unless the router is verified.
 
+use super::checks::{CheckFacts, outproxy_outcome, tunnels_outcome, version_outcome};
 use super::{Core, Effect, Event, WebOp};
 use crate::net::verify::Verdict;
-use crate::types::RouterStatus;
+use crate::types::{CheckId, RouterReport, RouterStatus, VerifyCheck};
 
 /// The contract status of a VERIFY verdict. `gate_ok` is false when the gatekeeper could not
 /// start; the router then counts as down.
@@ -65,6 +66,70 @@ impl Core {
         }
     }
 
+    /// The four router checks, in contract order (V1 of `docs/wiki/router-checks.md`).
+    #[must_use]
+    pub fn checks(&self) -> &[VerifyCheck] {
+        self.checks.list()
+    }
+
+    /// The `router_status()` answer and the `router-status` payload: status and checks.
+    #[must_use]
+    pub fn router_report(&self) -> RouterReport {
+        RouterReport {
+            status: self.router.clone(),
+            checks: self.checks.list().to_vec(),
+        }
+    }
+
+    /// V5: a VERIFY round starts. A `pending` check 1 turns `running`. Nothing while paused.
+    pub fn verify_started(&mut self) -> Vec<Effect> {
+        if self.router.paused || !self.checks.start_round() {
+            return Vec::new();
+        }
+        vec![Effect::Emit(Event::Router)]
+    }
+
+    /// The result of a VERIFY round at `now` (Unix ms): [`Core::router_changed`], then the
+    /// checks (V6, V7, V8, V9).
+    pub fn router_checked(&mut self, now: u64, status: RouterStatus) -> Vec<Effect> {
+        let fx = self.router_changed(status);
+        if self.router.paused {
+            self.checks.reset();
+        } else if self.router.state == "ok" {
+            self.checks.round(now, None);
+        } else {
+            let reason = self.router.detail.clone();
+            let reason = reason.unwrap_or_else(|| self.router.state.to_owned());
+            self.checks.round(now, Some(reason));
+        }
+        fx
+    }
+
+    /// V9 to V14: checks 2 to 4 from the facts of a round at `now`. Nothing while the gate
+    /// is closed or the connection is paused. Emits `router-status` only on a change.
+    pub fn checks_seen(&mut self, now: u64, facts: &CheckFacts) -> Vec<Effect> {
+        if !self.router.is_ok() || !self.checks.gate_passed() {
+            return Vec::new();
+        }
+        let runs = [
+            (
+                CheckId::Version,
+                version_outcome(facts.kind, facts.version.as_deref()),
+            ),
+            (CheckId::NoOutproxy, outproxy_outcome(&facts.outproxy)),
+            (CheckId::Tunnels, tunnels_outcome(facts.stats.as_ref())),
+        ];
+        let mut changed = false;
+        for (id, outcome) in runs {
+            changed |= self.checks.set(id, now, outcome);
+        }
+        if changed {
+            vec![Effect::Emit(Event::Router)]
+        } else {
+            Vec::new()
+        }
+    }
+
     /// True while the user has paused the connection.
     #[must_use]
     pub fn paused(&self) -> bool {
@@ -78,6 +143,7 @@ impl Core {
             return Vec::new();
         }
         self.router.paused = true;
+        self.checks.reset();
         let mut fx = vec![Effect::Emit(Event::Router)];
         fx.extend(self.destroy_all());
         fx
@@ -91,6 +157,7 @@ impl Core {
         }
         self.router.paused = false;
         self.router.state = "verifying";
+        self.checks.reset();
         vec![
             Effect::Emit(Event::Router),
             Effect::Emit(Event::TabsChanged),

@@ -910,6 +910,101 @@
     }
   }
 
+  /* Check list: the router checks on Home, one row each. The mark and the state text show
+   the state; a row changes only when new data arrives, so it has no animation and no
+   transition. */
+
+  .checks {
+    display: grid;
+    gap: var(--space-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: var(--fs-sm);
+  }
+
+  .checks > .check {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: var(--space-0-5) var(--space-2);
+    align-items: center;
+    cursor: default;
+  }
+
+  .check-mark {
+    display: inline-grid;
+    place-items: center;
+    width: 16px;
+    height: 16px;
+    border: 2px dashed var(--color-border-strong);
+    border-radius: var(--radius-round);
+    font-size: var(--fs-2xs);
+    font-weight: var(--fw-strong);
+    line-height: 1;
+    color: var(--color-text-muted);
+  }
+
+  .check-name {
+    min-width: 0;
+    color: var(--color-text);
+  }
+
+  .check-state {
+    font-size: var(--fs-xs);
+    color: var(--color-text-muted);
+    white-space: nowrap;
+  }
+
+  .check-detail {
+    grid-column: 2 / -1;
+    font-size: var(--fs-xs);
+    color: var(--color-text-muted);
+    overflow-wrap: anywhere;
+  }
+
+  .checks > .check[data-state="running"] .check-mark {
+    border-style: solid;
+    border-color: var(--color-accent);
+  }
+
+  .checks > .check[data-state="passed"] .check-mark {
+    border: 2px solid var(--color-accent);
+    background: var(--color-accent);
+    color: var(--color-accent-text);
+  }
+
+  .checks > .check[data-state="passed"] .check-mark::after {
+    content: "✓";
+  }
+
+  .checks > .check[data-state="passed"] .check-state {
+    color: var(--color-accent);
+  }
+
+  .checks > .check[data-state="failed"] .check-mark {
+    border: 2px solid var(--color-danger);
+    border-radius: var(--radius-xxs);
+    background: var(--color-danger-soft);
+    color: var(--color-danger);
+  }
+
+  .checks > .check[data-state="failed"] .check-mark::after {
+    content: "✕";
+  }
+
+  .checks > .check[data-state="failed"] .check-state,
+  .checks > .check[data-state="failed"] .check-detail {
+    color: var(--color-danger);
+  }
+
+  .checks > .check[data-state="not-checked"] .check-mark {
+    border-style: solid;
+  }
+
+  .checks > .check[data-state="not-checked"] .check-mark::after {
+    content: "–";
+  }
+
   /* Stat grid: labelled figures. .facts-lg shows a few large ones. */
 
   .facts {

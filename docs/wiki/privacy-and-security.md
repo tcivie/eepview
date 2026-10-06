@@ -11,7 +11,7 @@ Status: the design is written. The protections are coming in v0.1. eepview is pr
   3. A filter in the web engine blocks every request that is not for an `.i2p` host.
   4. A navigation guard stops links, pop-ups and redirects to other addresses.
   5. WebRTC is off, so a page cannot send direct UDP traffic.
-- **Router checked first.** No page loads until eepview has verified the router. It also checks that the router has no outproxy.
+- **Router checked first.** No page loads until eepview has verified the router. The Home page shows each router check and its real result: the proxy is I2P, the router version, no outproxy, and the network and tunnels. eepview reads the router's tunnel configuration to see an outproxy, and never changes it. An outproxy cannot carry eepview traffic anyway: eepview sends only `.i2p` requests. See [Router checks](router-checks.md).
 - **Private by default.** Cookies and cache vanish when you quit. JavaScript is off until you turn it on for a site. You can turn history off.
 - **Site icons stay with the site.** Once a day at most, eepview asks the site you visit for its icon (`/favicon.ico`). The request goes to that same `.i2p` site, through the same I2P proxy as the page, with no cookies and no referrer. Nothing goes anywhere else. eepview draws the icon again as a new image and keeps it only while the site is in your bookmarks or history. Clearing history clears the icons too. See [Site icons](site-icons.md).
 - **Consent first.** eepview downloads and installs nothing without your click.

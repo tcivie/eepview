@@ -78,6 +78,8 @@ The dot near the menu shows the router state. Hover or click it to open the pane
 
 ![Router stopped](https://raw.githubusercontent.com/tcivie/eepview/main/docs/images/ui/router-down-light.png)
 
+The Home page lists the four router checks under the router state. Each one says Waiting, Checking, Passed at a time, Failed or Not checked, with the reason. See [Router checks](router-checks.md).
+
 The Network page shows more: bandwidth, tunnels, known routers and the Java version.
 
 ![Network page](https://raw.githubusercontent.com/tcivie/eepview/main/docs/images/ui/stats-light.png)
