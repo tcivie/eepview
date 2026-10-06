@@ -18,69 +18,90 @@ use eepview_lib::net::outproxy::{
 
 const PORT: u16 = 4444;
 
-static NEXT: AtomicUsize = AtomicUsize::new(0);
+/// Helpers that may unwrap and panic (test support only).
+#[cfg(test)]
+mod support {
+    use super::*;
 
-/// A fresh folder in the system temp folder, removed on drop.
-struct Sandbox {
-    root: PathBuf,
-}
+    static NEXT: AtomicUsize = AtomicUsize::new(0);
 
-impl Sandbox {
-    fn new() -> Self {
-        let n = NEXT.fetch_add(1, Ordering::SeqCst);
-        let root =
-            std::env::temp_dir().join(format!("eepview-router-checks-{}-{n}", std::process::id()));
-        fs::create_dir_all(&root).expect("a temporary folder");
-        Self { root }
+    /// A fresh folder in the system temp folder, removed on drop.
+    pub(super) struct Sandbox {
+        pub(super) root: PathBuf,
     }
 
-    /// The variables of every OS, all inside the sandbox.
-    fn env(&self) -> impl Fn(&str) -> Option<String> {
-        let root = self.root.clone();
-        move |name| match name {
-            "HOME" => Some(root.to_string_lossy().into_owned()),
-            "LOCALAPPDATA" => Some(root.join("local").to_string_lossy().into_owned()),
-            "APPDATA" => Some(root.join("roaming").to_string_lossy().into_owned()),
-            _ => None,
+    impl Sandbox {
+        pub(super) fn new() -> Self {
+            let n = NEXT.fetch_add(1, Ordering::SeqCst);
+            let root = std::env::temp_dir()
+                .join(format!("eepview-router-checks-{}-{n}", std::process::id()));
+            fs::create_dir_all(&root).expect("a temporary folder");
+            Self { root }
+        }
+
+        /// The variables of every OS, all inside the sandbox.
+        pub(super) fn env(&self) -> impl Fn(&str) -> Option<String> {
+            let root = self.root.clone();
+            move |name| match name {
+                "HOME" => Some(root.to_string_lossy().into_owned()),
+                "LOCALAPPDATA" => Some(root.join("local").to_string_lossy().into_owned()),
+                "APPDATA" => Some(root.join("roaming").to_string_lossy().into_owned()),
+                _ => None,
+            }
+        }
+
+        /// The Java I2P configuration folders of this OS that live in the sandbox, in order.
+        pub(super) fn java_dirs(&self) -> Vec<PathBuf> {
+            let all = java_config_dirs(&self.env());
+            let inside: Vec<PathBuf> = all
+                .into_iter()
+                .filter(|d| d.starts_with(&self.root))
+                .collect();
+            assert!(!inside.is_empty(), "a Java I2P folder inside the sandbox");
+            inside
+        }
+
+        pub(super) fn java_dir(&self) -> PathBuf {
+            self.java_dirs().remove(0)
+        }
+
+        pub(super) fn i2pd_file(&self) -> PathBuf {
+            let all = i2pd_config_files(&self.env());
+            let inside = all.into_iter().find(|f| f.starts_with(&self.root));
+            inside.expect("an i2pd.conf path inside the sandbox")
+        }
+
+        pub(super) fn find(&self, kind: Option<ConsoleKind>, port: u16) -> OutproxyFinding {
+            find_outproxy(kind, port, &self.env())
         }
     }
 
-    /// The Java I2P configuration folders of this OS that live in the sandbox, in order.
-    fn java_dirs(&self) -> Vec<PathBuf> {
-        let all = java_config_dirs(&self.env());
-        let inside: Vec<PathBuf> = all
-            .into_iter()
-            .filter(|d| d.starts_with(&self.root))
-            .collect();
-        assert!(!inside.is_empty(), "a Java I2P folder inside the sandbox");
-        inside
+    impl Drop for Sandbox {
+        fn drop(&mut self) {
+            fs::remove_dir_all(&self.root).unwrap_or_default();
+        }
     }
 
-    fn java_dir(&self) -> PathBuf {
-        self.java_dirs().remove(0)
+    pub(super) fn put(path: &Path, text: &str) {
+        fs::create_dir_all(path.parent().expect("a parent folder")).expect("a folder");
+        fs::write(path, text).expect("a file");
     }
 
-    fn i2pd_file(&self) -> PathBuf {
-        let all = i2pd_config_files(&self.env());
-        let inside = all.into_iter().find(|f| f.starts_with(&self.root));
-        inside.expect("an i2pd.conf path inside the sandbox")
-    }
-
-    fn find(&self, kind: Option<ConsoleKind>, port: u16) -> OutproxyFinding {
-        find_outproxy(kind, port, &self.env())
-    }
-}
-
-impl Drop for Sandbox {
-    fn drop(&mut self) {
-        fs::remove_dir_all(&self.root).unwrap_or_default();
+    pub(super) fn assert_unknown_about_http_proxy(finding: &OutproxyFinding) {
+        match finding {
+            OutproxyFinding::Unknown(reason) => {
+                let lower = reason.to_lowercase();
+                assert!(
+                    lower.contains("http proxy"),
+                    "V12: no HTTP proxy found: {reason:?}"
+                );
+            }
+            other => panic!("V12: expected unknown, got {other:?}"),
+        }
     }
 }
 
-fn put(path: &Path, text: &str) {
-    fs::create_dir_all(path.parent().expect("a parent folder")).expect("a folder");
-    fs::write(path, text).expect("a file");
-}
+use support::{Sandbox, assert_unknown_about_http_proxy, put};
 
 fn strings(items: &[&str]) -> Vec<String> {
     items.iter().map(|s| String::from(*s)).collect()
@@ -105,19 +126,6 @@ fn listed(file: &str, outproxies: &[&str]) -> OutproxyFinding {
 
 fn clear(file: &str) -> OutproxyFinding {
     OutproxyFinding::Clear { file: file.into() }
-}
-
-fn assert_unknown_about_http_proxy(finding: &OutproxyFinding) {
-    match finding {
-        OutproxyFinding::Unknown(reason) => {
-            let lower = reason.to_lowercase();
-            assert!(
-                lower.contains("http proxy"),
-                "V12: no HTTP proxy found: {reason:?}"
-            );
-        }
-        other => panic!("V12: expected unknown, got {other:?}"),
-    }
 }
 
 // ---------------------------------------------------------------------------------------------

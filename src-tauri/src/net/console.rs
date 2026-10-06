@@ -96,7 +96,7 @@ const fn markers(kind: ConsoleKind) -> &'static [&'static str] {
 }
 
 /// `key=value` lines of a Java properties file. Comments and blank lines are dropped.
-fn properties(text: &str) -> Vec<(&str, &str)> {
+pub(crate) fn properties(text: &str) -> Vec<(&str, &str)> {
     text.lines()
         .map(str::trim)
         .filter(|l| !l.is_empty() && !l.starts_with('#') && !l.starts_with('!'))

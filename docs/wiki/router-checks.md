@@ -65,7 +65,7 @@ Each requirement is a test target. The tests check these rules, not the code.
 - **V12 Check 3, no outproxy.**
   - The proxy port is the port of `RouterStatus.proxy` (`127.0.0.1:4444` gives 4444).
   - **Java I2P.** In each Java I2P configuration folder of R2, in that order: every file in `i2ptunnel.config.d/`, by file name, then `i2ptunnel.config`. A file is a Java properties file (`key=value`; `#` and `!` start a comment line). In `i2ptunnel.config`, the keys of tunnel `<n>` are `tunnel.<n>.<key>`. A file in `i2ptunnel.config.d/` holds one tunnel, and its keys are either `<key>` or `tunnel.<n>.<key>`. A tunnel is the HTTP proxy when `type` is `httpclient` and `listenPort` is the proxy port. Its outproxies are the values of `proxyList` and of `option.i2ptunnel.httpclient.SSLOutproxies`, split on `,`, `;` and white space. Empty parts and repeats are dropped. The order is kept.
-  - **i2pd.** Each `i2pd.conf` of R2, in that order. The keys of the `[httpproxy]` section count. `#` starts a comment. The section is the HTTP proxy when `enabled` is not `false` and `port` (default `4444`) is the proxy port. Its outproxies are the value of `outproxy`, split on `,`, each part trimmed, empty parts dropped.
+  - **i2pd.** Each `i2pd.conf` of R2, in that order. The keys of the `[httpproxy]` section count. `#` starts a comment. A file with no `[httpproxy]` section has no HTTP proxy; an empty section uses the defaults. The section is the HTTP proxy when `enabled` is not `false` and `port` (default `4444`) is the proxy port. Its outproxies are the value of `outproxy`, split on `,`, each part trimmed, empty parts dropped.
   - **Which files.** Router type Java I2P: the Java I2P files only. i2pd: the i2pd files only. Type not known: both. Within one type, the first HTTP proxy found wins. When the type is not known and both types have an HTTP proxy on the port: `not-checked`, and the detail says that both a Java I2P and an i2pd configuration use that port.
   - **Result.** No HTTP proxy found on the port: `not-checked`. The detail says that no router configuration with an HTTP proxy on that port was found. An HTTP proxy with no outproxy: `passed`. The detail names the file. An HTTP proxy with outproxies: `failed`. The detail names each outproxy.
   - eepview only reads these files. A missing or unreadable file counts as no HTTP proxy. A detail names a file by its name only, never by its folder.
@@ -146,17 +146,17 @@ pub enum Outcome { Passed(Option<String>), Failed(String), NotChecked(String) }
 
 /// V11: `1.2.3`, `1.2`, `1`, each with an optional `-<text>` suffix. `None` for other text.
 pub fn parse_version(text: &str) -> Option<(u64, u64, u64)>;
-pub fn version_outcome(kind: Option<ConsoleKind>, version: Option<&str>) -> Outcome;   // V11
+pub fn version_outcome(kind: Option<RouterKind>, version: Option<&str>) -> Outcome;   // V11
 pub fn outproxy_outcome(finding: &OutproxyFinding) -> Outcome;                         // V12
 pub fn tunnels_outcome(stats: Option<&RouterStats>) -> Outcome;                         // V13
 
 /// The facts of one round (V10).
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CheckFacts { pub kind: Option<ConsoleKind>, pub version: Option<String>,
+pub struct CheckFacts { pub kind: Option<RouterKind>, pub version: Option<String>,
                         pub outproxy: OutproxyFinding, pub stats: Option<RouterStats> }
 ```
 
-`ConsoleKind` is `eepview_lib::net::console::ConsoleKind`. `RouterStats` is `eepview_lib::net::stats::RouterStats` (`Default` gives every field `None`).
+`RouterKind` is `eepview_lib::net::outproxy::RouterKind`, a re-export of `eepview_lib::net::console::ConsoleKind` (the same type). The core names it `RouterKind`, because the core never names `net::console` (R29 of [Router console](router-console.md)). `RouterStats` is `eepview_lib::net::stats::RouterStats` (`Default` gives every field `None`).
 
 ### Rust, `eepview_lib::core::Core`
 
@@ -197,7 +197,8 @@ pub fn java_outproxies(config: &str, port: u16) -> Option<Vec<String>>;
 pub fn i2pd_outproxies(i2pd_conf: &str, port: u16) -> Option<Vec<String>>;
 /// V12 over the files of this OS (the folders of `net::console::java_config_dirs` and the
 /// files of `net::console::i2pd_config_files`, with the same `env`).
-pub fn find_outproxy(kind: Option<ConsoleKind>, port: u16,
+pub use crate::net::console::ConsoleKind as RouterKind;
+pub fn find_outproxy(kind: Option<RouterKind>, port: u16,
                      env: &dyn Fn(&str) -> Option<String>) -> OutproxyFinding;
 ```
 

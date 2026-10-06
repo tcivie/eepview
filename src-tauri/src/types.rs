@@ -215,6 +215,70 @@ impl RouterStatus {
     }
 }
 
+/// One of the four router checks (`docs/wiki/router-checks.md`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum CheckId {
+    /// VERIFY: the proxy is an I2P router and the gatekeeper runs.
+    ProxyI2p,
+    /// The router version is at least the minimum of its type.
+    Version,
+    /// The HTTP proxy tunnel of the router lists no outproxy.
+    NoOutproxy,
+    /// The network status is OK and a client tunnel is built.
+    Tunnels,
+}
+
+impl CheckId {
+    /// The four checks, in contract order (V1).
+    pub const ALL: [Self; 4] = [
+        Self::ProxyI2p,
+        Self::Version,
+        Self::NoOutproxy,
+        Self::Tunnels,
+    ];
+}
+
+/// The state of one router check (V2).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum CheckState {
+    /// Not started.
+    Pending,
+    /// Runs now.
+    Running,
+    /// The last run passed.
+    Passed,
+    /// The last run failed.
+    Failed,
+    /// eepview cannot check this for this router.
+    NotChecked,
+}
+
+/// One router check, as the Home page shows it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VerifyCheck {
+    /// Which check.
+    pub id: CheckId,
+    /// Its state.
+    pub state: CheckState,
+    /// The short reason (failed, not checked) or the fact checked (passed).
+    pub detail: Option<String>,
+    /// Unix ms when it turned passed; `None` in every other state.
+    pub passed_at: Option<u64>,
+}
+
+/// The `router_status()` answer and the `router-status` payload.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct RouterReport {
+    /// Every `RouterStatus` field.
+    #[serde(flatten)]
+    pub status: RouterStatus,
+    /// The four router checks, in contract order.
+    pub checks: Vec<VerifyCheck>,
+}
+
 /// The `router_control` and `console_open` answer.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct ControlResult {

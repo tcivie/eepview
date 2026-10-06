@@ -23,6 +23,53 @@ const ORDER: [CheckId; 4] = [
 ];
 const PROXY: &str = "127.0.0.1:4444";
 
+/// Helpers that may unwrap and panic (test support only).
+#[cfg(test)]
+mod support {
+    use super::*;
+
+    pub(super) fn check(core: &Core, id: CheckId) -> &VerifyCheck {
+        core.checks()
+            .iter()
+            .find(|c| c.id == id)
+            .expect("every check is in the list")
+    }
+
+    pub(super) fn report_json() -> serde_json::Value {
+        let mut core = core();
+        pass_round(&mut core, 5_000);
+        let facts = CheckFacts {
+            kind: None,
+            ..good_facts()
+        };
+        core.checks_seen(5_000, &facts);
+        serde_json::to_value(core.router_report()).expect("the report serializes")
+    }
+
+    pub(super) fn not_checked_detail<'a>(outcome: &'a Outcome, why: &str) -> &'a str {
+        match outcome {
+            Outcome::NotChecked(detail) => detail,
+            other => panic!("{why}: expected not-checked, got {other:?}"),
+        }
+    }
+
+    pub(super) fn passed_detail<'a>(outcome: &'a Outcome, why: &str) -> &'a str {
+        match outcome {
+            Outcome::Passed(Some(detail)) => detail,
+            other => panic!("{why}: expected passed with a detail, got {other:?}"),
+        }
+    }
+
+    pub(super) fn failed_detail<'a>(outcome: &'a Outcome, why: &str) -> &'a str {
+        match outcome {
+            Outcome::Failed(detail) => detail,
+            other => panic!("{why}: expected failed, got {other:?}"),
+        }
+    }
+}
+
+use support::{check, failed_detail, not_checked_detail, passed_detail, report_json};
+
 fn core() -> Core {
     Core::new(None, PROXY, 0)
 }
@@ -36,13 +83,6 @@ fn status(state: &'static str, detail: Option<&str>) -> RouterStatus {
         paused: false,
         managed: false,
     }
-}
-
-fn check(core: &Core, id: CheckId) -> &VerifyCheck {
-    core.checks()
-        .iter()
-        .find(|c| c.id == id)
-        .expect("every check is in the list")
 }
 
 fn states(core: &Core) -> Vec<CheckState> {
@@ -172,17 +212,6 @@ fn v1_the_report_holds_the_status_and_the_same_four_checks() {
     );
     core.router_changed(status("building", None));
     assert_eq!(core.router_report().checks.len(), 4, "V1");
-}
-
-fn report_json() -> serde_json::Value {
-    let mut core = core();
-    pass_round(&mut core, 5_000);
-    let facts = CheckFacts {
-        kind: None,
-        ..good_facts()
-    };
-    core.checks_seen(5_000, &facts);
-    serde_json::to_value(core.router_report()).expect("the report serializes")
 }
 
 #[test]
@@ -725,27 +754,6 @@ fn v14_the_first_result_of_checks_two_to_four_emits() {
 // ---------------------------------------------------------------------------------------------
 // V11: check 2, the version.
 
-fn not_checked_detail<'a>(outcome: &'a Outcome, why: &str) -> &'a str {
-    match outcome {
-        Outcome::NotChecked(detail) => detail,
-        other => panic!("{why}: expected not-checked, got {other:?}"),
-    }
-}
-
-fn passed_detail<'a>(outcome: &'a Outcome, why: &str) -> &'a str {
-    match outcome {
-        Outcome::Passed(Some(detail)) => detail,
-        other => panic!("{why}: expected passed with a detail, got {other:?}"),
-    }
-}
-
-fn failed_detail<'a>(outcome: &'a Outcome, why: &str) -> &'a str {
-    match outcome {
-        Outcome::Failed(detail) => detail,
-        other => panic!("{why}: expected failed, got {other:?}"),
-    }
-}
-
 fn assert_names(detail: &str, words: &[&str], why: &str) {
     for word in words {
         assert!(
@@ -967,6 +975,11 @@ fn v11_a_missing_part_is_zero_and_a_suffix_is_ignored() {
         matches!(version_outcome(java, Some("3")), Outcome::Passed(_)),
         "V11: 3 is 3.0.0"
     );
+}
+
+#[test]
+fn v11_a_suffix_is_ignored() {
+    let java = Some(ConsoleKind::Java);
     assert!(
         matches!(version_outcome(java, Some("2.4.0-rc1")), Outcome::Passed(_)),
         "V11"

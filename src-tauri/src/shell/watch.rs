@@ -11,10 +11,12 @@ use tauri::{AppHandle, Runtime};
 
 use super::apply::with_core;
 use super::state::{lock, now_ms, shared};
+use crate::core::Core;
 use crate::core::router::status_of;
 use crate::diag::{self, Code, ErrorKind, Field, OpKind, RouterState};
 use crate::net::gatekeeper::Gatekeeper;
 use crate::net::loopback::LoopbackAddr;
+use crate::net::stats::RouterStats;
 use crate::net::verify::{Verdict, verify};
 use crate::types::RouterStatus;
 
@@ -32,32 +34,43 @@ pub fn start<R: Runtime>(app: &AppHandle<R>, proxy: Result<LoopbackAddr, String>
     });
 }
 
-/// One round of the watcher: VERIFY, then a statistics sample.
+/// One round of the watcher: VERIFY, a statistics sample, then router checks 2 to 4.
 fn tick<R: Runtime>(
     app: &AppHandle<R>,
     proxy: &Result<LoopbackAddr, String>,
     helper: Option<(LoopbackAddr, String)>,
 ) {
+    with_core(app, Core::verify_started);
     let verdict = proxy.clone().map_or_else(Verdict::Down, verify);
     apply(app, &verdict);
-    sample(app, helper);
+    let stats = sample(app, helper);
+    super::checks::run(app, stats);
 }
 
 /// Records the router bandwidth for `router_stats().history`, when a helper is configured.
-fn sample<R: Runtime>(app: &AppHandle<R>, helper: Option<(LoopbackAddr, String)>) {
-    if let Some((addr, token)) = helper {
-        let stats = crate::net::stats::fetch(addr, &token);
-        lock(&shared(app).core).record_stats(now_ms(), &stats);
-        with_core(app, |core| core.router_version(stats.version.as_deref()));
-    }
+/// Returns the helper statistics when it answered.
+fn sample<R: Runtime>(
+    app: &AppHandle<R>,
+    helper: Option<(LoopbackAddr, String)>,
+) -> Option<RouterStats> {
+    let (addr, token) = helper?;
+    let answer = crate::net::stats::try_fetch(addr, &token);
+    let stats = answer.clone().unwrap_or_default();
+    lock(&shared(app).core).record_stats(now_ms(), &stats);
+    with_core(app, |core| core.router_version(stats.version.as_deref()));
+    answer
 }
 
 /// VERIFY now, off the main thread (after `connection_resume()`).
 pub fn check_now<R: Runtime>(app: &AppHandle<R>, proxy: Result<LoopbackAddr, String>) {
     let app = app.clone();
     spawn("router-check", move || {
+        with_core(&app, Core::verify_started);
         let verdict = proxy.map_or_else(Verdict::Down, verify);
         apply(&app, &verdict);
+        let helper = super::env::router_helper();
+        let stats = helper.and_then(|(addr, token)| crate::net::stats::try_fetch(addr, &token));
+        super::checks::run(&app, stats);
     });
 }
 
@@ -87,7 +100,7 @@ fn apply<R: Runtime>(app: &AppHandle<R>, verdict: &Verdict) {
     let before = lock(&shared(app).core).router().clone();
     let status = status_of(verdict, &before.proxy, gate_ok);
     record(&before, matches!(verdict, Verdict::Ok(_)), &status);
-    with_core(app, |core| core.router_changed(status));
+    with_core(app, |core| core.router_checked(now_ms(), status));
 }
 
 /// Records a change of the router state: the VERIFY result, then up or down.

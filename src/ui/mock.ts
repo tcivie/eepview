@@ -3,6 +3,7 @@
 
 import type {
   Bookmark,
+  CheckId,
   ClearRange,
   CommandName,
   ConsoleInfo,
@@ -18,6 +19,7 @@ import type {
   Settings,
   Suggestion,
   TabInfo,
+  VerifyCheck,
 } from "./contract.ts";
 import type { Backend } from "./ipc.ts";
 import { isBeforeCursor, newestFirst } from "./lib/history-groups.ts";
@@ -110,22 +112,80 @@ let tabs: TabInfo[] = data.tabs.map((t, i) => {
   });
 });
 
+const CHECK_IDS: CheckId[] = ["proxy-i2p", "version", "no-outproxy", "tunnels"];
+const CHECKED_AT = Date.now() - 3 * MINUTE;
+const PASSED_DETAIL: Record<CheckId, string | null> = {
+  "proxy-i2p": null,
+  version: `Java I2P ${data.routerVersion}, minimum 2.4.0.`,
+  "no-outproxy": "No outproxy in 00-I2P_HTTP_Proxy-i2ptunnel.config.",
+  tunnels: "Network OK, 6 client tunnels.",
+};
+const MIXED: Partial<Record<CheckId, VerifyCheck>> = {
+  "no-outproxy": {
+    id: "no-outproxy",
+    state: "failed",
+    detail:
+      "The HTTP proxy in 00-I2P_HTTP_Proxy-i2ptunnel.config lists the outproxy exit.example.i2p.",
+    passedAt: null,
+  },
+  tunnels: {
+    id: "tunnels",
+    state: "not-checked",
+    detail: "The router does not report its client tunnels.",
+    passedAt: null,
+  },
+};
+
+const pendingCheck = (id: CheckId): VerifyCheck => ({
+  id,
+  state: "pending",
+  detail: null,
+  passedAt: null,
+});
+const passedCheck = (id: CheckId): VerifyCheck => ({
+  id,
+  state: "passed",
+  detail: PASSED_DETAIL[id],
+  passedAt: CHECKED_AT,
+});
+
+function openChecks(state: RouterState): VerifyCheck[] {
+  const mixed = params.get("checks") === "mixed";
+  return CHECK_IDS.map((id) => {
+    if (state === "building" && id === "tunnels") return { ...pendingCheck(id), state: "running" };
+    return (mixed ? MIXED[id] : undefined) ?? passedCheck(id);
+  });
+}
+
+function mockChecks(state: RouterState, paused: boolean, detail: string | null): VerifyCheck[] {
+  const checks = CHECK_IDS.map(pendingCheck);
+  if (paused) return checks;
+  if (state === "ok" || state === "building") return openChecks(state);
+  if (state === "verifying")
+    return checks.map((c, i) => (i === 0 ? { ...c, state: "running" } : c));
+  const reason = detail ?? `The router proxy is ${state}.`;
+  return checks.map((c, i) => (i === 0 ? { ...c, state: "failed", detail: reason } : c));
+}
+
 function routerFromParams(): RouterStatus {
   const requested = (params.get("router") ?? "ok") as RouterState;
+  const paused = params.has("paused");
   return {
     state: requested,
     proxy: data.proxy,
     version: data.routerVersion,
     detail: null,
     managed: params.get("managed") !== "0",
-    paused: params.has("paused"),
+    paused,
+    checks: mockChecks(requested, paused, null),
   };
 }
 
 let router = routerFromParams();
 
 function setRouter(patch: Partial<RouterStatus>): undefined {
-  router = { ...router, ...patch };
+  const next = { ...router, ...patch };
+  router = { ...next, checks: mockChecks(next.state, next.paused, next.detail) };
   emit("router-status", router);
   return undefined;
 }

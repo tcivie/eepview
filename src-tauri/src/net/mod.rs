@@ -11,6 +11,7 @@
 //! - [`gatekeeper`]: eepview's own proxy in front of the router (layer L1).
 //! - [`http`]: message heads for the gatekeeper.
 //! - [`icons`]: one site icon request through the gatekeeper.
+//! - [`outproxy`]: read the router tunnel configuration for router check 3 (no socket).
 //! - [`rules`]: the engine request rules (layer L3).
 //! - [`stats`]: router statistics from the router helper.
 //! - `testing` (tests only): a fake router proxy, so tests outside `net/` open no socket.
@@ -22,6 +23,7 @@ pub mod host;
 pub mod http;
 pub mod icons;
 pub mod loopback;
+pub mod outproxy;
 pub mod rules;
 pub mod stats;
 #[cfg(test)]

@@ -23,12 +23,8 @@
     flex-wrap: wrap;
     align-items: center;
     gap: var(--space-3);
-    margin-bottom: var(--space-5);
+    margin-bottom: var(--space-4);
     font-size: var(--fs-sm);
-  }
-
-  .hops-compact {
-    max-width: 360px;
   }
 
   .router-card-facts {

@@ -73,16 +73,6 @@ export function routerView(status: RouterLike): RouterView {
   return { ...view, text: parts.join(" ") };
 }
 
-export type HopState = "built" | "building" | "refused" | null;
-
-export function hopStates(tone: RouterTone, count: number): HopState[] {
-  return Array.from({ length: count }, (_, i): HopState => {
-    if (tone === "ready" || i === 0) return "built";
-    if (tone === "stopped") return i === 1 ? "refused" : null;
-    return i === 1 ? "building" : null;
-  });
-}
-
 /** The router version for a page: `I2P <version>`, or why there is none. */
 export function versionText(status: { version: string | null }): string {
   return status.version ? `I2P ${status.version}` : NO_VERSION;
