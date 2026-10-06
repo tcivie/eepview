@@ -73,3 +73,9 @@ describe("tab strip mouse", () => {
     }
   });
 });
+
+describe("failed load tab title", () => {
+  it("[browser-shell F7] a load-failed page without a title shows Page did not load", () => {
+    assert.equal(tabTitle({ url: "eepview://load-failed?url=x", title: "" }), "Page did not load");
+  });
+});

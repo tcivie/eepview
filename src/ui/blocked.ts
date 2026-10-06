@@ -3,14 +3,14 @@
 
 import "./boot.ts";
 import { announce, byId } from "./dom.ts";
+import { call } from "./ipc.ts";
+import { shortAddress } from "./lib/address.ts";
 import { reportHref } from "./lib/report-page.ts";
 
 const SAMPLE_REFUSED = "https://www.example.com/account/login?next=%2Fsettings&lang=en";
-const MAX_SHOWN = 2048;
 
 function refusedAddress(): string {
-  const raw = new URLSearchParams(window.location.search).get("url") ?? SAMPLE_REFUSED;
-  return raw.length > MAX_SHOWN ? `${raw.slice(0, MAX_SHOWN)}…` : raw;
+  return shortAddress(new URLSearchParams(window.location.search).get("url") ?? SAMPLE_REFUSED);
 }
 
 async function copyAddress(address: string): Promise<void> {
@@ -26,7 +26,9 @@ async function copyAddress(address: string): Promise<void> {
 const address = refusedAddress();
 byId("refused-url").textContent = address;
 byId<HTMLAnchorElement>("report-link").href = reportHref("blocked");
-byId("back-btn").addEventListener("click", () => window.history.back());
+byId("back-btn").addEventListener("click", () => {
+  call("go_back", {}).catch(() => undefined);
+});
 byId("copy-btn").addEventListener("click", () => {
   copyAddress(address).catch(() => undefined);
 });

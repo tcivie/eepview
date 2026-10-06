@@ -71,3 +71,10 @@ export function internalUrlForFile(href: string): string | null {
   if (!match) return null;
   return `eepview://${match[1]}${match[2] ?? ""}`;
 }
+
+const MAX_SHOWN = 2048;
+
+/** At most 2048 characters: a longer address is cut to 2047 and ends with "…". */
+export function shortAddress(text: string): string {
+  return text.length > MAX_SHOWN ? `${text.slice(0, MAX_SHOWN - 1)}…` : text;
+}

@@ -19,6 +19,7 @@ const INTERNAL_TITLES: Record<string, string> = {
   setup: "Set up",
   blocked: "Not an I2P address",
   "router-down": "Router stopped",
+  "load-failed": "Page did not load",
 };
 
 export function tabTitle(tab: Pick<TabLike, "url" | "title">): string {

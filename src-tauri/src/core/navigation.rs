@@ -4,7 +4,9 @@
 //! Address-bar navigation, back/forward, reload and stop.
 
 use super::{Core, Effect, EngineOp, Event, Load, WebOp, internal_title};
-use crate::nav::{Target, classify, host_of, internal_with, is_allowed, is_web};
+use tauri::Url;
+
+use crate::nav::{INTERNAL_SCHEME, Target, classify, host_of, internal_with, is_allowed, is_web};
 use crate::session::{Step, Traverse};
 use crate::types::NavResult;
 
@@ -181,11 +183,23 @@ impl Core {
         ]
     }
 
-    /// `reload(hard)` on the active tab.
+    /// Loads the address of a `load-failed` page again, in place of that page (F7).
+    fn retry(&mut self, id: u32, address: &str) -> Vec<Effect> {
+        if let Some(tab) = self.tabs.get_mut(id) {
+            tab.session.replace_current(address);
+        }
+        self.go_web(id, address)
+    }
+
+    /// `reload(hard)` on the active tab. On a `load-failed` page it loads the failed address
+    /// again, in place of the page (F7).
     pub fn reload(&mut self, hard: bool) -> Vec<Effect> {
         let id = self.tabs.active_id();
         if self.console_tab() == Some(id) {
             return self.console_reload(id, hard);
+        }
+        if let Some(address) = self.tabs.get(id).and_then(|t| failed_address(&t.url)) {
+            return self.retry(id, &address);
         }
         let Some(tab) = self.tabs.get_mut(id) else {
             return Vec::new();
@@ -232,4 +246,16 @@ impl Core {
         let home = self.home_url();
         self.navigate(&home).1
     }
+}
+
+/// The address of a `load-failed` page, when it names an allowed I2P address (F7).
+fn failed_address(url: &str) -> Option<String> {
+    let page = Url::parse(url).ok()?;
+    if page.scheme() != INTERNAL_SCHEME || page.host_str() != Some("load-failed") {
+        return None;
+    }
+    page.query_pairs()
+        .find(|(key, _)| key == "url")
+        .map(|(_, value)| value.into_owned())
+        .filter(|address| is_allowed(address))
 }

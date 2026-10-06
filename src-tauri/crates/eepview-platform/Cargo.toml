@@ -31,10 +31,12 @@ objc2-app-kit = { version = "0.3.2", default-features = false, features = [
 ] }
 objc2-foundation = { version = "0.3.2", default-features = false, features = [
   "std",
+  "NSDictionary",
   "NSError",
   "NSGeometry",
   "NSObject",
   "NSString",
+  "NSURL",
   "NSUserDefaults",
   "NSValue",
 ] }
@@ -45,10 +47,14 @@ objc2-web-kit = { version = "0.3.2", default-features = false, features = [
   "WKContentRuleList",
   "WKContentRuleListStore",
   "WKContentWorld",
+  "WKDownload",
   "WKFindConfiguration",
   "WKFindResult",
   "WKFrameInfo",
   "WKNavigation",
+  "WKNavigationAction",
+  "WKNavigationDelegate",
+  "WKNavigationResponse",
   "WKPreferences",
   "WKScriptMessage",
   "WKScriptMessageHandler",

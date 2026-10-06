@@ -6,10 +6,11 @@
 //! reload and zoom use Tauri. Only `WebView2` lacks a native find with counts, so it gets an
 //! app-injected script (`ExecuteScript` runs with page JavaScript off).
 
-use eepview_platform::{FindRequest, Nav, PlatformWebview};
+use eepview_platform::{FindRequest, LoadFailure, Nav, PlatformWebview};
 use tauri::{AppHandle, Manager, Runtime, Webview};
 
 use super::apply::with_core;
+use super::state::{lock, shared};
 use crate::core::{EngineOp, FindOp};
 use crate::diag::{self, Code, ErrorKind, Field, OpKind};
 
@@ -75,7 +76,12 @@ fn go<R: Runtime>(webview: &Webview<R>, nav: Nav) -> tauri::Result<()> {
 
 /// Hardens the engine, hooks the link under the mouse to the status bubble, and hooks the
 /// input (links, Esc, mouse buttons, context menus).
-pub fn native_hooks<R: Runtime>(platform: &PlatformWebview, app: &AppHandle<R>, tab: u32) {
+pub fn native_hooks<R: Runtime>(
+    platform: &PlatformWebview,
+    app: &AppHandle<R>,
+    tab: u32,
+    label: &str,
+) {
     super::input::install(app, platform, super::input::Source::Tab(tab));
     if eepview_platform::harden(platform).is_err() {
         bridge_failed(OpKind::Harden);
@@ -83,6 +89,29 @@ pub fn native_hooks<R: Runtime>(platform: &PlatformWebview, app: &AppHandle<R>, 
     if eepview_platform::on_hover(platform, hover_callback(app, tab)).is_err() {
         bridge_failed(OpKind::Hover);
     }
+    if eepview_platform::on_load_failed(platform, fail_callback(app, tab, label)).is_err() {
+        bridge_failed(OpKind::LoadFailed);
+    }
+}
+
+/// The callback that gets a load the engine failed in `tab`. A cancelled load is no failure,
+/// and a failure from a webview that no longer belongs to the tab is ignored (F8).
+fn fail_callback<R: Runtime>(
+    app: &AppHandle<R>,
+    tab: u32,
+    label: &str,
+) -> Box<dyn Fn(LoadFailure)> {
+    let (app, label) = (app.clone(), label.to_owned());
+    Box::new(move |failure: LoadFailure| {
+        let current = lock(&shared(&app).labels).get(&tab) == Some(&label);
+        let Some(reason) = failure.reason().filter(|_| current) else {
+            return;
+        };
+        let code = failure.code_text();
+        with_core(&app, |core| {
+            core.load_failed(tab, failure.url.as_deref(), reason.as_str(), &code)
+        });
+    })
 }
 
 /// The callback that gets the link under the mouse in `tab`.

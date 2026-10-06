@@ -100,8 +100,9 @@ impl ContentWebview {
 fn arm<R: Runtime>(webview: &Webview<R>, tab: u32, url: Url) -> tauri::Result<()> {
     let live = webview.clone();
     let app = webview.app_handle().clone();
+    let label = webview.label().to_owned();
     webview.with_webview(move |platform| {
-        super::engine::native_hooks(&platform, &app, tab);
+        super::engine::native_hooks(&platform, &app, tab, &label);
         let json = rules::content_rule_list().to_string();
         let rules = Rules {
             id: rules::CONTENT_RULES_ID,

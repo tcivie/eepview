@@ -24,6 +24,7 @@ Change it in a PR that changes both sides, or keep the old form working as a shi
 - v1.8: no new command or event. The keyboard shortcuts follow the K1 table of [Links, menus and shortcuts](links-and-shortcuts.md): new window N, and on Windows and Linux Ctrl+F4, Alt+D, F6, F5, Ctrl+F5, Ctrl+PageUp, Ctrl+PageDown and Alt+Home; Cmd+. and Cmd+Shift+[ ] on macOS. Alt+Left and Alt+Right are Back and Forward on Windows and Linux only. Esc stops a load only from a page (K4). The engines report link clicks, context menus and mouse buttons to the shell, never to a page ([#77](https://github.com/tcivie/eepview/pull/77)).
 - v1.9: `RouterStatus.checks`, `VerifyCheck`, `CheckId`, `CheckState`: the four router checks that the Home page shows. `router-status` also fires when a check changes. See [Router checks](router-checks.md). [#84](https://github.com/tcivie/eepview/pull/84)
 - v1.10: `router_stats` sends no request and records no sample: it answers the figures of the background sampler, which asks the router every 5 s. The 10-minute `history` is saved in `bandwidth.json` and loaded at start. The shape does not change ([#83](https://github.com/tcivie/eepview/pull/83)). See [Router console](router-console.md#background-sampling-and-the-saved-history).
+- v1.11: internal page `load-failed` (`url`, `reason`, `code`): a load that the engine failed. See [Browser shell](browser-shell.md), F1 to F8. [#87](https://github.com/tcivie/eepview/pull/87)
 
 ## Window layout
 
@@ -40,13 +41,14 @@ One OS window with several webviews (Tauri `unstable` multi-webview).
 
 On macOS the window has an overlay title bar with a hidden title. The traffic lights sit in the tab row. Windows and Linux keep the native decorations.
 
-Internal pages: `eepview://home`, `bookmarks`, `history`, `stats`, `settings`, `setup`, `blocked`, `router-down`.
+Internal pages: `eepview://home`, `bookmarks`, `history`, `stats`, `settings`, `setup`, `blocked`, `router-down`, `load-failed`.
 `eepview://<page>?<query>` loads `src/ui/<page>.html?<query>` in the `internal` webview.
 
 | Page | Parameters |
 |---|---|
 | `blocked` | `url`: the refused address |
 | `router-down` | `url`: the page to load when the router is back; `state`: `RouterStatus.state`; `reason=paused` while the connection is paused |
+| `load-failed` | `url`: the address that did not load; `reason`: `blocked`, `unreachable` or `engine`; `code`: the engine error, such as `NSURLErrorDomain -1022` ([Browser shell](browser-shell.md), F1 to F7) |
 | `history` | `q`: the search text from the address bar |
 
 ## Commands

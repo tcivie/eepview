@@ -30,7 +30,7 @@ This wiki is generated from docs/wiki in the repository. Edit it there, in a PR.
 | Supply chain | shipped | [Supply chain](supply-chain.md) | [#1](https://github.com/tcivie/eepview/pull/1) |
 | Documentation | shipped | [Documentation](documentation.md) | [#16](https://github.com/tcivie/eepview/pull/16) |
 | Browser UI | shipped | [Browser UI](browser-ui.md) | [#19](https://github.com/tcivie/eepview/pull/19) |
-| Browser shell | shipped | [Browser shell](browser-shell.md) | [#29](https://github.com/tcivie/eepview/pull/29), popups [#55](https://github.com/tcivie/eepview/pull/55), UX batch 1 [#57](https://github.com/tcivie/eepview/pull/57) |
+| Browser shell | shipped | [Browser shell](browser-shell.md) | [#29](https://github.com/tcivie/eepview/pull/29), popups [#55](https://github.com/tcivie/eepview/pull/55), UX batch 1 [#57](https://github.com/tcivie/eepview/pull/57), failed loads [#87](https://github.com/tcivie/eepview/pull/87) |
 | IPC contract | shipped | [IPC contract](ipc-contract.md) | [#29](https://github.com/tcivie/eepview/pull/29) |
 | Router checks | in progress | [Router checks](router-checks.md) | [#84](https://github.com/tcivie/eepview/pull/84) |
 | Router console | in progress | [Router console](router-console.md) | [#54](https://github.com/tcivie/eepview/pull/54), console tab [#76](https://github.com/tcivie/eepview/pull/76), statistics [#78](https://github.com/tcivie/eepview/pull/78), background sampling [#83](https://github.com/tcivie/eepview/pull/83) |

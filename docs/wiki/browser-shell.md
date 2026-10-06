@@ -45,6 +45,19 @@ Found in QA of the first shell build. Fixed in [#57](https://github.com/tcivie/e
 - The macOS leak test runs the binary inside the `.app` bundle, as users do. A bare binary has no `Info.plist`, so ATS never applies to it.
 - The release job checks the key in the `.app` of each dmg (`scripts/verify-dmg-signature.sh`), so a bundler change that drops it fails the release.
 
+## Failed loads
+
+A tab never spins forever. Before this, a load that the engine failed on macOS left the tab loading with a blank page: wry reports no failed navigation there.
+
+- **F1.** When the engine fails the main-frame load of a web tab, before the first commit or after it, the tab stops loading and shows `eepview://load-failed?url=<address>&reason=<reason>&code=<code>`. On macOS the platform bridge reports `webView:didFailProvisionalNavigation:withError:` and `webView:didFailNavigation:withError:` (`eepview_platform::on_load_failed`). Windows (`NavigationCompleted`) and Linux (`load-changed` after `load-failed`) already report a failed load as finished and show the engine's own error page, so the bridge reports nothing there.
+- **F2.** A cancelled load is not a failure, and the tab stays as it is: `NSURLErrorDomain` -999 (a new load replaced it, or Stop) `WebKitErrorDomain` 102 (the navigation guard or a download policy stopped it), and `WebKitErrorDomain` 204 (the engine shows the file itself, such as a media file).
+- **F3.** `reason` is `blocked` when the system or the engine filter stopped the request before it left the computer (`NSURLErrorDomain` -1022 App Transport Security, `WebKitErrorDomain` 104 content rule list). It is `unreachable` when the connection to the gatekeeper failed (`NSURLErrorDomain` -1001 timed out, -1003 host not found, -1004 cannot connect, -1005 connection lost, -1006 DNS failed, -1009 offline). Any other error is `engine`.
+- **F4.** `code` is the error domain, a space and the error number, for example `NSURLErrorDomain -1022`.
+- **F5.** `url` is the address the engine failed, when it is an allowed I2P address. Otherwise the page has no `url`: it shows no address, and Try again is off. A non-I2P address never reaches the page. The tab's own address is no fallback: during Back, Forward or Reload it is still the page the user was leaving.
+- **F6.** A failed load makes no history entry. The error page takes the place of the failed load in the tab's back/forward list: a failure after the commit replaces the entry of that address, so Back goes to the page before the failed one. A failure for a tab that is not loading a web page (it shows an internal page, or the load already ended) changes nothing. The failure also clears the "Loading …" status bubble.
+- **F7.** The page says that the page did not load, shows the address, a sentence for the reason and the code, and has **Try again**, **Go back**, and the "Report this problem" link of kind `load-failed`. Try again is the `reload` command: on the error page, Reload loads its address again in place of the error page, so no error entry stays in the list. Go back is the `go_back` command, so it steps the tab's own list.
+- **F8.** A failure from a webview that no longer belongs to the tab (the tab built a new webview, for example for another JavaScript choice) is ignored.
+
 ## Toolbar popups
 
 The toolbar has four popups: the address suggestions, the main menu, the router panel and the router hint (hovering the router dot). They show in their own webview, `popup`, over the page. The toolbar never grows for them.
@@ -121,3 +134,4 @@ eepview shows router information but never changes the router configuration. It 
 - 2026-10-03 — The address bar refuses a dot host with a port instead of panicking; the gatekeeper refuses a bare CR or LF in a head — [#69](https://github.com/tcivie/eepview/pull/69)
 - 2026-10-03 — The router console opens in a console tab, with one console link — [#76](https://github.com/tcivie/eepview/pull/76)
 - 2026-10-06 — Root cause of "no eepsite loads, the tab spins forever" on macOS: ATS refused every `http://` load in the `.app` bundle before WebKit opened a socket (`NSURLErrorDomain -1022`). wry does not report a failed provisional load, so the tab never stopped loading. The leak test ran the bare binary, which has no `Info.plist`, so CI missed it. Fix: `NSAllowsArbitraryLoadsInWebContent` in `src-tauri/Info.plist` (B1), and the macOS leak test runs the `.app` — [#85](https://github.com/tcivie/eepview/pull/85)
+- 2026-10-06 — Failed loads (F1 to F8): a load that the engine fails ends the tab load and shows `eepview://load-failed`. Root cause of the endless spinner: wry 0.57 passes no failed navigation to Tauri on macOS; a delegate relay in `eepview-platform` now reports it — [#87](https://github.com/tcivie/eepview/pull/87)

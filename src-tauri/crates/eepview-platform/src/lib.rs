@@ -18,6 +18,7 @@
 //! | [`on_input`] | a script in the private world | `AcceleratorKeyPressed`, `ContextMenuRequested` | `button-press-event`, `key-press-event`, `context-menu` |
 //! | [`copy_text`], [`edit`] | `NSPasteboard`, responder actions | Win32 clipboard; native menu items | `GtkClipboard`, editing commands |
 //! | [`held_keys`] | `NSEvent.modifierFlags` | `GetKeyState` | `GdkKeymap` |
+//! | [`on_load_failed`] | a navigation delegate in front of wry's: the two fail calls | none: wry reports a failed load as finished | none: as on Windows |
 
 #[cfg(target_os = "linux")]
 pub mod linux;
@@ -76,6 +77,66 @@ pub struct WindowButtons {
     pub right: f64,
     /// Vertical center of the buttons.
     pub center_y: f64,
+}
+
+/// A main-frame load that the engine failed (docs/wiki/browser-shell.md, F1 to F5).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LoadFailure {
+    /// The error domain, such as `NSURLErrorDomain`.
+    pub domain: String,
+    /// The error number in that domain.
+    pub code: i64,
+    /// The address that failed, when the engine reports one.
+    pub url: Option<String>,
+}
+
+/// Why a load failed (F3).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FailReason {
+    /// The system or the engine filter stopped the request before it left the computer.
+    Blocked,
+    /// The connection to the gatekeeper failed.
+    Unreachable,
+    /// Any other engine error.
+    Engine,
+}
+
+impl FailReason {
+    /// The `reason` parameter of the `load-failed` page.
+    #[must_use]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Blocked => "blocked",
+            Self::Unreachable => "unreachable",
+            Self::Engine => "engine",
+        }
+    }
+}
+
+/// The URL loading error domain of Apple's systems.
+const URL_DOMAIN: &str = "NSURLErrorDomain";
+/// The `WebKit` error domain.
+const WEBKIT_DOMAIN: &str = "WebKitErrorDomain";
+
+impl LoadFailure {
+    /// The reason of the failure, or `None` for a cancelled load (F2), which is no failure.
+    #[must_use]
+    pub fn reason(&self) -> Option<FailReason> {
+        match (self.domain.as_str(), self.code) {
+            (URL_DOMAIN, -999) | (WEBKIT_DOMAIN, 102 | 204) => None,
+            (URL_DOMAIN, -1022) | (WEBKIT_DOMAIN, 104) => Some(FailReason::Blocked),
+            (URL_DOMAIN, -1001 | -1003 | -1004 | -1005 | -1006 | -1009) => {
+                Some(FailReason::Unreachable)
+            }
+            _ => Some(FailReason::Engine),
+        }
+    }
+
+    /// The `code` parameter of the `load-failed` page: the domain, a space and the number (F4).
+    #[must_use]
+    pub fn code_text(&self) -> String {
+        format!("{} {}", self.domain, self.code)
+    }
 }
 
 /// The rules of [`attach_rules`].
@@ -229,6 +290,30 @@ pub fn harden(webview: &PlatformWebview) -> Result<(), String> {
 /// Fails when the engine handle is missing or the engine refuses the call.
 pub fn on_input(webview: &PlatformWebview, hooks: Hooks) -> Result<(), String> {
     imp::on_input(webview, hooks)
+}
+
+/// Calls `callback` when the engine fails a main-frame load of this webview. Only macOS
+/// needs it: there wry reports no failed load. Install it once per webview. Elsewhere it
+/// does nothing.
+///
+/// # Errors
+///
+/// Fails when the engine handle is missing or the engine refuses the call.
+pub fn on_load_failed(
+    webview: &PlatformWebview,
+    callback: Box<dyn Fn(LoadFailure)>,
+) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        imp::on_load_failed(webview, callback)
+    }
+    // wry reports a failed load as finished here, and the engine shows its own error page.
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = webview;
+        drop(callback);
+        Ok(())
+    }
 }
 
 /// Puts plain text on the system clipboard.
