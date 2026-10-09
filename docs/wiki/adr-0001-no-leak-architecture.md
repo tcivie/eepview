@@ -99,4 +99,4 @@ OS-level network isolation of the network process (sandbox profiles, network nam
 
 ## History
 
-- 2026-10-09 — L3b: a tab loads a page only after its filter is on, and never after a failed filter; on Windows the filter also covers `SharedWorker` and `ServiceWorker` requests. Find on Windows uses the native API, never a page script — [#PR](https://github.com/tcivie/eepview/pull/PR)
+- 2026-10-09 — L3b: a tab loads a page only after its filter is on, and never after a failed filter; on Windows the filter also covers `SharedWorker` and `ServiceWorker` requests. Find on Windows uses the native API, never a page script — [#92](https://github.com/tcivie/eepview/pull/92)

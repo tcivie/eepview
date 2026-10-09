@@ -652,4 +652,4 @@ The point of value `v` in slot `i` of `n` values is `x = i × 600 / (n − 1)` a
 - 2026-10-03 — The console opens in a console tab; one "I2P Router Console" link replaces the five page links — [#76](https://github.com/tcivie/eepview/pull/76)
 - 2026-10-03 — Router statistics from the console, UI contract shape — [#78](https://github.com/tcivie/eepview/pull/78)
 - 2026-10-06 — Background stats sampler, saved bandwidth history, rate units with K = 1 000 — [#83](https://github.com/tcivie/eepview/pull/83)
-- 2026-10-09 — R19: on Windows the console rule list also covers `SharedWorker` and `ServiceWorker` requests — [#PR](https://github.com/tcivie/eepview/pull/PR)
+- 2026-10-09 — R19: on Windows the console rule list also covers `SharedWorker` and `ServiceWorker` requests — [#92](https://github.com/tcivie/eepview/pull/92)

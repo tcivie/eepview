@@ -187,4 +187,4 @@ The `eepview-platform` crate holds the engine glue for each system, the only pla
 
 - 2026-10-03 — Requirements for link clicks, the context menu, keyboard shortcuts and mouse buttons — [#77](https://github.com/tcivie/eepview/pull/77)
 - 2026-10-03 — The engine glue on macOS, Windows and Linux, the router console tab rules, and the review answers (one guard name, the run on a close, the layout keys, Esc, `Modifiers` methods, `Target.history`) — [#77](https://github.com/tcivie/eepview/pull/77)
-- 2026-10-09 — T1: the input script and the hover script act only on trusted events — [#PR](https://github.com/tcivie/eepview/pull/PR)
+- 2026-10-09 — T1: the input script and the hover script act only on trusted events — [#92](https://github.com/tcivie/eepview/pull/92)
