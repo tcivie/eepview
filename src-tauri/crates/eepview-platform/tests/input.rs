@@ -7,8 +7,8 @@
 //! The tests read the requirement and the public interface only, never the implementation.
 
 use eepview_platform::{
-    Button, Hit, INPUT_CHANNEL, Input, Keys, code_of_char, code_of_virtual_key, dom_button,
-    input_script, keys_of, parse_message,
+    Button, HOVER_SCRIPT, Hit, INPUT_CHANNEL, Input, Keys, code_of_char, code_of_virtual_key,
+    dom_button, input_script, keys_of, parse_message,
 };
 
 /// The keys named by `held`: `m` meta, `c` ctrl, `a` alt, `s` shift. Built with the `with_` methods.
@@ -481,6 +481,81 @@ fn c12_the_chrome_script_has_only_the_context_menu_listener() {
 fn c2_the_content_script_is_longer_than_the_chrome_script() {
     assert!(input_script(true).len() > input_script(false).len());
     assert_ne!(input_script(true), input_script(false));
+}
+
+/// Every `addEventListener` call of `script`: the event name and the handler text. The
+/// handler text starts at the handler's parameters: of the inline arrow function, or of the
+/// `const <name> = ` function that the call passes by name.
+fn listeners(script: &str) -> Vec<(String, String)> {
+    const CALL: &str = "addEventListener(";
+    let mut found = Vec::new();
+    for (at, _) in script.match_indices(CALL) {
+        let call = &script[at + CALL.len()..];
+        let event = call.split('"').nth(1).unwrap_or_default().to_owned();
+        let handler = call.split_once(',').map_or("", |(_, rest)| rest.trim_start());
+        let name: String = handler
+            .chars()
+            .take_while(|c| c.is_ascii_alphanumeric() || *c == '_')
+            .collect();
+        let text = if name.is_empty() {
+            handler
+        } else {
+            let definition = format!("const {name} = ");
+            script.split_once(&definition).map_or("", |(_, rest)| rest)
+        };
+        found.push((event, text.to_owned()));
+    }
+    found
+}
+
+/// True when the first statement of the arrow function `handler` returns for an event that
+/// the user did not make: `(e) => { if (!e.isTrusted) return; ...`.
+fn trusted_only(handler: &str) -> bool {
+    let Some((params, body)) = handler.split_once("=>") else {
+        return false;
+    };
+    let param = params.trim().trim_start_matches('(').trim_end_matches(')');
+    let first = body.trim_start().trim_start_matches('{').trim_start();
+    !param.is_empty() && first.starts_with(&format!("if (!{param}.isTrusted) return;"))
+}
+
+#[test]
+fn t1_every_listener_of_the_input_script_ignores_events_that_a_page_made() {
+    for (content, count) in [(true, 5), (false, 1)] {
+        let found = listeners(&input_script(content));
+        assert_eq!(found.len(), count, "content={content}: {found:?}");
+        for (event, handler) in &found {
+            assert!(
+                trusted_only(handler),
+                "content={content}: the {event} listener acts on a page-made event"
+            );
+        }
+    }
+}
+
+#[test]
+fn t1_every_listener_of_the_hover_script_ignores_events_that_a_page_made() {
+    let found = listeners(HOVER_SCRIPT);
+    assert_eq!(found.len(), 2, "{found:?}");
+    for (event, handler) in &found {
+        assert!(
+            trusted_only(handler),
+            "the {event} listener acts on a page-made event"
+        );
+    }
+}
+
+#[test]
+fn t1_the_listener_check_finds_a_listener_without_the_trusted_test() {
+    let script = r#"window.addEventListener("click", (e) => { post(e); }, true);
+  const on = (ev) => { if (!ev.isTrusted) return; post(ev); };
+  window.addEventListener("keydown", on, true);"#;
+    let found = listeners(script);
+    assert_eq!(found.len(), 2);
+    assert_eq!(found[0].0, "click");
+    assert!(!trusted_only(&found[0].1));
+    assert_eq!(found[1].0, "keydown");
+    assert!(trusted_only(&found[1].1));
 }
 
 // ---------------------------------------------------------------------------------------------

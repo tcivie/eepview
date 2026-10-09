@@ -10,6 +10,7 @@ use std::time::Duration;
 use serde_json::{Value, json};
 use tauri::{AppHandle, Emitter, Manager, Runtime, Url, Webview};
 
+use super::arming::Next;
 use super::content::ContentWebview;
 use super::state::{lock, now_ms, shared};
 use super::{engine, view};
@@ -208,21 +209,34 @@ pub fn tab_webview<R: Runtime>(app: &AppHandle<R>, tab: u32) -> Option<Webview<R
 }
 
 fn destroy<R: Runtime>(app: &AppHandle<R>, tab: u32) {
-    let label = lock(&shared(app).labels).remove(&tab);
-    if let Some(webview) = label.and_then(|l| app.get_webview(&l)) {
+    let Some(label) = lock(&shared(app).labels).remove(&tab) else {
+        return;
+    };
+    lock(&shared(app).arming).forget(&label);
+    if let Some(webview) = app.get_webview(&label) {
         let _ = webview.close();
     }
 }
 
+/// Loads a page in a tab. The live webview loads it only when its engine filter is on (L3b).
+/// Before that the URL waits for the filter; after a failed filter a new webview is built.
 fn load_tab<R: Runtime>(app: &AppHandle<R>, load: &Load) {
     let live = (!load.rebuild)
         .then(|| tab_webview(app, load.tab))
         .flatten();
     if let Some(webview) = live {
-        if let Ok(url) = Url::parse(&load.url) {
-            let _ = webview.navigate(url);
+        let Ok(url) = Url::parse(&load.url) else {
+            return;
+        };
+        let next = lock(&shared(app).arming).load(webview.label(), &url);
+        match next {
+            Next::Navigate => {
+                let _ = webview.navigate(url);
+                return;
+            }
+            Next::Wait => return,
+            Next::Rebuild => {}
         }
-        return;
     }
     destroy(app, load.tab);
     create(app, load);
@@ -244,10 +258,13 @@ fn create<R: Runtime>(app: &AppHandle<R>, load: &Load) {
             lock(&state.labels).insert(load.tab, label);
             view::raise_chrome(app, &window);
         }
-        Err(e) => diag::event(
-            Code::WebviewCreateFailed,
-            &[Field::Tab(TabKind::Web), Field::Error(ErrorKind::from(&e))],
-        ),
+        Err(e) => {
+            lock(&state.arming).forget(&label);
+            diag::event(
+                Code::WebviewCreateFailed,
+                &[Field::Tab(TabKind::Web), Field::Error(ErrorKind::from(&e))],
+            );
+        }
     }
 }
 

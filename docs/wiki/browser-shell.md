@@ -57,6 +57,7 @@ A tab never spins forever. Before this, a load that the engine failed on macOS l
 - **F6.** A failed load makes no history entry. The error page takes the place of the failed load in the tab's back/forward list: a failure after the commit replaces the entry of that address, so Back goes to the page before the failed one. A failure for a tab that is not loading a web page (it shows an internal page, or the load already ended) changes nothing. The failure also clears the "Loading …" status bubble.
 - **F7.** The page says that the page did not load, shows the address, a sentence for the reason and the code, and has **Try again**, **Go back**, and the "Report this problem" link of kind `load-failed`. Try again is the `reload` command: on the error page, Reload loads its address again in place of the error page, so no error entry stays in the list. Go back is the `go_back` command, so it steps the tab's own list.
 - **F8.** A failure from a webview that no longer belongs to the tab (the tab built a new webview, for example for another JavaScript choice) is ignored.
+- **F9.** When the engine filter (L3b) of a new tab webview cannot be attached, that webview never loads a page. The tab stops loading and shows the load-failed page with `reason` `blocked` and `code` `eepview engine-filter`, for the newest address that waited for the filter. The next load in the tab, Try again too, builds a new webview, which tries the filter again. See [ADR 0001](adr-0001-no-leak-architecture.md) (L3b).
 
 ## Toolbar popups
 
@@ -118,7 +119,7 @@ eepview shows router information but never changes the router configuration. It 
 
 ## Limits
 
-- Find on Windows uses an app-injected script (`WebView2` has no native find with a count).
+- Find on Windows needs a `WebView2` runtime with the native find API (`ICoreWebView2Find`). On an older runtime, find finds nothing and shows no count. No find runs a script in the page's own JavaScript world: there a page could read every query and fake the count.
 - The Linux engine filter (L3b) waits for a webkit2gtk binding; the page policy (L3a) holds there.
 - On macOS the engine draws no background of its own once a colour is set, so a page with no background shows the window colour until the tab returns to the engine default (UX batch 1, item 2).
 - HTTPS eepsites load only on Windows: TLS tunnels stay closed on macOS and Linux (ADR 0001).
@@ -135,3 +136,4 @@ eepview shows router information but never changes the router configuration. It 
 - 2026-10-03 — The router console opens in a console tab, with one console link — [#76](https://github.com/tcivie/eepview/pull/76)
 - 2026-10-06 — Root cause of "no eepsite loads, the tab spins forever" on macOS: ATS refused every `http://` load in the `.app` bundle before WebKit opened a socket (`NSURLErrorDomain -1022`). wry does not report a failed provisional load, so the tab never stopped loading. The leak test ran the bare binary, which has no `Info.plist`, so CI missed it. Fix: `NSAllowsArbitraryLoadsInWebContent` in `src-tauri/Info.plist` (B1), and the macOS leak test runs the `.app` — [#85](https://github.com/tcivie/eepview/pull/85)
 - 2026-10-06 — Failed loads (F1 to F8): a load that the engine fails ends the tab load and shows `eepview://load-failed`. Root cause of the endless spinner: wry 0.57 passes no failed navigation to Tauri on macOS; a delegate relay in `eepview-platform` now reports it — [#87](https://github.com/tcivie/eepview/pull/87)
+- 2026-10-09 — F9: a tab whose engine filter failed never loads a page and shows the load-failed page. Find on Windows uses the native `WebView2` find API, not a page script — [#PR](https://github.com/tcivie/eepview/pull/PR)

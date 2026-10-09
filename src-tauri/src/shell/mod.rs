@@ -8,12 +8,14 @@
 //!   `popup`).
 //! - [`popup`]: places and shows the toolbar popups.
 //! - [`content`]: the only factory of remote `tab-*` webviews (ADR 0001).
+//! - [`arming`]: a tab webview loads a page only after its engine filter is on (L3b).
 //! - [`console`]: the only factory of the `console` webview (the router's own pages).
 //! - [`engine`]: back, forward, stop, find and zoom with page JavaScript off.
 //! - [`commands`]: the IPC commands.
 //! - [`input`]: link clicks, keys, mouse buttons and context menus from the engines.
 
 pub mod apply;
+pub mod arming;
 pub mod checks;
 pub mod chrome;
 pub mod commands;
