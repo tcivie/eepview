@@ -7,14 +7,7 @@
 name: fuzz
 
 on:
-  pull_request:
-    paths:
-      - "src-tauri/src/**"
-      - "src-tauri/fuzz/**"
-      - "src-tauri/Cargo.toml"
-      - "src-tauri/Cargo.lock"
-      - ".clusterfuzzlite/**"
-      - ".github/workflows/fuzz.yml"
+  # Nightly on main, and on demand. The heavy lane and the fast lane do not wait for it.
   schedule:
     - cron: "41 3 * * *"
   workflow_dispatch:
@@ -22,21 +15,21 @@ on:
 permissions: {}
 
 concurrency:
-  group: fuzz-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: fuzz-${{ github.sha }}
+  cancel-in-progress: false
 
 jobs:
   fuzz:
-    name: fuzz (${{ github.event_name == 'pull_request' && 'code-change' || 'batch' }})
+    name: fuzz (batch)
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     permissions:
       contents: read # check out the repository
       actions: read # list the earlier corpus and crash artifacts of the repository
     env:
-      MODE: ${{ github.event_name == 'pull_request' && 'code-change' || 'batch' }}
-      # Total time for all four targets: 5 minutes each on a pull request, 15 each in the batch.
-      FUZZ_SECONDS: ${{ github.event_name == 'pull_request' && '1200' || '3600' }}
+      MODE: batch
+      # Total time for all four targets: 15 minutes each.
+      FUZZ_SECONDS: "3600"
     steps:
       # The workspace must hold the repository: ClusterFuzzLite reads .clusterfuzzlite/project.yaml
       # from it to pick the Ubuntu 24.04 build and run images.

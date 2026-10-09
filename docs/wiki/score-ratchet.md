@@ -1,6 +1,6 @@
 # Score ratchet
 
-CI stops any change that lowers our external scores. A score can stay the same or go up. It can never go down. This works like the coverage ratchet in `ci.yml`.
+CI stops any change that lowers our external scores. A score can stay the same or go up. It can never go down. This works like the coverage ratchet in `heavy.yml`.
 
 ## What is tracked
 
@@ -12,12 +12,14 @@ The floors live in `.github/score-floors.json`.
 
 ## The two jobs
 
+The `score-ratchet (pr)` job is in `.github/workflows/ci.yml`, the fast lane. It moved there from `score-ratchet.yml`. The `score-ratchet (published)` job is in `.github/workflows/score-ratchet.yml`, which keeps only that job.
+
 `scripts/score-ratchet.sh` runs both. `scripts/score-ratchet-test.sh` tests it with a fake `docker`; the `pr` job runs that test first. It needs `curl` and `jq`. The `pr` mode also needs Docker.
 
 | Check | When it runs | What it does |
 | --- | --- | --- |
-| `score-ratchet (pr)` | Each pull request | Runs the Scorecard CLI on the PR checkout for Binary-Artifacts, Dangerous-Workflow, Pinned-Dependencies, Token-Permissions, SAST, Security-Policy, License, Fuzzing, Dependency-Update-Tool and Packaging. Fails when one scores below its `scorecard_pr` floor. It stops an unpinned action or a broad token permission. |
-| `score-ratchet (published)` | Push to main, every day, and by hand | Compares the published Scorecard and Best Practices scores with the floors. Fails when one is lower. Opens or updates one issue titled "Score dropped" with a table. |
+| `score-ratchet (pr)` | Each pull request (`ci.yml`) | Runs the Scorecard CLI on the PR checkout for Binary-Artifacts, Dangerous-Workflow, Pinned-Dependencies, Token-Permissions, SAST, Security-Policy, License, Fuzzing, Dependency-Update-Tool and Packaging. Fails when one scores below its `scorecard_pr` floor. It stops an unpinned action or a broad token permission. |
+| `score-ratchet (published)` | Push to main, every day, and by hand (`score-ratchet.yml`) | Compares the published Scorecard and Best Practices scores with the floors. Fails when one is lower. Opens or updates one issue titled "Score dropped" with a table. |
 
 The CLI runs from the official image `ghcr.io/ossf/scorecard`, pinned by digest. The `gcr.io/openssf/scorecard` registry refuses anonymous pulls at the time of writing, and `ghcr.io` carries the same release.
 
@@ -37,8 +39,9 @@ When a score goes up, the script prints "raise the floor" lines and the full flo
 4. Do not lower a floor to turn the check green. A floor may go down only when the Scorecard project changes how a check scores. Say so in the PR and get the owner to approve it.
 5. Close the issue when the job passes again.
 
-The `score-ratchet (pr)` check is not yet a required check. The product owner adds it after it passes on main.
+The `gate` job of `ci.yml` needs `score-ratchet (pr)`. A pull request that lowers a file-based score fails the gate, and the gate is a required check. The `published` job is not a required check.
 
 ## History
 
 - Added in [#40](https://github.com/tcivie/eepview/pull/40).
+- The `score-ratchet (pr)` job moved into `ci.yml` in [#89](https://github.com/tcivie/eepview/pull/89).

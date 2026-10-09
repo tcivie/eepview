@@ -2,7 +2,7 @@
 
 Status: in progress, in [#62](https://github.com/tcivie/eepview/pull/62).
 
-Fuzzing feeds random input to the parsers that decide what eepview may load. It checks that they never panic and never let a clearnet address through. It runs on every code change and once a day.
+Fuzzing feeds random input to the parsers that decide what eepview may load. It checks that they never panic and never let a clearnet address through. It runs every night and on demand. It does not run on pull requests.
 
 ## How it works
 
@@ -10,10 +10,10 @@ Fuzzing feeds random input to the parsers that decide what eepview may load. It 
 - `libfuzzer-sys` is pinned to `=0.4.13`. Its build script compiles libFuzzer (C++), which Socket flags. The isolation above is why that is safe.
 - The fuzz build starts from the lock file of the app (`src-tauri/Cargo.lock`), so the fuzzer tests the versions that ship, `url` included. `fuzz/Cargo.lock` is not committed.
 - ClusterFuzzLite runs the targets in CI. `.clusterfuzzlite/` holds the build image (Ubuntu 24.04, pinned by digest), `build.sh` and `project.yaml`. `.github/workflows/fuzz.yml` runs the targets. The Tauri crates link GTK and WebKitGTK, so `build.sh` copies their shared libraries next to each target.
-- A pull request that changes `src-tauri/src/` or the fuzz setup gets a code-change run of 20 minutes in all, about 5 minutes per target.
-- Main gets a batch run every day at 03:41 UTC, 60 minutes in all. ClusterFuzzLite stores the corpus as a GitHub Actions artifact and lists it with the workflow token (`actions: read`), so each run starts from the last one.
+- `fuzz.yml` runs in batch mode every night at 03:41 UTC, and on demand. A run takes 60 minutes in all, 15 minutes per target. ClusterFuzzLite stores the corpus as a GitHub Actions artifact and lists it with the workflow token (`actions: read`), so each run starts from the last one.
+- No pull request runs the fuzzer. Neither the fast lane nor the heavy lane waits for it. See [CI and quality gates](ci-and-quality-gates.md).
 - The fuzz job and the branch-coverage job use one pinned nightly toolchain, named in `scripts/nightly-toolchain.txt`. The app stays on the stable toolchain of `rust-toolchain.toml`. Nothing sets `RUSTC_BOOTSTRAP`.
-- The fuzz job is not a required check. The `lint` workflow runs rustfmt and clippy (pedantic, `-D warnings`) on the fuzz crate too.
+- The fuzz job is not a required check. The `rustfmt + clippy (ubuntu-24.04)` job of the fast lane (`ci.yml`) runs rustfmt and clippy (pedantic, `-D warnings`) on the fuzz crate too.
 
 | Target | API | Properties |
 |---|---|---|
@@ -46,15 +46,16 @@ To replay a crash input: `cargo fuzz run <target> <file>`.
 
 ## Where crashes show up
 
-- On a pull request, a crash fails the `fuzz` job. The log shows the input and the stack. The job uploads the input as the `fuzz-crashes` artifact.
-- A crash in the daily run fails the `fuzz` run on main in the Actions tab, with the same log and artifact.
+- A crash in the nightly run fails the `fuzz` run in the Actions tab. The log shows the input and the stack. The job uploads the input as the `fuzz-crashes` artifact.
 - A crash is a bug. Fix it and add a regression test for the input. Do not silence the target.
 
 ## Limits
 
+- A change that adds a crash shows it the next night, because no pull request runs the fuzzer.
 - The targets check the properties above, not full behaviour. The unit tests and the [leak test](leak-test.md) check the rest.
 - The router proxy check, the sockets and the web views are not fuzzed. They need a runtime.
 
 ## History
 
 - 2026-10-03 — Add cargo-fuzz targets and ClusterFuzzLite — [#62](https://github.com/tcivie/eepview/pull/62)
+- 2026-10-09 — Fast lane for pull requests, heavy lane for release branches — [#89](https://github.com/tcivie/eepview/pull/89)

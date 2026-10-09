@@ -27,7 +27,7 @@ Working rules for any human or AI agent on this repo.
 ## Tests
 
 - Write unit tests for every pure module.
-- Coverage only goes up. The ratchet is in `ci.yml`.
+- Coverage only goes up. The ratchet is in `heavy.yml`: it runs every night on main and on every pull request into a release branch.
 - Add no coverage exclusions.
 - Tests check the requirement, not the code. The agent that writes the tests is not the agent that writes the code. It reads the requirement and the public interface only, never the implementation. Each test names its requirement. Never edit a test to match the code. See `docs/wiki/testing-policy.md`.
 

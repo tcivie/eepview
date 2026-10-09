@@ -2,12 +2,13 @@
 
 Status: shipped.
 
-A `v*` tag builds installers for four targets, adds SBOMs, debug symbols and checksums, signs every file with Sigstore, and makes a draft GitHub release.
+A `v*` tag on a release branch builds installers for four targets, adds SBOMs, debug symbols and checksums, signs every file with Sigstore, and makes a draft GitHub release.
 
 ## How it works
 
+- A release comes from a release branch. See [Release branches](#release-branches).
 - A push of a tag that matches `v*` starts `release.yml`. A manual run (`workflow_dispatch`) does the same, with the `dry_run` input.
-- The `gates` job runs `scripts/release-gates.sh`. It reads the required checks from the active ruleset of the default branch. It fails when the tagged commit is not on `main`, or when a required check has no `success` run on that commit or on the head of the pull request that merged it. Some required checks, such as `docs-check`, run on pull requests only. The `build` job needs `gates`. The release no longer calls `lint.yml`, `security.yml` or `ci.yml`.
+- The `gates` job runs `scripts/release-gates.sh`. It fails when the tagged commit is not on a `release/*` branch. It reads the union of the checks that the rulesets of main and of the release branches require: `gate`, `heavy-gate`, `docs-check` and the two Socket checks. It fails when one of them has no `success` run on the tagged commit or on the head of the pull request that merged it. These checks run on pull requests, so a squash commit has none of its own. That is why the script reads the head of the pull request too. The `build` job needs `gates`. The release does not call `ci.yml` or `heavy.yml`.
 - The `build` job has four legs. Each uses the Tauri CLI with no third-party release action:
   1. `scripts/repro-env.sh` sets `SOURCE_DATE_EPOCH`, `CARGO_INCREMENTAL=0` and `--remap-path-prefix`. See [Reproducible builds](reproducible-builds.md).
   2. `npx tauri build --no-bundle -- --locked` builds the release binary.
@@ -24,6 +25,14 @@ A `v*` tag builds installers for four targets, adds SBOMs, debug symbols and che
 - The same job attests build provenance with `actions/attest-build-provenance`.
 - The same job writes the release notes with git-cliff (see [Changelog and release notes](#changelog-and-release-notes)).
 - Last, `gh release create --draft --notes-file` uploads the files and the `.sigstore.json` bundles. A person reads the draft and publishes it.
+
+## Release branches
+
+- Cut a release branch from main: `git push origin <sha>:refs/heads/release/v0.1`.
+- A ruleset on `refs/heads/release/**` blocks deletion and force pushes. It requires a pull request (squash). It requires the checks `gate` (the fast lane), `heavy-gate` (the heavy lane), `docs-check` and the two Socket checks. A pull request into a release branch runs every job of the fast lane, not only the jobs of the areas it changes. See [CI and quality gates](ci-and-quality-gates.md).
+- A change reaches a release branch only through a pull request. That pull request runs both lanes.
+- No workflow runs on a push to a release branch. The zizmor cache-poisoning audit flags a cache in a workflow that runs on such a push, and `release.yml` builds without caches.
+- To put `heavy-gate` on the cut commit itself, run `heavy.yml` on the release branch by hand: `gh workflow run heavy.yml --ref release/v0.1`.
 
 ## Changelog and release notes
 
@@ -80,8 +89,9 @@ sha256sum --check --ignore-missing SHA256SUMS
    ```sh
    gh workflow run release.yml -f dry_run=true --ref main
    ```
-2. Real release. Bump the version, merge it, then push a signed tag from `main`. See [Release and support](release-and-support.md#signed-tags).
+2. Real release. Cut a release branch from main. Bump the version before the cut, or in a pull request into the release branch. Push a signed tag on a commit of the release branch. Every required check of both rulesets must be green on that commit or on the head of the pull request that merged it. To tag the cut commit itself, run `heavy.yml` on the branch by hand first. See [Release and support](release-and-support.md#signed-tags).
    ```sh
+   git push origin <sha>:refs/heads/release/v0.1
    git tag -s v0.1.0 -m "eepview v0.1.0" && git push origin v0.1.0
    ```
 3. Open the draft release, check the files and `SHA256SUMS`, then publish it.
@@ -92,7 +102,7 @@ sha256sum --check --ignore-missing SHA256SUMS
 - A dry run signs with the identity of its own ref (`refs/heads/...`). Those signatures do not match the `refs/tags/v` pattern above, by design.
 - The macOS release ships only the `.dmg`. `bundle.macOS.signingIdentity` is `-` in `src-tauri/tauri.conf.json`, so the Tauri bundler ad-hoc signs the `.app` before it builds the `.dmg`. A build step mounts the `.dmg` and runs `codesign --verify --deep --strict` and `codesign -dv` on the app. It fails unless the report says `Signature=adhoc`. It also fails unless the app's `Info.plist` sets `NSAppTransportSecurity` > `NSAllowsArbitraryLoadsInWebContent` to true; without it no `http://` eepsite loads ([Browser shell](browser-shell.md), B1). There is no Developer ID signature and no notarization.
 - Windows installers are not signed.
-- The `gates` job skips its check on a branch dry run, so a pipeline change can be tested before merge. It needs a green `main` at the tagged commit. A dry run on `main` fails while the checks of `main` HEAD are red or still running.
+- The `gates` job skips its check on a dry run on any branch except a `release/*` branch, so you can test a pipeline change before merge. A dry run on a release branch runs the check. It fails while `gate` or `heavy-gate` is missing, red or still running on the head of that branch.
 - The pipeline has no lint exclusion. actionlint and `zizmor --offline --persona=pedantic` report nothing.
 
 ## History
@@ -104,3 +114,4 @@ sha256sum --check --ignore-missing SHA256SUMS
 - [#47](https://github.com/tcivie/eepview/pull/47): permission comments in `release.yml`; zizmor runs with the pedantic persona.
 - [#50](https://github.com/tcivie/eepview/pull/50): generated changelog and release notes from commit titles with git-cliff.
 - [#85](https://github.com/tcivie/eepview/pull/85): the dmg check also requires the App Transport Security key for web content in the app.
+- [#89](https://github.com/tcivie/eepview/pull/89): releases come from `release/*` branches, and `gates` reads the required checks of the main and release-branch rulesets.

@@ -5,7 +5,6 @@ name: score-ratchet
 on:
   push:
     branches: [main]
-  pull_request:
   schedule:
     - cron: "41 6 * * *"
   workflow_dispatch:
@@ -13,28 +12,12 @@ on:
 permissions: {}
 
 concurrency:
-  group: score-ratchet-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: score-ratchet-${{ github.sha }}
+  cancel-in-progress: false
 
 jobs:
-  pr:
-    name: score-ratchet (pr)
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Test the ratchet script
-        run: scripts/score-ratchet-test.sh
-      - name: Compare the file-based Scorecard checks with the floors
-        run: scripts/score-ratchet.sh pr
-
   published:
     name: score-ratchet (published)
-    if: github.event_name != 'pull_request'
     runs-on: ubuntu-24.04
     permissions:
       contents: read
