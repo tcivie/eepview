@@ -20,11 +20,11 @@ The Rust side of the browser, in `src-tauri/`: tabs, navigation, bookmarks, hist
 
 - Only an `http(s)` URL on a `.i2p` host enters tab state or reaches an engine. `Core::load` is the one place a load is made, and it checks the rule again, so no other path can replay a clearnet URL.
 - Address bar: blank input is ignored; the host is lower-cased and one trailing dot dropped; one word with no dot, no colon and no scheme searches; anything else that is not on `*.i2p` is `not-i2p`; unparseable input is `invalid`.
-- `.i2p` URLs may carry an explicit port 1–65535 (http and https). The gatekeeper forwards them; `CONNECT` stays limited to `:80` and `:443`.
+- `.i2p` URLs may carry an explicit port 1–65535 (http and https). The gatekeeper forwards them. A `CONNECT` to an `.i2p` host on any port 1–65535 but 443 is plain HTTP, checked request by request, the same as port 80. macOS WebKit sends every `http://` load as `CONNECT`, so this rule makes every eepsite port load there. Port 443 is the TLS relay (Windows only).
 - Back and forward follow the standard per-tab session history: a new navigation clears the forward list, and back and forward never leave the tab's own history.
 - `bookmark_add` refuses a non-I2P URL with `not-i2p`.
 - Hand-edited store files are not trusted: a settings homepage that is not an I2P site or an internal page falls back to `eepview://home`; history keeps only I2P entries, newest first, at most 10 000.
-- Gatekeeper: a bare CR in the request line or a header, and a bare LF in a header value, get 400 and nothing goes upstream (RFC 9112), also inside a `CONNECT` tunnel; duplicate `Content-Length` headers are refused with 400; a request body cut short closes both sides at once.
+- Gatekeeper: a bare CR in the request line or a header, and a bare LF in a header value, get 400 and nothing goes upstream (RFC 9112), also inside a `CONNECT` tunnel; duplicate `Content-Length` headers are refused with 400; a request body cut short closes both sides at once. A 1xx interim head from the router never reaches the engine: the gatekeeper discards it and sends only the final head, with the page policy. A `101 Switching Protocols` and more than 8 interim heads get 502. A silent engine does not end a TLS relay.
 
 ## Requirements (UX batch 1)
 
@@ -135,3 +135,4 @@ eepview shows router information but never changes the router configuration. It 
 - 2026-10-03 — The router console opens in a console tab, with one console link — [#76](https://github.com/tcivie/eepview/pull/76)
 - 2026-10-06 — Root cause of "no eepsite loads, the tab spins forever" on macOS: ATS refused every `http://` load in the `.app` bundle before WebKit opened a socket (`NSURLErrorDomain -1022`). wry does not report a failed provisional load, so the tab never stopped loading. The leak test ran the bare binary, which has no `Info.plist`, so CI missed it. Fix: `NSAllowsArbitraryLoadsInWebContent` in `src-tauri/Info.plist` (B1), and the macOS leak test runs the `.app` — [#85](https://github.com/tcivie/eepview/pull/85)
 - 2026-10-06 — Failed loads (F1 to F8): a load that the engine fails ends the tab load and shows `eepview://load-failed`. Root cause of the endless spinner: wry 0.57 passes no failed navigation to Tauri on macOS; a delegate relay in `eepview-platform` now reports it — [#87](https://github.com/tcivie/eepview/pull/87)
+- 2026-10-09 — Gatekeeper: a 1xx interim head is discarded, and only the final head gets the page policy; a `CONNECT` to any `.i2p` port but 443 is plain HTTP like port 80; a TLS relay has no engine-side timeout — [#91](https://github.com/tcivie/eepview/pull/91)

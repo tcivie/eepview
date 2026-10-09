@@ -5,7 +5,7 @@ SPDX-License-Identifier: MIT
 
 # ADR 0001: No-leak architecture
 
-Status: accepted. Shipped in [#29](https://github.com/tcivie/eepview/pull/29).
+Status: accepted. Shipped in [#29](https://github.com/tcivie/eepview/pull/29). Amended in [#91](https://github.com/tcivie/eepview/pull/91): `CONNECT` ports, interim heads, TLS relay timeouts.
 
 ## Goal
 
@@ -17,9 +17,9 @@ Each layer alone blocks a clearnet or local request. A leak needs all five to fa
 
 | # | Layer | Where | Blocks |
 |---|---|---|---|
-| L1 | **Gatekeeper proxy**: eepview's own HTTP proxy on `127.0.0.1:<random>`. Every content webview points at it, never at the router. It forwards a request only when its host passes `is_i2p_host` (lowercase, no trailing dot, no userinfo, IDN refused), and only to the verified router proxy. Everything else gets `403` with no upstream connection. `CONNECT` goes only to `*.i2p:80` (terminated and checked like plain HTTP) or `*.i2p:443` (relayed only on Windows, see below). | `src-tauri/src/net/gatekeeper.rs` | Clearnet through a router outproxy (so the outproxy never matters), IP literals, `localhost`, LAN |
+| L1 | **Gatekeeper proxy**: eepview's own HTTP proxy on `127.0.0.1:<random>`. Every content webview points at it, never at the router. It forwards a request only when its host passes `is_i2p_host` (lowercase, no trailing dot, no userinfo, IDN refused), and only to the verified router proxy. Everything else gets `403` with no upstream connection. `CONNECT` goes only to `*.i2p`. Port 443 is relayed, only on Windows (see below). Any other port 1–65535 is terminated and checked like plain HTTP: each request goes to the `CONNECT` host and port. | `src-tauri/src/net/gatekeeper.rs` | Clearnet through a router outproxy (so the outproxy never matters), IP literals, `localhost`, LAN |
 | L2 | **Engine proxy**: `proxy_url` = the gatekeeper. On Windows `--proxy-server=<gatekeeper> --proxy-bypass-list=<-loopback> --force-webrtc-ip-handling-policy=disable_non_proxied_udp` are always set together. | `src-tauri/src/shell/content.rs` | Direct connections |
-| L3a | **Page policy**: the gatekeeper adds a `Content-Security-Policy` to every response. Every fetch directive allows only `http(s)://*.i2p:*` (plus `data:` and `blob:` for images, fonts and media). | `src-tauri/src/net/rules.rs` | Loopback bypass of the proxy (spike S1), `fetch`, WebSocket, frames to IPs |
+| L3a | **Page policy**: the gatekeeper adds a `Content-Security-Policy` to every response. Only the final response head reaches the engine: a 1xx interim head never does. Every fetch directive allows only `http(s)://*.i2p:*` (plus `data:` and `blob:` for images, fonts and media). | `src-tauri/src/net/rules.rs` | Loopback bypass of the proxy (spike S1), `fetch`, WebSocket, frames to IPs |
 | L3b | **Engine request filter**: macOS `WKContentRuleList`; Windows a `WebResourceRequested` filter that answers 403. One rule set: block all, then allow `.i2p` and `about:`, `data:`, `blob:`. A content webview starts on `about:blank` and loads the page only after the filter is attached; if it cannot be attached, nothing loads. Linux: webkit2gtk has no binding for `WebKitUserContentFilter` yet; L3a holds there. | `src-tauri/src/shell/content.rs`, `src-tauri/src/net/rules.rs`, `src-tauri/crates/eepview-platform` | The same, inside the engine, even for a response without the policy |
 | L4 | **Navigation guard**: `on_navigation` and the new-window handler allow only the same `.i2p` rule. | `content.rs`, `src-tauri/src/nav.rs` | Top-level navigation, popups, `file:`, `data:`, `javascript:`, custom schemes |
 | L5 | **WebRTC off**: an init script in every frame removes the WebRTC constructors; WebKitGTK turns WebRTC and media capture off in its settings; Windows sets the UDP flag above. | `content.rs`, `eepview-platform` | UDP and STUN |
@@ -32,11 +32,16 @@ One host predicate, `net::host::is_i2p_host`, is the single source of truth for 
 
 Every engine runs page content in a separate, OS-sandboxed content process with no direct network access: `WKWebView` WebContent, `WebView2` renderer, WebKitGTK web process. All network traffic leaves through one network process. That network process is what the five layers confine. An OS-level layer that confines it from outside (L6) is on the [roadmap](roadmap.md).
 
-**Gatekeeper answers** (owner decision). A non-`.i2p` host gets 403, a malformed request 400 (two `Content-Length` headers count as malformed), and a chunked request body 411. None of them opens an upstream connection, and the connection closes. An `.i2p` URL may carry an explicit port 1–65535 and is forwarded with it; `CONNECT` stays limited to `:80` and `:443`. When the client ends before the request body does, the gatekeeper closes both sides at once.
+**Gatekeeper answers** (owner decision). A non-`.i2p` host gets 403, a malformed request 400 (two `Content-Length` headers count as malformed), and a chunked request body 411. None of them opens an upstream connection, and the connection closes. An `.i2p` URL may carry an explicit port 1–65535 and is forwarded with it. When the client ends before the request body does, the gatekeeper closes both sides at once.
+
+**`CONNECT` ports** (amended in [#91](https://github.com/tcivie/eepview/pull/91)). A `CONNECT` port must be 1–65535, in digits. Port 443 is the TLS relay. Every other port is plain HTTP, the same as port 80: the gatekeeper reads each request in the tunnel, checks it, and sends it to the `CONNECT` host and port only. A `Host` header that names another host or another port gets 403. macOS WebKit sends every `http://` load as `CONNECT host:port`, so without this rule an eepsite on another port does not load there. Port 0, a port over 65535 and a port that is not digits get 403.
+
+**Interim heads** (amended in [#91](https://github.com/tcivie/eepview/pull/91)). The router can send 1xx interim heads before the final response head. Each one is unsolicited, because the gatekeeper removes `Expect` from the request. The gatekeeper discards each 1xx head and reads the next head. Only the final head gets the page policy and goes to the engine, then the body. A `101 Switching Protocols` gets the 502 refusal and is never relayed. More than 8 interim heads get the 502 refusal too. The same rule applies to the router's answer to a TLS `CONNECT`.
 
 **Gatekeeper timing and close** (owner decision).
 
 - **Dead router.** The connect to the router proxy times out after 500 ms. When the router is gone, the client gets the 502 within 1 s on every OS. Without this bound, Windows retries a refused loopback connect for about 2 s. The read and write timeouts on an open upstream connection do not change.
+- **TLS relay** (amended in [#91](https://github.com/tcivie/eepview/pull/91)). The 60 s head timeout and the 5 min write timeout on the engine side apply until the relay starts. Then the engine side has no timeout: a long download, a long poll or a silent engine does not end the tunnel. The router side keeps its 5 min timeouts, so a router that hangs cannot hold a connection forever.
 - **Connection limit.** The gatekeeper handles at most 256 connections at once. A connection over that limit gets `503 Service Unavailable` before its request is read, and closes like the other early answers below. At most 256 of these busy answers drain at once; beyond that a busy answer closes without the drain.
 - **Early answers reach the client.** The gatekeeper can answer before it has read the whole request: the busy 503, and a 403, 400 or 411 sent while request bytes are still unread. After such an answer it closes in this order:
   1. It shuts down its write side, so the client sees the end of the answer.
