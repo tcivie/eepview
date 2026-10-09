@@ -6,8 +6,9 @@
 //! Every content webview uses it as its proxy. It forwards a request to the verified router
 //! proxy only when the host passes [`super::host::is_i2p_host`], and answers everything else
 //! itself with no upstream connection. It forwards one request per connection, adds the page
-//! policy (L3) to every response, and never pipes raw bytes from the engine to the router
-//! except inside a `CONNECT <name>.i2p:443` TLS tunnel.
+//! policy (L3) to every response, never sends a 1xx interim head to the engine, and never
+//! pipes raw bytes from the engine to the router except inside a `CONNECT <name>.i2p:443` TLS
+//! tunnel.
 
 use std::io::{self, Read, Write};
 use std::net::{Shutdown, TcpListener, TcpStream};
@@ -34,6 +35,8 @@ const UPSTREAM_CONNECT: Duration = Duration::from_millis(500);
 /// After an early answer, unread input is drained for at most this long and this much.
 const DRAIN_TIME: Duration = Duration::from_secs(1);
 const DRAIN_BYTES: usize = 64 * 1024;
+/// Most 1xx interim heads the router may send before the final response head.
+const MAX_INTERIM: usize = 8;
 /// Whether `CONNECT *.i2p:443` is relayed (see [`Gatekeeper::start`]).
 const TLS_TUNNELS: bool = cfg!(windows);
 const ESTABLISHED: &[u8] = b"HTTP/1.1 200 Connection established\r\n\r\n";
@@ -54,6 +57,8 @@ struct Shared {
     /// Busy answers still draining; capped at `limit`, so a flood cannot spawn threads freely.
     draining: Arc<AtomicUsize>,
     limit: usize,
+    /// How long the engine may take to send a request head ([`CLIENT_TIMEOUT`]).
+    head_timeout: Duration,
     allow_tls: bool,
     failures: Arc<Failures>,
 }
@@ -82,6 +87,15 @@ impl Gatekeeper {
         allow_tls: bool,
         limit: usize,
     ) -> io::Result<Self> {
+        Self::start_tuned(upstream, allow_tls, limit, CLIENT_TIMEOUT)
+    }
+
+    fn start_tuned(
+        upstream: &VerifiedUpstream,
+        allow_tls: bool,
+        limit: usize,
+        head_timeout: Duration,
+    ) -> io::Result<Self> {
         let (listener, addr) = LoopbackAddr::listen_any()?;
         let open = Arc::new(AtomicBool::new(true));
         let shared = Shared {
@@ -90,6 +104,7 @@ impl Gatekeeper {
             active: Arc::new(AtomicUsize::new(0)),
             draining: Arc::new(AtomicUsize::new(0)),
             limit,
+            head_timeout,
             allow_tls,
             failures: Arc::new(Failures::default()),
         };
@@ -221,7 +236,7 @@ fn answer_busy(mut stream: TcpStream, shared: &Shared) {
 }
 
 fn handle(mut client: TcpStream, shared: &Shared) -> io::Result<()> {
-    client.set_read_timeout(Some(CLIENT_TIMEOUT))?;
+    client.set_read_timeout(Some(shared.head_timeout))?;
     client.set_write_timeout(Some(UPSTREAM_TIMEOUT))?;
     let Some((head, rest)) = read_head(&mut client)? else {
         return refuse(&mut client, Refusal::BadRequest);
@@ -240,7 +255,7 @@ fn handle(mut client: TcpStream, shared: &Shared) -> io::Result<()> {
             };
             forward(&mut client, &rest, &request, shared)
         }
-        Plan::Terminate { host } => terminate(&mut client, &rest, &host, shared),
+        Plan::Terminate { host, port } => terminate(&mut client, &rest, &host, port, shared),
         Plan::Relay { host } => relay(client, &rest, &host, shared),
         Plan::Refuse(reason) => refuse(&mut client, reason),
     }
@@ -293,7 +308,14 @@ fn close_gently(client: &mut TcpStream) {
 
 /// Reads one message head. `None` on a clean EOF, a broken head or a head over the limit.
 fn read_head(stream: &mut impl Read) -> io::Result<Option<(Head, Vec<u8>)>> {
-    let mut buf = Vec::with_capacity(4096);
+    read_head_after(stream, Vec::with_capacity(4096))
+}
+
+/// Reads one message head that starts with the bytes in `buf`, which were read before.
+fn read_head_after(
+    stream: &mut impl Read,
+    mut buf: Vec<u8>,
+) -> io::Result<Option<(Head, Vec<u8>)>> {
     let mut chunk = [0u8; 4096];
     loop {
         if let Some(end) = http::head_end(&buf) {
@@ -311,8 +333,38 @@ fn read_head(stream: &mut impl Read) -> io::Result<Option<(Head, Vec<u8>)>> {
     }
 }
 
-/// `CONNECT <host>:80`: confirm, then read exactly one plain request from the tunnel.
-fn terminate(client: &mut TcpStream, early: &[u8], host: &str, shared: &Shared) -> io::Result<()> {
+/// Reads the final response head from the router, and the bytes after it. Every 1xx interim
+/// head is unsolicited, because the gatekeeper drops `Expect`, so it is discarded and the
+/// next head is read. `None` on a broken head, a `101 Switching Protocols` (never relayed),
+/// or more than [`MAX_INTERIM`] interim heads.
+fn read_final_head(upstream: &mut impl Read) -> io::Result<Option<(Head, Vec<u8>)>> {
+    let mut buf = Vec::new();
+    for _ in 0..=MAX_INTERIM {
+        let Some((head, rest)) = read_head_after(upstream, buf)? else {
+            return Ok(None);
+        };
+        if http::status_code(&head.start) == Some(101) {
+            trace::line(&format!("refused interim head {}", head.start));
+            return Ok(None);
+        }
+        if !http::is_interim(&head.start) {
+            return Ok(Some((head, rest)));
+        }
+        buf = rest;
+    }
+    trace::line("refused: too many interim heads");
+    Ok(None)
+}
+
+/// `CONNECT <host>:<port>` for any port but 443: confirm, then read exactly one plain request
+/// from the tunnel. The request goes to that host and port only.
+fn terminate(
+    client: &mut TcpStream,
+    early: &[u8],
+    host: &str,
+    port: u16,
+    shared: &Shared,
+) -> io::Result<()> {
     client.write_all(ESTABLISHED)?;
     let mut source = early.chain(&mut *client);
     let head = read_head(&mut source)?;
@@ -323,7 +375,7 @@ fn terminate(client: &mut TcpStream, early: &[u8], host: &str, shared: &Shared) 
     };
     trace::line(&format!("tunnel head {}", head.start));
     rest.extend_from_slice(unread);
-    match http::plan_inner(&head, host) {
+    match http::plan_inner(&head, host, port) {
         Plan::Http { method, host, path } => {
             let request = Request {
                 method: &method,
@@ -379,7 +431,7 @@ fn forward(client: &mut TcpStream, rest: &[u8], req: &Request, shared: &Shared) 
         req.method, req.host, req.path, req.head,
     ))?;
     send_body(client, rest, length, &mut upstream)?;
-    let Some((head, body)) = read_head(&mut upstream)? else {
+    let Some((head, body)) = read_final_head(&mut upstream)? else {
         return refuse_page(client, req, shared, Refusal::Upstream);
     };
     trace::line(&format!("answer {} for {}", head.start, req.url()));
@@ -424,12 +476,17 @@ fn relay(mut client: TcpStream, rest: &[u8], host: &str, shared: &Shared) -> io:
         return refuse(&mut client, Refusal::Upstream);
     };
     upstream.write_all(&http::upstream_connect(host))?;
-    let Some((head, early)) = read_head(&mut upstream)? else {
+    let Some((head, early)) = read_final_head(&mut upstream)? else {
         return refuse(&mut client, Refusal::Upstream);
     };
     if !http::is_success(&head.start) {
         return refuse(&mut client, Refusal::Upstream);
     }
+    // The head timeout is for the request head only. A relay may stay silent in one direction
+    // for a long time (a long download, a long poll), and the engine may stop reading for a
+    // while: only an end of input from either side ends it.
+    client.set_read_timeout(None)?;
+    client.set_write_timeout(None)?;
     client.write_all(ESTABLISHED)?;
     client.write_all(&early)?;
     upstream.write_all(rest)?;

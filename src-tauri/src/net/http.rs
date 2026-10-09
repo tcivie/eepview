@@ -181,10 +181,13 @@ pub enum Plan {
         /// Path and query.
         path: String,
     },
-    /// `CONNECT <host>:80`: answer 200, then read one plain HTTP request from the tunnel.
+    /// `CONNECT <host>:<port>` for any port 1–65535 but 443: answer 200, then read one plain
+    /// HTTP request from the tunnel.
     Terminate {
         /// I2P host.
         host: String,
+        /// The `CONNECT` port.
+        port: u16,
     },
     /// `CONNECT <host>:443`: relay the TLS bytes through the router proxy.
     Relay {
@@ -218,11 +221,19 @@ fn plan_connect(target: &str, allow_tls: bool) -> Plan {
         return Plan::Refuse(Refusal::NotI2p);
     }
     let host = host.to_owned();
-    match port {
-        "80" => Plan::Terminate { host },
-        "443" if allow_tls => Plan::Relay { host },
-        _ => Plan::Refuse(Refusal::NotI2p),
+    match connect_port(port) {
+        Some(443) if allow_tls => Plan::Relay { host },
+        Some(443) | None => Plan::Refuse(Refusal::NotI2p),
+        Some(port) => Plan::Terminate { host, port },
     }
+}
+
+/// The port of a `CONNECT` target: digits only, 1–65535.
+fn connect_port(text: &str) -> Option<u16> {
+    if !text.bytes().all(|b| b.is_ascii_digit()) {
+        return None;
+    }
+    text.parse().ok().filter(|&port| port != 0)
 }
 
 fn plan_absolute(method: &str, target: &str) -> Plan {
@@ -264,22 +275,26 @@ fn path_of(url: &Url) -> String {
     }
 }
 
-/// Decides the one request read inside a `CONNECT <host>:80` tunnel.
+/// Decides the one request read inside a `CONNECT <host>:<port>` tunnel. The request goes to
+/// `host` and `port` (the host alone for port 80), whatever it names. A `Host` header that
+/// names another host or another port is refused.
 #[must_use]
-pub fn plan_inner(head: &Head, host: &str) -> Plan {
+pub fn plan_inner(head: &Head, host: &str, port: u16) -> Plan {
     let Some((method, target, version)) = head.request_line() else {
         return Plan::Refuse(Refusal::BadRequest);
     };
     if !version.starts_with("HTTP/1.") || !target.starts_with('/') || method == "CONNECT" {
         return Plan::Refuse(Refusal::BadRequest);
     }
-    let named = head.header("host").unwrap_or(host);
-    if named != host && named != format!("{host}:80") {
+    let with_port = format!("{host}:{port}");
+    let pinned = if port == 80 { host } else { &with_port };
+    let named = head.header("host").unwrap_or(pinned);
+    if named != pinned && named != with_port {
         return Plan::Refuse(Refusal::NotI2p);
     }
     Plan::Http {
         method: method.to_owned(),
-        host: host.to_owned(),
+        host: pinned.to_owned(),
         path: target.to_owned(),
     }
 }
@@ -311,6 +326,12 @@ pub fn rewrite_response(mut head: Head) -> Vec<u8> {
         .push(("X-DNS-Prefetch-Control".into(), "off".into()));
     head.headers.push(("Connection".into(), "close".into()));
     head.to_bytes()
+}
+
+/// True when a response start line says 1xx: an interim head, and a final head follows it.
+#[must_use]
+pub fn is_interim(start: &str) -> bool {
+    status_code(start).is_some_and(|c| (100..200).contains(&c))
 }
 
 /// True when a response start line says 2xx.
@@ -424,13 +445,27 @@ mod tests {
     }
 
     #[test]
-    fn connect_requests() {
+    fn connect_to_any_port_but_443_is_terminated() {
+        for port in [80, 1, 22, 8080, 65535] {
+            assert_eq!(
+                plan_of(&format!("CONNECT stats.i2p:{port} HTTP/1.1")),
+                Plan::Terminate {
+                    host: "stats.i2p".into(),
+                    port
+                }
+            );
+        }
         assert_eq!(
-            plan_of("CONNECT stats.i2p:80 HTTP/1.1"),
+            plan_of("CONNECT stats.i2p:080 HTTP/1.1"),
             Plan::Terminate {
-                host: "stats.i2p".into()
+                host: "stats.i2p".into(),
+                port: 80
             }
         );
+    }
+
+    #[test]
+    fn connect_requests() {
         assert_eq!(
             plan_of("CONNECT stats.i2p:443 HTTP/1.1"),
             Plan::Relay {
@@ -442,7 +477,12 @@ mod tests {
         for refused in [
             "CONNECT example.com:443 HTTP/1.1",
             "CONNECT 127.0.0.1:80 HTTP/1.1",
-            "CONNECT stats.i2p:22 HTTP/1.1",
+            "CONNECT example.com:8080 HTTP/1.1",
+            "CONNECT stats.i2p:0 HTTP/1.1",
+            "CONNECT stats.i2p:65536 HTTP/1.1",
+            "CONNECT stats.i2p:+80 HTTP/1.1",
+            "CONNECT stats.i2p: HTTP/1.1",
+            "CONNECT stats.i2p:8o HTTP/1.1",
             "CONNECT Stats.i2p:80 HTTP/1.1",
             "CONNECT stats.i2p.:80 HTTP/1.1",
         ] {
@@ -457,25 +497,73 @@ mod tests {
     #[test]
     fn inner_requests_stay_on_the_tunnel_host() {
         let ok = head("GET /x HTTP/1.1\r\nHost: a.i2p\r\n\r\n");
-        assert!(matches!(plan_inner(&ok, "a.i2p"), Plan::Http { .. }));
+        assert!(matches!(plan_inner(&ok, "a.i2p", 80), Plan::Http { .. }));
         let port = head("GET /x HTTP/1.1\r\nHost: a.i2p:80\r\n\r\n");
-        assert!(matches!(plan_inner(&port, "a.i2p"), Plan::Http { .. }));
+        assert!(matches!(plan_inner(&port, "a.i2p", 80), Plan::Http { .. }));
         let other = head("GET /x HTTP/1.1\r\nHost: evil.com\r\n\r\n");
-        assert_eq!(plan_inner(&other, "a.i2p"), Plan::Refuse(Refusal::NotI2p));
+        assert_eq!(
+            plan_inner(&other, "a.i2p", 80),
+            Plan::Refuse(Refusal::NotI2p)
+        );
         let absolute = head("GET http://evil.com/ HTTP/1.1\r\n\r\n");
         assert_eq!(
-            plan_inner(&absolute, "a.i2p"),
+            plan_inner(&absolute, "a.i2p", 80),
             Plan::Refuse(Refusal::BadRequest)
         );
         let nested = head("CONNECT /x HTTP/1.1\r\n\r\n");
         assert_eq!(
-            plan_inner(&nested, "a.i2p"),
+            plan_inner(&nested, "a.i2p", 80),
             Plan::Refuse(Refusal::BadRequest)
         );
         assert_eq!(
-            plan_inner(&head("x\r\n\r\n"), "a.i2p"),
+            plan_inner(&head("x\r\n\r\n"), "a.i2p", 80),
             Plan::Refuse(Refusal::BadRequest)
         );
+    }
+
+    // Req: a `CONNECT a.i2p:8080` tunnel forwards to `a.i2p:8080` only. The `Host` header must
+    // name that host and port; another port or another host is refused.
+    #[test]
+    fn inner_requests_on_another_port_stay_on_the_tunnel_port() {
+        let ok = head("GET /x HTTP/1.1\r\nHost: a.i2p:8080\r\n\r\n");
+        let pinned = Plan::Http {
+            method: "GET".into(),
+            host: "a.i2p:8080".into(),
+            path: "/x".into(),
+        };
+        assert_eq!(plan_inner(&ok, "a.i2p", 8080), pinned);
+        let none = head("GET /x HTTP/1.1\r\n\r\n");
+        assert_eq!(plan_inner(&none, "a.i2p", 8080), pinned);
+        let out = String::from_utf8(upstream_request("GET", "a.i2p:8080", "/x", &ok)).unwrap();
+        assert!(
+            out.starts_with("GET http://a.i2p:8080/x HTTP/1.1\r\n"),
+            "{out}"
+        );
+        assert!(out.contains("\r\nHost: a.i2p:8080\r\n"), "{out}");
+        for named in [
+            "a.i2p",
+            "a.i2p:80",
+            "a.i2p:8081",
+            "b.i2p:8080",
+            "evil.com:8080",
+        ] {
+            let wrong = head(&format!("GET /x HTTP/1.1\r\nHost: {named}\r\n\r\n"));
+            assert_eq!(
+                plan_inner(&wrong, "a.i2p", 8080),
+                Plan::Refuse(Refusal::NotI2p),
+                "{named}"
+            );
+        }
+    }
+
+    #[test]
+    fn interim_heads_are_1xx() {
+        assert!(is_interim("HTTP/1.1 100 Continue"));
+        assert!(is_interim("HTTP/1.1 101 Switching Protocols"));
+        assert!(is_interim("HTTP/1.1 103 Early Hints"));
+        assert!(!is_interim("HTTP/1.1 200 OK"));
+        assert!(!is_interim("HTTP/1.1 99 X"));
+        assert!(!is_interim("HTTP/1.1 x"));
     }
 
     #[test]
