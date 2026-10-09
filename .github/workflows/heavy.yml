@@ -57,7 +57,7 @@ jobs:
       - name: Rust line coverage gate
         working-directory: src-tauri
         # The gate is on the run itself: `report` has no --workspace and would gate the root crate only.
-        run: cargo llvm-cov nextest --workspace --locked --summary-only --fail-under-lines 93
+        run: cargo llvm-cov nextest --profile ci --workspace --locked --summary-only --fail-under-lines 93
 
   # Branch coverage needs a nightly compiler. One dated nightly is used for this measurement only;
   # everything else builds on the pinned stable toolchain.
@@ -95,7 +95,7 @@ jobs:
       - name: Rust branch coverage gate
         working-directory: src-tauri
         run: |
-          cargo "+$(cat ../scripts/nightly-toolchain.txt)" llvm-cov nextest --workspace --locked --branch --json --summary-only --output-path "$RUNNER_TEMP/branch.json"
+          cargo "+$(cat ../scripts/nightly-toolchain.txt)" llvm-cov nextest --profile ci --workspace --locked --branch --json --summary-only --output-path "$RUNNER_TEMP/branch.json"
           jq -r -e '.data[0].totals.branches.percent | "branch coverage: \(.)% (floor 82)", . >= 82' "$RUNNER_TEMP/branch.json"
 
   codeql-rust:

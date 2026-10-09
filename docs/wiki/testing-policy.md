@@ -60,7 +60,7 @@ Rust tests run under cargo-nextest, in CI and on your machine. It runs each test
 
 ## Limits
 
-- Today the Rust coverage floor is 0, because the first Rust tests arrive with the browser shell. Raise it in that PR.
+- The Rust coverage floors are 93 for lines and 82 for branches. See [Coverage](coverage.md).
 - DOM glue outside `src/ui/lib` and `src/ui/shared` is not covered.
 
 ## History

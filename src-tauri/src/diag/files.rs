@@ -15,18 +15,17 @@ use std::path::Path;
 /// Fails when the folder cannot be created.
 pub fn private_dir(dir: &Path) -> io::Result<()> {
     fs::create_dir_all(dir)?;
-    restrict(dir, 0o700)
+    #[cfg(unix)]
+    restrict(dir, 0o700)?;
+    Ok(())
 }
 
+/// Sets the Unix mode of `path`. Windows has no mode: the folder in the user profile already
+/// limits access to the user.
 #[cfg(unix)]
 fn restrict(path: &Path, mode: u32) -> io::Result<()> {
     use std::os::unix::fs::PermissionsExt;
     fs::set_permissions(path, fs::Permissions::from_mode(mode))
-}
-
-#[cfg(not(unix))]
-fn restrict(_path: &Path, _mode: u32) -> io::Result<()> {
-    Ok(())
 }
 
 /// Private file options that never follow a symbolic link (0600, `O_NOFOLLOW` on Unix).
@@ -52,6 +51,7 @@ fn no_follow(_options: &mut OpenOptions) {}
 /// Fails when the file cannot be opened.
 pub fn append(path: &Path) -> io::Result<File> {
     let file = private().create(true).append(true).open(path)?;
+    #[cfg(unix)]
     restrict(path, 0o600)?;
     Ok(file)
 }
@@ -67,6 +67,7 @@ pub fn replace(path: &Path) -> io::Result<File> {
         .write(true)
         .truncate(true)
         .open(path)?;
+    #[cfg(unix)]
     restrict(path, 0o600)?;
     Ok(file)
 }
@@ -80,11 +81,10 @@ pub fn create_new(path: &Path) -> io::Result<File> {
     private().create_new(true).write(true).open(path)
 }
 
-#[cfg(test)]
+#[cfg(all(test, unix))]
 mod tests {
     use super::*;
 
-    #[cfg(unix)]
     #[test]
     fn modes_are_private_and_links_are_refused() {
         use std::os::unix::fs::{PermissionsExt, symlink};

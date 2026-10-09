@@ -14,7 +14,7 @@ This page lists the style rules, the tool that enforces each one, and what a rev
 | TOML | `taplo` format and lint. | The `repo checks` job of `ci.yml` and lefthook. |
 | Shell | `shellcheck`. `set -euo pipefail`. | The `repo checks` job of `ci.yml` and lefthook. |
 | GitHub workflows | `actionlint`, `zizmor`. Actions pinned by full SHA. `permissions: {}` with the minimum per job. `persist-credentials: false`. | The `repo checks` job (actionlint) and the `zizmor (workflow security)` job of `ci.yml`, and lefthook. |
-| Python | Python is used only for the lizard stubs in `scripts/lizard-stubs`. There is no Python linter in CI today. Keep these files small. | Review. |
+| Python | The leak harness (`tests/leak`) and the lizard stubs in `scripts/lizard-stubs`. ruff checks and formats `tests/leak`. | `leak harness (ruff + unit tests)` |
 | License headers | Each source file has an SPDX header. Other files are covered by `REUSE.toml`. | `reuse lint` in the `repo checks` job of `ci.yml` and in lefthook. |
 | Commit sign-off | Each commit has a `Signed-off-by` line. | The `dco` job of `ci.yml`. |
 | Docs | All docs live in `docs/wiki/`. | `docs-check`. |
