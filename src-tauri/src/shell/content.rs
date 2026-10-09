@@ -195,7 +195,7 @@ fn first_load_sent(label: &str, sent: tauri::Result<()>) {
 }
 
 /// Windows: the proxy in the browser arguments, and a data folder of its own, so the
-/// arguments never clash with the chrome webviews in one WebView2 environment.
+/// arguments never clash with the chrome webviews in one `WebView2` environment.
 #[cfg(windows)]
 fn windows_engine<R: Runtime>(
     builder: WebviewBuilder<R>,

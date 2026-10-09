@@ -7,7 +7,7 @@ Status: shipped.
 - A new feature needs tests in the same pull request.
 - A bug fix needs a regression test. The test must fail before the fix and pass after it. Say in the PR how you saw it fail.
 - Every pure module has unit tests. In TypeScript, a module in `src/ui/lib` or `src/ui/shared` needs a sibling `.test.ts` file. `scripts/check-tested.sh` fails if it is missing.
-- Coverage only goes up. The ratchet values are in `.github/workflows/ci.yml` and `package.json`. Raise them when coverage rises. Never lower them. See [Coverage](coverage.md).
+- Coverage only goes up. The ratchet values are in `.github/workflows/heavy.yml` and `package.json`. Raise them when coverage rises. Never lower them. See [Coverage](coverage.md).
 - A change to the no-leak design needs a test too. The architecture test and the leak test must stay green. See [Leak test](leak-test.md).
 - Add no coverage exclusion and no skipped test.
 
@@ -35,22 +35,35 @@ The flow:
 ```sh
 npm ci
 npm run build
-cargo test --manifest-path src-tauri/Cargo.toml --locked
+cargo nextest run --manifest-path src-tauri/Cargo.toml --locked
 npm test
 npm run test:coverage
 ```
 
-- `cargo test` runs the Rust unit tests and the integration tests.
+- `cargo nextest run` runs the Rust unit tests and the integration tests. Install it with `brew install cargo-nextest` or `cargo install cargo-nextest --locked`.
 - `npm test` runs the TypeScript unit tests with the Node test runner.
 - `npm run test:coverage` checks the TypeScript coverage thresholds.
-- For Rust coverage, run `cargo llvm-cov --all-targets --summary-only` in `src-tauri`.
-- The full set of checks also runs in CI on Linux, macOS and Windows.
+- For Rust coverage, run `cargo llvm-cov nextest --workspace --summary-only` in `src-tauri`.
+- The Rust tests run in CI on Linux for each change to the Rust or UI files. They also run on macOS and on Windows when a change touches the code of that OS. The coverage jobs and the release-build leak test run in the heavy lane. See [CI and quality gates](ci-and-quality-gates.md).
+
+## The test runner
+
+Rust tests run under cargo-nextest, in CI and on your machine. It runs each test in its own process.
+
+- The reason is time. Some `net::console` tests wait on each other for more than 60 s. In the single process of `cargo test`, the lib tests took 218 s. Under nextest, 1,596 tests took 33 s on 8 cores.
+- The config is `src-tauri/.config/nextest.toml`.
+- A test that runs for 2 minutes (30 s, four times) is stopped and reported as hung.
+- The `ci` profile does not stop at the first failure. It runs every test and prints the output of each failure when it happens and again at the end. CI uses it with `--profile ci`.
+- Tests that bind the default router console ports (7657 and 7070) belong to the `console-ports` test group. The group runs one test at a time, so none of them finds a port taken by another.
+- The crates have no doc tests, so nextest runs every test.
+- The coverage is the same under both runners. See [Coverage](coverage.md).
 
 ## Limits
 
-- Today the Rust coverage floor is 0, because the first Rust tests arrive with the browser shell. Raise it in that PR.
+- The Rust coverage floors are 93 for lines and 82 for branches. See [Coverage](coverage.md).
 - DOM glue outside `src/ui/lib` and `src/ui/shared` is not covered.
 
 ## History
 
 - 2026-10-03 — Add the testing policy — [#30](https://github.com/tcivie/eepview/pull/30).
+- 2026-10-09 — Fast lane for pull requests, heavy lane for release branches — [#89](https://github.com/tcivie/eepview/pull/89).

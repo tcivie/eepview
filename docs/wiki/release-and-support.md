@@ -7,7 +7,7 @@ Status: in progress. eepview has no release yet.
 ## Versioning
 
 - eepview follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Before 1.0, a minor version may break things. Each change is in `CHANGELOG.md`.
-- A release is a git tag `vX.Y.Z` on `main`.
+- A release is a git tag `vX.Y.Z` on a release branch (`release/vX.Y`), cut from `main`.
 
 ## Support
 
@@ -24,7 +24,7 @@ Status: in progress. eepview has no release yet.
 
 ## How releases are verified
 
-- A tag starts `release.yml`. The lint, security and test jobs must pass first. See [Release pipeline](release-pipeline.md).
+- A tag starts `release.yml`. The tagged commit must sit on a `release/*` branch, with the `gate` and `heavy-gate` checks green. See [Release pipeline](release-pipeline.md).
 - The release holds installers for four targets, two CycloneDX SBOMs and a `SHA256SUMS` file.
 - A user checks a download with `sha256sum -c SHA256SUMS`.
 - Each release file has a keyless Sigstore signature, made through GitHub Actions OIDC. The workflow also attests build provenance. The commands to check both are in [Release pipeline](release-pipeline.md#verify-a-download). The attestation step runs only while the repository is public.
@@ -68,3 +68,4 @@ git tag -v v0.1.0
 
 - 2026-10-03 — Add the release and support policy — [#30](https://github.com/tcivie/eepview/pull/30).
 - [#37](https://github.com/tcivie/eepview/pull/37): signed tags documented.
+- 2026-10-09 — Releases come from release branches — [#89](https://github.com/tcivie/eepview/pull/89).

@@ -21,10 +21,11 @@ Do these steps on the day the repo goes public.
 
 CodeQL and Scorecard need a public repo on the free plan. They were removed so no check shows as skipped.
 
+CodeQL has no file of its own now. The `codeql (actions)` and `codeql (javascript-typescript)` jobs are in `ci.yml`. The `codeql (rust)` job is in `heavy.yml`.
+
 The squash commit of the PR that removed them is `3c3f92a`. Run:
 
 ```sh
-git show 3c3f92a^:.github/workflows/codeql.yml > .github/workflows/codeql.yml
 git show 3c3f92a^:.github/workflows/scorecard.yml > .github/workflows/scorecard.yml
 ```
 
@@ -32,12 +33,7 @@ Then remove the `if: ${{ !github.event.repository.private }}` lines. They are no
 
 ## 2. Update the `protect-main` ruleset
 
-Add these checks to the required checks:
-
-- `codeql (actions)`
-- `codeql (javascript-typescript)`
-- `codeql (rust)`
-- `dependency-review`
+The required checks on main are `gate`, `docs-check`, `Socket Security: Project Report` and `Socket Security: Pull Request Alerts`. The `gate` job of `ci.yml` needs `codeql (actions)`, `codeql (javascript-typescript)` and `dependency-review`, so the ruleset does not list them. `codeql (rust)` runs in the heavy lane. The `heavy-gate` check requires it on release branches. See [CI and quality gates](ci-and-quality-gates.md).
 
 Do not add Scorecard. `scorecard.yml` has no `pull_request` trigger, so no PR reports it. A required Scorecard check would block every PR.
 
@@ -59,7 +55,7 @@ gh api -X PUT repos/tcivie/eepview/private-vulnerability-reporting
 
 ## 4. Add dependency review
 
-Add a workflow that uses `actions/dependency-review-action`, pinned by commit hash. Set `fail-on-severity: high`.
+The `dependency-review` job in `ci.yml` uses `actions/dependency-review-action`, pinned by commit hash, with `fail-on-severity: high`.
 
 ## 5. Register at bestpractices.dev
 
@@ -88,3 +84,7 @@ Open the advisory link in `SECURITY.md`. Make sure it works.
 ## 5. Check release provenance
 
 The `publish` job in `release.yml` attests build provenance only when the repo is public. After the switch, run a release and check that the attest step ran. Then run `gh attestation verify <file> --repo tcivie/eepview` on one bundle.
+
+## History
+
+- 2026-10-09 — Fast lane for pull requests, heavy lane for release branches — [#89](https://github.com/tcivie/eepview/pull/89)

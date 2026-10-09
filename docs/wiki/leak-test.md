@@ -3,13 +3,27 @@
 Status: shipped.
 
 A permanent test on Linux, macOS and Windows. It proves that a page in eepview reaches only
-`.i2p` hosts. It is the required check `leak-test (<os>)`. The spec is the "Leak test" section
-of [ADR 0001](adr-0001-no-leak-architecture.md).
+`.i2p` hosts. It runs in both CI lanes, as the checks `leak-test (ubuntu-24.04, debug)` and
+`leak-test (<os>, release)`. The spec is the "Leak test" section of
+[ADR 0001](adr-0001-no-leak-architecture.md).
+
+## When it runs
+
+| Lane | Check | Build | OS | When |
+| --- | --- | --- | --- | --- |
+| Fast lane (`ci.yml`) | `leak-test (ubuntu-24.04, debug)` and `leak harness (ruff + unit tests)` | debug | Linux | A pull request changes a no-leak layer file, the engine settings or the harness. Every push to main. |
+| Heavy lane (`heavy.yml`) | `leak-test (<os>, release)` and `leak harness (ruff + unit tests)` | release | ubuntu-24.04, macos-15, windows-2025 | A pull request into a release branch, every night on main, and by hand. |
+
+- The list of files that mark the leak area is in [CI and quality gates](ci-and-quality-gates.md).
+- A pull request into main gets the Linux debug run only, and only when it marks the leak area. The macOS and Windows runs happen in the heavy lane.
+- On a release branch, the `heavy-gate` check needs the release run on all three OS.
+- Both lanes call one script, `scripts/leak-run.sh debug|release`. It builds the app, checks the hardening on a Linux release build, and runs the harness. The script is shared because a reusable workflow and a local composite action do not pass both linters. See the Limits of [CI and quality gates](ci-and-quality-gates.md).
+- The `leak harness (ruff + unit tests)` job runs `ruff check` and `ruff format --check` on `tests/leak`, then the unit tests of the harness.
 
 ## What it does
 
-`tests/leak/harness.py` (Python 3, standard library only) runs the real release build, in the
-form that users run:
+`scripts/leak-run.sh` builds the app in the form that users run. Then it runs
+`tests/leak/harness.py` (Python 3, standard library only) against it:
 
 - macOS runs the binary inside `eepview.app`. The bundle's `Info.plist` turns on App Transport
   Security (ATS). A bare binary has no `Info.plist`, so ATS never applies to it, and a run of the
@@ -27,8 +41,9 @@ The run itself:
 - `EEPVIEW_START_URL=http://leaktest.i2p/` and `EEPVIEW_EXIT_AFTER=30`.
 - `EEPVIEW_LOG=1`: the app prints a test trace on stderr. It has one line for each gatekeeper
   request head, answer, refusal and failed connection, and one line for each first load of a
-  tab webview. The harness keeps it in `app.<run>.log`, in the `leak-results-<os>` artifact.
-  The trace never goes into the diagnostics log or a bug report.
+  tab webview. The harness keeps it in `app.<run>.log`. CI uploads it, when the job fails, in the
+  `leak-results-debug-<OS>` or `leak-results-release-<OS>` artifact. The trace never goes into
+  the diagnostics log or a bug report.
 - The fake proxy listens with a backlog of 128. The page sends a burst of parallel requests.
   With the default backlog of 5, macOS drops connects, and the gatekeeper answers 502 after its
   500 ms connect limit.
@@ -42,7 +57,7 @@ a form auto-submit, a 302 to clearnet and `location = "http://example.com/"`.
 
 Two runs: `default` (JavaScript on, the one that counts) and `js-off` (a sanity check).
 
-On Linux, the job also runs `scripts/check-hardening.sh` on the release binary it built. It fails the PR when PIE, full RELRO or NX is missing.
+On a Linux release build, `scripts/leak-run.sh` also runs `scripts/check-hardening.sh` on the binary. The job fails when PIE, full RELRO or NX is missing.
 
 ## Pass criteria
 
@@ -77,6 +92,12 @@ python3 tests/leak/harness.py --binary src-tauri/target/release/bundle/macos/eep
 python3 -m unittest discover -s tests/leak
 ```
 
+To run the same steps as CI, call the script. Set `RUNNER_OS` to `Linux`, `macOS` or `Windows`:
+
+```sh
+RUNNER_OS=macOS ./scripts/leak-run.sh release
+```
+
 ## Results per OS
 
 | OS | default (JS on) | js-off | Notes |
@@ -90,3 +111,4 @@ python3 -m unittest discover -s tests/leak
 - Added in [#41](https://github.com/tcivie/eepview/pull/41).
 - The frame done signal, the trace and the fake proxy backlog in [#71](https://github.com/tcivie/eepview/pull/71).
 - macOS runs the binary inside the `.app` bundle in [#85](https://github.com/tcivie/eepview/pull/85). The bare binary has no `Info.plist`, so App Transport Security never applied to it, and the test missed a bug where no `http://` page loaded in the installed app.
+- The test runs in two lanes in [#89](https://github.com/tcivie/eepview/pull/89): a debug build on Linux in the fast lane, and a release build on all three OS in the heavy lane. `scripts/leak-run.sh` holds the shared steps.

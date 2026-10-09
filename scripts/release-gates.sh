@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 # SPDX-FileCopyrightText: 2026 The eepview contributors
 # SPDX-License-Identifier: MIT
-# Fail unless the tagged commit is on main and every required check passed on it.
-# Required checks come from the active ruleset that targets the default branch.
-# Env: REPO (owner/name), SHA (the tagged commit). Needs a full checkout and origin/main.
-# The caller must check out with fetch-depth 0, so origin/main exists.
+# Fail unless the tagged commit is on a release branch and every required check passed on it.
+# Required checks are the union of the active rulesets for main and for the release branches
+# (refs/heads/release/**): gate, heavy-gate, docs-check and the Socket checks.
+# See docs/wiki/release-pipeline.md.
+# Env: REPO (owner/name), SHA (the tagged commit). Needs a full checkout with the release branches.
+# The caller must check out with fetch-depth 0, so the origin/release/* refs exist.
 set -euo pipefail
 
 : "${REPO:?set REPO to owner/name}"
@@ -16,7 +18,8 @@ required_checks() {
   for id in $(gh api "repos/${REPO}/rulesets" \
     --jq '.[] | select(.enforcement == "active" and .target == "branch") | .id'); do
     gh api "repos/${REPO}/rulesets/${id}" --jq '
-      select(.conditions.ref_name.include | index("~DEFAULT_BRANCH"))
+      select(.conditions.ref_name.include
+        | any(. == "~DEFAULT_BRANCH" or startswith("refs/heads/release/")))
       | .rules[] | select(.type == "required_status_checks")
       | .parameters.required_status_checks[].context'
   done | sort -u
@@ -39,8 +42,8 @@ passed_checks() {
 }
 
 main() {
-  if ! git merge-base --is-ancestor "$SHA" origin/main; then
-    echo "::error::$SHA is not on main"
+  if [ -z "$(git branch -r --contains "$SHA" --list 'origin/release/*')" ]; then
+    echo "::error::$SHA is not on a release branch (release/*)"
     exit 1
   fi
 
