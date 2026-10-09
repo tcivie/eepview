@@ -1,0 +1,225 @@
+# SPDX-FileCopyrightText: 2026 The eepview contributors
+# SPDX-License-Identifier: MIT
+
+name: heavy
+
+# The heavy lane: the suites that take minutes. It runs on pull requests into a release branch,
+# every night on main, and on demand on any branch (`gh workflow run heavy.yml --ref <branch>`). The heavy-gate job is the required check of the
+# release branches. A nightly failure opens an issue. See docs/wiki/ci-and-quality-gates.md.
+
+on:
+  pull_request:
+    branches: ["release/**"]
+  schedule:
+    - cron: "23 2 * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: heavy-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  # Ratchet: raise the floors when coverage rises. Never lower them. See docs/wiki/coverage.md.
+  coverage-lines:
+    name: coverage (rust lines + typescript)
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Start the WebKitGTK install
+        run: ./scripts/ci-apt.sh start
+      - name: Install the pinned Rust toolchain
+        run: |
+          rustup toolchain install
+          rustup component add llvm-tools-preview
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: src-tauri
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - uses: taiki-e/install-action@83ac0ad63c0167e6f06796fab0fce28db1bf3db0 # v2.87.22
+        with:
+          tool: cargo-llvm-cov,cargo-nextest
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --ignore-scripts
+      # tauri::generate_context! needs the built UI (dist) to compile.
+      - run: npm run build
+      - run: npm run test:coverage
+      - name: Wait for the WebKitGTK install
+        run: ./scripts/ci-apt.sh wait
+      - name: Rust line coverage gate
+        working-directory: src-tauri
+        # The gate is on the run itself: `report` has no --workspace and would gate the root crate only.
+        run: cargo llvm-cov nextest --workspace --locked --summary-only --fail-under-lines 93
+
+  # Branch coverage needs a nightly compiler. One dated nightly is used for this measurement only;
+  # everything else builds on the pinned stable toolchain.
+  coverage-branches:
+    name: coverage (rust branches)
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Start the WebKitGTK install
+        run: ./scripts/ci-apt.sh start
+      - name: Install the pinned nightly
+        run: rustup toolchain install "$(cat scripts/nightly-toolchain.txt)" --profile minimal --component llvm-tools-preview
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: src-tauri
+          key: nightly
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - uses: taiki-e/install-action@83ac0ad63c0167e6f06796fab0fce28db1bf3db0 # v2.87.22
+        with:
+          tool: cargo-llvm-cov,cargo-nextest
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run build
+      - name: Wait for the WebKitGTK install
+        run: ./scripts/ci-apt.sh wait
+      # cargo-llvm-cov has no --fail-under-branches, so jq reads the workspace total from the
+      # JSON summary of the same run and prints it before the check.
+      - name: Rust branch coverage gate
+        working-directory: src-tauri
+        run: |
+          cargo "+$(cat ../scripts/nightly-toolchain.txt)" llvm-cov nextest --workspace --locked --branch --json --summary-only --output-path "$RUNNER_TEMP/branch.json"
+          jq -r -e '.data[0].totals.branches.percent | "branch coverage: \(.)% (floor 82)", . >= 82' "$RUNNER_TEMP/branch.json"
+
+  codeql-rust:
+    name: codeql (rust)
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      security-events: write # upload the CodeQL results to code scanning
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: github/codeql-action/init@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+        with:
+          languages: rust
+          build-mode: none
+          queries: security-extended
+      - uses: github/codeql-action/analyze@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+        with:
+          category: /language:rust
+
+  leak:
+    name: leak-test (${{ matrix.os }}, release)
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15, windows-2025]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Negative control (the detectors must fire)
+        shell: bash
+        run: |
+          py="$(command -v python3 || command -v python)"
+          "$py" tests/leak/harness.py --negative-control --out leak-control
+      - name: Start the WebKitGTK, Xvfb and strace install
+        if: runner.os == 'Linux'
+        run: ./scripts/ci-apt.sh start xvfb strace
+      - name: Install the pinned Rust toolchain
+        shell: bash
+        run: rustup toolchain install
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: src-tauri
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Wait for the WebKitGTK, Xvfb and strace install
+        if: runner.os == 'Linux'
+        run: ./scripts/ci-apt.sh wait
+      - name: Build the app and run the leak test
+        shell: bash
+        run: ./scripts/leak-run.sh release
+      - name: Upload the leak logs
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: leak-results-release-${{ runner.os }}
+          path: |
+            leak-control/
+            leak-results/
+          if-no-files-found: warn
+          retention-days: 7
+
+  leak-harness:
+    name: leak harness (ruff + unit tests)
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: ruff check + format
+        env:
+          PIP_DISABLE_PIP_VERSION_CHECK: "1"
+        run: |
+          python3 -m venv "$RUNNER_TEMP/ruff-venv"
+          "$RUNNER_TEMP/ruff-venv/bin/pip" install --quiet --no-deps --require-hashes -r tests/leak/requirements-lint.txt
+          "$RUNNER_TEMP/ruff-venv/bin/ruff" check tests/leak
+          "$RUNNER_TEMP/ruff-venv/bin/ruff" format --check tests/leak
+      - name: Unit tests for the harness
+        run: python3 -m unittest discover -s tests/leak -v
+
+  # The required check of the release branches. Every job must pass; a skipped or cancelled job
+  # fails it. It runs after a cancel too (always()), because a skipped gate would count as a pass.
+  heavy-gate:
+    name: heavy-gate
+    if: always()
+    needs: [coverage-lines, coverage-branches, codeql-rust, leak, leak-harness]
+    runs-on: ubuntu-24.04
+    permissions:
+      issues: write # open or comment on the nightly failure issue
+    steps:
+      - name: Every heavy job passed
+        id: verdict
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          echo "$NEEDS" | jq -r 'to_entries[] | "\(.value.result)\t\(.key)"'
+          echo "$NEEDS" | jq -e '[.[] | select(.result != "success")] | length == 0' >/dev/null
+      - name: Open or update the nightly failure issue
+        if: failure() && github.event_name == 'schedule'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          title="Nightly heavy suite failed"
+          body="The heavy suite failed on main at ${SHA}. Run: ${RUN_URL}"
+          number="$(gh issue list --state open --search "${title} in:title" --json number,title \
+            --jq "[.[] | select(.title == \"${title}\")][0].number // empty")"
+          if [ -n "$number" ]; then
+            gh issue comment "$number" --body "$body"
+          else
+            gh issue create --title "$title" --body "$body"
+          fi

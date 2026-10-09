@@ -3,10 +3,17 @@
 
 name: ci
 
+# The fast lane. A pull request runs only the jobs of the areas that it changes
+# (scripts/ci-changes.sh). The gate job passes when every job that ran passed, and it is the one
+# required check of this workflow. A push to main runs every job.
+# The slow suites (coverage, the release-build leak test on every OS, CodeQL for Rust) run in
+# heavy.yml. See docs/wiki/ci-and-quality-gates.md.
+
 on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 permissions: {}
 
@@ -14,42 +21,45 @@ concurrency:
   group: ci-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+env:
+  # Line tables keep file:line in panics and backtraces, and make the build and the cache smaller.
+  CARGO_PROFILE_DEV_DEBUG: line-tables-only
+
 jobs:
-  test:
-    name: build + test (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
+  changes:
+    name: changes
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-24.04, macos-15, windows-2025]
+    outputs:
+      rust_src: ${{ steps.areas.outputs.rust_src }}
+      rust: ${{ steps.areas.outputs.rust }}
+      web: ${{ steps.areas.outputs.web }}
+      macos: ${{ steps.areas.outputs.macos }}
+      windows: ${{ steps.areas.outputs.windows }}
+      deps: ${{ steps.areas.outputs.deps }}
+      workflows: ${{ steps.areas.outputs.workflows }}
+      leak: ${{ steps.areas.outputs.leak }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          fetch-depth: 0
           persist-credentials: false
-      - name: Install WebKitGTK build dependencies
-        if: runner.os == 'Linux'
+      - name: Find the areas that this change touches
+        id: areas
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
-      - name: Install the pinned Rust toolchain
-        shell: bash
-        run: rustup toolchain install
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-        with:
-          workspaces: src-tauri
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: 24
-          cache: npm
-      - run: npm ci
-      - run: npm run build
-      - run: cargo test --manifest-path src-tauri/Cargo.toml --locked
+          if [ "$EVENT" = pull_request ]; then
+            ./scripts/ci-changes.sh "$BASE_SHA" "$HEAD_SHA" | tee -a "$GITHUB_OUTPUT"
+          else
+            ./scripts/ci-changes.sh --all | tee -a "$GITHUB_OUTPUT"
+          fi
 
-  coverage:
-    name: coverage (rust + typescript)
+  repo:
+    name: repo checks (biome, taplo, shellcheck, complexity, reuse, actionlint)
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -57,44 +67,463 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Install WebKitGTK build dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
-      - name: Install the pinned Rust toolchain
-        shell: bash
-        run: |
-          rustup toolchain install
-          rustup component add llvm-tools-preview
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24
           cache: npm
       - run: npm ci --ignore-scripts
-      # tauri::generate_context! needs the built frontend (dist) to compile.
-      - run: npm run build
+      - run: npx biome ci .
+      - name: taplo
+        run: |
+          npx taplo fmt --check
+          npx taplo lint
+      - name: shellcheck
+        run: |
+          mapfile -t files < <(git ls-files '*.sh')
+          if [ "${#files[@]}" -gt 0 ]; then shellcheck "${files[@]}"; fi
+      - run: ./scripts/palette-check.sh
+      - run: ./scripts/style-check.sh
+      - run: ./scripts/ci-changes.test.sh
+      - name: complexity (lizard)
+        env:
+          PIP_DISABLE_PIP_VERSION_CHECK: "1"
+        run: |
+          python3 -m venv "$RUNNER_TEMP/lint-venv"
+          "$RUNNER_TEMP/lint-venv/bin/pip" install --quiet --no-deps --require-hashes -r scripts/requirements-lint.txt
+          PATH="$RUNNER_TEMP/lint-venv/bin:$PATH" ./scripts/complexity.sh
+      - name: reuse (SPDX headers)
+        env:
+          PIP_DISABLE_PIP_VERSION_CHECK: "1"
+        run: |
+          python3 -m venv "$RUNNER_TEMP/reuse-venv"
+          "$RUNNER_TEMP/reuse-venv/bin/pip" install --quiet --require-hashes -r scripts/requirements-reuse-build.txt
+          "$RUNNER_TEMP/reuse-venv/bin/pip" install --quiet --no-build-isolation --no-deps --require-hashes -r scripts/requirements-reuse.txt
+          "$RUNNER_TEMP/reuse-venv/bin/reuse" lint
+      - name: actionlint
+        env:
+          ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/actionlint.tar.gz" \
+            https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz
+          echo "$ACTIONLINT_SHA256  $RUNNER_TEMP/actionlint.tar.gz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/actionlint.tar.gz" -C "$RUNNER_TEMP" actionlint
+          "$RUNNER_TEMP/actionlint"
+
+  secrets:
+    name: gitleaks (full history)
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: gitleaks
+        env:
+          GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/gitleaks.tar.gz" \
+            https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz
+          echo "$GITLEAKS_SHA256  $RUNNER_TEMP/gitleaks.tar.gz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/gitleaks.tar.gz" -C "$RUNNER_TEMP" gitleaks
+          "$RUNNER_TEMP/gitleaks" git --redact --no-banner .
+
+  rust-lint:
+    name: rustfmt + clippy (ubuntu-24.04)
+    needs: changes
+    if: needs.changes.outputs.rust_src == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Start the WebKitGTK install
+        run: ./scripts/ci-apt.sh start
+      - name: Install the pinned Rust toolchain
+        run: rustup toolchain install
+      - run: cargo fmt --manifest-path src-tauri/Cargo.toml --check
+      - run: cargo fmt --manifest-path src-tauri/fuzz/Cargo.toml --check
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           workspaces: src-tauri
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --ignore-scripts
+      # tauri::generate_context! needs the built UI (dist) to compile.
+      - run: npm run build
+      - name: Wait for the WebKitGTK install
+        run: ./scripts/ci-apt.sh wait
+      - run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --locked -- -D warnings
+      - name: clippy (fuzz crate, on the lock file of the app)
+        run: |
+          cp src-tauri/Cargo.lock src-tauri/fuzz/Cargo.lock
+          cargo clippy --manifest-path src-tauri/fuzz/Cargo.toml --target-dir src-tauri/target --all-targets -- -D warnings
+
+  rust-test:
+    name: rust tests (ubuntu-24.04)
+    needs: changes
+    if: needs.changes.outputs.rust == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Start the WebKitGTK install
+        run: ./scripts/ci-apt.sh start
+      - name: Install the pinned Rust toolchain
+        run: rustup toolchain install
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: src-tauri
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: taiki-e/install-action@83ac0ad63c0167e6f06796fab0fce28db1bf3db0 # v2.87.22
         with:
-          tool: cargo-llvm-cov
-      # Ratchet: raise these numbers when coverage rises. Never lower them.
-      # See docs/wiki/coverage.md.
-      - name: Rust line coverage gate
-        working-directory: src-tauri
-        # The gate is on the run itself: `report` has no --workspace and would gate the root crate only.
-        run: cargo llvm-cov --workspace --all-targets --summary-only --fail-under-lines 93
-      # Branch coverage needs a nightly compiler. One dated nightly is used for this
-      # measurement only; everything else builds on the pinned stable toolchain.
-      - name: Install the pinned nightly for branch coverage
-        run: rustup toolchain install "$(cat scripts/nightly-toolchain.txt)" --profile minimal --component llvm-tools-preview
-      # cargo-llvm-cov has no --fail-under-branches, so jq reads the workspace total from the
-      # JSON summary of the same run and prints it before the check.
-      - name: Rust branch coverage gate
-        working-directory: src-tauri
-        run: |
-          cargo "+$(cat ../scripts/nightly-toolchain.txt)" llvm-cov --workspace --all-targets --branch --json --summary-only --output-path "$RUNNER_TEMP/branch.json"
-          jq -r -e '.data[0].totals.branches.percent | "branch coverage: \(.)% (floor 82)", . >= 82' "$RUNNER_TEMP/branch.json"
+          tool: cargo-nextest
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run build
+      - name: Wait for the WebKitGTK install
+        run: ./scripts/ci-apt.sh wait
+      - run: cargo nextest run --manifest-path src-tauri/Cargo.toml --locked --profile ci
+
+  # The Linux jobs never compile the code for macOS or Windows. These two jobs run when a change
+  # touches that code, a manifest or the lock file, and on every push.
+  rust-macos:
+    name: clippy + rust tests (macos-15)
+    needs: changes
+    if: needs.changes.outputs.macos == 'true'
+    runs-on: macos-15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install the pinned Rust toolchain
+        run: rustup toolchain install
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: src-tauri
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - uses: taiki-e/install-action@83ac0ad63c0167e6f06796fab0fce28db1bf3db0 # v2.87.22
+        with:
+          tool: cargo-nextest
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run build
+      - run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --locked -- -D warnings
+      - run: cargo nextest run --manifest-path src-tauri/Cargo.toml --locked --profile ci
+
+  rust-windows:
+    name: clippy + rust tests (windows-2025)
+    needs: changes
+    if: needs.changes.outputs.windows == 'true'
+    runs-on: windows-2025
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install the pinned Rust toolchain
+        shell: bash
+        run: rustup toolchain install
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: src-tauri
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - uses: taiki-e/install-action@83ac0ad63c0167e6f06796fab0fce28db1bf3db0 # v2.87.22
+        with:
+          tool: cargo-nextest
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run build
+      - run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --locked -- -D warnings
+      - run: cargo nextest run --manifest-path src-tauri/Cargo.toml --locked --profile ci
+
+  web:
+    name: typescript (tsc + tests + coverage)
+    needs: changes
+    if: needs.changes.outputs.web == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run typecheck
       - run: npm run test:coverage
+
+  deps:
+    name: cargo-deny (bans, sources)
+    needs: changes
+    if: needs.changes.outputs.deps == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2.1.1
+        with:
+          manifest-path: src-tauri/Cargo.toml
+          command: check
+          arguments: --all-features
+          # Socket.dev covers advisories and licenses. cargo-deny keeps what Socket does not do.
+          command-arguments: bans sources
+
+  workflows:
+    name: zizmor (workflow security)
+    needs: changes
+    if: needs.changes.outputs.workflows == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: zizmorcore/zizmor-action@cc914d7f3750a2d13d75c7f184a1060aa0e9d482 # v0.6.4
+        with:
+          # Code scanning upload needs a public repo on the free plan. Print and fail instead.
+          advanced-security: false
+          persona: pedantic
+          # Pinned, so a new zizmor release cannot turn CI red.
+          version: 1.30.1
+
+  # CodeQL for workflows runs on every pull request: it is the fastest language, and it keeps a
+  # static analysis result on every change (the Scorecard SAST check). Rust is in heavy.yml.
+  codeql-actions:
+    name: codeql (actions)
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      security-events: write # upload the CodeQL results to code scanning
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: github/codeql-action/init@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+        with:
+          languages: actions
+          build-mode: none
+          queries: security-extended
+      - uses: github/codeql-action/analyze@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+        with:
+          category: /language:actions
+
+  codeql-js:
+    name: codeql (javascript-typescript)
+    needs: changes
+    if: needs.changes.outputs.web == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      security-events: write # upload the CodeQL results to code scanning
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: github/codeql-action/init@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+        with:
+          languages: javascript-typescript
+          build-mode: none
+          queries: security-extended
+      - uses: github/codeql-action/analyze@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+        with:
+          category: /language:javascript-typescript
+
+  # The leak test of a debug build on Linux, when a change touches a no-leak layer, the engine
+  # settings or the harness. heavy.yml runs the release build on every OS.
+  leak-quick:
+    name: leak-test (ubuntu-24.04, debug)
+    needs: changes
+    if: needs.changes.outputs.leak == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Negative control (the detectors must fire)
+        shell: bash
+        run: |
+          py="$(command -v python3 || command -v python)"
+          "$py" tests/leak/harness.py --negative-control --out leak-control
+      - name: Start the WebKitGTK, Xvfb and strace install
+        if: runner.os == 'Linux'
+        run: ./scripts/ci-apt.sh start xvfb strace
+      - name: Install the pinned Rust toolchain
+        shell: bash
+        run: rustup toolchain install
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: src-tauri
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Wait for the WebKitGTK, Xvfb and strace install
+        if: runner.os == 'Linux'
+        run: ./scripts/ci-apt.sh wait
+      - name: Build the app and run the leak test
+        shell: bash
+        run: ./scripts/leak-run.sh debug
+      - name: Upload the leak logs
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: leak-results-debug-${{ runner.os }}
+          path: |
+            leak-control/
+            leak-results/
+          if-no-files-found: warn
+          retention-days: 7
+
+  leak-harness:
+    name: leak harness (ruff + unit tests)
+    needs: changes
+    if: needs.changes.outputs.leak == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: ruff check + format
+        env:
+          PIP_DISABLE_PIP_VERSION_CHECK: "1"
+        run: |
+          python3 -m venv "$RUNNER_TEMP/ruff-venv"
+          "$RUNNER_TEMP/ruff-venv/bin/pip" install --quiet --no-deps --require-hashes -r tests/leak/requirements-lint.txt
+          "$RUNNER_TEMP/ruff-venv/bin/ruff" check tests/leak
+          "$RUNNER_TEMP/ruff-venv/bin/ruff" format --check tests/leak
+      - name: Unit tests for the harness
+        run: python3 -m unittest discover -s tests/leak -v
+
+  dco:
+    name: dco
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: every commit has a Signed-off-by line that matches its author
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+        run: |
+          set -euo pipefail
+          if [ "$PR_AUTHOR" = "dependabot[bot]" ]; then
+            echo "skip: the pull request is from dependabot"
+            exit 0
+          fi
+          status=0
+          while read -r sha; do
+            author="$(git log -1 --format='%an <%ae>' "$sha")"
+            if git log -1 --format='%(trailers:key=Signed-off-by,valueonly)' "$sha" | grep -qxF "$author"; then
+              echo "ok   $sha"
+            else
+              echo "error: $sha has no 'Signed-off-by: $author' line. Use git commit -s." >&2
+              status=1
+            fi
+          done < <(git rev-list --no-merges "$BASE_SHA..$HEAD_SHA")
+          exit "$status"
+
+  dependency-review:
+    name: dependency-review
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      pull-requests: write # post the review summary as a PR comment
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          fail-on-severity: high
+          comment-summary-in-pr: on-failure
+
+  score-ratchet:
+    name: score-ratchet (pr)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Test the ratchet script
+        run: scripts/score-ratchet-test.sh
+      - name: Compare the file-based Scorecard checks with the floors
+        run: scripts/score-ratchet.sh pr
+
+  # The one required check of this workflow. A job that was skipped did not need to run: its area
+  # did not change. Any other result (failure, cancelled) fails the gate. It runs after a cancel
+  # too (always()), because a skipped gate would count as a pass.
+  gate:
+    name: gate
+    if: always()
+    needs:
+      - changes
+      - repo
+      - secrets
+      - rust-lint
+      - rust-test
+      - rust-macos
+      - rust-windows
+      - web
+      - deps
+      - workflows
+      - codeql-actions
+      - codeql-js
+      - leak-quick
+      - leak-harness
+      - dco
+      - dependency-review
+      - score-ratchet
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Every job passed, or was skipped because its area did not change
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          echo "$NEEDS" | jq -r 'to_entries[] | "\(.value.result)\t\(.key)"'
+          echo "$NEEDS" | jq -e '[.[] | select(.result != "success" and .result != "skipped")] | length == 0' >/dev/null

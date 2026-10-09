@@ -1,0 +1,14 @@
+# SPDX-FileCopyrightText: 2026 The eepview contributors
+# SPDX-License-Identifier: MIT
+
+# cargo-nextest runs each test in its own process. Tests that wait on a timer or a socket then do
+# not hold each other up, as they do in the one process of `cargo test`. See docs/wiki/testing-policy.md.
+
+[profile.default]
+# A test that runs longer than 2 minutes hangs. nextest stops it and reports it.
+slow-timeout = { period = "30s", terminate-after = 4 }
+
+[profile.ci]
+# Run every test, and print the output of each failure at the moment it fails and again at the end.
+fail-fast = false
+failure-output = "immediate-final"
