@@ -263,12 +263,12 @@ fn early_403_for_a_clearnet_host_with_an_unread_body_reaches_the_client() {
     check_early_answer("403 clearnet host", 403, &raw);
 }
 
-// Req: ADR "CONNECT stays limited to :80 and :443": the 403 for a refused CONNECT port, with 32 KiB
+// Req: ADR "a CONNECT port must be 1-65535": the 403 for a refused CONNECT port, with 32 KiB
 // of tunnel bytes behind the head unread, reaches the client whole.
 #[test]
 fn early_403_for_a_refused_connect_port_with_unread_bytes_reaches_the_client() {
-    let raw = with_body("CONNECT site.i2p:22 HTTP/1.1\r\n\r\n", &filler(BODY_SIZE));
-    check_early_answer("403 CONNECT port 22", 403, &raw);
+    let raw = with_body("CONNECT site.i2p:0 HTTP/1.1\r\n\r\n", &filler(BODY_SIZE));
+    check_early_answer("403 CONNECT port 0", 403, &raw);
 }
 
 // Req: ADR "A malformed request 400 (two Content-Length headers count as malformed)": the 400
