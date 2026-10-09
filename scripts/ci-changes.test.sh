@@ -119,12 +119,12 @@ case_pipeline() {
   echo 'on: push' >.github/workflows/ci.yml
   commit
   expect "a change to the fast lane runs every area" \
-    "deps leak macos rust rust_src web windows workflows" main change
+    "deps heavy leak macos rust rust_src web windows workflows" main change
 }
 
 case_all() {
   make_repo
-  expect "--all runs every area" "deps leak macos rust rust_src web windows workflows" --all
+  expect "--all runs every area" "deps heavy leak macos rust rust_src web windows workflows" --all
 }
 
 case_merge_base() {
@@ -138,7 +138,101 @@ case_merge_base() {
   expect "a change on main after the branch started does not count" "" main change
 }
 
+case_issue_form() {
+  make_repo
+  mkdir -p .github/ISSUE_TEMPLATE
+  echo 'name: Bug' >.github/ISSUE_TEMPLATE/bug.yml
+  commit
+  expect "the bug report form runs the Rust tests that read it" "rust workflows" main change
+}
+
+case_platform_shared() {
+  make_repo
+  mkdir -p src-tauri/crates/eepview-platform/src
+  echo 'pub fn parse() {}' >src-tauri/crates/eepview-platform/src/input.rs
+  commit
+  expect "a shared file of the platform crate runs every OS" "leak macos rust rust_src windows" main change
+}
+
+case_deny_config() {
+  make_repo
+  echo '[bans]' >src-tauri/deny.toml
+  commit
+  expect "the cargo-deny config runs cargo-deny" "deps rust rust_src" main change
+}
+
+case_not_unix() {
+  make_repo
+  printf '#[cfg(not(unix))]\nfn no_follow() {}\n' >src-tauri/src/core/files.rs
+  commit
+  expect "code under not(unix) runs the Windows job" "rust rust_src windows" main change
+}
+
+case_any_windows() {
+  make_repo
+  printf '#[cfg(any(windows, target_os = "linux"))]\nfn w() {}\n' >src-tauri/src/core/w.rs
+  commit
+  expect "code under any(windows, ...) runs the Windows job" "rust rust_src windows" main change
+}
+
+case_navigation_rule() {
+  make_repo
+  mkdir -p src-tauri/src/core
+  echo 'pub fn tab_navigation() {}' >src-tauri/src/core/page.rs
+  commit
+  expect "the navigation rule runs the leak test" "leak rust rust_src" main change
+}
+
+case_public_js() {
+  make_repo
+  mkdir -p public
+  echo 'document.documentElement.dataset.theme = "dark";' >public/theme-boot.js
+  commit
+  expect "a script in public/ runs the web jobs and the Rust tests" "rust web" main change
+}
+
+case_heavy_lane() {
+  make_repo
+  echo 'on: schedule' >.github/workflows/heavy.yml
+  commit
+  expect "a change to the heavy lane runs it" "heavy workflows" main change
+}
+
+# The JSON list of runners for the macOS and Windows job.
+expect_other_os() {
+  local name="$1" want="$2" got
+  shift 2
+  total=$((total + 1))
+  got="$("$root/scripts/ci-changes.sh" "$@" | sed -n 's/^other_os=//p')"
+  if [ "$got" = "$want" ]; then
+    echo "ok   $name"
+  else
+    echo "FAIL $name: want [$want], got [$got]"
+    failures=$((failures + 1))
+  fi
+}
+
+case_other_os() {
+  make_repo
+  echo more >>docs/wiki/page.md
+  commit
+  expect_other_os "no OS code gives the none runner" '["none"]' main change
+  expect_other_os "--all gives both runners" '["macos-15","windows-2025"]' --all
+  echo 'pub fn n() {}' >>src-tauri/src/shell/menu.rs
+  commit
+  expect_other_os "macOS code gives the macOS runner" '["macos-15"]' main change
+}
+
 case_docs_only
+case_issue_form
+case_platform_shared
+case_deny_config
+case_not_unix
+case_any_windows
+case_navigation_rule
+case_public_js
+case_heavy_lane
+case_other_os
 case_ui
 case_rust_plain
 case_leak_path

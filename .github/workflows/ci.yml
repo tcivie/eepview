@@ -40,6 +40,7 @@ jobs:
       deps: ${{ steps.areas.outputs.deps }}
       workflows: ${{ steps.areas.outputs.workflows }}
       leak: ${{ steps.areas.outputs.leak }}
+      other_os: ${{ steps.areas.outputs.other_os }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -47,12 +48,16 @@ jobs:
           persist-credentials: false
       - name: Find the areas that this change touches
         id: areas
+        # bash with pipefail: a failure of the script must fail the step, not hide behind tee.
+        shell: bash
         env:
           EVENT: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        # A pull request into a release branch runs every job: a release ships what it tests.
         run: |
-          if [ "$EVENT" = pull_request ]; then
+          if [ "$EVENT" = pull_request ] && [[ "$BASE_REF" != release/* ]]; then
             ./scripts/ci-changes.sh "$BASE_SHA" "$HEAD_SHA" | tee -a "$GITHUB_OUTPUT"
           else
             ./scripts/ci-changes.sh --all | tee -a "$GITHUB_OUTPUT"
@@ -197,44 +202,19 @@ jobs:
         run: ./scripts/ci-apt.sh wait
       - run: cargo nextest run --manifest-path src-tauri/Cargo.toml --locked --profile ci
 
-  # The Linux jobs never compile the code for macOS or Windows. These two jobs run when a change
-  # touches that code, a manifest or the lock file, and on every push.
-  rust-macos:
-    name: clippy + rust tests (macos-15)
+  # The Linux jobs never compile the code for macOS or Windows. This job runs on each OS whose
+  # code, manifests or lock file a change touches, and on every push.
+  rust-other-os:
+    name: clippy + rust tests (${{ matrix.os }})
     needs: changes
-    if: needs.changes.outputs.macos == 'true'
-    runs-on: macos-15
+    if: needs.changes.outputs.other_os != '["none"]'
+    runs-on: ${{ matrix.os }}
     permissions:
       contents: read
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Install the pinned Rust toolchain
-        run: rustup toolchain install
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-        with:
-          workspaces: src-tauri
-          save-if: ${{ github.ref == 'refs/heads/main' }}
-      - uses: taiki-e/install-action@83ac0ad63c0167e6f06796fab0fce28db1bf3db0 # v2.87.22
-        with:
-          tool: cargo-nextest
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: 24
-          cache: npm
-      - run: npm ci --ignore-scripts
-      - run: npm run build
-      - run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --locked -- -D warnings
-      - run: cargo nextest run --manifest-path src-tauri/Cargo.toml --locked --profile ci
-
-  rust-windows:
-    name: clippy + rust tests (windows-2025)
-    needs: changes
-    if: needs.changes.outputs.windows == 'true'
-    runs-on: windows-2025
-    permissions:
-      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ${{ fromJSON(needs.changes.outputs.other_os) }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -377,7 +357,6 @@ jobs:
           py="$(command -v python3 || command -v python)"
           "$py" tests/leak/harness.py --negative-control --out leak-control
       - name: Start the WebKitGTK, Xvfb and strace install
-        if: runner.os == 'Linux'
         run: ./scripts/ci-apt.sh start xvfb strace
       - name: Install the pinned Rust toolchain
         shell: bash
@@ -392,7 +371,6 @@ jobs:
           cache: npm
       - run: npm ci --ignore-scripts
       - name: Wait for the WebKitGTK, Xvfb and strace install
-        if: runner.os == 'Linux'
         run: ./scripts/ci-apt.sh wait
       - name: Build the app and run the leak test
         shell: bash
@@ -419,16 +397,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: ruff check + format
-        env:
-          PIP_DISABLE_PIP_VERSION_CHECK: "1"
-        run: |
-          python3 -m venv "$RUNNER_TEMP/ruff-venv"
-          "$RUNNER_TEMP/ruff-venv/bin/pip" install --quiet --no-deps --require-hashes -r tests/leak/requirements-lint.txt
-          "$RUNNER_TEMP/ruff-venv/bin/ruff" check tests/leak
-          "$RUNNER_TEMP/ruff-venv/bin/ruff" format --check tests/leak
-      - name: Unit tests for the harness
-        run: python3 -m unittest discover -s tests/leak -v
+      - name: ruff check, ruff format and the unit tests of the harness
+        run: ./scripts/leak-harness-check.sh
 
   dco:
     name: dco
@@ -497,7 +467,8 @@ jobs:
 
   # The one required check of this workflow. A job that was skipped did not need to run: its area
   # did not change. Any other result (failure, cancelled) fails the gate. It runs after a cancel
-  # too (always()), because a skipped gate would count as a pass.
+  # too (always()), because a skipped gate would count as a pass. It also fails when the changes
+  # job gave no area, because then every area job would skip.
   gate:
     name: gate
     if: always()
@@ -507,8 +478,7 @@ jobs:
       - secrets
       - rust-lint
       - rust-test
-      - rust-macos
-      - rust-windows
+      - rust-other-os
       - web
       - deps
       - workflows
@@ -527,3 +497,6 @@ jobs:
         run: |
           echo "$NEEDS" | jq -r 'to_entries[] | "\(.value.result)\t\(.key)"'
           echo "$NEEDS" | jq -e '[.[] | select(.result != "success" and .result != "skipped")] | length == 0' >/dev/null
+          echo "$NEEDS" | jq -e '.changes.outputs as $o
+            | ["rust_src", "rust", "web", "deps", "workflows", "leak"]
+            | all(. as $k | $o[$k] == "true" or $o[$k] == "false")' >/dev/null

@@ -8,7 +8,7 @@ A `v*` tag on a release branch builds installers for four targets, adds SBOMs, d
 
 - A release comes from a release branch. See [Release branches](#release-branches).
 - A push of a tag that matches `v*` starts `release.yml`. A manual run (`workflow_dispatch`) does the same, with the `dry_run` input.
-- The `gates` job runs `scripts/release-gates.sh`. It fails when the tagged commit is not on a `release/*` branch. It reads the checks that the ruleset of the release branches requires: `gate` and `heavy-gate`. It fails when one of them has no `success` run on the tagged commit or on the head of the pull request that merged it. These checks run on pull requests, so a squash commit has none of its own. That is why the script reads the head of the pull request too. The `build` job needs `gates`. The release does not call `ci.yml` or `heavy.yml`.
+- The `gates` job runs `scripts/release-gates.sh`. It fails when the tagged commit is not on a `release/*` branch. It reads the union of the checks that the rulesets of main and of the release branches require: `gate`, `heavy-gate`, `docs-check` and the two Socket checks. It fails when one of them has no `success` run on the tagged commit or on the head of the pull request that merged it. These checks run on pull requests, so a squash commit has none of its own. That is why the script reads the head of the pull request too. The `build` job needs `gates`. The release does not call `ci.yml` or `heavy.yml`.
 - The `build` job has four legs. Each uses the Tauri CLI with no third-party release action:
   1. `scripts/repro-env.sh` sets `SOURCE_DATE_EPOCH`, `CARGO_INCREMENTAL=0` and `--remap-path-prefix`. See [Reproducible builds](reproducible-builds.md).
   2. `npx tauri build --no-bundle -- --locked` builds the release binary.
@@ -29,7 +29,7 @@ A `v*` tag on a release branch builds installers for four targets, adds SBOMs, d
 ## Release branches
 
 - Cut a release branch from main: `git push origin <sha>:refs/heads/release/v0.1`.
-- A ruleset on `refs/heads/release/**` blocks deletion and force pushes. It requires a pull request (squash). It requires the checks `gate` (the fast lane) and `heavy-gate` (the heavy lane). See [CI and quality gates](ci-and-quality-gates.md).
+- A ruleset on `refs/heads/release/**` blocks deletion and force pushes. It requires a pull request (squash). It requires the checks `gate` (the fast lane), `heavy-gate` (the heavy lane), `docs-check` and the two Socket checks. A pull request into a release branch runs every job of the fast lane, not only the jobs of the areas it changes. See [CI and quality gates](ci-and-quality-gates.md).
 - A change reaches a release branch only through a pull request. That pull request runs both lanes.
 - No workflow runs on a push to a release branch. The zizmor cache-poisoning audit flags a cache in a workflow that runs on such a push, and `release.yml` builds without caches.
 - To put `heavy-gate` on the cut commit itself, run `heavy.yml` on the release branch by hand: `gh workflow run heavy.yml --ref release/v0.1`.
@@ -89,7 +89,7 @@ sha256sum --check --ignore-missing SHA256SUMS
    ```sh
    gh workflow run release.yml -f dry_run=true --ref main
    ```
-2. Real release. Cut a release branch from main. Bump the version before the cut, or in a pull request into the release branch. Push a signed tag on a commit of the release branch. The checks `gate` and `heavy-gate` must be green on that commit or on the head of the pull request that merged it. To tag the cut commit itself, run `heavy.yml` on the branch by hand first. See [Release and support](release-and-support.md#signed-tags).
+2. Real release. Cut a release branch from main. Bump the version before the cut, or in a pull request into the release branch. Push a signed tag on a commit of the release branch. Every required check of both rulesets must be green on that commit or on the head of the pull request that merged it. To tag the cut commit itself, run `heavy.yml` on the branch by hand first. See [Release and support](release-and-support.md#signed-tags).
    ```sh
    git push origin <sha>:refs/heads/release/v0.1
    git tag -s v0.1.0 -m "eepview v0.1.0" && git push origin v0.1.0
@@ -114,4 +114,4 @@ sha256sum --check --ignore-missing SHA256SUMS
 - [#47](https://github.com/tcivie/eepview/pull/47): permission comments in `release.yml`; zizmor runs with the pedantic persona.
 - [#50](https://github.com/tcivie/eepview/pull/50): generated changelog and release notes from commit titles with git-cliff.
 - [#85](https://github.com/tcivie/eepview/pull/85): the dmg check also requires the App Transport Security key for web content in the app.
-- [#89](https://github.com/tcivie/eepview/pull/89): releases come from `release/*` branches, and `gates` reads the checks `gate` and `heavy-gate` of the release-branch ruleset.
+- [#89](https://github.com/tcivie/eepview/pull/89): releases come from `release/*` branches, and `gates` reads the required checks of the main and release-branch rulesets.

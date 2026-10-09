@@ -17,13 +17,18 @@ CI has two lanes. The fast lane runs on every pull request and gives a result in
 | Area | Files that mark it | Jobs that run |
 | --- | --- | --- |
 | `rust_src` | `src-tauri/**`, `rust-toolchain.toml` | `rustfmt + clippy (ubuntu-24.04)`. It checks the fuzz crate too. |
-| `rust` | The `rust_src` files, and the UI files: `src/**`, `index.html`, `package.json`, `package-lock.json`, `vite.config.ts`, `tsconfig*.json` | `rust tests (ubuntu-24.04)`, under cargo-nextest. The UI files mark it because the Rust tests read some UI files, and the app embeds the built UI. |
-| `web` | The UI files, and `scripts/check-tested.sh` | `typescript (tsc + tests + coverage)` and `codeql (javascript-typescript)` |
-| `macos` | A changed Rust file that holds macOS code. `src-tauri/*macos*`. `src-tauri/Info.plist`. The Cargo manifests and the lock file. `src-tauri/build.rs`. `src-tauri/tauri.conf.json`. `rust-toolchain.toml`. | `clippy + rust tests (macos-15)` |
-| `windows` | The same rule for Windows code, and `src-tauri/*windows*`. The manifests, the lock file, `build.rs`, `tauri.conf.json` and `rust-toolchain.toml` mark it too. `Info.plist` does not. | `clippy + rust tests (windows-2025)` |
-| `deps` | The Cargo manifests, `src-tauri/Cargo.lock`, `deny.toml`, `package.json`, `package-lock.json` | `cargo-deny (bans, sources)` |
+| `rust` | The `rust_src` files, and the UI files: `src/**`, `public/**`, `index.html`, `package.json`, `package-lock.json`, `vite.config.ts`, `tsconfig*.json`, and `.github/ISSUE_TEMPLATE/**` (the Rust tests read the bug report form) | `rust tests (ubuntu-24.04)`, under cargo-nextest. The UI files mark it because the Rust tests read some UI files, and the app embeds the built UI. |
+| `web` | The UI files, `scripts/check-tested.sh` and `tests/leak/pages/**` | `typescript (tsc + tests + coverage)` and `codeql (javascript-typescript)` |
+| `macos` | A changed Rust file that holds macOS code: the whole word `macos` or `apple`, read at both ends of the change. Every file of `src-tauri/crates/eepview-platform/**`, because macos.rs calls the shared files. `src-tauri/*macos*`. `src-tauri/Info.plist`. The Cargo manifests and the lock file. `src-tauri/build.rs`. `src-tauri/tauri.conf.json`. `rust-toolchain.toml`. | `clippy + rust tests (macos-15)` |
+| `windows` | The same rule for Windows code: the whole word `windows`, or `not(unix`. Every file of the platform crate, and `src-tauri/*windows*`. The manifests, the lock file, `build.rs`, `tauri.conf.json` and `rust-toolchain.toml` mark it too. `Info.plist` does not. | `clippy + rust tests (windows-2025)` |
+| `deps` | The Cargo manifests, `src-tauri/Cargo.lock`, `src-tauri/deny.toml`, `package.json`, `package-lock.json` | `cargo-deny (bans, sources)` |
 | `workflows` | `.github/**` | `zizmor (workflow security)` |
-| `leak` | The no-leak layer files under `src-tauri`: `src/net/gatekeeper*`, `src/net/rules.rs`, `src/net/host.rs`, `src/net/loopback.rs`, `src/nav.rs`, `src/shell/content.rs`, `src/shell/engine.rs`, `src/shell/webrtc.rs`, `crates/eepview-platform/**`, `capabilities/**`, `tauri.conf.json` and `Info.plist`. Also `tests/leak/**`, `scripts/leak-run.sh`, the manifests and the lock file, `build.rs` and `rust-toolchain.toml`. | `leak-test (ubuntu-24.04, debug)` and `leak harness (ruff + unit tests)` |
+| `leak` | The no-leak layer files under `src-tauri`: `src/net/**` (the gatekeeper, the rules, VERIFY), `src/nav.rs`, `src/core/page.rs` (the navigation and new-window rules), `src/shell/content.rs`, `src/shell/engine.rs`, `src/shell/webrtc.rs`, `src/shell/console.rs`, `src/shell/chrome.rs`, `src/shell/input.rs`, `crates/eepview-platform/**`, `capabilities/**`, `tauri.conf.json` and `Info.plist`. Also `tests/leak/**`, `scripts/leak-run.sh`, the manifests and the lock file, `build.rs` and `rust-toolchain.toml`. | `leak-test (ubuntu-24.04, debug)` and `leak harness (ruff + unit tests)` |
+| `heavy` | `.github/workflows/heavy.yml`, `scripts/leak-run.sh`, `scripts/leak-harness-check.sh`, `scripts/ci-apt.sh`, `scripts/nightly-toolchain.txt`, `src-tauri/.config/nextest.toml`, `tests/leak/**` | No job in `ci.yml`. The `plan` job of `heavy.yml` runs the heavy lane on a pull request into main when this area changes, so a broken heavy lane shows before the merge. |
+
+- The macOS and Windows jobs are one matrix job. `scripts/ci-changes.sh` prints `other_os`, the JSON list of runners to test on (`["none"]` when there is none).
+- A pull request into a release branch runs every area: a release ships what it tests.
+- The `gate` job also fails when the `changes` job gave no value for an area. Without that check, a broken script would skip every area job and the gate would pass.
 
 - The Linux jobs never compile code for macOS or Windows. So `ci-changes.sh` reads each changed Rust file at both ends of the change. A file that holds macOS code or Windows code marks that OS. A block that the change removes counts too.
 - These jobs run on every pull request, whatever the change:
@@ -50,13 +55,14 @@ CI has two lanes. The fast lane runs on every pull request and gives a result in
   - `codeql (rust)`.
   - `leak-test (<os>, release)` on ubuntu-24.04, macos-15 and windows-2025. See [Leak test](leak-test.md).
   - `leak harness (ruff + unit tests)`.
-- The `heavy-gate` job needs these jobs. It passes only when every one of them passed. A skipped or cancelled job fails it.
+- The `plan` job decides whether the lane runs: always on a schedule, by hand, or on a pull request into a release branch; on a pull request into main only when the `heavy` area changed.
+- The `heavy-gate` job needs these jobs. When the lane runs, it passes only when every job passed, and a skipped or cancelled job fails it. When `plan` skips the lane, every job must be skipped.
 - When the nightly run fails, `heavy-gate` opens the issue "Nightly heavy suite failed". When that issue is open, it adds a comment to it.
 
 ### Release branches
 
 - Cut a release branch from main: `git push origin <sha>:refs/heads/release/v0.1`.
-- A ruleset on `refs/heads/release/**` blocks deletion and force pushes. It requires a pull request (squash), and it requires the checks `gate` and `heavy-gate`.
+- A ruleset on `refs/heads/release/**` blocks deletion and force pushes. It requires a pull request (squash), and it requires the checks `gate`, `heavy-gate`, `docs-check` and the two Socket checks.
 - A change reaches a release branch only through a pull request. That pull request runs both lanes.
 - No workflow runs on a push to a release branch. The zizmor cache-poisoning audit flags a cache in a workflow that runs on such a push, and `release.yml` builds without caches.
 - To put `heavy-gate` on the cut commit itself, run `heavy.yml` on the release branch by hand.
@@ -73,7 +79,8 @@ CI has two lanes. The fast lane runs on every pull request and gives a result in
 ### Rules
 
 - Required checks on main: `gate`, `docs-check`, `Socket Security: Project Report` and `Socket Security: Pull Request Alerts`. A repository ruleset blocks direct pushes to main. A pull request needs these checks green.
-- Required checks on a release branch: `gate` and `heavy-gate`.
+- Required checks on a release branch: `gate`, `heavy-gate`, `docs-check`, `Socket Security: Project Report` and `Socket Security: Pull Request Alerts`.
+- `scripts/release-gates.sh` takes the union of the required checks of both rulesets. A tag passes only when each one passed on the tagged commit or on the head of the pull request that merged it.
 - rustfmt and clippy run with `pedantic` and `-D warnings`. The `reuse` tool and its build backend are pinned by hash in `scripts/requirements-reuse.txt` and `scripts/requirements-reuse-build.txt`.
 - zizmor runs with the pedantic persona in CI and in lefthook. Every write permission and every non-default read permission has a comment that says why. CI pins the zizmor version (1.30.1).
 - Complexity limits: cognitive and cyclomatic complexity 10 or less, 40 lines per function, 5 parameters, nesting 3.

@@ -16,9 +16,10 @@ packages=(libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsv
 # and try it again, up to 3 times.
 apt_options=(-o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30)
 
+# The && matters: install runs as an if condition, where set -e is off.
 install() {
-  sudo apt-get "${apt_options[@]}" update -q
-  sudo apt-get "${apt_options[@]}" install -y -q --no-install-recommends "${packages[@]}" "$@"
+  sudo apt-get "${apt_options[@]}" update -q &&
+    sudo apt-get "${apt_options[@]}" install -y -q --no-install-recommends "${packages[@]}" "$@"
 }
 
 start() {
