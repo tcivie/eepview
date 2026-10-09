@@ -4,7 +4,7 @@ The build uses few dependencies. Tools and actions are pinned. Every dependency 
 
 ## How it works
 
-- cargo-deny checks bans and sources on every PR (`security.yml`).
+- cargo-deny checks bans and sources in the `cargo-deny (bans, sources)` job of `ci.yml`. The job runs when a PR changes a Cargo manifest, `src-tauri/Cargo.lock`, `deny.toml`, `package.json` or `package-lock.json`, and on every push to main.
 - Socket.dev reviews dependency changes for advisories, licenses and supply-chain risk. The config is `socket.yml`.
 - Dependabot opens update PRs (`.github/dependabot.yml`).
 - CI actions are pinned by full commit SHA.
@@ -26,3 +26,4 @@ The build uses few dependencies. Tools and actions are pinned. Every dependency 
 - 2026-10-03 — Repo bootstrap with cargo-deny and Dependabot — [#1](https://github.com/tcivie/eepview/pull/1)
 - 2026-10-03 — Cut dependencies flagged by Socket — [#10](https://github.com/tcivie/eepview/pull/10)
 - 2026-10-03 — Hash-pinned CI tools — [#15](https://github.com/tcivie/eepview/pull/15)
+- 2026-10-09 — Fast lane for pull requests, heavy lane for release branches — [#89](https://github.com/tcivie/eepview/pull/89)

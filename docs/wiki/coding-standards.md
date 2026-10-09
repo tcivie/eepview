@@ -8,15 +8,15 @@ This page lists the style rules, the tool that enforces each one, and what a rev
 
 | Language or file | Standard | Enforced by |
 | --- | --- | --- |
-| Rust | `rustfmt` format. Clippy `pedantic` with `-D warnings`. `unsafe_code` is denied. | `cargo fmt --check` and `cargo clippy` in `lint.yml` and in lefthook. Config in `src-tauri/Cargo.toml` and `src-tauri/clippy.toml`. |
-| TypeScript and JavaScript | Biome lint and format. `tsc` in strict mode. | `npx biome ci .` and `npm run typecheck` in `lint.yml`. Biome runs in lefthook. |
+| Rust | `rustfmt` format. Clippy `pedantic` with `-D warnings`. `unsafe_code` is denied. | `cargo fmt --check` and `cargo clippy` in the `rustfmt + clippy (ubuntu-24.04)` job of `ci.yml` and in lefthook. Config in `src-tauri/Cargo.toml` and `src-tauri/clippy.toml`. |
+| TypeScript and JavaScript | Biome lint and format. `tsc` in strict mode. | `npx biome ci .` in the `repo checks` job of `ci.yml`, and `npm run typecheck` in its `typescript (tsc + tests + coverage)` job. Biome runs in lefthook. |
 | HTML and CSS | Biome format. | Biome. |
-| TOML | `taplo` format and lint. | `lint.yml` and lefthook. |
-| Shell | `shellcheck`. `set -euo pipefail`. | `lint.yml` and lefthook. |
-| GitHub workflows | `actionlint`, `zizmor`. Actions pinned by full SHA. `permissions: {}` with the minimum per job. `persist-credentials: false`. | `lint.yml`, `security.yml`, lefthook. |
+| TOML | `taplo` format and lint. | The `repo checks` job of `ci.yml` and lefthook. |
+| Shell | `shellcheck`. `set -euo pipefail`. | The `repo checks` job of `ci.yml` and lefthook. |
+| GitHub workflows | `actionlint`, `zizmor`. Actions pinned by full SHA. `permissions: {}` with the minimum per job. `persist-credentials: false`. | The `repo checks` job (actionlint) and the `zizmor (workflow security)` job of `ci.yml`, and lefthook. |
 | Python | Python is used only for the lizard stubs in `scripts/lizard-stubs`. There is no Python linter in CI today. Keep these files small. | Review. |
-| License headers | Each source file has an SPDX header. Other files are covered by `REUSE.toml`. | `reuse lint` in `lint.yml` and in lefthook. |
-| Commit sign-off | Each commit has a `Signed-off-by` line. | The `dco` workflow. |
+| License headers | Each source file has an SPDX header. Other files are covered by `REUSE.toml`. | `reuse lint` in the `repo checks` job of `ci.yml` and in lefthook. |
+| Commit sign-off | Each commit has a `Signed-off-by` line. | The `dco` job of `ci.yml`. |
 | Docs | All docs live in `docs/wiki/`. | `docs-check`. |
 
 ## Complexity limits
@@ -49,3 +49,4 @@ The maintainer reviews pull requests from contributors. Automated checks review 
 ## History
 
 - 2026-10-03 — Add the coding standards page — [#30](https://github.com/tcivie/eepview/pull/30).
+- 2026-10-09 — Fast lane for pull requests, heavy lane for release branches — [#89](https://github.com/tcivie/eepview/pull/89).

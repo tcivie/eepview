@@ -54,13 +54,19 @@ npm run tauri dev
 
 | Task | Command |
 | --- | --- |
-| Rust tests | `cargo test --manifest-path src-tauri/Cargo.toml` |
+| Rust tests | `cargo nextest run --manifest-path src-tauri/Cargo.toml` |
 | UI tests | `npm test` |
 | UI coverage gate | `npm run test:coverage` |
 | Leak harness | see [Leak test](leak-test.md) (coming in v0.1) |
 | Type check | `npm run typecheck` |
 
 See [Coverage](coverage.md) for the ratchet.
+
+## Fast local loop
+
+- Run the Rust tests with cargo-nextest: `cargo nextest run --manifest-path src-tauri/Cargo.toml`. Install it with `brew install cargo-nextest` or `cargo install cargo-nextest --locked`. It runs each test in its own process, and it is the runner that CI uses. See [Testing policy](testing-policy.md).
+- Keep one `CARGO_TARGET_DIR` for every worktree. The dependencies then build once.
+- sccache is optional. Set `RUSTC_WRAPPER=sccache` and it caches the dependency builds across target dirs.
 
 ## Lint
 
@@ -71,7 +77,7 @@ cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --locked -- -D w
 ./scripts/complexity.sh
 ```
 
-Install the hooks once with `lefthook install`. They run the fast checks before each commit. CI runs the full set. See [CI and quality gates](ci-and-quality-gates.md).
+Install the hooks once with `lefthook install`. They run the fast checks before each commit. CI runs the full set. A pull request runs the fast lane, and only the jobs of the areas that it changes. A pull request into a release branch also runs the heavy lane. See [CI and quality gates](ci-and-quality-gates.md).
 
 ## The rules
 
@@ -99,3 +105,4 @@ The full list is in [AGENTS.md](https://github.com/tcivie/eepview/blob/main/AGEN
 - 2026-10-03 — Write the page — [#28](https://github.com/tcivie/eepview/pull/28)
 - 2026-10-03 — Do not edit CHANGELOG.md in a PR; the release job generates it — [#50](https://github.com/tcivie/eepview/pull/50)
 - 2026-10-03 — PR ownership rules: auto-merge, first red check, threads during CI, merge main on DIRTY — [#67](https://github.com/tcivie/eepview/pull/67)
+- 2026-10-09 — Fast lane for pull requests, heavy lane for release branches — [#89](https://github.com/tcivie/eepview/pull/89)
