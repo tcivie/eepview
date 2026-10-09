@@ -12,9 +12,13 @@ log="$RUNNER_TEMP/apt.log"
 status="$RUNNER_TEMP/apt.status"
 packages=(libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev)
 
+# A mirror can stall a download for minutes. These options end a stalled request after 30 s
+# and try it again, up to 3 times.
+apt_options=(-o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30)
+
 install() {
-  sudo apt-get update -q
-  sudo apt-get install -y -q --no-install-recommends "${packages[@]}" "$@"
+  sudo apt-get "${apt_options[@]}" update -q
+  sudo apt-get "${apt_options[@]}" install -y -q --no-install-recommends "${packages[@]}" "$@"
 }
 
 start() {
