@@ -229,6 +229,7 @@ const MENU_SCRIPT: &str = r#"
     return true;
   };
   window.addEventListener("contextmenu", (e) => {
+    if (!e.isTrusted) return;
     e.preventDefault();
     const el = elementOf(e.target);
     if (!el) return;
@@ -251,6 +252,7 @@ const CONTENT_SCRIPT: &str = r#"
   const opensTab = (e) =>
     e.button === 1 || (e.button === 0 && !e.ctrlKey && (e.metaKey || e.shiftKey));
   const onLink = (e) => {
+    if (!e.isTrusted) return;
     const el = elementOf(e.target);
     const a = el && el.closest("a[href], area[href]");
     if (!a || !opensTab(e)) return;
@@ -262,9 +264,11 @@ const CONTENT_SCRIPT: &str = r#"
   window.addEventListener("click", onLink, true);
   window.addEventListener("auxclick", onLink, true);
   window.addEventListener("keydown", (e) => {
+    if (!e.isTrusted) return;
     if (e.key === "Escape") post(["key", "Escape", keys(e)].join("\t"));
   }, true);
   window.addEventListener("mouseup", (e) => {
+    if (!e.isTrusted) return;
     if (e.button !== 3 && e.button !== 4) return;
     e.preventDefault();
     post(["mouse", String(e.button)].join("\t"));
@@ -274,6 +278,10 @@ const CONTENT_SCRIPT: &str = r#"
 /// The input script of a webview (macOS). It runs in the private script world, so page
 /// scripts can neither see nor call it, and it runs with page JavaScript off. It runs once
 /// per document, even when it is also evaluated by hand.
+///
+/// The DOM is shared by every script world, so an event that a page script dispatches also
+/// reaches these listeners. Each listener returns at once for such an event
+/// (`isTrusted` false): only the user's own input opens a tab or a menu, or stops a load.
 #[must_use]
 pub fn input_script(content: bool) -> String {
     let page = if content { CONTENT_SCRIPT } else { "" };

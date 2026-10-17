@@ -13,6 +13,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::menu::MenuItem;
 use tauri::{Manager, Runtime, Url};
 
+use super::arming::Arming;
 use crate::context_menu::Target;
 use crate::core::Core;
 use crate::net::console::VerifiedConsole;
@@ -52,6 +53,8 @@ pub struct Shared<R: Runtime> {
     pub sampler_live: AtomicBool,
     /// The label of the live webview of each tab.
     pub labels: Mutex<HashMap<u32, String>>,
+    /// The engine filter state of each tab webview, and the URL that waits for it.
+    pub arming: Mutex<Arming>,
     /// The origin of the bundled pages (`tauri://localhost` or the dev server).
     pub base: Mutex<Option<Url>>,
     /// The Stop menu item, enabled only while the active tab loads.
@@ -88,6 +91,7 @@ impl<R: Runtime> Shared<R> {
             sampler: Mutex::new(None),
             sampler_live: AtomicBool::new(false),
             labels: Mutex::new(HashMap::new()),
+            arming: Mutex::new(Arming::default()),
             base: Mutex::new(None),
             stop_item: Mutex::new(None),
             fullscreen: AtomicBool::new(false),

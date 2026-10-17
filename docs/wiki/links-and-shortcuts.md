@@ -103,6 +103,10 @@ Each requirement is a test target. The tests check these rules, not the code. "C
 - **B2.** A double-click on the empty part of the tab strip opens a new tab, as Cmd/Ctrl+T does (K8). On every system, that double-click never changes the window: no maximize, restore, zoom or minimize. (The empty strip is a window drag region, and a drag region maximizes on a double-click by default.)
 - **B3.** The mouse back and forward buttons go back and forward in the active tab. This works wherever the pointer is in the window: a web page (JavaScript on or off), an internal page, or the toolbar.
 
+### Trusted input
+
+- **T1.** The shell acts only on input that the user made. On macOS the input script and the hover script run in a private script world, but every script world shares the DOM, so an event that a page script dispatches also reaches their listeners. Each listener returns at once when `event.isTrusted` is false. So a page script cannot open a tab, open the context menu, stop a load, go back or forward, or change the link that the status bubble shows. On Windows and Linux the shell reads input from engine events that a page script cannot make.
+
 ## Public interface
 
 The tests call these. All of them are pure: no Tauri runtime, no engine.
@@ -183,3 +187,4 @@ The `eepview-platform` crate holds the engine glue for each system, the only pla
 
 - 2026-10-03 — Requirements for link clicks, the context menu, keyboard shortcuts and mouse buttons — [#77](https://github.com/tcivie/eepview/pull/77)
 - 2026-10-03 — The engine glue on macOS, Windows and Linux, the router console tab rules, and the review answers (one guard name, the run on a close, the layout keys, Esc, `Modifiers` methods, `Target.history`) — [#77](https://github.com/tcivie/eepview/pull/77)
+- 2026-10-09 — T1: the input script and the hover script act only on trusted events — [#92](https://github.com/tcivie/eepview/pull/92)

@@ -11,14 +11,16 @@ use webview2_com::Microsoft::Web::WebView2::Win32::{
     COREWEBVIEW2_CONTEXT_MENU_TARGET_KIND, COREWEBVIEW2_CONTEXT_MENU_TARGET_KIND_IMAGE,
     COREWEBVIEW2_KEY_EVENT_KIND, COREWEBVIEW2_KEY_EVENT_KIND_KEY_DOWN,
     COREWEBVIEW2_KEY_EVENT_KIND_SYSTEM_KEY_DOWN, COREWEBVIEW2_WEB_RESOURCE_CONTEXT_ALL,
-    ICoreWebView2, ICoreWebView2_11, ICoreWebView2_12, ICoreWebView2AcceleratorKeyPressedEventArgs,
-    ICoreWebView2ContextMenuItem, ICoreWebView2ContextMenuItemCollection,
-    ICoreWebView2ContextMenuRequestedEventArgs, ICoreWebView2ContextMenuTarget,
-    ICoreWebView2Environment9, ICoreWebView2Settings4, ICoreWebView2Settings8,
+    COREWEBVIEW2_WEB_RESOURCE_REQUEST_SOURCE_KINDS_ALL, ICoreWebView2, ICoreWebView2_11,
+    ICoreWebView2_12, ICoreWebView2_22, ICoreWebView2_28,
+    ICoreWebView2AcceleratorKeyPressedEventArgs, ICoreWebView2ContextMenuItem,
+    ICoreWebView2ContextMenuItemCollection, ICoreWebView2ContextMenuRequestedEventArgs,
+    ICoreWebView2ContextMenuTarget, ICoreWebView2Environment9, ICoreWebView2Environment15,
+    ICoreWebView2Find, ICoreWebView2FindOptions, ICoreWebView2Settings4, ICoreWebView2Settings8,
 };
 use webview2_com::{
     AcceleratorKeyPressedEventHandler, CallDevToolsProtocolMethodCompletedHandler,
-    ContextMenuRequestedEventHandler, CustomItemSelectedEventHandler,
+    ContextMenuRequestedEventHandler, CustomItemSelectedEventHandler, FindStartCompletedHandler,
     StatusBarTextChangedEventHandler, WebResourceRequestedEventHandler, take_pwstr,
 };
 use windows::Win32::Foundation::{GlobalFree, HANDLE, HGLOBAL};
@@ -59,13 +61,25 @@ pub fn attach_rules(
     done(filter(webview, rules.allow));
 }
 
-/// Answers 403 to every request whose URL `allow` refuses (L3b).
+/// Answers 403 to every request whose URL `allow` refuses (L3b). The filter covers every
+/// request source: the documents, and the `SharedWorker` and `ServiceWorker` requests that a
+/// filter for documents only never sees. A runtime without `ICoreWebView2_22` gets no filter,
+/// so the tab loads nothing (fail closed).
 fn filter(webview: &PlatformWebview, allow: Box<dyn Fn(&str) -> bool>) -> Result<(), String> {
     let core = core(webview)?;
+    let core22 = core
+        .cast::<ICoreWebView2_22>()
+        .map_err(|e| e.to_string())?;
     let env = webview.environment();
     // SAFETY: COM call on a live object with a static wide string.
-    unsafe { core.AddWebResourceRequestedFilter(w!("*"), COREWEBVIEW2_WEB_RESOURCE_CONTEXT_ALL) }
-        .map_err(|e| e.to_string())?;
+    unsafe {
+        core22.AddWebResourceRequestedFilterWithRequestSourceKinds(
+            w!("*"),
+            COREWEBVIEW2_WEB_RESOURCE_CONTEXT_ALL,
+            COREWEBVIEW2_WEB_RESOURCE_REQUEST_SOURCE_KINDS_ALL,
+        )
+    }
+    .map_err(|e| e.to_string())?;
     let handler = WebResourceRequestedEventHandler::create(Box::new(move |_, args| {
         let Some(args) = args else { return Ok(()) };
         // SAFETY: getter on the live event args.
@@ -144,18 +158,96 @@ fn hard_reload(core: &ICoreWebView2) -> windows_core::Result<()> {
     }
 }
 
-/// No native find with counts: the caller falls back to a script.
+/// The native find (`ICoreWebView2Find`): the query never reaches a page script, and a page
+/// cannot change the count. A fresh search starts a find session and reports its match
+/// count; next and previous move in that session. False on a runtime without the find API:
+/// then nothing is searched, and no page script stands in.
 #[must_use]
 pub fn find(
-    _webview: &PlatformWebview,
-    _request: &FindRequest,
-    _on_count: Box<dyn Fn(Option<u32>)>,
+    webview: &PlatformWebview,
+    request: &FindRequest,
+    on_count: Box<dyn Fn(Option<u32>)>,
 ) -> bool {
-    false
+    let Ok(find) = finder(webview) else {
+        return false;
+    };
+    let sent = if request.fresh {
+        start_find(webview, &find, request, on_count)
+    } else if request.backwards {
+        // SAFETY: COM call on the live find session of this webview, on the UI thread.
+        unsafe { find.FindPrevious() }
+    } else {
+        // SAFETY: as above.
+        unsafe { find.FindNext() }
+    };
+    sent.is_ok()
 }
 
-/// Nothing to clear: the script find selects text, and the next page load drops it.
-pub fn find_clear(_webview: &PlatformWebview) {}
+/// The find API of the webview. An old runtime has no `ICoreWebView2_28`.
+fn finder(webview: &PlatformWebview) -> Result<ICoreWebView2Find, String> {
+    let core28 = core(webview)?
+        .cast::<ICoreWebView2_28>()
+        .map_err(|e| e.to_string())?;
+    // SAFETY: getter on a live object on the UI thread.
+    unsafe { core28.Find() }.map_err(|e| e.to_string())
+}
+
+/// Starts a find session for `request`. When it has started, `on_count` gets its match
+/// count.
+fn start_find(
+    webview: &PlatformWebview,
+    find: &ICoreWebView2Find,
+    request: &FindRequest,
+    on_count: Box<dyn Fn(Option<u32>)>,
+) -> windows_core::Result<()> {
+    let options = find_options(webview, request)?;
+    let session = find.clone();
+    let done = FindStartCompletedHandler::create(Box::new(move |result| {
+        on_count(result.ok().and_then(|()| match_count(&session)));
+        Ok(())
+    }));
+    // SAFETY: COM call on live objects on the UI thread; WebView2 keeps the handler until it
+    // calls it once.
+    unsafe { find.Start(&options, &done) }
+}
+
+/// The options of a find: the query and the case rule, every match marked, and no find bar
+/// of the engine's own (eepview shows its own find bar).
+fn find_options(
+    webview: &PlatformWebview,
+    request: &FindRequest,
+) -> windows_core::Result<ICoreWebView2FindOptions> {
+    let env = webview.environment().cast::<ICoreWebView2Environment15>()?;
+    // SAFETY: factory call on the live environment.
+    let options = unsafe { env.CreateFindOptions() }?;
+    let term = HSTRING::from(request.query.as_str());
+    // SAFETY: setter on the live options; the term outlives the call.
+    unsafe { options.SetFindTerm(&term) }?;
+    // SAFETY: setter on the live options.
+    unsafe { options.SetIsCaseSensitive(request.case_sensitive) }?;
+    // SAFETY: setter on the live options.
+    unsafe { options.SetShouldHighlightAllMatches(true) }?;
+    // SAFETY: setter on the live options.
+    unsafe { options.SetSuppressDefaultFindDialog(true) }?;
+    Ok(options)
+}
+
+/// The match count of a find session, or `None` when the engine has none.
+fn match_count(find: &ICoreWebView2Find) -> Option<u32> {
+    let mut count = 0_i32;
+    // SAFETY: getter on the live find session.
+    unsafe { find.MatchCount(&raw mut count) }.ok()?;
+    u32::try_from(count).ok()
+}
+
+/// Ends the find session: the marks of the matches go away.
+pub fn find_clear(webview: &PlatformWebview) {
+    if let Ok(find) = finder(webview) {
+        // SAFETY: COM call on the live find session, on the UI thread. An error means that no
+        // session runs.
+        drop(unsafe { find.Stop() });
+    }
+}
 
 /// Autofill, password saving and `SmartScreen` reputation checks off.
 ///

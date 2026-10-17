@@ -10,14 +10,15 @@
 //! - L3a: the page policy, added by the gatekeeper to every response (`net::rules`).
 //! - L3b: the engine request filter (`WKContentRuleList` on macOS, a `WebResourceRequested`
 //!   filter on Windows), attached through `eepview-platform` before the first load. The
-//!   webview starts on `about:blank` and loads the page only once the filter is on.
+//!   webview starts on `about:blank` and loads a page only once the filter is on. Until then
+//!   a load only waits ([`super::arming`]); after a failed filter the webview never loads.
 //! - L4: [`nav::guard`] on every navigation and new-window request.
 //! - L5: WebRTC removed in every frame (`webrtc::webrtc_off`); `WebKitGTK` also turns it off in the
 //!   engine settings.
 //!
 //! No IPC: the capabilities name only the `toolbar` and `internal` webviews.
 
-use eepview_platform::Rules;
+use eepview_platform::{FailReason, Rules};
 use tauri::webview::{DownloadEvent, NewWindowResponse, PageLoadEvent};
 use tauri::{
     AppHandle, LogicalPosition, LogicalSize, Manager, Runtime, Url, Webview, WebviewBuilder,
@@ -36,6 +37,9 @@ use crate::net::rules;
 
 /// The first document of every content webview, until the engine filter is on.
 const BLANK: &str = "about:blank";
+
+/// The `code` of the load-failed page when the engine filter cannot be attached.
+pub const FILTER_FAILED: &str = "eepview engine-filter";
 
 /// `WebView2` features off: the out-of-process UI and `SmartScreen` calls home.
 const WINDOWS_FEATURES_OFF: &str = "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection";
@@ -95,9 +99,11 @@ impl ContentWebview {
     }
 }
 
-/// Turns on the engine filter (L3b) and the native hooks, then loads `url`. When the filter
-/// cannot be attached, the webview stays on `about:blank` (fail closed).
+/// Turns on the engine filter (L3b) and the native hooks. `url` waits for the filter and
+/// loads only when the filter is on. When the filter cannot be attached, the webview stays on
+/// `about:blank` (fail closed).
 fn arm<R: Runtime>(webview: &Webview<R>, tab: u32, url: Url) -> tauri::Result<()> {
+    lock(&shared(webview.app_handle()).arming).start(webview.label(), url);
     let live = webview.clone();
     let app = webview.app_handle().clone();
     let label = webview.label().to_owned();
@@ -109,33 +115,66 @@ fn arm<R: Runtime>(webview: &Webview<R>, tab: u32, url: Url) -> tauri::Result<()
             json: &json,
             allow: Box::new(rules::engine_allows),
         };
-        eepview_platform::attach_rules(&platform, rules, load_after_rules(live, url));
+        eepview_platform::attach_rules(&platform, rules, load_after_rules(live, tab));
     })
 }
 
-/// The load that waits for the engine filter.
+/// The callback of the engine filter of the webview of `tab`. On `Ok` the newest URL that
+/// waits loads, in a task on the main thread: no other load of the tab can run between the
+/// state change and this load. On `Err` the webview never loads a page.
 fn load_after_rules<R: Runtime>(
     webview: Webview<R>,
-    url: Url,
+    tab: u32,
 ) -> Box<dyn FnOnce(Result<(), String>)> {
     Box::new(move |result| match result {
         // Linux, Windows and a cached macOS rule list call this inside `with_webview`.
         Ok(()) => apply::outside(move || {
-            trace::load(&format!("{} navigate {url}", webview.label()));
-            let sent = webview.navigate(url);
-            first_load_sent(webview.label(), sent);
+            let main = webview.clone();
+            let queued = webview.run_on_main_thread(move || load_waiting(&main));
+            if let Err(e) = queued {
+                diag::event(
+                    Code::ThreadFailed,
+                    &[
+                        Field::Op(OpKind::MainThread),
+                        Field::Error(ErrorKind::from(&e)),
+                    ],
+                );
+            }
         }),
-        Err(e) => {
-            trace::load(&format!("engine filter failed, page not loaded: {e}"));
-            diag::event(
-                Code::EngineCallFailed,
-                &[
-                    Field::Op(OpKind::EngineFilter),
-                    Field::Error(ErrorKind::Platform),
-                ],
-            );
-        }
+        Err(e) => filter_failed(&webview, tab, &e),
     })
+}
+
+/// The filter of `webview` is on: loads the newest URL that waited for it. Call on the main
+/// thread.
+fn load_waiting<R: Runtime>(webview: &Webview<R>) {
+    let waiting = lock(&shared(webview.app_handle()).arming).armed(webview.label());
+    let Some(url) = waiting else {
+        return;
+    };
+    trace::load(&format!("{} navigate {url}", webview.label()));
+    let sent = webview.navigate(url);
+    first_load_sent(webview.label(), sent);
+}
+
+/// The filter of `webview` could not be attached: the webview stays on `about:blank` and
+/// never loads a page. The tab shows the load-failed page for the URL that waited.
+fn filter_failed<R: Runtime>(webview: &Webview<R>, tab: u32, error: &str) {
+    trace::load(&format!("engine filter failed, page not loaded: {error}"));
+    diag::event(
+        Code::EngineCallFailed,
+        &[
+            Field::Op(OpKind::EngineFilter),
+            Field::Error(ErrorKind::Platform),
+        ],
+    );
+    let app = webview.app_handle();
+    let waiting = lock(&shared(app).arming).failed(webview.label());
+    let url = waiting.map(String::from);
+    let reason = FailReason::Blocked.as_str();
+    with_core(app, |core| {
+        core.load_failed(tab, url.as_deref(), reason, FILTER_FAILED)
+    });
 }
 
 /// The outcome of the first load call of the tab webview `label`.
@@ -262,9 +301,18 @@ fn finished(core: &mut Core, tab: u32, url: &str, failed: bool) -> Vec<crate::co
 #[cfg(test)]
 mod tests {
     use std::path::PathBuf;
+    use std::thread;
+    use std::time::Duration;
+
+    use tauri::App;
 
     use super::*;
-    use crate::shell::testing::{app, bare, core, wait_for};
+    use crate::core::{Effect, WebOp};
+    use crate::net::testing::FakeRouter;
+    use crate::shell::testing::{Mock, app, bare, core, label, load, open_gate, wait_for};
+
+    /// Long enough for a load that a callback sends from another thread.
+    const SETTLE: Duration = Duration::from_millis(200);
 
     fn url(text: &str) -> Url {
         Url::parse(text).unwrap()
@@ -325,12 +373,94 @@ mod tests {
     fn the_first_load_waits_for_the_filter() {
         let app = app();
         let webview = app.get_webview("status").unwrap();
-        load_after_rules(webview.clone(), url("http://a.i2p/"))(Err("no filter".into()));
+        lock(&shared(app.handle()).arming).start("status", url("http://a.i2p/"));
         assert_ne!(webview.url().unwrap().as_str(), "http://a.i2p/");
-        load_after_rules(webview.clone(), url("http://a.i2p/"))(Ok(()));
+        load_after_rules(webview.clone(), 1)(Ok(()));
         assert!(wait_for(
             || webview.url().unwrap().as_str() == "http://a.i2p/"
         ));
+    }
+
+    /// The URL that the mock engine shows in `webview`, or an empty text.
+    fn shown(webview: &Webview<Mock>) -> String {
+        webview.url().map(|u| u.to_string()).unwrap_or_default()
+    }
+
+    /// A load of `url` in tab `tab`, as the core asks for it.
+    fn web_load(tab: u32, url: &str) -> Vec<Effect> {
+        vec![Effect::Web(WebOp::Load(load(tab, url)))]
+    }
+
+    /// An app with a gatekeeper and the webview of tab 1, built for `first`. The mock engine
+    /// never calls the filter callback, so the filter stays off until a test calls it.
+    fn tab_app(first: &str) -> (App<Mock>, FakeRouter, Webview<Mock>) {
+        let app = app();
+        let router = FakeRouter::start();
+        open_gate(&app, &router);
+        apply::apply(app.handle(), web_load(1, first));
+        let webview = apply::tab_webview(app.handle(), 1).unwrap();
+        (app, router, webview)
+    }
+
+    #[test]
+    fn a_load_before_the_filter_is_on_does_not_navigate() {
+        let (app, _router, webview) = tab_app("http://a.i2p/");
+        apply::apply(app.handle(), web_load(1, "http://b.i2p/"));
+        thread::sleep(SETTLE);
+        assert_eq!(shown(&webview), BLANK);
+    }
+
+    #[test]
+    fn the_filter_callback_loads_the_newest_url() {
+        let (app, _router, webview) = tab_app("http://a.i2p/");
+        apply::apply(app.handle(), web_load(1, "http://b.i2p/"));
+        load_after_rules(webview.clone(), 1)(Ok(()));
+        assert!(wait_for(|| shown(&webview) == "http://b.i2p/"));
+        thread::sleep(SETTLE);
+        assert_eq!(shown(&webview), "http://b.i2p/");
+    }
+
+    #[test]
+    fn a_tab_whose_filter_failed_never_navigates() {
+        let (app, _router, webview) = tab_app("http://a.i2p/");
+        let first = label(&app, 1);
+        load_after_rules(webview.clone(), 1)(Err("no filter".into()));
+        apply::apply(app.handle(), web_load(1, "http://c.i2p/"));
+        thread::sleep(SETTLE);
+        assert_ne!(shown(&webview), "http://c.i2p/");
+        assert_ne!(
+            label(&app, 1),
+            first,
+            "a new webview tries the filter again"
+        );
+    }
+
+    #[test]
+    fn a_failed_filter_shows_the_load_failed_page() {
+        let app = app();
+        let router = FakeRouter::start();
+        open_gate(&app, &router);
+        let fx = {
+            let mut c = core(&app);
+            let verdict = crate::net::verify::verify(router.addr);
+            c.router_changed(crate::core::router::status_of(
+                &verdict,
+                "127.0.0.1:4444",
+                true,
+            ));
+            c.navigate("http://a.i2p/").1
+        };
+        apply::apply(app.handle(), fx);
+        let tab = core(&app).tabs().active_id();
+        let webview = apply::tab_webview(app.handle(), tab).unwrap();
+        load_after_rules(webview.clone(), tab)(Err("no filter".into()));
+        let url_of = || core(&app).tab_info(tab).map(|t| t.url).unwrap_or_default();
+        assert!(wait_for(|| url_of().starts_with("eepview://load-failed")));
+        let page = Url::parse(&url_of()).unwrap();
+        let pairs: Vec<(String, String)> = page.query_pairs().into_owned().collect();
+        assert!(pairs.contains(&("url".into(), "http://a.i2p/".into())));
+        assert!(pairs.contains(&("reason".into(), "blocked".into())));
+        assert_ne!(shown(&webview), "http://a.i2p/");
     }
 
     #[test]

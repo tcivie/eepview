@@ -13,7 +13,7 @@
 //! | [`attach_rules`] | `WKContentRuleList` | `WebResourceRequested` filter | none: no binding, engine is clean (spike S1) |
 //! | [`on_hover`] | user script in a private `WKContentWorld` | `StatusBarTextChanged` | `mouse-target-changed` |
 //! | [`go`] | `goBack` … `stopLoading` | `GoBack` … `Stop` | `go_back` … `stop_loading` |
-//! | [`find`] | `findString` + a count in the private world | not handled | `WebKitFindController` |
+//! | [`find`] | `findString` + a count in the private world | `ICoreWebView2Find` | `WebKitFindController` |
 //! | [`harden`] | fraud-check call-home off | autofill, password save, `SmartScreen` off | WebRTC and media capture off |
 //! | [`on_input`] | a script in the private world | `AcceleratorKeyPressed`, `ContextMenuRequested` | `button-press-event`, `key-press-event`, `context-menu` |
 //! | [`copy_text`], [`edit`] | `NSPasteboard`, responder actions | Win32 clipboard; native menu items | `GtkClipboard`, editing commands |
@@ -155,7 +155,8 @@ pub const HOVER_CHANNEL: &str = "eepviewHover";
 
 /// The hover script. It runs in a private script world, so page scripts can neither see nor
 /// call it, and it runs with page JavaScript off. It posts the `href` under the mouse, or an
-/// empty string when the mouse leaves a link.
+/// empty string when the mouse leaves a link. It ignores the mouse events that a page script
+/// dispatches (`isTrusted` false), so a page cannot change the link that the status shows.
 pub const HOVER_SCRIPT: &str = r#"(() => {
   let last = null;
   const post = (href) => {
@@ -165,10 +166,14 @@ pub const HOVER_SCRIPT: &str = r#"(() => {
   };
   const linkOf = (node) => (node && node.closest ? node.closest("a[href], area[href]") : null);
   document.addEventListener("mouseover", (e) => {
+    if (!e.isTrusted) return;
     const a = linkOf(e.target);
     post(a ? String(a.href) : "");
   }, true);
-  document.addEventListener("mouseout", (e) => { if (!e.relatedTarget) post(""); }, true);
+  document.addEventListener("mouseout", (e) => {
+    if (!e.isTrusted) return;
+    if (!e.relatedTarget) post("");
+  }, true);
 })();"#;
 
 /// Counts the matches of a query in the visible text. Runs in the private world.
@@ -248,8 +253,10 @@ pub fn go(webview: &PlatformWebview, nav: Nav) -> Result<(), String> {
     imp::go(webview, nav)
 }
 
-/// Finds text. For a fresh search `on_count` gets the match count. Returns false when the
-/// engine has no native find (the caller falls back to a script).
+/// Finds text with the engine's own find. For a fresh search `on_count` gets the match count.
+/// No engine runs a script in the page's own JavaScript world for it: there a page could
+/// replace `window.find`, read every query and fake the count. Returns false when the engine
+/// handle is missing or the engine has no native find: then nothing is searched.
 #[must_use]
 pub fn find(
     webview: &PlatformWebview,

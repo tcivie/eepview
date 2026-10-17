@@ -175,6 +175,51 @@ fn bridge_rules_are_strict() {
     }
 }
 
+/// The code of a file of the platform bridge, comment lines dropped.
+fn bridge_code(file: &str) -> io::Result<String> {
+    Ok(code(&root().join("crates/eepview-platform/src").join(file))?.join("\n"))
+}
+
+// L3b on Windows: the request filter sees every request source. A filter for documents
+// only never sees the requests of a `SharedWorker` or a `ServiceWorker`.
+#[test]
+fn the_windows_filter_sees_worker_requests() {
+    let windows = bridge_code("windows.rs").unwrap();
+    for token in [
+        "AddWebResourceRequestedFilterWithRequestSourceKinds(",
+        "COREWEBVIEW2_WEB_RESOURCE_CONTEXT_ALL",
+        "COREWEBVIEW2_WEB_RESOURCE_REQUEST_SOURCE_KINDS_ALL",
+    ] {
+        assert!(windows.contains(token), "windows.rs must use {token}");
+    }
+    assert!(
+        !windows.contains(".AddWebResourceRequestedFilter("),
+        "windows.rs adds a filter for documents only"
+    );
+}
+
+// Find in page runs no script in the page's own JavaScript world: there a page can replace
+// `window.find`, read every query and fake the match count. Windows uses `ICoreWebView2Find`.
+#[test]
+fn find_runs_no_script_in_the_page_world() {
+    let engine = prod_code("src/shell/engine.rs").unwrap();
+    for token in [".eval(", ".eval_with_callback(", "window.find"] {
+        assert!(
+            !engine.contains(token),
+            "engine.rs runs a page script: {token}"
+        );
+    }
+    let windows = bridge_code("windows.rs").unwrap();
+    assert!(
+        windows.contains("ICoreWebView2Find"),
+        "Windows find uses the native API"
+    );
+    assert!(
+        !windows.contains("ExecuteScript"),
+        "windows.rs runs a page script"
+    );
+}
+
 /// Every capability file as JSON.
 fn capabilities() -> Res<Vec<(String, serde_json::Value)>> {
     let mut out = Vec::new();
@@ -358,8 +403,10 @@ fn nested_webview_calls_leave_the_with_webview_closure() {
     // A Tauri webview call inside a `with_webview` closure deadlocks on Linux and Windows
     // (the dispatcher holds its window lock). These call sites must hop to another thread.
     for (file, call) in [
-        ("src/shell/content.rs", "webview.navigate(url)"),
-        ("src/shell/engine.rs", "find_by_script(&live"),
+        (
+            "src/shell/content.rs",
+            "run_on_main_thread(move || load_waiting",
+        ),
         ("src/shell/view.rs", "store_buttons(&handle"),
     ] {
         let text = code(&root().join(file)).unwrap().join("\n");
