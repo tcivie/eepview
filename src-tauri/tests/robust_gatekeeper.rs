@@ -296,7 +296,8 @@ impl Req {
 
     /// Req: ADR L1 "everything else gets 403 with no upstream connection": true when the target
     /// is not a clean absolute `http://` URL on an I2P host (https, authority form, origin form,
-    /// `*`, any other scheme), or a CONNECT to anything but `*.i2p:80` (and `:443` on Windows).
+    /// `*`, any other scheme), or a CONNECT to anything but `*.i2p` on a port 1-65535 (`:443`
+    /// only on Windows).
     fn must_refuse(&self) -> bool {
         if self.method == "CONNECT" {
             return !connect_allowed(&self.target);
@@ -314,11 +315,13 @@ impl Req {
     }
 }
 
-/// Req: ADR L1 "CONNECT goes only to *.i2p:80 or *.i2p:443" (an I2P host; `:443` also needs
-/// TLS tunnels, which the fixture opens only on Windows).
+/// Req: ADR L1 "CONNECT goes only to *.i2p" on a port of digits, 1-65535 (an I2P host; `:443`
+/// also needs TLS tunnels, which the fixture opens only on Windows).
 fn connect_allowed(authority: &str) -> bool {
     authority.rsplit_once(':').is_some_and(|(host, port)| {
-        is_i2p_host(host) && (port == "80" || (port == "443" && cfg!(windows)))
+        let digits = port.bytes().all(|b| b.is_ascii_digit());
+        let number = port.parse::<u16>().ok().filter(|_| digits);
+        is_i2p_host(host) && number.is_some_and(|n| n != 0 && (n != 443 || cfg!(windows)))
     })
 }
 
@@ -580,16 +583,16 @@ fn connect_443_is_closed_off_windows() {
     }
 }
 
-// Req: ADR L1 / PO ruling "CONNECT to *.i2p is allowed on :80 and :443, refused on every other
-// port": other ports are refused with a 4xx and no upstream connection; :80 is terminated and
-// its request reaches the router (macOS sends plain http as CONNECT :80).
+// Req: ADR L1 "a CONNECT port must be 1-65535, digits only": port 0, ports over 65535 and
+// ports that are not digits are refused with a 4xx and no upstream connection. Port 443
+// passes only where TLS tunnels are open (Windows).
 #[test]
-fn connect_ports_80_and_443_pass_and_others_are_refused() {
+fn connect_ports_out_of_range_are_refused() {
     let fx = Fixture::new();
     let before = fx.router.connections();
-    for port in [0, 1, 22, 81, 7657, 8080, 4444, 65535] {
+    for port in ["0", "65536", "99999", "+80", "8o"] {
         let raw = format!(
-            "CONNECT site.i2p:{port} HTTP/1.1\r\n\r\nGET / HTTP/1.1\r\nHost: site.i2p\r\n\r\n"
+            "CONNECT site.i2p:{port} HTTP/1.1\r\n\r\nGET / HTTP/1.1\r\nHost: site.i2p:{port}\r\n\r\n"
         );
         let answer = send(&fx, raw.as_bytes());
         assert!(answer.refused(), "port {port}: {}", answer.text);
@@ -599,16 +602,6 @@ fn connect_ports_80_and_443_pass_and_others_are_refused() {
         before,
         "a refused port reached the router"
     );
-    let ok = send(
-        &fx,
-        b"CONNECT site.i2p:80 HTTP/1.1\r\n\r\nGET /x HTTP/1.1\r\nHost: site.i2p\r\n\r\n",
-    );
-    assert!(
-        ok.text.starts_with("HTTP/1.1 200 Connection established"),
-        "{}",
-        ok.text
-    );
-    assert!(ok.text.contains("HTTP/1.1 200 OK"), "{}", ok.text);
     // :443 passes where TLS tunnels are open (Windows); elsewhere it is refused (ADR).
     let tls = send(&fx, b"CONNECT tls.i2p:443 HTTP/1.1\r\n\r\nping");
     if cfg!(windows) {
@@ -620,6 +613,40 @@ fn connect_ports_80_and_443_pass_and_others_are_refused() {
     } else {
         assert!(tls.refused(), "{}", tls.text);
     }
+}
+
+/// The answer head inside a `CONNECT site.i2p:<port>` tunnel for `GET /p` with `Host: <host>`.
+fn tunnel_get(fx: &Fixture, port: u16, host: &str) -> String {
+    let raw =
+        format!("CONNECT site.i2p:{port} HTTP/1.1\r\n\r\nGET /p HTTP/1.1\r\nHost: {host}\r\n\r\n");
+    let answer = send(fx, raw.as_bytes());
+    assert!(
+        answer
+            .text
+            .starts_with("HTTP/1.1 200 Connection established"),
+        "port {port}: {}",
+        answer.text
+    );
+    tunnel_response(answer.text.as_bytes()).0
+}
+
+// Req: ADR L1 / browser-shell "eepsite ports 1-65535 work": a CONNECT to *.i2p on any port
+// but 443 is terminated and checked like plain HTTP, and its request reaches the router with
+// that port (macOS sends plain http as CONNECT host:port). The answer has the page policy.
+#[test]
+fn connect_ports_other_than_443_are_terminated() {
+    let fx = Fixture::new();
+    for port in [1, 22, 81, 7657, 8080, 4444, 65535] {
+        let head = tunnel_get(&fx, port, &format!("site.i2p:{port}"));
+        assert!(head.starts_with("HTTP/1.1 200 OK"), "port {port}: {head}");
+        assert!(head.contains("Content-Security-Policy:"), "port {port}");
+        let line = format!("GET http://site.i2p:{port}/p HTTP/1.1");
+        assert_eq!(fx.router.lines().last(), Some(&line));
+    }
+    let head = tunnel_get(&fx, 80, "site.i2p");
+    assert!(head.starts_with("HTTP/1.1 200 OK"), "port 80: {head}");
+    let line = "GET http://site.i2p/p HTTP/1.1".to_owned();
+    assert_eq!(fx.router.lines().last(), Some(&line));
 }
 
 // Req: PO decision ".i2p URLs with an explicit port 1-65535 are allowed": the request reaches

@@ -102,7 +102,8 @@ fn everything_else_is_refused_with_no_upstream_connection() {
         "GET http://xn--bcher-kva.i2p/ HTTP/1.1\r\n\r\n",
         "CONNECT example.com:443 HTTP/1.1\r\n\r\n",
         "CONNECT 127.0.0.1:80 HTTP/1.1\r\n\r\n",
-        "CONNECT site.i2p:22 HTTP/1.1\r\n\r\n",
+        "CONNECT site.i2p:0 HTTP/1.1\r\n\r\n",
+        "CONNECT site.i2p:65536 HTTP/1.1\r\n\r\n",
         "GET /relative HTTP/1.1\r\nHost: site.i2p\r\n\r\n",
     ] {
         let out = send(&gate, raw);
@@ -362,4 +363,122 @@ fn a_length_required_refusal_for_an_i2p_url_is_a_failure() {
     );
     assert!(out.starts_with("HTTP/1.1 411"), "{out}");
     assert!(gate.take_failure("http://site.i2p/chunk"));
+}
+
+// Req: ADR 0001 L3a "the gatekeeper adds the page policy to every response". A 1xx interim
+// head (100 Continue, 103 Early Hints) is never sent to the engine. The engine gets exactly
+// one head, the final one, with the policy, and then the body.
+#[test]
+fn interim_heads_are_dropped_and_the_final_head_gets_the_policy() {
+    let (_router, gate, _) = setup();
+    for site in ["continue.i2p", "hints.i2p"] {
+        let out = send(
+            &gate,
+            &format!("GET http://{site}/ HTTP/1.1\r\nHost: {site}\r\n\r\n"),
+        );
+        assert!(out.starts_with("HTTP/1.1 200 OK\r\n"), "{site}: {out}");
+        assert_eq!(out.matches("HTTP/1.1 ").count(), 1, "{site}: {out}");
+        let (head, body) = out.split_once("\r\n\r\n").unwrap();
+        assert!(
+            head.contains("Content-Security-Policy: default-src"),
+            "{out}"
+        );
+        assert!(head.contains("X-DNS-Prefetch-Control: off"), "{out}");
+        assert!(head.contains("Content-Type: text/html"), "{out}");
+        assert!(!head.contains("Link:"), "{out}");
+        assert_eq!(body, "<html>final</html>", "{site}");
+    }
+}
+
+// Req: ADR 0001 L1 "never relay a protocol switch". A 101 Switching Protocols answer gets the
+// upstream refusal page. No byte of the 101 answer reaches the engine.
+#[test]
+fn a_switching_protocols_answer_is_refused() {
+    let (_router, gate, _) = setup();
+    let out = send(
+        &gate,
+        "GET http://switch.i2p/ HTTP/1.1\r\nHost: switch.i2p\r\n\r\n",
+    );
+    assert!(out.starts_with("HTTP/1.1 502"), "{out}");
+    assert!(!out.contains("101") && !out.contains("raw frames"), "{out}");
+    assert!(gate.take_failure("http://switch.i2p/"));
+}
+
+// Req: ADR 0001 L1 "at most 8 interim heads". 8 interim heads before the final head pass. One
+// more gets the upstream refusal page.
+#[test]
+fn interim_heads_over_the_cap_are_refused() {
+    let (_router, gate, _) = setup();
+    let ok = send(
+        &gate,
+        &format!("GET http://interim.i2p/{MAX_INTERIM} HTTP/1.1\r\n\r\n"),
+    );
+    assert!(ok.starts_with("HTTP/1.1 200 OK\r\n"), "{ok}");
+    assert!(ok.ends_with("\r\n\r\n<html>final</html>"), "{ok}");
+    let over = MAX_INTERIM + 1;
+    let out = send(
+        &gate,
+        &format!("GET http://interim.i2p/{over} HTTP/1.1\r\n\r\n"),
+    );
+    assert!(out.starts_with("HTTP/1.1 502"), "{out}");
+    assert!(!out.contains("Continue") && !out.contains("final"), "{out}");
+}
+
+// Req: the same rule for the router's answer to a TLS `CONNECT`: interim heads are skipped, a
+// 101 is refused.
+#[test]
+fn a_tls_relay_skips_interim_heads_and_refuses_a_switch() {
+    let (_router, gate, _) = setup();
+    let out = send(&gate, "CONNECT early.i2p:443 HTTP/1.1\r\n\r\nping");
+    assert_eq!(out, "HTTP/1.1 200 Connection established\r\n\r\nping");
+    let switched = send(&gate, "CONNECT switch.i2p:443 HTTP/1.1\r\n\r\nping");
+    assert!(switched.starts_with("HTTP/1.1 502"), "{switched}");
+    assert!(!switched.contains("raw frames"), "{switched}");
+}
+
+// Req: browser-shell "eepsite ports 1-65535 work". macOS WebKit sends a plain `http://` load
+// as `CONNECT host:port`. A `CONNECT` to a port other than 443 is plain HTTP like port 80:
+// each request in the tunnel is checked, and the Host is pinned to the `CONNECT` host.
+#[test]
+fn connect_to_another_port_is_terminated_like_port_80() {
+    let (router, gate, base) = setup();
+    let out = send(
+        &gate,
+        "CONNECT site.i2p:8080 HTTP/1.1\r\n\r\nGET /x HTTP/1.1\r\nHost: site.i2p:8080\r\n\r\n",
+    );
+    let established = "HTTP/1.1 200 Connection established\r\n\r\nHTTP/1.1 200 OK\r\n";
+    assert!(out.starts_with(established), "{out}");
+    assert!(
+        out.contains("Content-Security-Policy: default-src"),
+        "{out}"
+    );
+    let line = "GET http://site.i2p:8080/x HTTP/1.1".to_owned();
+    assert!(router.lines().contains(&line), "{:?}", router.lines());
+    let evil = send(
+        &gate,
+        "CONNECT site.i2p:8080 HTTP/1.1\r\n\r\nGET / HTTP/1.1\r\nHost: other.i2p:8080\r\n\r\n",
+    );
+    assert!(evil.contains("HTTP/1.1 403"), "{evil}");
+    for refused in [
+        "CONNECT example.com:8080 HTTP/1.1\r\n\r\n",
+        "CONNECT site.i2p:0 HTTP/1.1\r\n\r\n",
+        "CONNECT site.i2p:65536 HTTP/1.1\r\n\r\n",
+    ] {
+        let answer = send(&gate, refused);
+        assert!(answer.starts_with("HTTP/1.1 403"), "{refused}: {answer}");
+    }
+    assert_eq!(router.connections(), base + 1);
+}
+
+// Req: ADR 0001 "Gatekeeper timing": the head timeout applies to the request head only. A TLS
+// relay stays open while the engine sends nothing for longer than that, and the router side
+// is not half-closed. The test injects a 100 ms head timeout; the router waits 400 ms.
+#[test]
+fn a_silent_client_keeps_its_tls_relay_past_the_head_timeout() {
+    let router = FakeRouter::start();
+    let short = Duration::from_millis(100);
+    let gate = Gatekeeper::start_tuned(&router.verified(), true, MAX_CONNECTIONS, short).unwrap();
+    assert!(short < crate::net::testing::QUIET_WAIT);
+    let out = send(&gate, "CONNECT quiet.i2p:443 HTTP/1.1\r\n\r\n");
+    assert_eq!(out, "HTTP/1.1 200 Connection established\r\n\r\nstill open");
 }

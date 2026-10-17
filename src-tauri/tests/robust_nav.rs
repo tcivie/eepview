@@ -254,8 +254,8 @@ proptest! {
     }
 
     // Req: ADR L1 "forwards only when the host passes is_i2p_host; everything else 403, no
-    // upstream", "CONNECT only to *.i2p:80 or *.i2p:443". The planner never panics and every
-    // host it forwards, terminates or relays is an I2P host.
+    // upstream", "CONNECT only to *.i2p". The planner never panics and every host it
+    // forwards, terminates or relays is an I2P host.
     #[test]
     fn planner_never_names_a_non_i2p_host(
         method in prop_oneof![Just("GET".to_owned()), Just("POST".to_owned()), Just("CONNECT".to_owned()), "[A-Za-z]{1,8}"],
@@ -267,7 +267,7 @@ proptest! {
         let Some(head) = head_of(&text) else { return Ok(()); };
         match plan(&head, allow_tls) {
             Plan::Http { host, .. } => prop_assert!(is_i2p_host(&host)),
-            Plan::Terminate { host } => prop_assert!(is_i2p_host(&host)),
+            Plan::Terminate { host, .. } => prop_assert!(is_i2p_host(&host)),
             Plan::Relay { host } => {
                 prop_assert!(allow_tls, "Relay although TLS tunnels are closed");
                 prop_assert!(is_i2p_host(&host));
@@ -276,23 +276,26 @@ proptest! {
         }
     }
 
-    // Req: ADR L1 "CONNECT goes only to *.i2p:80 (terminated and checked) or *.i2p:443 (relayed
-    // only where TLS tunnels are open); everything else gets 403" (PO ruling: 80 and 443,
-    // every other port refused).
+    // Req: ADR L1 "CONNECT goes only to *.i2p: port 443 is relayed only where TLS tunnels are
+    // open, any other port 1-65535 is terminated and checked like plain HTTP; everything else
+    // gets 403".
     #[test]
-    fn connect_only_to_i2p_ports_80_and_443(host in tricky(), port in 0u32..70000, allow_tls in any::<bool>()) {
+    fn connect_only_to_i2p_ports(host in tricky(), port in 0u32..70000, allow_tls in any::<bool>()) {
         let text = format!("CONNECT {host}:{port} HTTP/1.1\r\n\r\n");
         let Some(head) = head_of(&text) else { return Ok(()); };
         match plan(&head, allow_tls) {
-            Plan::Terminate { host: h } => prop_assert!(port == 80 && is_i2p_host(&h)),
+            Plan::Terminate { host: h, port: p } => {
+                prop_assert!(u32::from(p) == port && port != 0 && port != 443 && is_i2p_host(&h));
+            }
             Plan::Relay { host: h } => prop_assert!(allow_tls && port == 443 && is_i2p_host(&h)),
             Plan::Http { .. } => prop_assert!(false, "CONNECT planned as plain HTTP"),
             Plan::Refuse(_) => {}
         }
     }
 
-    // Req: the same rule, from the accepting side: an I2P host on port 80 is always accepted,
-    // on port 443 when TLS tunnels are open, and any other port is refused.
+    // Req: the same rule, from the accepting side: an I2P host on any port 1-65535 but 443 is
+    // always terminated, on port 443 it is relayed when TLS tunnels are open, and port 0 or a
+    // port over 65535 is refused.
     #[test]
     fn connect_to_i2p_ports_is_decided_by_port(host in plain_i2p_host(), port in 0u32..70000) {
         prop_assume!(is_i2p_host(&host));
@@ -301,9 +304,13 @@ proptest! {
         let open = plan(&head, true);
         let closed = plan(&head, false);
         let right = match port {
-            80 => matches!((&open, &closed), (Plan::Terminate { .. }, Plan::Terminate { .. })),
+            0 | 65536.. => matches!((&open, &closed), (Plan::Refuse(_), Plan::Refuse(_))),
             443 => matches!((&open, &closed), (Plan::Relay { .. }, Plan::Refuse(_))),
-            _ => matches!((&open, &closed), (Plan::Refuse(_), Plan::Refuse(_))),
+            _ => matches!(
+                (&open, &closed),
+                (Plan::Terminate { port: a, .. }, Plan::Terminate { port: b, .. })
+                    if u32::from(*a) == port && a == b
+            ),
         };
         prop_assert!(right, "port {port}: {open:?} / {closed:?}");
     }

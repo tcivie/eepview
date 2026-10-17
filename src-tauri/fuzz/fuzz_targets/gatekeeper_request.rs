@@ -50,7 +50,9 @@ fn assert_plan(head: &Head, plan: &Plan) {
             assert_i2p(host);
             assert_upstream(head, method, host, path);
         }
-        Plan::Terminate { host } | Plan::Relay { host } => assert!(is_i2p_host(host), "{host:?}"),
+        Plan::Terminate { host, .. } | Plan::Relay { host } => {
+            assert!(is_i2p_host(host), "{host:?}");
+        }
         Plan::Refuse(_) => {}
     }
 }
@@ -63,5 +65,6 @@ fuzz_target!(|data: &[u8]| {
     let _ = head.body_length();
     assert_plan(&head, &plan(&head, true));
     assert_plan(&head, &plan(&head, false));
-    assert_plan(&head, &plan_inner(&head, TUNNEL_HOST));
+    assert_plan(&head, &plan_inner(&head, TUNNEL_HOST, 80));
+    assert_plan(&head, &plan_inner(&head, TUNNEL_HOST, 8080));
 });

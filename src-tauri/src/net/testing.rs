@@ -9,6 +9,7 @@ use std::net::{TcpListener, TcpStream};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
+use std::time::Duration;
 
 use super::console::{ConsoleKind, VerifiedConsole as Verified, probe};
 use super::http::{self, Head};
@@ -77,7 +78,8 @@ fn answer(mut stream: TcpStream, log: &Mutex<Vec<String>>) {
     };
     read_body(&mut stream, &head, &mut rest);
     log.lock().unwrap().push(head.start.clone());
-    let reply: Vec<u8> = match head.start.split(' ').nth(1).unwrap_or("") {
+    let target = head.start.split(' ').nth(1).unwrap_or("");
+    let reply: Vec<u8> = match target {
         "http://proxy.i2p/" => b"HTTP/1.1 200 OK\r\n\r\nI2P HTTP proxy OK".to_vec(),
         "http://example.com/" => b"HTTP/1.1 503 No Outproxy Configured\r\n\r\n".to_vec(),
         "http://down.i2p/" => b"HTTP/1.1 503 Service Unavailable\r\n\r\n".to_vec(),
@@ -85,13 +87,42 @@ fn answer(mut stream: TcpStream, log: &Mutex<Vec<String>>) {
             b"HTTP/1.1 503 Service Unavailable\r\n\r\n".to_vec()
         }
         "http://cut.i2p/" => return,
-        "tls.i2p:443" => return echo_tunnel(stream),
-        _ => {
+        "tls.i2p:443" => return echo_tunnel(stream, b"HTTP/1.1 200 OK\r\n\r\n"),
+        "early.i2p:443" => {
+            return echo_tunnel(stream, &[CONTINUE, b"HTTP/1.1 200 OK\r\n\r\n"].concat());
+        }
+        "switch.i2p:443" => return echo_tunnel(stream, SWITCH),
+        "quiet.i2p:443" => return quiet_tunnel(stream),
+        _ => interim_reply(target).unwrap_or_else(|| {
             let body = format!("hello body={}", String::from_utf8_lossy(&rest));
             format!("HTTP/1.1 200 OK\r\nConnection: keep-alive\r\n\r\n{body}").into_bytes()
-        }
+        }),
     };
     let _ = stream.write_all(&reply);
+}
+
+const CONTINUE: &[u8] = b"HTTP/1.1 100 Continue\r\n\r\n";
+const SWITCH: &[u8] = b"HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\n\
+    Connection: Upgrade\r\n\r\nraw frames";
+/// The final answer after the interim heads of [`interim_reply`].
+const FINAL: &[u8] = b"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n<html>final</html>";
+
+/// Answers that start with a 1xx interim head, sent in one write: `continue.i2p` (100),
+/// `hints.i2p` (103 Early Hints), `switch.i2p` (101 and raw bytes), and `interim.i2p/<n>`
+/// (`n` times 100, then the final answer).
+fn interim_reply(target: &str) -> Option<Vec<u8>> {
+    let interim = match target {
+        "http://continue.i2p/" => CONTINUE.to_vec(),
+        "http://hints.i2p/" => {
+            b"HTTP/1.1 103 Early Hints\r\nLink: </s.css>; rel=preload\r\n\r\n".to_vec()
+        }
+        "http://switch.i2p/" => return Some(SWITCH.to_vec()),
+        _ => {
+            let count = target.strip_prefix("http://interim.i2p/")?.parse().ok()?;
+            CONTINUE.repeat(count)
+        }
+    };
+    Some([interim.as_slice(), FINAL].concat())
 }
 
 /// True when `line` was requested exactly once so far (the log already holds this request).
@@ -119,11 +150,27 @@ fn read_body(stream: &mut TcpStream, head: &Head, rest: &mut Vec<u8>) {
     let _ = stream.take(missing).read_to_end(rest);
 }
 
-fn echo_tunnel(mut stream: TcpStream) {
-    let _ = stream.write_all(b"HTTP/1.1 200 OK\r\n\r\n");
+/// Answers the `CONNECT` with `answer`, then echoes the first bytes of the tunnel.
+fn echo_tunnel(mut stream: TcpStream, answer: &[u8]) {
+    let _ = stream.write_all(answer);
     let mut buf = [0u8; 64];
     if let Ok(n) = stream.read(&mut buf) {
         let _ = stream.write_all(&buf[..n]);
+    }
+}
+
+/// How long [`quiet_tunnel`] waits for the client before it answers.
+pub const QUIET_WAIT: Duration = Duration::from_millis(400);
+
+/// Answers the `CONNECT`, then waits [`QUIET_WAIT`] for bytes from the client. When the wait
+/// ends with no bytes and no end of input, it sends `still open`. When the gatekeeper ends
+/// the input (a half-close), it sends nothing.
+fn quiet_tunnel(mut stream: TcpStream) {
+    let _ = stream.write_all(b"HTTP/1.1 200 OK\r\n\r\n");
+    let _ = stream.set_read_timeout(Some(QUIET_WAIT));
+    let mut buf = [0u8; 64];
+    if stream.read(&mut buf).is_err() {
+        let _ = stream.write_all(b"still open");
     }
 }
 
