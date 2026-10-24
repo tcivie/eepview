@@ -74,13 +74,13 @@ windows = { version = "0.62.2", features = [
   "Win32_System_Ole",
   "Win32_UI_Input_KeyboardAndMouse",
 ] }
-windows-core = "0.62.2"
+windows-core = "0.100.0"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 # Context menu items from a `GAction` need WebKitGTK 2.18.
 webkit2gtk = { version = "2.0.2", features = ["v2_18"] }
 # Already in the tree through wry and tao: key and button events, and the clipboard.
-gtk = "0.18.2"
+gtk = "0.19.0"
 
 # Unsafe is allowed in this crate only, under strict rules: every unsafe block names its
 # invariant, holds one unsafe operation, and unsafe fns stay unsafe inside.
