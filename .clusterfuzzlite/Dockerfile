@@ -4,7 +4,7 @@
 # The ClusterFuzzLite build image for Rust on Ubuntu 24.04, pinned by digest (tag
 # ubuntu-24-04 on 2026-10-03). The Tauri crates need libwebkit2gtk-4.1, which Ubuntu 20.04 lacks.
 # Dependabot bumps the digest.
-FROM gcr.io/oss-fuzz-base/base-builder-rust:ubuntu-24-04@sha256:18d964446414087d7930a1cd380786ed4387e07415b33b8dbb6a974456bb8fa1
+FROM gcr.io/oss-fuzz-base/base-builder-rust:ubuntu-24-04@sha256:bceca1feaa6ee67cd11a4ac6104b754afb6da7f0a81d191212aff1d678c71f21
 
 # The system libraries that the Tauri crates link against, so that eepview_lib builds.
 RUN apt-get update && apt-get install -y --no-install-recommends \
