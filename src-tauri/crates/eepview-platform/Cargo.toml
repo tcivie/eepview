@@ -74,7 +74,7 @@ windows = { version = "0.62.2", features = [
   "Win32_System_Ole",
   "Win32_UI_Input_KeyboardAndMouse",
 ] }
-windows-core = "0.62.2"
+windows-core = "0.100.0"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 # Context menu items from a `GAction` need WebKitGTK 2.18.
