@@ -37,8 +37,7 @@ CI has two lanes. The fast lane runs on every pull request and gives a result in
   - `codeql (actions)`. It runs on every change, so every change keeps a static analysis result for the Scorecard SAST check.
   - `dco`. It checks that every commit has a `Signed-off-by` line that matches its author. Dependabot commits are skipped.
   - `dependency-review`. It fails a pull request that adds a dependency with a high severity advisory.
-  - `score-ratchet (pr)`. See [Score ratchet](score-ratchet.md).
-- `dco`, `dependency-review` and `score-ratchet (pr)` run on pull requests only. The other jobs of this list also run on a push to main.
+- `dco` and `dependency-review` run on pull requests only. The other jobs of this list also run on a push to main.
 - The `gate` job needs every other job of `ci.yml`. It runs with `always()`. It passes only when each job passed or was skipped. A skipped job means that its area did not change. A failed or cancelled job fails the gate. `always()` is there because a skipped gate would count as a pass.
 - Three settings make the lane fast:
   - `ci.yml` sets `CARGO_PROFILE_DEV_DEBUG=line-tables-only`. Panics keep `file:line`, and the build and the cache are smaller.
@@ -72,7 +71,6 @@ CI has two lanes. The fast lane runs on every pull request and gives a result in
 
 - `.github/workflows/scorecard.yml` runs OpenSSF Scorecard, publishes the result and uploads the SARIF to code scanning.
 - `.github/workflows/fuzz.yml` runs ClusterFuzzLite on the cargo-fuzz targets every night and on demand. It does not run on pull requests. It is not a required check. See [Fuzzing](fuzzing.md).
-- `.github/workflows/score-ratchet.yml` keeps the `published` job of the [Score ratchet](score-ratchet.md).
 - `.github/workflows/docs-check.yml` runs the `docs-check` job. It stays its own workflow, because it must run again when the title of the pull request changes. The job (`scripts/docs-check.sh`) fails a `feat` PR that changes no page under `docs/wiki/`, and any PR that edits `CHANGELOG.md`. It also checks that every wiki page is indexed. `scripts/docs-check.test.sh` tests the check.
 - The old workflows `lint.yml`, `security.yml`, `codeql.yml`, `dco.yml`, `dependency-review.yml` and `leak.yml` are gone. Their jobs moved into `ci.yml` or `heavy.yml`.
 

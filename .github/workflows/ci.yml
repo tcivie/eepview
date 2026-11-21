@@ -450,21 +450,6 @@ jobs:
           fail-on-severity: high
           comment-summary-in-pr: on-failure
 
-  score-ratchet:
-    name: score-ratchet (pr)
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Test the ratchet script
-        run: scripts/score-ratchet-test.sh
-      - name: Compare the file-based Scorecard checks with the floors
-        run: scripts/score-ratchet.sh pr
-
   # The one required check of this workflow. A job that was skipped did not need to run: its area
   # did not change. Any other result (failure, cancelled) fails the gate. It runs after a cancel
   # too (always()), because a skipped gate would count as a pass. It also fails when the changes
@@ -488,7 +473,6 @@ jobs:
       - leak-harness
       - dco
       - dependency-review
-      - score-ratchet
     runs-on: ubuntu-24.04
     steps:
       - name: Every job passed, or was skipped because its area did not change

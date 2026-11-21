@@ -45,7 +45,6 @@ This wiki is generated from docs/wiki in the repository. Edit it there, in a PR.
 | Reproducible builds | settings only | [Reproducible builds](reproducible-builds.md) | [#37](https://github.com/tcivie/eepview/pull/37) |
 | Release and support | in progress | [Release and support](release-and-support.md) | [#37](https://github.com/tcivie/eepview/pull/37) |
 | Coverage | shipped | [Coverage](coverage.md) | [#13](https://github.com/tcivie/eepview/pull/13) |
-| Score ratchet | shipped | [Score ratchet](score-ratchet.md) | [#40](https://github.com/tcivie/eepview/pull/40) |
 | Brand | shipped | [Brand](brand.md) | [#11](https://github.com/tcivie/eepview/pull/11), [#61](https://github.com/tcivie/eepview/pull/61) |
 | UI screenshots | shipped | [Brand: Screenshots](brand.md#screenshots) | [#61](https://github.com/tcivie/eepview/pull/61) |
 | UI components | shipped | [UI components](ui-components.md) | [#65](https://github.com/tcivie/eepview/pull/65) |
