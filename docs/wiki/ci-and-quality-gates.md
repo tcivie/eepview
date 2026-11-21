@@ -37,7 +37,8 @@ CI has two lanes. The fast lane runs on every pull request and gives a result in
   - `codeql (actions)`. It runs on every change, so every change keeps a static analysis result for the Scorecard SAST check.
   - `dco`. It checks that every commit has a `Signed-off-by` line that matches its author. Dependabot commits are skipped.
   - `dependency-review`. It fails a pull request that adds a dependency with a high severity advisory.
-- `dco` and `dependency-review` run on pull requests only. The other jobs of this list also run on a push to main.
+  - `score-ratchet (pr)`. See [Score ratchet](score-ratchet.md).
+- `dco`, `dependency-review` and `score-ratchet (pr)` run on pull requests only. The other jobs of this list also run on a push to main.
 - The `gate` job needs every other job of `ci.yml`. It runs with `always()`. It passes only when each job passed or was skipped. A skipped job means that its area did not change. A failed or cancelled job fails the gate. `always()` is there because a skipped gate would count as a pass.
 - Three settings make the lane fast:
   - `ci.yml` sets `CARGO_PROFILE_DEV_DEBUG=line-tables-only`. Panics keep `file:line`, and the build and the cache are smaller.
@@ -119,3 +120,4 @@ CI has two lanes. The fast lane runs on every pull request and gives a result in
 - 2026-10-03 — Run zizmor with the pedantic persona; document every workflow permission — [#47](https://github.com/tcivie/eepview/pull/47)
 - 2026-10-03 — docs-check: a feat PR needs a wiki change, and CHANGELOG.md is generated, not edited — [#50](https://github.com/tcivie/eepview/pull/50)
 - 2026-10-09 — Fast lane for pull requests, heavy lane for release branches — [#89](https://github.com/tcivie/eepview/pull/89)
+- 2026-11-21 — Remove the published score ratchet and its "Score dropped" issue. The PR job stays — [#109](https://github.com/tcivie/eepview/pull/109)

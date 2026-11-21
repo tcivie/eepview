@@ -1,0 +1,16 @@
+{
+  "scorecard_pr": {
+    "checks": {
+      "Binary-Artifacts": 10,
+      "Dangerous-Workflow": 10,
+      "Dependency-Update-Tool": 10,
+      "Fuzzing": 0,
+      "License": 9,
+      "Packaging": -1,
+      "Pinned-Dependencies": 10,
+      "SAST": 10,
+      "Security-Policy": 10,
+      "Token-Permissions": 10
+    }
+  }
+}
