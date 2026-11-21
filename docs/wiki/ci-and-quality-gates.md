@@ -72,7 +72,6 @@ CI has two lanes. The fast lane runs on every pull request and gives a result in
 
 - `.github/workflows/scorecard.yml` runs OpenSSF Scorecard, publishes the result and uploads the SARIF to code scanning.
 - `.github/workflows/fuzz.yml` runs ClusterFuzzLite on the cargo-fuzz targets every night and on demand. It does not run on pull requests. It is not a required check. See [Fuzzing](fuzzing.md).
-- `.github/workflows/score-ratchet.yml` keeps the `published` job of the [Score ratchet](score-ratchet.md).
 - `.github/workflows/docs-check.yml` runs the `docs-check` job. It stays its own workflow, because it must run again when the title of the pull request changes. The job (`scripts/docs-check.sh`) fails a `feat` PR that changes no page under `docs/wiki/`, and any PR that edits `CHANGELOG.md`. It also checks that every wiki page is indexed. `scripts/docs-check.test.sh` tests the check.
 - The old workflows `lint.yml`, `security.yml`, `codeql.yml`, `dco.yml`, `dependency-review.yml` and `leak.yml` are gone. Their jobs moved into `ci.yml` or `heavy.yml`.
 
@@ -121,3 +120,4 @@ CI has two lanes. The fast lane runs on every pull request and gives a result in
 - 2026-10-03 — Run zizmor with the pedantic persona; document every workflow permission — [#47](https://github.com/tcivie/eepview/pull/47)
 - 2026-10-03 — docs-check: a feat PR needs a wiki change, and CHANGELOG.md is generated, not edited — [#50](https://github.com/tcivie/eepview/pull/50)
 - 2026-10-09 — Fast lane for pull requests, heavy lane for release branches — [#89](https://github.com/tcivie/eepview/pull/89)
+- 2026-11-21 — Remove the published score ratchet and its "Score dropped" issue. The PR job stays — [#109](https://github.com/tcivie/eepview/pull/109)

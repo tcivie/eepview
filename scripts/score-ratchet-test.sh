@@ -2,7 +2,7 @@
 # SPDX-FileCopyrightText: 2026 The eepview contributors
 # SPDX-License-Identifier: MIT
 #
-# Test scripts/score-ratchet.sh with a fake docker and curl. Needs jq.
+# Test scripts/score-ratchet.sh with a fake docker. Needs jq.
 # Usage: scripts/score-ratchet-test.sh
 set -euo pipefail
 
@@ -35,7 +35,7 @@ run_pr() {
 
 out="$(run_pr)" || fail "pr mode failed with floors at or below the scores"
 grep -q 'raise the floor: scorecard/Fuzzing 0 -> 3' <<<"$out" || fail "no raise line for Fuzzing"
-jq -e '.scorecard_pr.checks.Fuzzing == 3 and .scorecard_pr.checks.License == 9 and .scorecard.score == 6.6' \
+jq -e '.scorecard_pr.checks.Fuzzing == 3 and .scorecard_pr.checks.License == 9' \
   <<<"${out#*Paste this into*:}" >/dev/null || fail "pr mode did not print the raised scorecard_pr floors"
 
 cp .github/score-floors.json "$tmp/floors.bak"

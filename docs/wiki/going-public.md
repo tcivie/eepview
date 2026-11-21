@@ -12,7 +12,7 @@ Status on 2026-10-03:
 | Dependency review | Done 2026-10-03 ([#26](https://github.com/tcivie/eepview/pull/26)) |
 | README badges | Done 2026-10-03 ([#26](https://github.com/tcivie/eepview/pull/26)). Best Practices badge is not added. |
 | `protect-main` required checks | Not done |
-| Best Practices registration | Not done. Owner action at bestpractices.dev. |
+| Best Practices registration | Done. Project [15180](https://www.bestpractices.dev/projects/15180). |
 | Release provenance check | Not done. Needs a release. |
 
 Do these steps on the day the repo goes public.
